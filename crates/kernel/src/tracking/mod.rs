@@ -26,13 +26,19 @@
 //! and on behalf of, operation, correlation and causation, role, app and
 //! plan version — from the ambient [`TrackingContext`], never from the
 //! caller. Events go to the outbox `kernel.tracked_events`
-//! (`CAMPBOOKS_TRACKING__SINK=outbox`) or nowhere (`none`, the default);
-//! publishing the outbox to a broker is campbooks-cloud#321.
+//! (`CAMPBOOKS_TRACKING__SINK=outbox` or `amqp`) or nowhere (`none`, the
+//! default). With `amqp`, the worker's [`Relay`] publishes the outbox to
+//! RabbitMQ (campbooks-cloud#321), and [`PruneTrackedEvents`] deletes the
+//! rows it published once their retention has passed.
 
 mod context;
 pub mod http;
+mod prune;
+pub mod relay;
 mod tracker;
 
+#[cfg(test)]
+mod relay_tests;
 #[cfg(test)]
 mod tests;
 
@@ -50,6 +56,8 @@ pub(crate) use context::{administrator, authenticated, for_job, origin};
               and the server's events, whatever the plan holds"
 )]
 pub use generated::*;
+pub use prune::PruneTrackedEvents;
+pub use relay::Relay;
 pub use tracker::Tracker;
 
 /// A tracked event: a type generated from the tracking plan. Never

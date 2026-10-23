@@ -261,6 +261,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
             handbook: handbook(),
             ..composition.assistant.clone()
         }),
+        campbooks_tasks::module(),
         campbooks_schedule::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
@@ -279,6 +280,10 @@ pub fn handbook() -> campbooks_assistant::Handbook {
         Section {
             module: campbooks_attention::NAME,
             text: campbooks_attention::HANDBOOK,
+        },
+        Section {
+            module: campbooks_tasks::NAME,
+            text: campbooks_tasks::HANDBOOK,
         },
         Section {
             module: campbooks_schedule::NAME,
@@ -302,7 +307,13 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
         .with_invitations(campbooks_workspaces::invitations())
-        .with_visibility(campbooks_conversations::visibility())
+        .with_visibility(Arc::new(campbooks_kernel::changes::Visibilities::new(
+            vec![
+                campbooks_conversations::visibility(),
+                campbooks_tasks::visibility(),
+            ],
+        )))
+        .with_open_tasks(campbooks_tasks::open_tasks())
         .with_preferences(campbooks_assistant::preferences())
         .with_kept_mail(campbooks_conversations::kept_mail())
         .with_outbound(campbooks_conversations::outbound_requests())
@@ -471,6 +482,9 @@ fn security_scheme() -> SecurityScheme {
             calendars you connect and your own Campbooks calendar, where Scout puts the dated \
             things it reads in your email. Events have a kind; free time is answered from your \
             working hours."),
+        (name = "tasks", description = "What you have to do: your tasks, with a due date, a \
+            plan (a day, or Later), a hand-off to one teammate and an undo for every change. \
+            Personal: a task is seen by who it is with, and by who handed it off."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \
@@ -793,7 +807,13 @@ mod tests {
         let modules: Vec<&str> = handbook.sections().iter().map(|s| s.module).collect();
         assert_eq!(
             modules,
-            ["assistant", "conversations", "attention", "schedule"]
+            [
+                "assistant",
+                "conversations",
+                "attention",
+                "tasks",
+                "schedule"
+            ]
         );
         for section in handbook.sections() {
             assert!(
@@ -1193,6 +1213,18 @@ mod tests {
             (false, true, false, false, false),
             "`{role}` only appends to {append_only}"
         );
+        // The relay, the prune, the backlog sample and the purge reach it
+        // through the kernel's functions only (campbooks-cloud#321).
+        for function in OUTBOX_FUNCTIONS {
+            let granted: bool =
+                sqlx::query_scalar("SELECT has_function_privilege($1, $2, 'EXECUTE')")
+                    .bind(role)
+                    .bind(function)
+                    .fetch_one(&db)
+                    .await
+                    .unwrap();
+            assert!(granted, "`{role}` may call {function}");
+        }
         for table in at_deploy {
             let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
                 "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
@@ -1274,6 +1306,16 @@ mod tests {
             "`{role}` reaches schema `bff` through these"
         );
     }
+
+    /// The functions the runtime role reaches the tracked events outbox
+    /// through (campbooks-cloud#321).
+    const OUTBOX_FUNCTIONS: [&str; 5] = [
+        "kernel.claim_tracked_events(integer)",
+        "kernel.mark_tracked_events_published(uuid[])",
+        "kernel.tracked_events_backlog()",
+        "kernel.prune_tracked_events(integer, integer)",
+        "kernel.purge_workspace_tracked_events(text, integer)",
+    ];
 
     /// The web sign-in's tables (campbooks-cloud#212).
     const BFF_TABLES: [&str; 3] = [
@@ -1652,6 +1694,8 @@ mod tests {
             // `kernel.purge_workspace_idempotency` (campbooks-cloud#65).
             ("kernel.idempotency", "DELETE, SELECT"),
             ("kernel.rate_limits", "DELETE, INSERT, SELECT, UPDATE"),
+            // The tracked events outbox's functions (campbooks-cloud#321).
+            ("kernel.tracked_events", "DELETE, SELECT, UPDATE"),
         ]
         .map(|(table, privileges)| (table.to_owned(), privileges.to_owned()));
         assert_eq!(

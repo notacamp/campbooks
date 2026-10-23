@@ -34,6 +34,11 @@ pub const REGISTRY: &[AboutType] = &[
         reads: &["conversations.get", "conversations.get_history"],
         id_param: "conversation_id",
     },
+    AboutType {
+        record_type: "tasks.task",
+        reads: &["tasks.get"],
+        id_param: "task_id",
+    },
     // An event of the member's calendar, and what Scout read in the email it
     // came from (the second read is made only when the event has a source
     // message, and only if the member can still read it).
@@ -138,6 +143,7 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
             let detail = answers.first().unwrap_or(&Value::Null);
             project::conversation(detail, answers.get(1))
         }
+        "tasks.task" => project::task_detail(answers.first().unwrap_or(&Value::Null)),
         "schedule.event" => {
             let detail = answers.first().unwrap_or(&Value::Null);
             project::event(detail, answers.get(1))

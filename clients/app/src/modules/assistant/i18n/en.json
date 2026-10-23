@@ -301,7 +301,9 @@
       "my_calendar_one": "Looked at your calendar: {{count}} event",
       "my_calendar_other": "Looked at your calendar: {{count}} events",
       "free_time": "Looked for free time",
-      "read_event": "Read an event of your calendar"
+      "read_event": "Read an event of your calendar",
+      "my_tasks": "Read your tasks",
+      "read_task": "Read a task"
     },
     "working": {
       "find_conversations": "Looking for conversations…",
@@ -312,7 +314,9 @@
       "my_inboxes": "Reading your inboxes…",
       "my_calendar": "Looking at your calendar…",
       "free_time": "Looking for free time…",
-      "read_event": "Reading the event…"
+      "read_event": "Reading the event…",
+      "my_tasks": "Reading your tasks…",
+      "read_task": "Reading the task…"
     },
     "proposal": {
       "label": "Scout proposes",

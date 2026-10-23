@@ -108,6 +108,34 @@ describe("UndoProvider", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Undone: Done · Sofia");
   });
 
+  it("offers a second action beside Undo and closes the toast when it runs", () => {
+    const run = vi.fn();
+    function WithOpen() {
+      const undo = useUndoToast();
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            undo.push({ label: "Added", undo: vi.fn(), open: { label: "Open", run } });
+          }}
+        >
+          make
+        </button>
+      );
+    }
+    renderUi(
+      <UndoProvider>
+        <WithOpen />
+      </UndoProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "make" }));
+    expect(screen.getByRole("button", { name: /^Undo/ })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Open" })).toBeNull();
+  });
+
   it("undoes the latest action with Z, stack-wise", () => {
     renderUi(
       <UndoProvider>

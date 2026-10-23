@@ -24,6 +24,7 @@ import {
   Visor,
   type OverflowAction,
 } from "~/lib/ui";
+import { MakeTaskForm } from "~/modules/tasks";
 
 import {
   useConversation,
@@ -122,6 +123,7 @@ export function ConversationReader({
   const { t: typed, i18n } = useTranslation("conversations");
   const t = typed as unknown as Translate;
   const { t: tShortcuts } = useTranslation("shortcuts");
+  const { t: tTasks } = useTranslation("tasks");
   const query = useConversation(workspaceId, conversationId);
   const detail = query.data;
   const conversation = detail?.conversation;
@@ -174,6 +176,8 @@ export function ConversationReader({
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState(false);
+  // "Make it a task": the inline form under the subject.
+  const [makingTask, setMakingTask] = useState(false);
   const [reply, setReply] = useState<ReplyRequest | null>(null);
   // Reply first asks Scout (the reply dialog).
   const [replying, setReplying] = useState<{ opened: number } | undefined>();
@@ -349,8 +353,16 @@ export function ConversationReader({
     },
     { enabled: viewing },
   );
+  // N T: a task from this email (the same key that adds one in Tasks).
+  useShortcut(
+    "tasks.create",
+    () => {
+      setMakingTask(true);
+    },
+    { enabled: viewing && !binned },
+  );
   useShortcut("overlay.close", onBack, {
-    enabled: !moving && replying === undefined && trusting === null,
+    enabled: !moving && replying === undefined && trusting === null && !makingTask,
   });
   // J/K step between conversations; the arrows keep scrolling this one.
   useShortcut("list.next", onNext, { alternates: false });
@@ -549,6 +561,19 @@ export function ConversationReader({
             actions.toggleStar(conversation);
           },
         },
+        ...(binned
+          ? []
+          : [
+              {
+                id: "task",
+                label: tTasks("make.button"),
+                icon: "tasks" as const,
+                shortcut: "tasks.create" as const,
+                onSelect: () => {
+                  setMakingTask(true);
+                },
+              },
+            ]),
         {
           id: "read",
           label: unread ? t("actions.read") : t("actions.unread"),
@@ -641,6 +666,19 @@ export function ConversationReader({
             ]}
           />
         </div>
+        {makingTask ? (
+          <MakeTaskForm
+            key={conversation.id}
+            workspaceId={workspaceId}
+            conversationId={conversation.id}
+            subject={conversation.subject}
+            senderAddress={newestInbound?.from.address}
+            now={now}
+            onClose={() => {
+              setMakingTask(false);
+            }}
+          />
+        ) : null}
         {kept ? (
           <Banner icon="archive" role="status" title={t("reader.kept.title")}>
             {t("reader.kept.lead", { address: inbox.address })}

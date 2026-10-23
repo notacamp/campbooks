@@ -26,6 +26,21 @@ export const Default: Story = {
   },
 };
 
+/** Something made that can be taken back or opened: both in one style. */
+export const WithOpen: Story = {
+  args: {
+    children: "Added to your tasks",
+    action: (
+      <>
+        <Button variant="primary" shortcut="undo">
+          Undo
+        </Button>
+        <Button variant="primary">Open</Button>
+      </>
+    ),
+  },
+};
+
 /** A failure that needs you: wraps, uses the alert visor, announced assertively. */
 export const Alert: Story = {
   args: {

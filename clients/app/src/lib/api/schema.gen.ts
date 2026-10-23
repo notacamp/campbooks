@@ -835,24 +835,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** What Scout read in a message. */
-        get: operations["conversations.get_message_read"];
-        put?: never;
-        /** Queue Scout's read of a message, when it has none. */
-        post: operations["conversations.request_message_read"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
         parameters: {
             query?: never;
@@ -1661,164 +1643,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/w/{workspace_id}/schedule/calendars": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List your calendars. */
-        get: operations["schedule.list_calendars"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/schedule/calendars/{calendar_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Turn a calendar on or off, or colour it. */
-        patch: operations["schedule.update_calendar"];
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/schedule/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List your events and occurrences in a window. */
-        get: operations["schedule.list_events"];
-        put?: never;
-        /** Make an event. */
-        post: operations["schedule.create_event"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/schedule/events/{event_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read one event. */
-        get: operations["schedule.get_event"];
-        put?: never;
-        post?: never;
-        /** Delete an event (a series is deleted whole), with an undo. */
-        delete: operations["schedule.delete_event"];
-        options?: never;
-        head?: never;
-        /** Change an event or one occurrence of a series. */
-        patch: operations["schedule.update_event"];
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/schedule/events/{event_id}/push": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Add an event of your Campbooks calendar to one of your provider calendars. */
-        post: operations["schedule.push_event"];
-        /** Take an event added to a provider calendar away again. */
-        delete: operations["schedule.unpush_event"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/schedule/events/{event_id}/response": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Answer an invitation. */
-        post: operations["schedule.respond_event"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/schedule/events/{event_id}/restore": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Bring a deleted event back. */
-        post: operations["schedule.restore_event"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/schedule/free-slots": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** When you are free. */
-        get: operations["schedule.free_slots"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/schedule/settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Your calendar settings. */
-        get: operations["schedule.get_settings"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Change your calendar settings. */
-        patch: operations["schedule.update_settings"];
-        trace?: never;
-    };
     "/api/v1/w/{workspace_id}/search": {
         parameters: {
             query?: never;
@@ -1881,6 +1705,144 @@ export interface paths {
         get: operations["conversations.list_streams"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List your tasks. */
+        get: operations["tasks.list"];
+        put?: never;
+        /** Make a task. */
+        post: operations["tasks.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a task. */
+        get: operations["tasks.get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a task's title, verb or due date. */
+        patch: operations["tasks.update"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a task done (paid, for a bill). */
+        post: operations["tasks.done"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/hand_off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hand an open task to a teammate. */
+        post: operations["tasks.hand_off"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/not_needed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a task not needed. */
+        post: operations["tasks.not_needed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan a task: a day, Later, or nothing. */
+        post: operations["tasks.plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open a closed task again, with its plan. */
+        post: operations["tasks.reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/take_back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back a task you handed to someone, while it is open. */
+        post: operations["tasks.take_back"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2481,24 +2443,11 @@ export interface components {
             /** @description The connection's id (a `connectors.connection`). */
             connection: string;
         };
-        /** @description An amount of money, in minor units. */
-        Amount: {
-            /** @description The ISO 4217 currency code. */
-            currency: string;
-            /**
-             * Format: int64
-             * @description Minor units (cents).
-             */
-            minor: number;
-        };
-        /** @description Your answer. */
+        /** @description The person's answer. */
         Answer: {
-            /**
-             * @description `accepted`, `tentative` or `declined` (a provider is never told
-             *     `needs_action`: it only takes an answer back to "not answered" on
-             *     events kept on Campbooks).
-             */
-            response: components["schemas"]["Response"];
+            /** @description Allow or deny. */
+            decision: components["schemas"]["Decision"];
+            workspace_id?: components["schemas"]["WorkspaceId"] | null;
         };
         /** @description "Not now" or "Don't suggest this". */
         AnswerRuleNotice: {
@@ -2507,12 +2456,13 @@ export interface components {
         };
         /** @description An answer's value: a label (choice), a level (score) or yes/no. */
         AnswerView: boolean | number | string;
-        /** @description Your answer, and the one before it. */
+        /** @description Where to go next. */
         Answered: {
-            /** @description The event afterwards. */
-            event: components["schemas"]["EventView"];
-            /** @description The answer before this one: send it back as `response` to undo. */
-            previous_response: components["schemas"]["Response"];
+            /**
+             * @description Navigate here: the app's redirect URI, with a code or
+             *     `error=access_denied`.
+             */
+            redirect: string;
         };
         /** @description A filter the query applied, for chips. */
         AppliedFilter: {
@@ -2621,20 +2571,6 @@ export interface components {
             /** @description `required`. */
             userVerification: string;
         };
-        BTreeMap: {
-            [key: string]: {
-                /**
-                 * @description `HH:MM`, after the start.
-                 * @example 18:00
-                 */
-                end: string;
-                /**
-                 * @description `HH:MM`, 24 hours.
-                 * @example 09:00
-                 */
-                start: string;
-            }[];
-        };
         BackchannelLogout: {
             /** @description The identity provider's signed logout token. */
             logout_token: string;
@@ -2644,53 +2580,6 @@ export interface components {
          * @enum {string}
          */
         Cadence: "daily" | "weekly" | "monthly";
-        /**
-         * Format: uuid
-         * @description CalendarId (UUIDv7)
-         */
-        CalendarId: string;
-        /** @description The member's calendars. */
-        CalendarList: {
-            /** @description Their Campbooks calendar first, then the others by name. */
-            calendars: components["schemas"]["CalendarView"][];
-        };
-        /** @description What to change of a calendar. */
-        CalendarPatch: {
-            /** @description Its colour as `#rrggbb`; empty goes back to the provider's. */
-            color?: string | null;
-            /**
-             * @description Show its events (a provider calendar only). Turning it on asks
-             *     connectors to read it again from the start.
-             */
-            syncing?: boolean | null;
-        };
-        /**
-         * @description Where a calendar lives.
-         * @enum {string}
-         */
-        CalendarSource: "campbooks" | "provider";
-        /** @description A calendar of the member. */
-        CalendarView: {
-            /** @description Its colour, `#rrggbb`, when the provider gave one. */
-            color?: string | null;
-            /** @description The calendar. */
-            id: components["schemas"]["CalendarId"];
-            /**
-             * @description Its name.
-             * @example Family
-             */
-            name: string;
-            /** @description Whether it is the account's primary calendar. */
-            primary: boolean;
-            /** @description Their Campbooks calendar, or one of a connected provider account. */
-            source: components["schemas"]["CalendarSource"];
-            /** @description Whether its events are shown (the Campbooks calendar always is). */
-            syncing: boolean;
-            /** @description Its IANA time zone, when known. */
-            time_zone?: string | null;
-            /** @description Whether events may be created and changed on it. */
-            writable: boolean;
-        };
         /** @description Someone the sentence names without an address. */
         Candidate: {
             /** @description Their address. */
@@ -2816,7 +2705,7 @@ export interface components {
          * @description A tool Scout used. Each reads as the member, and changes nothing.
          * @enum {string}
          */
-        ChatTool: "find_conversations" | "read_conversation" | "conversation_history" | "find_people" | "what_needs_me" | "my_inboxes" | "my_calendar" | "free_time" | "read_event";
+        ChatTool: "find_conversations" | "read_conversation" | "conversation_history" | "find_people" | "what_needs_me" | "my_inboxes" | "my_tasks" | "read_task";
         /** @description A chat and its messages, oldest first. */
         ChatView: {
             about?: components["schemas"]["RecordRef"] | null;
@@ -3326,13 +3215,6 @@ export interface components {
              */
             wrote: number;
         };
-        /** @description A calendar whose events were counted. */
-        CountedCalendar: {
-            /** @description The calendar. */
-            id: components["schemas"]["CalendarId"];
-            /** @description Its name. */
-            name: string;
-        };
         /** @description A rule to create. */
         CreateRule: {
             /** @description What it does. */
@@ -3479,13 +3361,6 @@ export interface components {
             threshold?: number | null;
             /** @description The answer. */
             value: components["schemas"]["AnswerView"];
-        };
-        /** @description A deleted event. */
-        DeletedEvent: {
-            /** @description The event. */
-            id: components["schemas"]["EventId"];
-            /** @description Sent to `schedule.restore_event` to bring it back. */
-            undo_token: string;
         };
         /**
          * @description Whether a message came in or went out.
@@ -3661,125 +3536,15 @@ export interface components {
             /** @description Returned unchanged. */
             state?: string | null;
         };
-        /**
-         * Format: uuid
-         * @description EventId (UUIDv7)
-         */
-        EventId: string;
-        /**
-         * @description What kind of dated thing an event is. A fixed set: obligations (pay by,
-         *     submit by, renew by) are never events, they are asks owned by `tasks`.
-         * @enum {string}
-         */
-        EventKind: "charge" | "appointment" | "meeting" | "travel" | "stay" | "show" | "reservation" | "delivery" | "expiry" | "hold" | "none";
-        /** @description Events, earliest first. */
-        EventList: {
-            /** @description The events and occurrences. */
-            events: components["schemas"]["EventView"][];
-            /** @description Whether more matched than `limit` allowed. */
-            truncated: boolean;
-        };
-        /**
-         * @description Why an event does not show what its member last asked for.
-         * @enum {string}
-         */
-        EventNotice: "kept_theirs" | "not_saved";
-        /**
-         * @description Who made an event.
-         * @enum {string}
-         */
-        EventOrigin: "provider" | "member" | "scout";
-        /**
-         * @description What to change. Leave out what stays; an empty string clears `place`,
-         *     `notes` and `time_zone`.
-         */
-        EventPatch: {
-            /** @description Whether it counts when free time is worked out. */
-            busy?: boolean | null;
-            /** @description A new end, in the same form. */
-            ends?: string | null;
-            kind?: components["schemas"]["EventKind"] | null;
-            /** @description New notes. */
-            notes?: string | null;
-            /** @description A new place. */
-            place?: string | null;
+        /** @description Who to hand it to. */
+        HandOffTo: {
             /**
-             * @description A new start (an RFC 3339 time with an offset, or a date for an all-day
-             *     event). The event keeps its length unless `ends` is given too.
+             * Format: int64
+             * @description The revision you saw.
              */
-            starts?: string | null;
-            /** @description A new IANA time zone. */
-            time_zone?: string | null;
-            /** @description A new title. */
-            title?: string | null;
-        };
-        /**
-         * @description Whether an event stands.
-         * @enum {string}
-         */
-        EventStatus: "confirmed" | "tentative" | "cancelled";
-        /** @description An event, or one occurrence of a series. */
-        EventView: {
-            /** @description Whether it lasts whole days. */
-            all_day: boolean;
-            /** @description Whether it counts when free time is worked out. */
-            busy: boolean;
-            /** @description Its calendar. */
-            calendar_id: components["schemas"]["CalendarId"];
-            /**
-             * @description When it ends, in the same form (exclusive for an all-day event).
-             * @example 2026-11-06T11:55:00+00:00
-             */
-            ends: string;
-            /** @description How Scout found it, when Scout added it: `structured` or `model`. */
-            found_by?: string | null;
-            /** @description The event (a series and its occurrences share it). */
-            id: components["schemas"]["EventId"];
-            /** @description What kind of dated thing it is. */
-            kind: components["schemas"]["EventKind"];
-            /** @description Notes. */
-            notes?: string | null;
-            notice?: components["schemas"]["EventNotice"] | null;
-            /** @description For an occurrence, the name to change it by (`?occurrence=`). */
-            occurrence?: string | null;
-            /** @description Whether it is on a provider calendar and exists there. */
-            on_provider: boolean;
-            /** @description Who made it. */
-            origin: components["schemas"]["EventOrigin"];
-            /** @description Whether your last change still waits to reach the provider. */
-            pending: boolean;
-            /** @description Where it is. */
-            place?: string | null;
-            /** @description Whether it is an occurrence of a series. */
-            recurring: boolean;
-            response?: components["schemas"]["Response"] | null;
-            source?: components["schemas"]["RecordRef"] | null;
-            /** @description The conversation of that email, when known. */
-            source_conversation?: string | null;
-            /**
-             * @description When it starts: an RFC 3339 time with the offset of the member's time
-             *     zone, or a `YYYY-MM-DD` date when it is all-day.
-             * @example 2026-11-06T07:40:00+00:00
-             */
-            starts: string;
-            /** @description Whether it stands. */
-            status: components["schemas"]["EventStatus"];
-            /** @description The IANA zone it was written in, when it has one. */
-            time_zone?: string | null;
-            /**
-             * @description Its title.
-             * @example Flight LIS → AMS
-             */
-            title: string;
-        };
-        /** @description When you are free. */
-        FreeSlotList: {
-            /** @description The calendars whose events were counted as busy. */
-            calendars: components["schemas"]["CountedCalendar"][];
-            /** @description Earliest first. */
-            slots: components["schemas"]["SlotView"][];
-            /** @description The time zone the working hours and the times are in. */
-            time_zone: string;
+            revision: number;
+            /** @description A member of the workspace. */
+            to: components["schemas"]["UserId"];
         };
         /** @description A header test: present, or equal to a value. */
         HeaderCondition: {
@@ -4004,6 +3769,11 @@ export interface components {
              */
             verdict: string;
         };
+        /**
+         * Format: uuid
+         * @description HistoryId (UUIDv7)
+         */
+        HistoryId: string;
         /** @description One result: a record the caller may open, with what a list row shows. */
         Hit: {
             /** @description Its container (an inbox). */
@@ -4166,12 +3936,6 @@ export interface components {
          * @description ItemId (UUIDv7)
          */
         ItemId: string;
-        /**
-         * @description What kind of thing that happens at a time a read of a message found
-         *     (campbooks-cloud#42). Obligations are not items: they are asks.
-         * @enum {string}
-         */
-        ItemKind: "charge" | "appointment" | "meeting" | "travel" | "stay" | "show" | "reservation" | "delivery" | "expiry";
         /**
          * @description Whether an item still needs someone.
          * @enum {string}
@@ -4358,33 +4122,6 @@ export interface components {
          * @description MessageId (UUIDv7)
          */
         MessageId: string;
-        /** @description What Scout read in a message. */
-        MessageReadView: {
-            /** @description The obligations found. */
-            asks: components["schemas"]["ReadAsk"][];
-            /**
-             * @description Whether Scout can read this message for dates: the pass said it tells
-             *     of something dated and the sender's own data did not cover it.
-             */
-            can_read: boolean;
-            /**
-             * @description The kind of dated thing the pass named, when it flagged the message
-             *     and no `complete` role may read mail here (the reader offers to add it
-             *     by hand).
-             */
-            dated_kind?: string | null;
-            /** @description Whether the decide pass flagged the message for a read. */
-            flagged: boolean;
-            /** @description The things that happen at a time found, the sender's data first. */
-            items: components["schemas"]["ReadItem"][];
-            /**
-             * @description The readers that produced a read: the sender's own data
-             *     (`structured`), and Scout's call (`model`).
-             */
-            layers: components["schemas"]["ReadLayer"][];
-            /** @description Where the model's read is. */
-            status: components["schemas"]["ReadStatus"];
-        };
         /** @description A message's plain-text body. */
         MessageText: {
             /** @description The text, up to 256 KiB. */
@@ -4560,40 +4297,33 @@ export interface components {
             /** @description Recipients, instead of the filled ones. */
             to?: components["schemas"]["Address"][] | null;
         };
-        /** @description An event to make. */
-        NewEvent: {
-            /** @description Whether it counts when free time is worked out (default yes). */
-            busy?: boolean | null;
-            calendar_id?: components["schemas"]["CalendarId"] | null;
-            /**
-             * @description When it ends, in the same form (exclusive for a date). An hour (or a
-             *     day) after the start when left out.
-             */
-            ends?: string | null;
-            kind?: components["schemas"]["EventKind"] | null;
-            /** @description Notes. */
-            notes?: string | null;
-            /** @description Where it is. */
-            place?: string | null;
-            /**
-             * @description When it starts: an RFC 3339 time with an offset, or a `YYYY-MM-DD`
-             *     date for an all-day event.
-             * @example 2026-11-12T15:00:00+00:00
-             */
-            starts: string;
-            /** @description The IANA time zone it is written in (default: yours). */
-            time_zone?: string | null;
-            /**
-             * @description What to call it.
-             * @example Dentist
-             */
-            title: string;
-        };
         /**
          * @description Whether a new rule should act now or wait for a yes.
          * @enum {string}
          */
         NewRuleState: "active" | "proposed";
+        /** @description A new task. */
+        NewTask: {
+            /**
+             * Format: date-time
+             * @description The time it is due; needs `due_on`, its local day.
+             */
+            due_at?: string | null;
+            /**
+             * Format: date
+             * @description The day it is due.
+             */
+            due_on?: string | null;
+            source?: components["schemas"]["RecordRef"] | null;
+            /**
+             * @description The address of the source's sender, kept to recognise the same
+             *     sender's other tasks.
+             */
+            source_sender?: string | null;
+            /** @description What to do: 1 to 200 characters. */
+            title: string;
+            verb?: components["schemas"]["TaskVerb"] | null;
+        };
         /**
          * @description Why there is nothing to offer.
          * @enum {string}
@@ -4734,6 +4464,26 @@ export interface components {
          * @enum {string}
          */
         Phase: "backfill" | "incremental" | "resync";
+        /** @description The plan the task should have. */
+        PlanTask: {
+            /**
+             * Format: date-time
+             * @description Later than now and less than a year away, for `later`.
+             */
+            later_until?: string | null;
+            /** @description `none`, `date` or `later`. */
+            plan: components["schemas"]["TaskPlan"];
+            /**
+             * Format: date
+             * @description The day, for `date`.
+             */
+            plan_on?: string | null;
+            /**
+             * Format: int64
+             * @description The revision you saw.
+             */
+            revision: number;
+        };
         /** @description A rule to preview. */
         PreviewRule: {
             /** @description What it would do. */
@@ -4988,11 +4738,6 @@ export interface components {
          * @enum {string}
          */
         Provider: "google" | "zoho" | "imap";
-        /** @description Where to add it. */
-        PushTo: {
-            /** @description One of your provider calendars that can be written. */
-            calendar_id: components["schemas"]["CalendarId"];
-        };
         /** @description Something in the query that was not understood. */
         QueryWarning: {
             /** @description `unknown_operator`, `empty_value` or `invalid_value`. */
@@ -5015,79 +4760,6 @@ export interface components {
             /** @description The sentence, at most 240 characters. */
             text: string;
         };
-        /** @description An obligation of the reader, dated or not. */
-        ReadAsk: {
-            amount?: components["schemas"]["Amount"] | null;
-            /** @description By when: a date, or an RFC 3339 time with an offset. */
-            due?: string | null;
-            /**
-             * @description Stable for the same message, layer and position
-             *     (`<message>:<layer>:ask:<n>`).
-             */
-            key: string;
-            /** @description The sentence that asks, as written (a model read only). */
-            quote?: string | null;
-            /** @description The reference of an open task this ask repeats. */
-            same_as?: string | null;
-            /** @description What to do, at most 80 characters. */
-            title: string;
-            /** @description Do something, or pay something. */
-            verb: components["schemas"]["Verb"];
-        };
-        /** @description Something of the reader's that happens at a time. */
-        ReadItem: {
-            /** @description Whether it lasts whole days. */
-            all_day: boolean;
-            /** @description The key of an earlier item of the conversation that this one cancels. */
-            cancels?: string | null;
-            /** @description When it ends, if the message says. */
-            ends?: string | null;
-            /**
-             * @description Stable for the same message, layer and position
-             *     (`<message>:<layer>:item:<n>`).
-             */
-            key: string;
-            /** @description What kind of thing it is. */
-            kind: components["schemas"]["ItemKind"];
-            /** @description Where, at most 120 characters. */
-            place?: string | null;
-            /** @description The sentence that gives its date, as written (a model read only). */
-            quote?: string | null;
-            /**
-             * Format: int64
-             * @description That event's `SEQUENCE`.
-             */
-            sequence?: number | null;
-            /**
-             * @description When it starts: an RFC 3339 time with an offset, or a date when
-             *     all-day.
-             */
-            starts: string;
-            /** @description The IANA time zone it is in, when the message says. */
-            time_zone?: string | null;
-            /** @description What it is, at most 80 characters; never the subject. */
-            title: string;
-            /** @description The `UID` of the iCalendar event it came from, if it came from one. */
-            uid?: string | null;
-            /** @description The key of an earlier item of the conversation that this one changes. */
-            updates?: string | null;
-        };
-        /**
-         * @description Which reader produced a read: the sender's own machine-readable data,
-         *     or Scout's one `complete` call.
-         * @enum {string}
-         */
-        ReadLayer: "structured" | "model";
-        /** @description What asking for the read did. */
-        ReadRequested: {
-            /** @description The outcome. */
-            outcome: components["schemas"]["Outcome"];
-        };
-        /**
-         * @description Where the model's read of a message is.
-         * @enum {string}
-         */
-        ReadStatus: "none" | "queued" | "failed" | "done";
         /**
          * @description Why an item needs someone, in the order Home shows the groups.
          * @enum {string}
@@ -5306,16 +4978,6 @@ export interface components {
             message_id: components["schemas"]["MessageId"];
             /** @description Done, Not needed, or for a Pay need Already paid or Still to pay. */
             outcome: components["schemas"]["Outcome"];
-        };
-        /**
-         * @description The member's answer to an invitation.
-         * @enum {string}
-         */
-        Response: "needs_action" | "accepted" | "tentative" | "declined";
-        /** @description The token a delete gave. */
-        Restore: {
-            /** @description The `undo_token` of `schedule.delete_event`. */
-            undo_token: string;
         };
         /** @description How to bring a removed rule back. */
         RestoreRule: {
@@ -5892,45 +5554,6 @@ export interface components {
              */
             note: string;
         };
-        /** @description What to change of the settings. Leave out what stays. */
-        SettingsPatch: {
-            /**
-             * @description Per kind, the provider calendar an event is also added to, replacing
-             *     the old map: a kind left out is taken off.
-             */
-            also_add_to?: {
-                [key: string]: components["schemas"]["CalendarId"];
-            } | null;
-            /**
-             * @description The time zone of the device, sent once: it is taken only when the
-             *     member has no time zone yet, and ignored after.
-             */
-            device_time_zone?: string | null;
-            /** @description The kinds Scout adds. */
-            scout_kinds?: components["schemas"]["EventKind"][] | null;
-            /** @description A new time zone (an IANA name). */
-            time_zone?: string | null;
-            working_hours?: components["schemas"]["BTreeMap"] | null;
-        };
-        /** @description A member's settings. */
-        SettingsView: {
-            /** @description Per kind, the provider calendar an event is also added to. */
-            also_add_to: {
-                [key: string]: components["schemas"]["CalendarId"];
-            };
-            /** @description The zone times are shown in: theirs, or UTC. */
-            effective_time_zone: string;
-            last_push_calendar?: components["schemas"]["CalendarId"] | null;
-            /** @description The kinds Scout adds to their Campbooks calendar. */
-            scout_kinds: components["schemas"]["EventKind"][];
-            /** @description Their IANA time zone; empty until they or their device set it. */
-            time_zone?: string | null;
-            /**
-             * @description Working hours by weekday (`mon` … `sun`), a missing day being a day
-             *     off. Monday to Friday 09:00–18:00 until they set some.
-             */
-            working_hours: components["schemas"]["BTreeMap"];
-        };
         /** @description What the member did with a card. */
         SettleProposal: {
             /**
@@ -5987,13 +5610,6 @@ export interface components {
              *     every user of an `open` instance.
              */
             restricted: boolean;
-        };
-        /** @description A free stretch. */
-        SlotView: {
-            /** @description When it ends. */
-            ends: string;
-            /** @description When it starts: RFC 3339 with the offset of your time zone. */
-            starts: string;
         };
         /** @description Until when. */
         Snooze: {
@@ -6188,6 +5804,196 @@ export interface components {
             streams: number;
         };
         /**
+         * @description Who made a change.
+         * @enum {string}
+         */
+        TaskActor: "member" | "scout" | "calendar";
+        /**
+         * @description What changed: the event's `change` and the history's `what`.
+         * @enum {string}
+         */
+        TaskChange: "created" | "edited" | "due_changed" | "planned" | "done" | "not_needed" | "reopened" | "handed_off" | "taken_back";
+        /** @description A task and its history. */
+        TaskDetail: {
+            /** @description What changed in it, oldest first. */
+            history: components["schemas"]["TaskHistoryEntry"][];
+            /** @description The task. */
+            task: components["schemas"]["TaskView"];
+        };
+        /**
+         * @description A field `tasks.update` changed.
+         * @enum {string}
+         */
+        TaskEditedField: "title" | "task_verb" | "due";
+        /**
+         * @description What a history entry holds besides its kind: ids, enums and dates only,
+         *     never a title.
+         */
+        TaskHistoryDetail: {
+            /**
+             * Format: date
+             * @description The due day afterwards.
+             */
+            due_on?: string | null;
+            /** @description The fields an edit changed. */
+            fields?: components["schemas"]["TaskEditedField"][];
+            /**
+             * Format: date-time
+             * @description When Later ends.
+             */
+            later_until?: string | null;
+            member?: components["schemas"]["UserId"] | null;
+            plan?: components["schemas"]["TaskPlan"] | null;
+            /**
+             * Format: date
+             * @description The planned day.
+             */
+            plan_on?: string | null;
+        };
+        /** @description One entry of a task's history. */
+        TaskHistoryEntry: {
+            /** @description Who: the member, Scout or the calendar. */
+            actor: components["schemas"]["TaskActor"];
+            actor_member?: components["schemas"]["UserId"] | null;
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @description Ids, enums and dates of the change. */
+            detail: components["schemas"]["TaskHistoryDetail"];
+            /** @description The entry. */
+            id: components["schemas"]["HistoryId"];
+            /** @description What changed. */
+            what: components["schemas"]["TaskChange"];
+        };
+        /**
+         * Format: uuid
+         * @description TaskId (UUIDv7)
+         */
+        TaskId: string;
+        /** @description The caller's tasks. */
+        TaskList: {
+            /** @description In order: overdue first, then by due date and time, then undated. */
+            tasks: components["schemas"]["TaskView"][];
+        };
+        /**
+         * @description How the task came to be.
+         * @enum {string}
+         */
+        TaskOrigin: "own" | "ask" | "deadline";
+        /**
+         * @description When the member will do it.
+         * @enum {string}
+         */
+        TaskPlan: "none" | "date" | "later";
+        /**
+         * @description The revision of a task the caller saw, for a change that needs nothing
+         *     else.
+         */
+        TaskRevision: {
+            /**
+             * Format: int64
+             * @description The revision you saw.
+             */
+            revision: number;
+        };
+        /**
+         * @description Whether it still needs doing.
+         * @enum {string}
+         */
+        TaskState: "open" | "done" | "not_needed";
+        /** @description The task as it should become. */
+        TaskUpdate: {
+            /**
+             * Format: date-time
+             * @description The time it is due; needs `due_on`.
+             */
+            due_at?: string | null;
+            /**
+             * Format: date
+             * @description The day it is due; none clears it.
+             */
+            due_on?: string | null;
+            /**
+             * Format: int64
+             * @description The revision you saw.
+             */
+            revision: number;
+            /** @description What to do: 1 to 200 characters. */
+            title: string;
+            /** @description Do or Pay. */
+            verb: components["schemas"]["TaskVerb"];
+        };
+        /**
+         * @description What kind of thing it is: something to do, or a bill to pay.
+         * @enum {string}
+         */
+        TaskVerb: "do" | "pay";
+        /** @description A task, as the caller sees it. */
+        TaskView: {
+            /** @description The member it is with. */
+            assignee: components["schemas"]["UserId"];
+            /**
+             * Format: date-time
+             * @description When it was closed.
+             */
+            closed_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When it was made.
+             */
+            created_at: string;
+            /** @description The member who made it. */
+            created_by: components["schemas"]["UserId"];
+            /**
+             * Format: date-time
+             * @description The time it is due, when it has one (`due_on` is its local day).
+             */
+            due_at?: string | null;
+            /**
+             * Format: date
+             * @description The day it is due.
+             */
+            due_on?: string | null;
+            handed_by?: components["schemas"]["UserId"] | null;
+            /** @description The task. */
+            id: components["schemas"]["TaskId"];
+            /**
+             * Format: date-time
+             * @description When Later ends, for `later`.
+             */
+            later_until?: string | null;
+            /** @description How it came to be. */
+            origin: components["schemas"]["TaskOrigin"];
+            /** @description Whether it is open and its due day has passed (the caller's today). */
+            overdue: boolean;
+            /** @description The plan. A Later that has ended reads as `none`. */
+            plan: components["schemas"]["TaskPlan"];
+            /**
+             * Format: date
+             * @description The planned day, for `date`.
+             */
+            plan_on?: string | null;
+            /**
+             * Format: int64
+             * @description Grows with every change: send the one you saw with a change.
+             */
+            revision: number;
+            source?: components["schemas"]["RecordRef"] | null;
+            /** @description Open, done or not needed. */
+            state: components["schemas"]["TaskState"];
+            /** @description What to do, in the member's words. */
+            title: string;
+            /**
+             * Format: date-time
+             * @description When it last changed.
+             */
+            updated_at: string;
+            /** @description Do or Pay. */
+            verb: components["schemas"]["TaskVerb"];
+        };
+        /**
          * Format: uuid
          * @description TeachingId (UUIDv7)
          */
@@ -6239,18 +6045,6 @@ export interface components {
          * @enum {string}
          */
         Trust: "sure" | "check";
-        /** @description The event, back on the Campbooks calendar, and where it was removed from. */
-        Unpushed: {
-            /**
-             * @description The provider calendar the copy was removed from: send it back as
-             *     `calendar_id` to `schedule.push_event` to undo.
-             */
-            calendar_id: components["schemas"]["CalendarId"];
-            /** @description The event afterwards. */
-            event: components["schemas"]["EventView"];
-            /** @description The Campbooks event: the one to push again to undo this. */
-            id: components["schemas"]["EventId"];
-        };
         /**
          * @description Why a sentence can't be a rule.
          * @enum {string}
@@ -6283,31 +6077,6 @@ export interface components {
             /** @description A new name, 1 to 100 characters (trimmed). */
             name?: string | null;
         };
-        /** @description The event after the change, and what changed as it was before. */
-        UpdatedEvent: {
-            /** @description The previous value of `busy`, if it changed. */
-            busy?: boolean | null;
-            /** @description The previous end, if it changed. */
-            ends?: string | null;
-            /** @description The event afterwards. */
-            event: components["schemas"]["EventView"];
-            /**
-             * @description The event that was changed: the one to `PATCH` to undo it (changing
-             *     one occurrence of a series makes an exception with an id of its own).
-             */
-            id: components["schemas"]["EventId"];
-            kind?: components["schemas"]["EventKind"] | null;
-            /** @description The previous notes (empty: none), if they changed. */
-            notes?: string | null;
-            /** @description The previous place (empty: none), if it changed. */
-            place?: string | null;
-            /** @description The previous start, if it changed. */
-            starts?: string | null;
-            /** @description The previous time zone (empty: none), if it changed. */
-            time_zone?: string | null;
-            /** @description The previous title, if it changed. */
-            title?: string | null;
-        };
         /** @description The account the credential is for. */
         UserEntity: {
             /** @description The person's name. */
@@ -6325,11 +6094,6 @@ export interface components {
          * @description UserId (UUIDv7)
          */
         UserId: string;
-        /**
-         * @description What an ask of the reader is: do something, or pay something.
-         * @enum {string}
-         */
-        Verb: "do" | "pay";
         /** @description The running build. */
         VersionResponse: {
             /**
@@ -9493,114 +9257,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageBody"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such message, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "conversations.get_message_read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The conversation. */
-                conversation_id: components["schemas"]["ConversationId"];
-                /** @description The message. */
-                message_id: components["schemas"]["MessageId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The read. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MessageReadView"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such message, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "conversations.request_message_read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The conversation. */
-                conversation_id: components["schemas"]["ConversationId"];
-                /** @description The message. */
-                message_id: components["schemas"]["MessageId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description What was done. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReadRequested"];
                 };
             };
             /** @description No valid access token. */
@@ -13015,897 +12671,6 @@ export interface operations {
             };
         };
     };
-    "schedule.list_calendars": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Your calendars. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarList"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.update_calendar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The calendar. */
-                calendar_id: components["schemas"]["CalendarId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CalendarPatch"];
-            };
-        };
-        responses: {
-            /** @description The calendar afterwards. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarView"];
-                };
-            };
-            /** @description A colour that is not `#rrggbb` (`invalid_color`), or your Campbooks calendar turned off (`invalid_calendar`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such calendar, or it is not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.list_events": {
-        parameters: {
-            query: {
-                /**
-                 * @description Start of the window: an RFC 3339 time with an offset, or a date (the
-                 *     start of that day in your time zone).
-                 * @example 2026-11-01
-                 */
-                from: string;
-                /**
-                 * @description End of the window, in the same form, after `from` and at most 365
-                 *     days later.
-                 * @example 2026-11-08
-                 */
-                to: string;
-                /** @description Only these calendars: ids separated by commas. */
-                calendars?: string;
-                /** @description Only these kinds: kinds separated by commas (`travel,stay`). */
-                kind?: string;
-                /**
-                 * @description Only events whose title contains this text, ignoring case and
-                 *     accents.
-                 */
-                q?: string;
-                /** @description At most this many, earliest first (1 to 500, default 200). */
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The events. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventList"];
-                };
-            };
-            /** @description A window that is not valid or longer than 365 days (`invalid_window`), or a kind that does not exist (`invalid_kind`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A calendar that is not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.create_event": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewEvent"];
-            };
-        };
-        responses: {
-            /** @description The event. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventView"];
-                };
-            };
-            /** @description Times that do not read or do not follow each other (`invalid_when`), a title that is empty or too long (`invalid_text`), a time zone that is not an IANA name (`invalid_time_zone`), or a calendar that cannot be written (`calendar_read_only`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such calendar, or it is not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.get_event": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The event. */
-                event_id: components["schemas"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The event. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventView"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such event, or it is not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.delete_event": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The event. */
-                event_id: components["schemas"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The event is deleted; the token undoes it. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeletedEvent"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such event, or it is not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description An earlier change still waits for the provider (`change_pending`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.update_event": {
-        parameters: {
-            query?: {
-                /**
-                 * @description For an event of a series: the name of the occurrence (its `occurrence`
-                 *     in a list). A series is never changed as a whole.
-                 */
-                occurrence?: string;
-            };
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The event. */
-                event_id: components["schemas"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EventPatch"];
-            };
-        };
-        responses: {
-            /** @description The event afterwards, and what changed as it was. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UpdatedEvent"];
-                };
-            };
-            /** @description Nothing to change (`nothing_to_change`), times that do not read or follow each other (`invalid_when`), a text that is empty or too long (`invalid_text`), a time zone that is not an IANA name (`invalid_time_zone`), a whole series (`series_not_editable`) or a calendar that cannot be written (`calendar_read_only`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such event or occurrence, or it is not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description An earlier change still waits for the provider (`change_pending`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.push_event": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The event on your Campbooks calendar. */
-                event_id: components["schemas"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PushTo"];
-            };
-        };
-        responses: {
-            /** @description The event on the provider calendar. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventView"];
-                };
-            };
-            /** @description The event is not on your Campbooks calendar (`not_on_campbooks`), or the calendar cannot be written (`calendar_read_only`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such event or calendar, or not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description An earlier change still waits (`change_pending`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.unpush_event": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The event on the provider calendar. */
-                event_id: components["schemas"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The event, back on your Campbooks calendar. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Unpushed"];
-                };
-            };
-            /** @description The event was not added from your Campbooks calendar (`not_pushed`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such event, or it is not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The event has not reached the provider yet (`change_pending`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.respond_event": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The event. */
-                event_id: components["schemas"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Answer"];
-            };
-        };
-        responses: {
-            /** @description The event afterwards, and your earlier answer. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Answered"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such event, or it is not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description An earlier change still waits for the provider (`change_pending`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.restore_event": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The event. */
-                event_id: components["schemas"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Restore"];
-            };
-        };
-        responses: {
-            /** @description The event, back. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventView"];
-                };
-            };
-            /** @description The token is not the one of the delete (`invalid_undo`), or the event is not deleted. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such event, or it is not yours. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The delete is on its way to the provider (`change_pending`): try again in a moment. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.free_slots": {
-        parameters: {
-            query: {
-                /**
-                 * @description Start of the window: an RFC 3339 time with an offset, or a date (the
-                 *     start of that day in your time zone).
-                 * @example 2026-11-03
-                 */
-                from: string;
-                /**
-                 * @description End of the window, in the same form, after `from`, at most 62 days
-                 *     later.
-                 * @example 2026-11-04
-                 */
-                to: string;
-                /**
-                 * @description The length of slot to look for, 5 to 1,440 minutes.
-                 * @example 60
-                 */
-                minutes: number;
-            };
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The free slots. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FreeSlotList"];
-                };
-            };
-            /** @description A window that is not valid or longer than 62 days (`invalid_window`), or minutes out of range (`invalid_minutes`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.get_settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Your settings. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SettingsView"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "schedule.update_settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SettingsPatch"];
-            };
-        };
-        responses: {
-            /** @description Your settings afterwards. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SettingsView"];
-                };
-            };
-            /** @description A time zone that is not an IANA name (`invalid_time_zone`), working hours that end before they start (`invalid_hours`), a kind Scout does not add (`invalid_kind`), or a calendar that is not one of yours or cannot be written (`invalid_calendar`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
     "search.query": {
         parameters: {
             query?: {
@@ -14173,6 +12938,746 @@ export interface operations {
             };
             /** @description No such workspace or inbox, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.list": {
+        parameters: {
+            query?: {
+                /**
+                 * @description `open` (the default), `done` or `not_needed`. Ignored when `ids`
+                 *     names the tasks, unless given.
+                 */
+                state?: "open" | "done" | "not_needed";
+                /** @description Due on or after this day. */
+                due_from?: string;
+                /** @description Due on or before this day. */
+                due_to?: string;
+                /** @description Only open tasks whose due day has passed. */
+                overdue?: boolean;
+                /** @description Only tasks with no due day. */
+                undated?: boolean;
+                /** @description Only tasks from this record type (with `source_id`). */
+                source_type?: string;
+                /** @description Only tasks from this record. */
+                source_id?: string;
+                /** @description `mine` (default) or `handed_off`. */
+                whose?: "mine" | "handed_off";
+                /**
+                 * @description 1 to 100 task ids, separated by commas: Home's batch read. Tasks the
+                 *     caller cannot see are left out.
+                 */
+                ids?: string;
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's tasks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskList"];
+                };
+            };
+            /** @description Ids that are not 1 to 100 task ids (`invalid_ids`), or an offset beyond 14 hours (`invalid_offset`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.create": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTask"];
+            };
+        };
+        responses: {
+            /** @description The task. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description A blank or too long title (`invalid_title`), a due time without a day, or a bad sender address. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or a source you cannot see. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.get": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The task and its history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.update": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description A blank or too long title (`invalid_title`), or a due time without a day. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.done": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.hand_off": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandOffTo"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description Not a member of the workspace (`not_a_member`), or yourself (`hand_off_yourself`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.not_needed": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.plan": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanTask"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description A `date` plan without a day (`plan_needs_day`), or a `later` time in the past or over a year away (`invalid_later`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.reopen": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is still open (`task_open`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.take_back": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you did not hand it off (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), it is closed (`task_closed`) or was not handed to anyone (`not_handed_off`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

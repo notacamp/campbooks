@@ -123,6 +123,7 @@ async fn a_large_workspace_is_purged_in_batches(db: PgPool) {
             jobs: 12_000,
             events: 12_000,
             changes: 1,
+            tracked: 0,
             keys: 0,
             batches: 3,
         }

@@ -27,7 +27,7 @@ use sqlx::PgPool;
 
 use crate::{
     domain::{Reason, Trust},
-    events::{ConversationNeedChanged, NeedFacts},
+    events::{ConversationNeedChanged, NeedFacts, TaskChanged, TaskState, TaskVerb},
 };
 
 /// Every scope of this module.
@@ -79,14 +79,20 @@ impl Visibility for TestInboxes {
         access: &'a Access,
         container: &'a RecordRef,
     ) -> VisibilityFuture<'a> {
-        let visible = container.record_type == "conversations.inbox"
-            && match access.user {
+        let visible = match container.record_type.as_str() {
+            "conversations.inbox" => match access.user {
                 None => true,
                 Some(user) => self
                     .members
                     .lock()
                     .is_ok_and(|m| m.contains(&(container.id.clone(), user))),
-            };
+            },
+            // A member's tasks are that member's alone.
+            "tasks.assignee" => access
+                .user
+                .is_some_and(|user| user.to_string() == container.id),
+            _ => false,
+        };
         Box::pin(async move { Ok(visible) })
     }
 }
@@ -119,7 +125,65 @@ pub struct Need {
     pub lapses_at: Option<DateTime<Utc>>,
 }
 
+/// A task as `tasks.task_changed` would carry it.
+#[derive(Clone)]
+pub struct Task {
+    pub id: String,
+    pub revision: i64,
+    pub state: TaskState,
+    pub verb: TaskVerb,
+    pub due_on: Option<NaiveDate>,
+    pub later_until: Option<DateTime<Utc>>,
+    pub assignee: UserId,
+    /// The conversation it came from.
+    pub source: Option<String>,
+}
+
+impl Task {
+    /// An open `do` task numbered `revision`, with nothing else.
+    pub fn open(id: &str, revision: i64, assignee: UserId) -> Self {
+        Self {
+            id: id.into(),
+            revision,
+            state: TaskState::Open,
+            verb: TaskVerb::Do,
+            due_on: None,
+            later_until: None,
+            assignee,
+            source: None,
+        }
+    }
+}
+
 impl Kit {
+    /// Publish `tasks.task_changed` for `task` and run the jobs it causes.
+    pub async fn task(&self, workspace: WorkspaceId, task: &Task) -> WorkerStats {
+        let event = TaskChanged {
+            workspace: workspace.to_string(),
+            task: task.id.clone(),
+            revision: task.revision,
+            state: task.state,
+            verb: task.verb,
+            due_on: task.due_on,
+            plan: if task.later_until.is_some() {
+                "later"
+            } else {
+                "none"
+            }
+            .into(),
+            later_until: task.later_until,
+            assignee: task.assignee,
+            source: task
+                .source
+                .as_ref()
+                .map(|id| RecordRef::new("conversations.conversation", id)),
+        };
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        self.state.events.publish(&mut tx, &event).await.unwrap();
+        tx.commit().await.unwrap();
+        self.run_jobs().await
+    }
+
     /// The module over `db`.
     pub async fn new(db: PgPool) -> Self {
         let idp = TestIdp::start().await;

@@ -36,6 +36,10 @@ const INBOX: &str = "conversations.inbox";
 const EVENT: &str = "schedule.event";
 /// Most events `my_calendar` lists.
 const CALENDAR_EVENTS: usize = 25;
+/// Record type of a task (the tasks module's).
+const TASK: &str = "tasks.task";
+/// Most tasks `my_tasks` answers.
+const TASKS: usize = 30;
 
 /// The catalogue operations each tool may invoke: the test checks that each
 /// is in the catalogue, may be called by the assistant and changes nothing.
@@ -59,6 +63,8 @@ pub const OPERATIONS: &[(ChatTool, &[&str])] = &[
         ChatTool::MyInboxes,
         &["conversations.list_inboxes", "conversations.list_streams"],
     ),
+    (ChatTool::MyTasks, &["tasks.list"]),
+    (ChatTool::ReadTask, &["tasks.get"]),
     (ChatTool::MyCalendar, &["schedule.list_events"]),
     (ChatTool::FreeTime, &["schedule.free_slots"]),
     (ChatTool::ReadEvent, &["schedule.get_event"]),
@@ -66,13 +72,15 @@ pub const OPERATIONS: &[(ChatTool, &[&str])] = &[
 
 impl ChatTool {
     /// Every tool, in the order they are offered.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 11] = [
         Self::FindConversations,
         Self::ReadConversation,
         Self::ConversationHistory,
         Self::FindPeople,
         Self::WhatNeedsMe,
         Self::MyInboxes,
+        Self::MyTasks,
+        Self::ReadTask,
         Self::MyCalendar,
         Self::FreeTime,
         Self::ReadEvent,
@@ -87,6 +95,8 @@ impl ChatTool {
             Self::FindPeople => "find_people",
             Self::WhatNeedsMe => "what_needs_me",
             Self::MyInboxes => "my_inboxes",
+            Self::MyTasks => "my_tasks",
+            Self::ReadTask => "read_task",
             Self::MyCalendar => "my_calendar",
             Self::FreeTime => "free_time",
             Self::ReadEvent => "read_event",
@@ -208,6 +218,34 @@ fn read_definitions() -> Vec<ToolDefinition> {
                     "The member's inboxes (addresses, roles) and how many conversations each \
                      stream holds.",
                     object(json!({}), &[]),
+                ),
+                ChatTool::MyTasks => (
+                    "The member's open tasks, overdue first, then by due date, undated last. \
+                     Narrow them by due day (`YYYY-MM-DD`, in the member's days), only the \
+                     overdue or only the undated, or the ones the member handed to a teammate. \
+                     Up to 30.",
+                    object(
+                        json!({
+                            "due_from": {"type": "string", "minLength": 10, "maxLength": 10,
+                                         "description": "Due on or after this day, YYYY-MM-DD."},
+                            "due_to": {"type": "string", "minLength": 10, "maxLength": 10,
+                                       "description": "Due on or before this day, YYYY-MM-DD."},
+                            "overdue": {"type": "boolean"},
+                            "undated": {"type": "boolean"},
+                            "handed_off": {"type": "boolean",
+                                           "description": "True for the open tasks the member handed to someone else."},
+                        }),
+                        &[],
+                    ),
+                ),
+                ChatTool::ReadTask => (
+                    "Read one task of the member's: its title, dates, plan, where it came from \
+                     and what changed in it.",
+                    object(
+                        json!({"task_id": {"type": "string", "minLength": 1, "maxLength": 64,
+                                           "description": "The task's id, as `about` or another tool gave it."}}),
+                        &["task_id"],
+                    ),
                 ),
                 ChatTool::MyCalendar => (
                     "The member's calendar: their events and the occurrences of their series \
@@ -403,6 +441,19 @@ impl Toolbox {
                 self.what_needs_me(waiting).await
             }
             ChatTool::MyInboxes => self.my_inboxes().await,
+            ChatTool::MyTasks => self.my_tasks(arguments).await,
+            ChatTool::ReadTask => {
+                let id = text("task_id").unwrap_or_default();
+                let detail = self
+                    .member
+                    .read("tasks.get", json!({ "task_id": id }))
+                    .await?;
+                Ok((
+                    project::task_detail(&detail),
+                    vec![RecordRef::new(TASK, id)],
+                    1,
+                ))
+            }
             ChatTool::MyCalendar => self.my_calendar(arguments).await,
             ChatTool::FreeTime => self.free_time(arguments).await,
             ChatTool::ReadEvent => {
@@ -418,6 +469,37 @@ impl Toolbox {
                 ))
             }
         }
+    }
+
+    /// The member's open tasks, narrowed by the model's arguments.
+    async fn my_tasks(
+        &self,
+        arguments: &Map<String, Value>,
+    ) -> Result<(Value, Vec<RecordRef>, u32), Unread> {
+        let mut input = json!({ "utc_offset": self.utc_offset });
+        for key in ["due_from", "due_to", "overdue", "undated"] {
+            if let Some(value) = arguments.get(key) {
+                input[key] = value.clone();
+            }
+        }
+        if arguments.get("handed_off").and_then(Value::as_bool) == Some(true) {
+            input["whose"] = "handed_off".into();
+        }
+        let list = self.member.read("tasks.list", input).await?;
+        let found: Vec<&Value> = list["tasks"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(TASKS)
+            .collect();
+        let records = found
+            .iter()
+            .filter_map(|task| task["id"].as_str())
+            .map(|id| RecordRef::new(TASK, id))
+            .collect();
+        let tasks: Vec<Value> = found.iter().map(|task| project::task(task)).collect();
+        let count = count(tasks.len());
+        Ok((json!({ "tasks": tasks }), records, count))
     }
 
     /// The member's events in a window.
@@ -704,6 +786,19 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
             .as_str()
             .is_some_and(|s| (min..=max).contains(&s.chars().count()))
     };
+    // A day written YYYY-MM-DD.
+    let day = |value: &Value| {
+        value.as_str().is_some_and(|s| {
+            s.len() == 10
+                && s.char_indices().all(|(at, c)| {
+                    if at == 4 || at == 7 {
+                        c == '-'
+                    } else {
+                        c.is_ascii_digit()
+                    }
+                })
+        })
+    };
     let one_of =
         |value: &Value, options: &[&str]| value.as_str().is_some_and(|s| options.contains(&s));
     let whole = |value: &Value, min: u64, max: u64| {
@@ -719,9 +814,12 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
             &["inbox", "sent", "starred", "archive", "spam", "trash"],
         ),
         (ChatTool::ReadConversation | ChatTool::ConversationHistory, "conversation_id")
+        | (ChatTool::ReadTask, "task_id")
         | (ChatTool::ReadEvent, "event_id") => string(value, 1, 64),
         (ChatTool::FindPeople, "query") | (ChatTool::MyCalendar, "q") => string(value, 2, 100),
-        (ChatTool::WhatNeedsMe, "waiting") => value.is_boolean(),
+        (ChatTool::MyTasks, "due_from" | "due_to") => day(value),
+        (ChatTool::WhatNeedsMe, "waiting")
+        | (ChatTool::MyTasks, "overdue" | "undated" | "handed_off") => value.is_boolean(),
         (ChatTool::MyCalendar | ChatTool::FreeTime, "from" | "to") => string(value, 10, 40),
         (ChatTool::MyCalendar, "kind") => one_of(value, &KINDS),
         (ChatTool::MyCalendar, "limit") => whole(value, 1, 25),
@@ -744,6 +842,7 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
         ChatTool::MyCalendar => &["from", "to"],
         ChatTool::FreeTime => &["from", "to", "minutes"],
         ChatTool::ReadEvent => &["event_id"],
+        ChatTool::ReadTask => &["task_id"],
         _ => &[],
     };
     if !required.iter().all(|key| object.contains_key(*key)) {
@@ -841,5 +940,30 @@ mod tests {
         assert!(arguments(free, "{\"from\": \"2026-11-03\", \"to\": \"2026-11-04\"}").is_none());
         assert!(arguments(ChatTool::ReadEvent, "{}").is_none());
         assert!(arguments(ChatTool::ReadEvent, "{\"event_id\": \"e-1\"}").is_some());
+    }
+
+    #[test]
+    fn the_task_tools_take_days_and_an_id_only() {
+        let mine = ChatTool::MyTasks;
+        assert!(arguments(mine, "").is_some());
+        assert!(
+            arguments(
+                mine,
+                "{\"due_from\": \"2026-10-19\", \"due_to\": \"2026-10-25\", \"overdue\": true}"
+            )
+            .is_some()
+        );
+        for bad in [
+            "{\"due_to\": \"next friday\"}",
+            "{\"due_to\": \"2026-1-25\"}",
+            "{\"overdue\": \"yes\"}",
+            "{\"state\": \"done\"}",
+            "{\"task_id\": \"1\"}",
+        ] {
+            assert!(arguments(mine, bad).is_none(), "{bad}");
+        }
+        assert!(arguments(ChatTool::ReadTask, "{}").is_none());
+        assert!(arguments(ChatTool::ReadTask, "{\"task_id\": \"0192f0c4\"}").is_some());
+        assert!(arguments(ChatTool::ReadTask, "{\"task_id\": \"0192f0c4\", \"x\": 1}").is_none());
     }
 }

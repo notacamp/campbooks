@@ -301,7 +301,9 @@
       "my_calendar_one": "He mirado tu calendario: {{count}} evento",
       "my_calendar_other": "He mirado tu calendario: {{count}} eventos",
       "free_time": "He buscado tiempo libre",
-      "read_event": "He leído un evento de tu calendario"
+      "read_event": "He leído un evento de tu calendario",
+      "my_tasks": "He leído tus tareas",
+      "read_task": "He leído una tarea"
     },
     "working": {
       "find_conversations": "Buscando conversaciones…",
@@ -312,7 +314,9 @@
       "my_inboxes": "Leyendo tus bandejas de entrada…",
       "my_calendar": "Mirando tu calendario…",
       "free_time": "Buscando tiempo libre…",
-      "read_event": "Leyendo el evento…"
+      "read_event": "Leyendo el evento…",
+      "my_tasks": "Leyendo tus tareas…",
+      "read_task": "Leyendo la tarea…"
     },
     "proposal": {
       "label": "Scout propone",

@@ -1,0 +1,119 @@
+{
+  "title": "Tareas",
+  "subtitle": "{{open}} abiertas · {{week}} vencen esta semana",
+  "shortcuts": {
+    "create": "Nueva tarea"
+  },
+  "list": {
+    "label": "Lista de tareas",
+    "showLater": "Mostrar",
+    "hideLater": "Ocultar"
+  },
+  "groups": {
+    "overdue": "Vencidas",
+    "today": "Hoy",
+    "coming": "Próximamente",
+    "none": "Sin fecha",
+    "later": "Más tarde"
+  },
+  "add": {
+    "label": "Añadir una tarea",
+    "placeholder": "Añadir una tarea…",
+    "due": "Fecha límite",
+    "today": "Hoy",
+    "tomorrow": "Mañana",
+    "pick": "Elegir fecha",
+    "date": "Fecha",
+    "kind": "Tipo",
+    "do": "Hacer",
+    "pay": "Pagar",
+    "submit": "Añadir",
+    "added": "Tarea añadida",
+    "failed": "No se pudo añadir {{title}}. No se guardó nada."
+  },
+  "row": {
+    "own": "La escribiste tú",
+    "fromEmail": "De {{name}} · correo",
+    "with": "Con {{name}}",
+    "markDone": "Marcar como hecha: {{title}}",
+    "markPaid": "Marcar como pagada: {{title}}"
+  },
+  "due": {
+    "overdue_one": "Vencida · {{count}} día",
+    "overdue_other": "Vencida · {{count}} días",
+    "today": "Para hoy",
+    "tomorrow": "Para mañana",
+    "on": "Para el {{date}}"
+  },
+  "plan": {
+    "planned": "Prevista para {{date}}",
+    "later": "Más tarde · {{date}}"
+  },
+  "empty": {
+    "title": "Nada pendiente",
+    "body": "Añade una tarea o crea una desde un correo.",
+    "add": "Añadir una tarea"
+  },
+  "error": {
+    "title": "No se pudieron cargar las tareas",
+    "body": "Vuelve a intentarlo en un momento.",
+    "retry": "Reintentar"
+  },
+  "detail": {
+    "label": "Tarea",
+    "empty": "Elige una tarea",
+    "emptyBody": "Elige una tarea de la lista para verla aquí.",
+    "back": "Volver",
+    "titleLabel": "Título de la tarea",
+    "noDate": "Sin fecha",
+    "dueOn": "Para el {{date}}",
+    "change": "Cambiar",
+    "when": "¿Cuándo la harás?",
+    "pickDay": "Elegir un día",
+    "later": "Más tarde",
+    "laterChoices": "Más tarde hasta",
+    "tonight": "Esta noche",
+    "tomorrow": "Mañana",
+    "nextWeek": "La semana que viene",
+    "source": "De dónde viene",
+    "sourceLine": "{{subject}} · {{date}}",
+    "openEmail": "Abrir el correo",
+    "hand": "Pasársela a alguien",
+    "handFind": "Buscar a un compañero por su nombre",
+    "handNone": "Nadie con ese nombre.",
+    "handedToYou": "{{name}} te pasó esta tarea.",
+    "takeBack": "Recuperarla",
+    "someone": "alguien",
+    "done": "Hecha",
+    "paid": "Pagada",
+    "notNeeded": "No hace falta",
+    "payNote": "Campbooks nunca paga por ti. Esto solo la marca como pagada."
+  },
+  "toast": {
+    "done": "Hecha · {{title}}",
+    "paid": "Pagada · {{title}}",
+    "notNeeded": "No hace falta · {{title}}",
+    "later": "Más tarde, hasta {{when}} · {{title}}",
+    "planCleared": "Sin plan · {{title}}",
+    "planned": "Prevista para {{date}} · {{title}}",
+    "dueChanged": "Fecha límite cambiada · {{title}}",
+    "renamed": "Renombrada · {{title}}",
+    "handedOff": "Pasada a {{name}} · {{title}}",
+    "takenBack": "Recuperada · {{title}}",
+    "failed": "No se pudo cambiar {{title}}. Queda como estaba.",
+    "changed": "{{title}} ha cambiado mientras tanto. Míralo de nuevo."
+  },
+  "make": {
+    "button": "Convertir en tarea",
+    "title": "Título",
+    "submit": "Añadir tarea",
+    "cancel": "Cancelar",
+    "added": "Añadida a tus tareas",
+    "open": "Abrir"
+  },
+  "laterDialog": {
+    "title": "Aplazar hasta…",
+    "description": "Sale del Inicio hasta entonces y vuelve sola.",
+    "choices": "Cuándo"
+  }
+}

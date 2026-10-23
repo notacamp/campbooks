@@ -29,6 +29,7 @@ export const recordReaders: Readonly<Record<string, readonly string[]>> = {
   "schedule.calendar": ["schedule.get_settings", "schedule.list_calendars"],
   "schedule.event": ["schedule.free_slots", "schedule.get_event", "schedule.list_events"],
   "search.result": ["search.query"],
+  "tasks.task": ["tasks.get", "tasks.list"],
   "workspaces.invitation": ["workspaces.list_invitations"],
   "workspaces.member": ["workspaces.list_members"],
   "workspaces.security_event": ["workspaces.list_security_events"],

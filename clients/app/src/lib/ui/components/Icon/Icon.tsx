@@ -19,6 +19,7 @@ const ICONS = {
     path("M3.5 10h17M8 3v4M16 3v4"),
   ],
   check: [path("m5 12.5 4.5 4.5L19 7.5")],
+  tasks: [<circle key="c" cx="12" cy="12" r="8.5" />, path("m8.5 12.3 2.4 2.4 4.6-5")],
   document: [
     path("M6.5 3h7.2L19 8.3V19a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"),
     path("M13.5 3v5.5H19"),

@@ -1697,7 +1697,8 @@ async fn a_stream_lists_its_inboxes_once_and_again_when_access_changes(db: PgPoo
         "workspaces.workspace"
     );
     let listed = world.server.listings();
-    assert_eq!(listed, 1, "the first read lists Bea's inboxes");
+    // Once per kind of container: her inboxes, and her own tasks.
+    assert_eq!(listed, 2, "the first read lists Bea's containers");
 
     // Woken again and again, by mail and by renames: the list is kept.
     world.ingest(&ws, shared, EN).await;

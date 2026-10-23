@@ -1,0 +1,18 @@
+{
+  "errors": {
+    "invalid_title": "A task needs a title of 1 to 200 characters.",
+    "invalid_source_sender": "The sender's address is not valid.",
+    "due_time_needs_day": "A due time needs a due day.",
+    "invalid_ids": "Ask for 1 to 100 task ids, separated by commas.",
+    "invalid_offset": "The offset from UTC must be within 14 hours.",
+    "task_changed": "This task changed since you saw it. Reload it and try again.",
+    "task_closed": "This task is already closed.",
+    "task_open": "This task is still open.",
+    "task_not_yours": "This task is with someone else now.",
+    "plan_needs_day": "Choose a day to plan it for.",
+    "invalid_later": "Choose a time later than now and less than a year away.",
+    "not_a_member": "You can only hand a task to a member of this workspace.",
+    "hand_off_yourself": "Choose someone else to hand it to.",
+    "not_handed_off": "This task was not handed to anyone."
+  }
+}

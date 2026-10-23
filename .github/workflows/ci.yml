@@ -165,8 +165,17 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s
           --health-timeout 5s --health-retries 10
+      # The tracked events relay's tests publish to and read from it
+      # (campbooks-cloud#321). Streams are core in RabbitMQ 4.
+      rabbitmq:
+        image: rabbitmq:4.3.5-alpine
+        ports: ["5672:5672"]
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 5s
+          --health-timeout 10s --health-retries 20
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/campbooks
+      CAMPBOOKS_TEST_AMQP_URL: amqp://guest:guest@localhost:5672/%2f
     steps:
       - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v2 # reads rust-toolchain.toml
@@ -209,23 +218,19 @@ jobs:
           arguments: --config clients/app/src-tauri/deny.toml
           command: check advisories bans sources
 
-  clients:
+  # The clients gates run as parallel jobs (each suite on its own runner, a
+  # minute of setup each instead of ~15 minutes in a row); `clients`, the
+  # required check, is green only when all are.
+  clients-checks:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 25
+    timeout-minutes: 30
     defaults:
       run: { working-directory: clients }
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with: { package_json_file: clients/package.json }
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: clients/.nvmrc
-          cache: pnpm
-          cache-dependency-path: clients/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/clients-setup
       - name: Lint
         if: always()
         run: pnpm lint
@@ -260,30 +265,80 @@ jobs:
       - name: Translations at parity (en, pt, es, fr)
         if: always()
         run: pnpm i18n:check
-      - name: Tests + coverage
-        if: always()
-        run: pnpm test
       - name: Build
         if: always()
         run: pnpm build
-      - name: Chromium for story tests
-        if: always()
-        run: pnpm --filter @campbooks/app exec playwright install --with-deps chromium
-      - name: Storybook stories (render, interactions, axe in light and dark)
-        if: always()
-        run: pnpm test-storybook
-      - name: Copy fits in every language (longest translations, phone and desktop)
-        if: always()
-        run: pnpm --filter @campbooks/app test:fit
-      - name: WebKit for the mail frame policy test
-        if: always()
-        run: pnpm --filter @campbooks/app exec playwright install --with-deps webkit
-      - name: Mail frame under the desktop and web page policies (WebKit)
-        if: always()
-        run: pnpm --filter @campbooks/app test:csp
       - name: Audit (prod deps)
         if: always()
         run: pnpm audit --prod
+
+  clients-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    defaults:
+      run: { working-directory: clients }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/clients-setup
+      - name: Tests + coverage
+        run: pnpm test
+
+  clients-stories:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    defaults:
+      run: { working-directory: clients }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/clients-setup
+        with: { playwright: chromium }
+      - name: Storybook stories (render, interactions, axe in light and dark)
+        run: pnpm test-storybook
+
+  clients-fit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    defaults:
+      run: { working-directory: clients }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/clients-setup
+        with: { playwright: chromium }
+      - name: Copy fits in every language (longest translations, phone and desktop)
+        run: pnpm --filter @campbooks/app test:fit
+
+  clients-webkit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    defaults:
+      run: { working-directory: clients }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/clients-setup
+        with: { playwright: webkit }
+      - name: Mail frame under the desktop and web page policies (WebKit)
+        run: pnpm --filter @campbooks/app test:csp
+
+  clients:
+    # The required check: every clients job above passed.
+    if: always()
+    needs: [clients-checks, clients-tests, clients-stories, clients-fit, clients-webkit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "clients-checks, clients-tests, clients-stories, clients-fit, clients-webkit: $RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
 
   tauri:
     # The native shell is its own Cargo workspace so GUI system libraries never
@@ -295,9 +350,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: System libraries for Tauri (Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+        uses: ./.github/actions/apt-packages
+        with:
+          # The same set (and cache) as tauri-shell, so one warm cache covers
+          # both; the driver and xvfb are small and unused here.
+          key: tauri-shell
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf webkit2gtk-driver xvfb
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with: { cache: false, components: "rustfmt,clippy" }
       - uses: Swatinem/rust-cache@v2
@@ -326,9 +384,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: System libraries, WebKitWebDriver and a virtual display
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf webkit2gtk-driver xvfb
+        uses: ./.github/actions/apt-packages
+        with:
+          key: tauri-shell
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf webkit2gtk-driver xvfb
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with: { cache: false }
       - uses: Swatinem/rust-cache@v2

@@ -38,7 +38,7 @@ use tower_http::request_id::RequestId;
 use tracing::{Instrument as _, Level, Subscriber, field::Empty};
 use tracing_subscriber::{
     EnvFilter, Layer, Registry,
-    filter::Targets,
+    filter::{FilterExt as _, Targets, filter_fn},
     fmt::{self, MakeWriter},
     layer::Context,
     prelude::*,
@@ -48,8 +48,18 @@ use tracing_subscriber::{
 /// `service.name` unless `OTEL_SERVICE_NAME` says otherwise.
 pub const SERVICE_NAME: &str = "campbooks-server";
 
-/// Log filter when `RUST_LOG` is unset.
-pub const DEFAULT_LOG_FILTER: &str = "info,sqlx=warn";
+/// Log filter when `RUST_LOG` is unset. The AMQP client's own lines are off:
+/// the tracking relay logs what failed by kind itself, and the client's
+/// lines could carry a returned message or connection details
+/// (campbooks-cloud#321).
+pub const DEFAULT_LOG_FILTER: &str =
+    "info,sqlx=warn,lapin=off,amq_protocol=off,amq_protocol_tcp=off,tcp_stream=off";
+
+/// Targets never logged, whatever `RUST_LOG` says: IMAP client crates trace
+/// every command they send, sign-ins (passwords) included, and what they
+/// read (mail). Campbooks' own IMAP client logs neither; these stay off in
+/// case such a crate comes back into the graph.
+pub const SILENCED_TARGETS: &[&str] = &["async_imap", "imap_proto"];
 
 /// sqlx's event for each pool acquire (`acquired_after_secs`), enabled at
 /// DEBUG by the server's pool options.
@@ -319,12 +329,12 @@ where
             .json()
             .flatten_event(true)
             .with_writer(writer)
-            .with_filter(log_filter())
+            .with_filter(log_filter().and(filter_fn(loggable)))
             .boxed(),
         LogFormat::Pretty => fmt::layer()
             .pretty()
             .with_writer(writer)
-            .with_filter(log_filter())
+            .with_filter(log_filter().and(filter_fn(loggable)))
             .boxed(),
     };
     let mut span_filter = log_filter();
@@ -333,7 +343,7 @@ where
     }
     let spans = tracing_opentelemetry::layer()
         .with_tracer(tracer)
-        .with_filter(span_filter)
+        .with_filter(span_filter.and(filter_fn(loggable)))
         .boxed();
     let mut layers = vec![logs, spans];
     if let Some(histogram) = pool_wait {
@@ -348,6 +358,17 @@ where
 
 fn log_filter() -> EnvFilter {
     EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(DEFAULT_LOG_FILTER))
+}
+
+/// Whether events and spans of `metadata`'s target may be logged at all
+/// (not one of [`SILENCED_TARGETS`], nor under one).
+fn loggable(metadata: &tracing::Metadata<'_>) -> bool {
+    let target = metadata.target();
+    !SILENCED_TARGETS.iter().any(|silenced| {
+        target
+            .strip_prefix(silenced)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with("::"))
+    })
 }
 
 /// Records sqlx's `acquired_after_secs` into the pool-wait histogram.
@@ -568,6 +589,34 @@ mod tests {
         );
         assert_eq!(loggable_request_id("alice@example.com"), "invalid");
         assert_eq!(loggable_request_id(&"a".repeat(200)), "invalid");
+    }
+
+    #[test]
+    fn imap_client_crates_are_never_logged_even_at_trace() {
+        use std::sync::Mutex;
+
+        /// Records the target of every event it lets through.
+        struct Seen(Arc<Mutex<Vec<String>>>);
+        impl<S: Subscriber> Layer<S> for Seen {
+            fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
+                if let Ok(mut seen) = self.0.lock() {
+                    seen.push(event.metadata().target().to_owned());
+                }
+            }
+        }
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        // What `RUST_LOG=trace` builds, with the same guard as the server's.
+        let layer =
+            Seen(seen.clone()).with_filter(EnvFilter::new("trace").and(filter_fn(loggable)));
+        let subscriber = Registry::default().with(layer);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::trace!(target: "async_imap::imap_stream", "w1 LOGIN ana secret");
+            tracing::trace!(target: "imap_proto", "* 1 FETCH (BODY[] {{5}}");
+            tracing::trace!(target: "async_imap_lookalike", "kept");
+            tracing::trace!(target: "campbooks_connectors", "kept");
+        });
+        let seen = seen.lock().unwrap().clone();
+        assert_eq!(seen, ["async_imap_lookalike", "campbooks_connectors"]);
     }
 
     #[test]

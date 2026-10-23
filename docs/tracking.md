@@ -20,7 +20,7 @@ admin event view, audit trails and whatever is built on them later.
 | Generated code | `crates/modules/<m>/src/tracking.gen.rs`, `crates/kernel/src/tracking/tracking.gen.rs` | Generated. One struct per event version, one `<Record>Snapshot` per record, one enum per enum. |
 | Patches | `tracking/patches/*.yaml` | How agents and scripts change the plan, kept as the history of those edits. |
 | The tool | `crates/tracking-plan` | Reads, checks, formats, patches and generates. Depends on no other Campbooks crate, so it runs without building the server. |
-| The kernel | `campbooks_kernel::tracking` | `Tracker::track`, the ambient context, the outbox `kernel.tracked_events`. |
+| The kernel | `campbooks_kernel::tracking` | `Tracker::track`, the ambient context, the outbox `kernel.tracked_events`, and the relay that publishes it to RabbitMQ. |
 
 Never edit the mirror or a `tracking.gen.rs` by hand: CI fails when they are
 not exactly what the workbook generates.
@@ -200,8 +200,99 @@ The context is set by:
 
 - `none` (default): `track` returns at once and writes nothing.
 - `outbox`: events are appended to `kernel.tracked_events` in the
-  transaction of the change. The runtime role may only append; nothing reads
-  them back yet. Publishing them to RabbitMQ (`amqp`) is campbooks-cloud#321.
+  transaction of the change, and stay there (for tests and inspection). The
+  runtime role may only append.
+- `amqp`: the outbox, published to RabbitMQ by the relay
+  (campbooks-cloud#321).
+
+### The relay
+
+With the sink `amqp`, every `worker` (and `all`) process runs a relay
+(`kernel::tracking::Relay`); `api`-only processes only write the outbox.
+Each batch is one transaction in the kernel scope:
+
+1. claim up to `BATCH_SIZE` unpublished rows, oldest id first, locked
+   `FOR UPDATE SKIP LOCKED` (`kernel.claim_tracked_events`), so several
+   relays never hold the same row;
+2. publish each row as one message (`mandatory`) and wait for every
+   publisher confirm, at most 30 s;
+3. mark the rows published (`kernel.mark_tracked_events_published`) and
+   commit.
+
+A nack, a message returned as unroutable, a broker error or the timeout
+rolls the batch back, and its rows go out with a later one. A full batch is
+followed by the next at once; otherwise the relay waits for the outbox's
+`NOTIFY kernel_tracked_events` (an insert trigger) or `POLL_INTERVAL_MS`.
+While the broker is unreachable, events wait in Postgres and the relay
+reconnects with backoff (1 s up to 60 s, with jitter), logging the kind of
+failure only: never the URL or its credentials. On shutdown a batch in
+flight gets the worker's grace period (`CAMPBOOKS_JOBS__SHUTDOWN_GRACE_SECONDS`).
+
+Delivery is **at least once**: a crash between the confirms and the commit
+publishes a batch twice. Subscribers deduplicate on the event id. Events
+from concurrent transactions can commit out of order, so subscribers order
+by `occurred_at`.
+
+The hourly `kernel.prune_tracked_events` deletes rows published more than
+`PUBLISHED_RETENTION_HOURS` ago. It never deletes an unpublished row, however
+long the broker is away. A purged workspace's rows, published or not, go
+with its purge.
+
+### The message
+
+- Exchange `EXCHANGE` (topic, durable); routing key `<name>.v<version>`,
+  e.g. `conversations.conversation_archived.v1`.
+- Body (JSON): the envelope's fields at the top level, the event's
+  properties and records under `body`:
+
+  ```json
+  {
+    "id": "0192…", "name": "conversations.conversation_archived", "version": 1,
+    "occurred_at": "2026-10-24T09:00:00Z", "workspace_id": "…",
+    "actor": {"type": "user", "id": "…"}, "on_behalf_of": null,
+    "operation": "conversations.archive", "correlation": "…", "causation": null,
+    "role": "all", "app_version": "0.1.0", "plan_version": 1,
+    "body": {"conversation": {"id": "…", "status": "archived", "…": "…"}}
+  }
+  ```
+- Properties: `message_id` the event id, `type` the name, `content_type`
+  `application/json`, `timestamp` when it happened (seconds), persistent,
+  and the header `x-event-version`.
+
+### Topology and how to subscribe
+
+With `DECLARE_TOPOLOGY` on (the default), the relay declares at start, idempotently:
+the exchange `EXCHANGE`, a stream queue `STREAM` (`x-queue-type: stream`,
+`x-max-age: STREAM_MAX_AGE`), and a binding on `#`. Off, it declares
+nothing and only publishes, which suits a broker user that may write but
+not configure (the hosted cloud declares the topology with its
+infrastructure, campbooks-cloud#322).
+
+A subscriber that needs history reads the stream: over AMQP 0-9-1, consume
+`STREAM` with a prefetch (`basic.qos`), manual acks and the argument
+`x-stream-offset` (`first`, `last`, `next`, an offset, or a timestamp); or
+with a stream protocol client. A subscriber that needs work-queue behaviour
+binds its own quorum queue (with a dead-letter queue) to `EXCHANGE`, on `#`
+or on the routing keys it wants.
+
+### Settings
+
+| Variable (`CAMPBOOKS_TRACKING__…`) | Default | |
+| --- | --- | --- |
+| `SINK` | `none` | `none`, `outbox` or `amqp` |
+| `AMQP_URL` | | `amqp://user:password@host:5672/%2f` or `amqps://…`; required with `amqp`. Secret |
+| `EXCHANGE` | `campbooks.events` | the topic exchange |
+| `STREAM` | `campbooks.events` | the stream queue declared and bound to it |
+| `STREAM_MAX_AGE` | `30D` | how long the stream keeps events (`Y`, `M`, `D`, `h`, `m`, `s`) |
+| `DECLARE_TOPOLOGY` | `true` | declare the exchange, stream and binding at start |
+| `BATCH_SIZE` | `200` | events per batch (1 to 5000) |
+| `POLL_INTERVAL_MS` | `1000` | how often an idle relay looks when no notification arrives |
+| `PUBLISHED_RETENTION_HOURS` | `24` | how long published rows stay in the outbox |
+
+Metrics (no ids): `campbooks.tracking.published{outcome=confirmed|nacked|error}`,
+`campbooks.tracking.backlog` (rows waiting) and
+`campbooks.tracking.oldest_unpublished` (seconds), sampled every 15 s while
+metrics are exported.
 
 ## Testing
 

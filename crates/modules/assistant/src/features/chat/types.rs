@@ -111,6 +111,10 @@ pub enum ChatTool {
     WhatNeedsMe,
     /// Read your inboxes and their streams.
     MyInboxes,
+    /// Read your tasks (campbooks-cloud#43).
+    MyTasks,
+    /// Read one task and what changed in it.
+    ReadTask,
     /// Read your calendar: your events in a window.
     MyCalendar,
     /// Read when you are free.

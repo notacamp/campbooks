@@ -26,6 +26,7 @@
     "imap_login_refused_other": "O servidor de correio recusou o início de sessão. Verifique o nome de utilizador e a palavra-passe. Se o seu fornecedor tiver palavras-passe de aplicação, use uma.",
     "smtp_login_refused_one": "O servidor de envio recusou o início de sessão. Este fornecedor exige uma palavra-passe de aplicação: crie uma nas definições de segurança da sua conta e use-a aqui.",
     "smtp_login_refused_other": "O servidor de envio (SMTP) recusou o início de sessão. Verifique o nome de utilizador e a palavra-passe, e se o servidor lhe permite enviar.",
+    "imap_busy": "O servidor de correio está ocupado e não deixou o Campbooks entrar. Tente novamente dentro de alguns minutos.",
     "imap_unreachable": "Não foi possível contactar o servidor de correio (IMAP). Verifique o nome e a porta e tente de novo.",
     "smtp_unreachable": "Não foi possível contactar o servidor de envio (SMTP). Verifique o nome e a porta e tente de novo.",
     "imap_tls_failed": "O certificado do servidor de correio não é válido para o seu nome, por isso o Campbooks não se ligou. Verifique o nome do servidor.",

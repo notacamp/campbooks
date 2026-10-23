@@ -36,6 +36,7 @@ campbooks-attention = { path = "crates/modules/attention" }
 campbooks-search = { path = "crates/modules/search" }
 campbooks-assistant = { path = "crates/modules/assistant" }
 campbooks-schedule = { path = "crates/modules/schedule" }
+campbooks-tasks = { path = "crates/modules/tasks" }
 campbooks-tracking-plan = { path = "crates/tracking-plan" }
 
 # HTTP / async
@@ -163,13 +164,12 @@ html5ever = "0.40.1"
 # Search: telling which of the four shipped languages an entry is written in
 # (whatlang: trigram profiles, no model files, MIT).
 whatlang = "0.18.0"
-# Email: any mailbox over IMAP (connectors' IMAP adapter, campbooks-cloud#310):
-# the IMAP client (chatmail's, on tokio; Campbooks wraps it in its own
-# `imap::Session`), SRV and MX lookups for finding a mailbox's servers, the
-# provider database's XML (already in the graph), and TLS to the servers
-# with the platform's verifier (rustls, tokio-rustls and the verifier are
-# already in the graph through reqwest and lettre).
-async-imap = { version = "0.12.0", default-features = false, features = ["runtime-tokio"] }
+# Email: any mailbox over IMAP (connectors' IMAP adapter, campbooks-cloud#310,
+# #311): the IMAP client is Campbooks' own (`imap::Session`, bounded framing
+# of every response, campbooks-cloud#311); SRV and MX lookups for finding a
+# mailbox's servers, the provider database's XML (already in the graph), and
+# TLS to the servers with the platform's verifier (rustls, tokio-rustls and
+# the verifier are already in the graph through reqwest and lettre).
 hickory-resolver = { version = "0.26.3", default-features = false, features = ["system-config", "tokio"] }
 quick-xml = "0.41.0"
 rustls-platform-verifier = "0.7.1"
@@ -195,6 +195,11 @@ chrono-tz = "0.10.4"
 # lines, and its occurrences are expanded when events are listed
 # (campbooks-cloud#42). Pinned; 0.14.0 is the current release. Rust, no C.
 rrule = "=0.14.0"
+# Tracked events (ADR 0020, campbooks-cloud#321): the relay publishes the
+# outbox to RabbitMQ over AMQP 0-9-1 with publisher confirms. On tokio, TLS
+# (`amqps://`) through rustls with aws-lc-rs and the platform's verifier,
+# all already in the graph; no OpenSSL.
+lapin = { version = "4.12.1", default-features = false, features = ["rustls", "tokio"] }
 
 # Passkeys (identity, ADR 0014): COSE_Key parsing and the CBOR of WebAuthn
 # attestation objects. Signatures are verified with aws-lc-rs.

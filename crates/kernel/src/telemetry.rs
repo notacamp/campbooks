@@ -270,6 +270,33 @@ struct Instruments {
     jobs: Gauge<u64>,
     oldest_ready: Gauge<f64>,
     rate_limit_refusals: Counter<u64>,
+    tracking_published: Counter<u64>,
+    tracking_backlog: Gauge<u64>,
+    tracking_oldest: Gauge<f64>,
+}
+
+/// How publishing a tracked event ended, as the `outcome` attribute of
+/// `campbooks.tracking.published`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PublishOutcome {
+    /// The broker confirmed it; its row is marked published.
+    Confirmed,
+    /// The broker refused it (a nack, or returned as unroutable); it waits
+    /// for the next batch.
+    Nacked,
+    /// The broker or the database failed; it waits for the next batch.
+    Error,
+}
+
+impl PublishOutcome {
+    /// The attribute value.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Confirmed => "confirmed",
+            Self::Nacked => "nacked",
+            Self::Error => "error",
+        }
+    }
 }
 
 impl fmt::Debug for Metrics {
@@ -316,6 +343,21 @@ impl Metrics {
                         "Requests refused by a per-caller API rate limit, by class, \
                          principal kind and caller kind.",
                     )
+                    .build(),
+                tracking_published: meter
+                    .u64_counter("campbooks.tracking.published")
+                    .with_description(
+                        "Tracked events the relay published to the broker, by outcome.",
+                    )
+                    .build(),
+                tracking_backlog: meter
+                    .u64_gauge("campbooks.tracking.backlog")
+                    .with_description("Tracked events waiting in the outbox to be published.")
+                    .build(),
+                tracking_oldest: meter
+                    .f64_gauge("campbooks.tracking.oldest_unpublished")
+                    .with_unit("s")
+                    .with_description("Age of the oldest tracked event waiting to be published.")
                     .build(),
             }),
             exported,
@@ -408,6 +450,23 @@ impl Metrics {
         );
     }
 
+    /// `count` tracked events whose publishing ended with `outcome`.
+    pub(crate) fn tracking_published(&self, outcome: PublishOutcome, count: u64) {
+        if count > 0 {
+            self.instruments
+                .tracking_published
+                .add(count, &[KeyValue::new("outcome", outcome.as_str())]);
+        }
+    }
+
+    /// The outbox's backlog: rows waiting, and the age of the oldest.
+    pub(crate) fn tracking_backlog(&self, waiting: u64, oldest_seconds: f64) {
+        self.instruments.tracking_backlog.record(waiting, &[]);
+        self.instruments
+            .tracking_oldest
+            .record(oldest_seconds.max(0.0), &[]);
+    }
+
     pub(crate) fn oldest_ready(&self, queue: &str, seconds: f64) {
         self.instruments.oldest_ready.record(
             seconds.max(0.0),
@@ -468,5 +527,13 @@ mod tests {
         .map(JobOutcome::as_str)
         .into();
         assert_eq!(words, ["succeeded", "retried", "failed", "lost"]);
+        let words: Vec<_> = [
+            PublishOutcome::Confirmed,
+            PublishOutcome::Nacked,
+            PublishOutcome::Error,
+        ]
+        .map(PublishOutcome::as_str)
+        .into();
+        assert_eq!(words, ["confirmed", "nacked", "error"]);
     }
 }

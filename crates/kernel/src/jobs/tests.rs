@@ -1436,9 +1436,9 @@ async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
     );
     wait_for_kernel_schedules(&db).await;
     stop.send(()).unwrap();
-    // The probe, and the kernel's prunes, blob sweep, purged-workspace
-    // sweep and rekey dispatch scheduled at start-up.
-    assert_eq!(worker.await.unwrap().succeeded, 9);
+    // The probe, and the kernel's prunes (tracked events' included), blob
+    // sweep, purged-workspace sweep and rekey dispatch scheduled at start-up.
+    assert_eq!(worker.await.unwrap().succeeded, 10);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1448,8 +1448,8 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
         jobs.poll_interval_ms = 50;
         // Room for both probes and every start-up schedule at once (all
         // instance-wide, so one fairness bucket).
-        jobs.concurrency = 10;
-        jobs.per_workspace = 10;
+        jobs.concurrency = 11;
+        jobs.per_workspace = 11;
     })
     .await;
     let quick = created(
@@ -1484,9 +1484,10 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
 
     stop.send(()).unwrap();
     let stats = worker.await.unwrap();
-    // The quick probe and the kernel's prunes, blob sweep, purged-workspace
-    // sweep and rekey dispatch scheduled at start-up.
-    assert_eq!((stats.succeeded, stats.released), (9, 1));
+    // The quick probe and the kernel's prunes (tracked events' included),
+    // blob sweep, purged-workspace sweep and rekey dispatch scheduled at
+    // start-up.
+    assert_eq!((stats.succeeded, stats.released), (10, 1));
     assert_eq!(job(&db, quick).await.state, "succeeded");
     let slow = job(&db, slow).await;
     assert_eq!((slow.state.as_str(), slow.attempts), ("pending", 0));
@@ -1520,6 +1521,7 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.prune_idempotency",
             "kernel.prune_jobs",
             "kernel.prune_rate_limits",
+            "kernel.prune_tracked_events",
             "kernel.sequence_changes",
             "kernel.sweep_blobs",
             "kernel.sweep_purged_workspaces",
@@ -1535,6 +1537,7 @@ fn registry_collects_kernel_and_module_work() {
         [
             "kernel.prune_jobs",
             "kernel.prune_events",
+            "kernel.prune_tracked_events",
             "kernel.sweep_blobs",
             "kernel.prune_idempotency",
             "kernel.prune_rate_limits",
@@ -1663,6 +1666,7 @@ fn registry_marks_the_instance_only_kinds() {
             "kernel.prune_idempotency",
             "kernel.prune_jobs",
             "kernel.prune_rate_limits",
+            "kernel.prune_tracked_events",
             "kernel.sweep_blobs",
             "kernel.sweep_purged_workspaces",
             "test.forget_fails",
