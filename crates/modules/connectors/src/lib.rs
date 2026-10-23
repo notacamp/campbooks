@@ -91,6 +91,8 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::ConnectionNeedsReauth>()
             .publishes::<events::ConnectionRemoved>()
             .publishes::<events::MessagesChanged>()
+            .publishes::<events::CalendarChanged>()
+            .publishes::<events::CalendarChangeCompleted>()
             .publishes::<events::SendCompleted>()
             .handler(features::sync_stream::SyncStream::new(deps.clone()))
             .handler(features::send_message::SendMessage::new(deps.clone()))

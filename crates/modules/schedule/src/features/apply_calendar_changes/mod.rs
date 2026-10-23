@@ -215,6 +215,7 @@ fn source_of(upsert: &BatchEvent) -> Option<(String, String)> {
     well_formed.then(|| (kind.to_owned(), id.to_owned()))
 }
 
+#[allow(clippy::too_many_lines)]
 async fn upsert_event(
     state: &AppState,
     tx: &mut Transaction<'static, Postgres>,

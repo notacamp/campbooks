@@ -176,6 +176,16 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
         "asks[].same_as",
         TASK_REFERENCE,
     ),
+    (
+        "connectors.calendar_change_completed",
+        "provider_event_id",
+        "the provider's id of a calendar event (Google's base32hex id): opaque, never its content",
+    ),
+    (
+        "connectors.calendar_change_completed",
+        "etag",
+        "the provider's version marker of a calendar event: opaque, never its content",
+    ),
     ("identity.client_registered", "client", CLIENT_ID),
     ("identity.client_removed", "client", CLIENT_ID),
     ("identity.consent_granted", "client", CLIENT_ID),

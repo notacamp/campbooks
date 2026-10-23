@@ -132,22 +132,23 @@ pub struct UpdatedEvent {
             (`change_pending`).", body = Problem, content_type = "application/problem+json"),
     )
 )]
+#[allow(clippy::too_many_lines)]
 pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<ScheduleWrite>,
-    extract::Path(path): extract::Path<EventPath>,
+    extract::Path(which): extract::Path<EventPath>,
     extract::Query(occurrence): extract::Query<OccurrenceQuery>,
     extract::Json(patch): extract::Json<EventPatch>,
 ) -> Result<Json<UpdatedEvent>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let member = ops::require_event(&state, &mut tx, access, Action::Write, path.event_id).await?;
+    let member = ops::require_event(&state, &mut tx, access, Action::Write, which.event_id).await?;
     if patch == EventPatch::default() {
         return Err(Error::BadRequest(
             crate::MESSAGES.reason("nothing_to_change"),
         ));
     }
-    let mut row = event_of(&mut tx, member, path.event_id).await?;
+    let mut row = event_of(&mut tx, member, which.event_id).await?;
     if row.deleted_at.is_some() || row.pushed_to.is_some() {
         return Err(Error::NotFound);
     }

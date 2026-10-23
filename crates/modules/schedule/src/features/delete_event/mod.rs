@@ -97,28 +97,27 @@ pub async fn handler(
     .execute(&mut *tx)
     .await?;
     // What Scout added and the member removed is not added again.
-    if row.origin == "scout" {
-        if let Some(message) = row
+    if row.origin == "scout"
+        && let Some(message) = row
             .source_id
             .as_deref()
             .and_then(|id| id.parse::<Uuid>().ok())
-        {
-            for key in &row.item_keys {
-                sqlx::query(
-                    "INSERT INTO schedule.removed_items
+    {
+        for key in &row.item_keys {
+            sqlx::query(
+                "INSERT INTO schedule.removed_items
                          (id, workspace_id, member_id, message_id, item_key, kind)
                      VALUES ($1, $2, $3, $4, $5, $6)
                      ON CONFLICT (workspace_id, member_id, item_key) DO NOTHING",
-                )
-                .bind(Uuid::now_v7())
-                .bind(access.workspace)
-                .bind(member)
-                .bind(message)
-                .bind(key)
-                .bind(&row.kind)
-                .execute(&mut *tx)
-                .await?;
-            }
+            )
+            .bind(Uuid::now_v7())
+            .bind(access.workspace)
+            .bind(member)
+            .bind(message)
+            .bind(key)
+            .bind(&row.kind)
+            .execute(&mut *tx)
+            .await?;
         }
     }
     if !calendar.is_campbooks() && row.provider_event_id.is_some() {

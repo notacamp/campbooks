@@ -697,11 +697,10 @@ fn arguments(tool: ChatTool, raw: &str) -> Option<Map<String, Value>> {
         ),
         (ChatTool::ReadConversation | ChatTool::ConversationHistory, "conversation_id")
         | (ChatTool::ReadEvent, "event_id") => string(value, 1, 64),
-        (ChatTool::FindPeople, "query") => string(value, 2, 100),
+        (ChatTool::FindPeople, "query") | (ChatTool::MyCalendar, "q") => string(value, 2, 100),
         (ChatTool::WhatNeedsMe, "waiting") => value.is_boolean(),
         (ChatTool::MyCalendar | ChatTool::FreeTime, "from" | "to") => string(value, 10, 40),
         (ChatTool::MyCalendar, "kind") => one_of(value, &KINDS),
-        (ChatTool::MyCalendar, "q") => string(value, 2, 100),
         (ChatTool::MyCalendar, "limit") => whole(value, 1, 25),
         (ChatTool::FreeTime, "minutes") => whole(value, 5, 1440),
         _ => false,

@@ -110,14 +110,14 @@ fn is_color(color: &str) -> bool {
 pub async fn update(
     State(state): State<AppState>,
     workspace: Workspace<ScheduleWrite>,
-    extract::Path(path): extract::Path<CalendarPath>,
+    extract::Path(which): extract::Path<CalendarPath>,
     extract::Json(patch): extract::Json<CalendarPatch>,
 ) -> Result<Json<CalendarView>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let member =
-        ops::require_calendar(&state, &mut tx, access, Action::Write, path.calendar_id).await?;
-    let calendar = calendar_of(&mut tx, member, path.calendar_id).await?;
+        ops::require_calendar(&state, &mut tx, access, Action::Write, which.calendar_id).await?;
+    let calendar = calendar_of(&mut tx, member, which.calendar_id).await?;
     if let Some(color) = patch.color.as_deref().filter(|color| !color.is_empty())
         && !is_color(color)
     {

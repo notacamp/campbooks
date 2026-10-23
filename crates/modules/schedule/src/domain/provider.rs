@@ -41,7 +41,7 @@ pub fn parse(event: &BatchEvent) -> Option<Parsed> {
     let end = event
         .end
         .as_ref()
-        .and_then(|end| end.moment())
+        .and_then(crate::inbound::ProviderWhen::moment)
         .map(|(m, _)| m);
     // A provider event with an end of another form, or one that does not
     // come after the start, is shown with the default length.
@@ -49,7 +49,7 @@ pub fn parse(event: &BatchEvent) -> Option<Parsed> {
     let original = event
         .original_start
         .as_ref()
-        .and_then(|when| when.moment())
+        .and_then(crate::inbound::ProviderWhen::moment)
         .map(|(moment, _)| moment.key());
     Some(Parsed {
         title: event.title.clone().unwrap_or_default(),

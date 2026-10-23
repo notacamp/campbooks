@@ -55,6 +55,8 @@ impl From<&CalendarRow> for CalendarView {
 }
 
 /// An event, or one occurrence of a series.
+// The wire shape: independent facts a client reads, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct EventView {
     /// The event (a series and its occurrences share it).

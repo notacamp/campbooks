@@ -110,6 +110,15 @@ impl ProviderWhen {
     }
 }
 
+/// The four columns that hold a span: `starts_at`, `ends_at`, `starts_on`,
+/// `ends_on`.
+pub type Columns = (
+    Option<DateTime<Utc>>,
+    Option<DateTime<Utc>>,
+    Option<NaiveDate>,
+    Option<NaiveDate>,
+);
+
 /// A start and an end of the same form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
@@ -160,14 +169,7 @@ impl Span {
 
     /// The four columns that hold it: `starts_at`, `ends_at`, `starts_on`,
     /// `ends_on`.
-    pub fn columns(
-        self,
-    ) -> (
-        Option<DateTime<Utc>>,
-        Option<DateTime<Utc>>,
-        Option<NaiveDate>,
-        Option<NaiveDate>,
-    ) {
+    pub fn columns(self) -> Columns {
         match (self.start, self.end) {
             (Moment::At(a), Moment::At(b)) => (Some(a), Some(b), None, None),
             (Moment::On(a), Moment::On(b)) => (None, None, Some(a), Some(b)),
