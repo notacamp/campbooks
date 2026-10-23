@@ -69,12 +69,12 @@ time.
 
 ## 8. Client
 
-- [ ] 8.1 Calendar place in the sidebar and tab bar, `g s` (`nav.schedule` in the shortcut catalogue), shortcuts sheet
-- [ ] 8.2 Agenda, Week (time grid, all-day row, now line, overlap), Month; `1/2/3`, `t`, `j/k`, `n`
-- [ ] 8.3 Event sheet: kind chip, From <email> link, quote, Add to my calendar, Edit, RSVP, Remove + Undo, pending and kept-theirs states
-- [ ] 8.4 Reader strip: found items, "Scout is reading this…", request read on open, L1-only "This email has a <kind> · Add"
-- [ ] 8.5 Settings → Calendar: time zone, working hours, calendars, kinds, also-add-to, Add calendar access
-- [ ] 8.6 Kind icons and colour tokens in the design system; Storybook stories for each screen
+- [x] 8.1 Calendar place in the sidebar and tab bar, `g s` (`nav.schedule` in the shortcut catalogue), shortcuts sheet
+- [x] 8.2 Agenda, Week (time grid, all-day row, now line, overlap), Month; `1/2/3`, `t`, `j/k`, `n e`
+- [x] 8.3 Event sheet: kind chip, From <email> link, quote, Add to my calendar, Edit, RSVP, Remove + Undo, pending and kept-theirs states
+- [x] 8.4 Reader strip: found items, "Scout is reading this…", request read on open, L1-only "This email has a <kind> · Add"
+- [x] 8.5 Settings → Calendar: time zone, working hours, calendars, kinds, also-add-to, Add calendar access
+- [x] 8.6 Kind icons and colour tokens in the design system; Storybook stories for each screen
 - [ ] 8.7 i18n en/pt-PT/es-ES/fr, `pnpm test:fit` passes at 375 and 1280
 
 ## 9. Evaluation and measurement

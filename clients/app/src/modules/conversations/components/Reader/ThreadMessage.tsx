@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -57,6 +57,8 @@ export interface ThreadMessageProps {
   spam?: boolean | undefined;
   /** Show the reader's keys (⇧I, V) on its buttons; off where they are not bound. */
   shortcuts?: boolean | undefined;
+  /** What was read from it (the calendar's strip), under its header; shown while open. */
+  found?: ReactNode | undefined;
   now?: Date | undefined;
 }
 
@@ -82,6 +84,7 @@ export function ThreadMessage({
   inertLinks = false,
   spam = false,
   shortcuts = true,
+  found,
   now,
 }: ThreadMessageProps) {
   const { t: typed, i18n } = useTranslation("conversations");
@@ -203,6 +206,7 @@ export function ThreadMessage({
           : recipientsLine(t, message, i18n.language)
       }
       rich={message.has_html}
+      found={found}
       files={files}
       quoted={
         quoted === undefined ? undefined : (

@@ -10,7 +10,8 @@ found in an email, and Settings → Calendar.
 Calendar SHALL be a place next to Home and Inbox in the sidebar and in the
 phone tab bar, opened with G then S (`nav.schedule`, already in the shortcut catalogue). It SHALL open on Agenda at today, and
 offer Agenda, Week and Month, switched with 1, 2 and 3. T SHALL go to today,
-J and K to the next and previous period, and N SHALL open a new event. Every
+J and K to the next and previous period, and N then E (N W, a new workspace,
+is global and would hide a lone N) SHALL open a new event. Every
 shortcut SHALL show its key where the action is, as the rest of the app
 does, and be listed in the shortcuts sheet. Times SHALL be shown in the
 member's time zone.

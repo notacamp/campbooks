@@ -145,6 +145,19 @@ const ICONS = {
       "M6.5 7l.8 11.6A1.5 1.5 0 0 0 8.8 20h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7M10.2 11v5M13.8 11v5",
     ),
   ],
+  // The calendar's kinds: a flight, a bed, a ticket, a table, a parcel, a card, an hourglass, a done task.
+  travel: [path("M21.5 2.5 11 13M21.5 2.5l-6.5 19-4-8.5-8.5-4Z")],
+  stay: [
+    path("M3.5 19V6M3.5 14h17v5M20.5 14a3 3 0 0 0-3-3h-7v3"),
+    <circle key="c" cx="7" cy="10.5" r="1.5" />,
+  ],
+  ticket: [path("M4 6.5h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4ZM14.5 6.5v12")],
+  dining: [path("M7 3v18M4 3v5a3 3 0 0 0 6 0V3M17 21V3c-2 1-3 4-3 7h3")],
+  parcel: [path("M3.5 7 12 3l8.5 4v10L12 21l-8.5-4ZM3.5 7 12 11l8.5-4M12 11v10")],
+  card: [<rect key="r" x="3" y="6" width="18" height="12" rx="2" />, path("M3 10h18M7 15h3")],
+  hourglass: [path("M6.5 3h11M6.5 21h11M7.5 3c0 5 9 5 9 9s-9 4-9 9M16.5 3c0 5-9 5-9 9s9 4 9 9")],
+  task: [<circle key="c" cx="12" cy="12" r="8.5" />, path("m8.8 12.2 2.3 2.3 4.2-4.6")],
+  edit: [path("M4.5 19.5 5 15.5 15.5 5a2 2 0 0 1 3 3L8 18.5ZM13.5 7l3.5 3.5")],
 } satisfies Record<string, ReactElement[]>;
 
 export type IconName = keyof typeof ICONS;

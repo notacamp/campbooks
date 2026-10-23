@@ -25,7 +25,7 @@ import {
   SuspendedAccounts,
   useMailboxConsent,
 } from "~/modules/identity";
-import { buildScheduleRoutes } from "~/modules/schedule";
+import { buildScheduleRoutes, SCHEDULE_SHORTCUTS } from "~/modules/schedule";
 import { buildSearchRoutes, SEARCH_SHORTCUTS } from "~/modules/search";
 import {
   buildSystemAdminRoutes,
@@ -86,7 +86,7 @@ export function buildModuleRoutes<
       // `identity` is the front door for connecting a mailbox (as on the server).
       ...buildConnectorsRoutes(workspace, { useConsent: useMailboxConsent }),
       ...assistant.workspace,
-      ...buildScheduleRoutes(workspace),
+      ...buildScheduleRoutes(workspace, { useConsent: useMailboxConsent }),
       // `cargo xtask new-module` inserts above this line.
     ],
   } as const;
@@ -127,4 +127,5 @@ export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...IDENTITY_SHORTCUTS,
   ...ASSISTANT_SHORTCUTS,
   ...CONNECTORS_SHORTCUTS,
+  ...SCHEDULE_SHORTCUTS,
 ];

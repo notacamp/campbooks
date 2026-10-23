@@ -1,4 +1,244 @@
 {
-  "title": "Calendrier",
-  "summary": "Ce module n’a pas encore d’écrans."
+  "title": "Agenda",
+  "loadError": "Impossible de charger votre agenda.",
+  "retry": "Réessayer",
+  "period": {
+    "zone": "Heure de {{city}}"
+  },
+  "views": {
+    "label": "Vue",
+    "agenda": "Liste",
+    "week": "Semaine",
+    "month": "Mois"
+  },
+  "toolbar": {
+    "label": "Actions de l’agenda",
+    "previousWeek": "Semaine précédente",
+    "nextWeek": "Semaine suivante",
+    "previousMonth": "Mois précédent",
+    "nextMonth": "Mois suivant",
+    "today": "Aujourd’hui",
+    "newEvent": "Nouvel événement"
+  },
+  "agenda": {
+    "today": "Aujourd’hui",
+    "empty": "Rien dans votre agenda.",
+    "week": "Cette semaine"
+  },
+  "week": {
+    "label": "Semaine",
+    "due": "Échéances",
+    "allDay": "Toute la journée"
+  },
+  "month": {
+    "label": "Mois",
+    "more": "+{{count}} de plus"
+  },
+  "when": {
+    "allDay": "Toute la journée",
+    "from": "À partir de {{time}}",
+    "range": "{{start}} – {{end}}"
+  },
+  "kind": {
+    "charge": "Prélèvement",
+    "appointment": "Rendez-vous",
+    "meeting": "Réunion",
+    "travel": "Voyage",
+    "stay": "Séjour",
+    "show": "Spectacle",
+    "reservation": "Réservation",
+    "delivery": "Livraison",
+    "expiry": "Expiration",
+    "hold": "Réservé",
+    "none": "Événement",
+    "due": "Échéance"
+  },
+  "from": {
+    "email": "D’un e-mail"
+  },
+  "sheet": {
+    "close": "Fermer",
+    "kind": "Type : {{kind}}. Modifier",
+    "kindMenu": "Type",
+    "inZone": "{{time}}, heure de {{city}}",
+    "onlyYou": "Vous seul le voyez tant que vous ne l’ajoutez pas à un agenda",
+    "synced": "Synchronisé dans les deux sens",
+    "source": {
+      "label": "D’un e-mail",
+      "meta": "{{sender}} · {{when}}",
+      "open": "Ouvrir l’e-mail"
+    },
+    "how": {
+      "label": "Comment Scout l’a su",
+      "structured": "Lu dans les données que l’expéditeur a jointes pour les machines. Aucune IA n’a servi.",
+      "model": "Scout a lu l’e-mail et trouvé la date dans cette phrase :"
+    },
+    "edit": "Modifier",
+    "remove": "Retirer",
+    "addToMine": "Ajouter à mon agenda",
+    "alsoIn": "Aussi dans {{calendar}}",
+    "pick": "À quel agenda ?",
+    "always": "Toujours ajouter {{kind}} à cet agenda",
+    "noWritable": "Donnez l’accès à l’agenda dans les Réglages pour placer des événements dans vos agendas.",
+    "rsvp": "Vous venez ?",
+    "series": "Se répète",
+    "release": "Libérer le temps",
+    "pushed": "Aussi dans votre agenda"
+  },
+  "rsvp": {
+    "needs_action": "Sans réponse",
+    "accepted": "Accepter",
+    "tentative": "Peut-être",
+    "declined": "Refuser"
+  },
+  "notice": {
+    "keptTheirs": "Modifié dans {{where}} entre-temps ; nous avons gardé leur version",
+    "notSaved": "Nous n’avons pas pu enregistrer votre dernière modification.",
+    "pending": "Votre modification est en route vers {{where}}."
+  },
+  "due": {
+    "label": "Échéance",
+    "pay": "Payer · {{title}}",
+    "payAmount": "Payer · {{title}} · {{amount}}",
+    "do": "Faire · {{title}}",
+    "today": "Pour aujourd’hui",
+    "at": "Pour {{time}}",
+    "overdue_one": "En retard · {{count}} jour",
+    "overdue_other": "En retard · {{count}} jours",
+    "meta": "Tâche",
+    "wasDue": "Prévu pour {{day}}",
+    "dueOn": "Pour {{day}}",
+    "note": "Une tâche : elle vit dans vos tâches et s’affiche ici à son échéance",
+    "calendar": "Tâches",
+    "markPaid": "Marquez-la payée depuis la tâche",
+    "markDone": "Marquez-la faite depuis la tâche",
+    "paid": "Payée",
+    "done": "Faite",
+    "hold": "Réserver du temps",
+    "later": "Plus tard",
+    "open": "Ouvrir la tâche",
+    "failed": "Impossible. Réessayez."
+  },
+  "form": {
+    "newTitle": "Nouvel événement",
+    "editTitle": "Modifier l’événement",
+    "name": "Titre",
+    "kind": "Type",
+    "day": "Date",
+    "allDay": "Toute la journée",
+    "starts": "Début",
+    "ends": "Fin",
+    "place": "Lieu",
+    "save": "Enregistrer",
+    "add": "Ajouter l’événement",
+    "cancel": "Annuler",
+    "error": "Impossible d’enregistrer. Vérifiez la date et l’heure.",
+    "fromEmail": "De l’e-mail « {{subject}} »"
+  },
+  "toast": {
+    "removed": "{{title}} retiré. Scout ne le rajoutera pas.",
+    "created": "{{title}} ajouté",
+    "kindChanged": "{{title}} est maintenant : {{kind}}",
+    "pushed": "Ajouté à {{calendar}}",
+    "answered": "{{title}} : {{response}}",
+    "saved": "{{title}} enregistré"
+  },
+  "found": {
+    "label": "Scout a remarqué",
+    "reading": "Scout lit ceci…",
+    "failed": "Scout n’a pas pu lire cet e-mail.",
+    "added": "Ajouté à votre agenda",
+    "alsoIn": "Aussi dans {{calendar}}",
+    "undo": "Annuler",
+    "removed": "Retiré de votre agenda. Scout ne le rajoutera pas.",
+    "putBack": "Le remettre",
+    "add": "Ajouter",
+    "cantRead": "Scout ne peut pas lire les détails sur ce serveur. Ajoutez-le et saisissez l’heure.",
+    "has": {
+      "charge": "Cet e-mail contient un prélèvement",
+      "appointment": "Cet e-mail contient un rendez-vous",
+      "meeting": "Cet e-mail contient une réunion",
+      "travel": "Cet e-mail contient un voyage",
+      "stay": "Cet e-mail contient un séjour",
+      "show": "Cet e-mail contient un spectacle",
+      "reservation": "Cet e-mail contient une réservation",
+      "delivery": "Cet e-mail contient une livraison",
+      "expiry": "Cet e-mail contient une expiration"
+    }
+  },
+  "settings": {
+    "label": "Réglages de l’agenda",
+    "title": "Agenda",
+    "lead": "D’où viennent vos événements, quand vous travaillez et ce que Scout ajoute à partir de vos e-mails.",
+    "calendars": {
+      "title": "Agendas",
+      "description": "Campbooks lit et écrit dans ces agendas dans les deux sens. Votre agenda Campbooks garde ce que Scout trouve dans vos e-mails ; vous seul le voyez tant que vous n’ajoutez pas un événement à un autre.",
+      "campbooks": "Ce que Scout trouve dans vos e-mails · vous seul",
+      "alwaysOn": "Toujours actif",
+      "primary": "principal",
+      "readOnly": "lecture seule",
+      "show": "Afficher {{name}}",
+      "colour": "Couleur de {{name}}",
+      "access": "Donner l’accès à l’agenda",
+      "accessHint": "{{address}} : e-mails seulement. Donnez l’accès à l’agenda pour voir ici les agendas de ce compte.",
+      "refused": "Impossible de commencer. Réessayez."
+    },
+    "kinds": {
+      "title": "Ce que Scout ajoute à partir de vos e-mails",
+      "description": "Scout les place dans votre agenda Campbooks, chacun lié à son e-mail. Choisissez un agenda pour les y ajouter aussi, sans demander. Les dates à payer ou à faire deviennent des tâches, pas des événements.",
+      "add": "Scout ajoute : {{kind}}",
+      "alsoAdd": "Ajouter aussi à",
+      "nowhere": "Nulle part ailleurs",
+      "travel": "Vols, trains, bus, location de voiture",
+      "stay": "Hôtels et locations, de l’arrivée au départ",
+      "show": "Concerts, théâtre, cinéma, matchs",
+      "reservation": "Restaurants et tables",
+      "appointment": "Médecins, services, visites",
+      "meeting": "Invitations envoyées sous forme de fichier d’agenda",
+      "delivery": "Colis et leurs créneaux de livraison",
+      "charge": "Renouvellements et prélèvements automatiques",
+      "expiry": "Ce qui se termine sans rien à faire"
+    },
+    "kindNames": {
+      "travel": "Voyages",
+      "stay": "Séjours",
+      "show": "Spectacles et billets",
+      "reservation": "Réservations",
+      "appointment": "Rendez-vous",
+      "meeting": "Réunions",
+      "delivery": "Livraisons",
+      "charge": "Prélèvements",
+      "expiry": "Expirations"
+    },
+    "time": {
+      "title": "Fuseau horaire et heures de travail",
+      "description": "Les heures s’affichent dans votre fuseau. Les heures de travail sont celles où Scout cherche du temps libre quand vous réservez du temps pour une tâche.",
+      "zone": "Fuseau horaire",
+      "zoneHint": "Réglé depuis cet appareil jusqu’à ce que vous le changiez",
+      "days": "Jours de travail",
+      "hours": "Heures de travail",
+      "from": "De",
+      "to": "à",
+      "weekdays": {
+        "mon": "Lun",
+        "tue": "Mar",
+        "wed": "Mer",
+        "thu": "Jeu",
+        "fri": "Ven",
+        "sat": "Sam",
+        "sun": "Dim"
+      }
+    }
+  },
+  "shortcuts": {
+    "agenda": "Liste",
+    "week": "Semaine",
+    "month": "Mois",
+    "today": "Aller à aujourd’hui",
+    "create": "Nouvel événement",
+    "edit": "Modifier l’événement",
+    "remove": "Retirer l’événement",
+    "push": "Ajouter à mon agenda",
+    "openEmail": "Ouvrir l’e-mail"
+  }
 }

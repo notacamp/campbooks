@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
 import { Button, ReaderPane } from "~/lib/ui";
+import { renderFoundInMessage } from "~/modules/schedule";
 
 import { DRAFTS, isPlace } from "./api/queries";
 import { DraftsScreen } from "./components/InboxScreen/DraftsScreen";
@@ -77,6 +78,7 @@ function InboxPage() {
         stream={stream}
         conversationId={params.conversationId}
         renderReplySlot={renderReplyComposer}
+        renderFound={renderFoundInMessage}
         startReply={search.reply === true}
         replyTo={search.to}
         composeAction={composeAction}

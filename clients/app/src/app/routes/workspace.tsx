@@ -128,6 +128,7 @@ export function WorkspaceLayout() {
 const SETTINGS_SECTIONS = [
   { id: "members", path: "members" },
   { id: "mailboxes", path: "mailboxes" },
+  { id: "calendar", path: "calendar" },
   { id: "waysIn", path: "sign-in" },
   { id: "memory", path: "memory" },
 ] as const;
@@ -202,9 +203,11 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const inSettings = pathname.startsWith(`${base}/settings`);
   const inInbox = pathname.startsWith(`${base}/inbox`);
   const inSearch = pathname.startsWith(`${base}/search`);
-  const atHome = !inSettings && !inInbox && !inSearch;
+  const inSchedule = pathname.startsWith(`${base}/schedule`);
+  const atHome = !inSettings && !inInbox && !inSearch && !inSchedule;
   const needsYou = useAttentionCount(workspace.id);
   const inboxPath = streamPath(workspace.id, "primary");
+  const schedulePath = `${base}/schedule`;
   const searchPath = `${base}/search`;
   // The stream, view or Drafts on screen (`/inbox/sent`…): these are places, not streams.
   const place = /\/inbox\/([^/]+)/u.exec(pathname)?.[1];
@@ -218,6 +221,9 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   });
   useShortcut("nav.inbox", () => {
     void navigate({ to: inboxPath });
+  });
+  useShortcut("nav.schedule", () => {
+    void navigate({ to: schedulePath });
   });
   useShortcut("nav.settings", () => {
     void navigate({ to: membersPath });
@@ -305,6 +311,13 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             />
             <StreamNav workspaceId={workspace.id} current={openStream} />
             <NavItem
+              label={tNav("nav.schedule")}
+              icon="schedule"
+              shortcut="nav.schedule"
+              current={inSchedule}
+              {...link(schedulePath)}
+            />
+            <NavItem
               label={tNav("nav.settings")}
               icon="settings"
               shortcut="nav.settings"
@@ -387,6 +400,13 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
               icon: "inbox",
               current: inInbox,
               ...link(inboxPath),
+            },
+            {
+              id: "schedule",
+              label: tNav("nav.schedule"),
+              icon: "schedule",
+              current: inSchedule,
+              ...link(schedulePath),
             },
             {
               id: "settings",
