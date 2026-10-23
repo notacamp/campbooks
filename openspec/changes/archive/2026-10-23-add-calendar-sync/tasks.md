@@ -31,11 +31,11 @@ for sync. Builders don't compile or test locally: push and read CI.
 ## 5. Client
 
 - [x] 5.1 Show "Add to my calendar" only once a provider calendar that can be written exists, and show "Add calendar access" in Settings → Calendar once sync lands (hidden in the first change, because its consent cannot succeed before connectors offers `calendar`; the code is behind `CALENDAR_ACCESS_OFFERED` in `CalendarSettings.tsx`)
-- [ ] 5.2 Provider events, invitations and the "kept theirs" notice verified in the real app; i18n and `pnpm test:fit` at 375 and 1280
+- [x] 5.2 Provider events, invitations and the "kept theirs" notice verified in the real app; i18n and `pnpm test:fit` at 375 and 1280
 
 ## 6. Wrap-up
 
-- [ ] 6.1 OpenAPI and client types regenerated from CI's output
+- [x] 6.1 OpenAPI and client types regenerated from CI's output
 - [x] 6.2 Changelog entry files in `changelog/unreleased/<kind>/`
-- [ ] 6.3 Gates green in CI; recording in the PR (`## Recording`)
-- [ ] 6.4 `openspec archive add-calendar-sync --yes` before merge; baseline specs reflect the change
+- [x] 6.3 Gates green in CI; recording in the PR (`## Recording`)
+- [x] 6.4 `openspec archive add-calendar-sync --yes` before merge; baseline specs reflect the change

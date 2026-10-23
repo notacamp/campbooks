@@ -2960,10 +2960,6 @@ export interface components {
         ChatProposal: {
             action?: components["schemas"]["ProposalAction"] | null;
             detail?: components["schemas"]["ProposalDetail"] | null;
-            /**
-             * @description The event's own facts (an event change, except a new one); its
-             *     `record` is the event.
-             */
             event?: components["schemas"]["ProposalEvent"] | null;
             facts?: components["schemas"]["ProposalFacts"] | null;
             /**
@@ -9301,7 +9297,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The provider is not configured on this instance (`provider_not_configured`), or this instance has no front door for consents (`mailbox_unsupported`). */
+            /** @description The provider is not configured on this instance (`provider_not_configured`), this instance has no front door for consents (`mailbox_unsupported`), or the capability is switched off on it (`capability_not_offered`, Zoho Calendar). */
             409: {
                 headers: {
                     [name: string]: unknown;

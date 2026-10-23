@@ -309,7 +309,7 @@ describe("an event's cards", () => {
       expect(withAnswer(deleteNew, answer)).toBeUndefined();
     }
     // A request with nothing to wait for is as it was.
-    expect(withAnswer(edit, undefined)).toBe(edit);
+    expect(withAnswer(edit, null)).toBe(edit);
   });
 
   it("send a new event's undo to the event the answer names", async () => {

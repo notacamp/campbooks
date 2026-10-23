@@ -13,16 +13,7 @@ import {
 } from "../../api/queries";
 import { SCOUT_KINDS, type EventKind, type ReadItem, type ScoutKind } from "../../api/types";
 import type { T } from "../../labels";
-import {
-  addDays,
-  canPush,
-  clock,
-  dayLong,
-  dayOf,
-  isShown,
-  minutesOf,
-  nowIn,
-} from "../../model";
+import { addDays, canPush, clock, dayLong, dayOf, isShown, minutesOf, nowIn } from "../../model";
 import { AddToCalendar } from "../Calendar/AddToCalendar";
 import { EventDialog, type EventDraft } from "../Calendar/EventDialog";
 
