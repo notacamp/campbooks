@@ -8,7 +8,9 @@
 //! the send stands (released, waiting for the provider, its author still
 //! allowed to send from that inbox), and the document recorded is the one
 //! it stored, never the one the event names. A send that does not stand,
-//! or names another inbox, is recorded nowhere.
+//! or names another inbox, is recorded nowhere. Nor does one bound to
+//! another destination than the inbox's stream, connection and mailbox now
+//! (campbooks-cloud#242): it is recorded through the stream resolved here.
 
 use campbooks_kernel::{
     Event, EventConsumer, JobContext, JobError, blobs::BlobOwner, jobs::EnqueueOptions,
@@ -19,7 +21,10 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    domain::model::{InboxId, SendId, StreamId},
+    domain::{
+        destinations,
+        model::{InboxId, SendId, StreamId},
+    },
     events::SendRequested,
     features::send_message::{GIVE_UP_AFTER, SEND_OWNER, SendMessage, SendMessagePayload},
 };
@@ -45,9 +50,12 @@ impl EventConsumer for QueueSend {
             .map_err(|_| JobError::fatal("send_requested names no workspace"))?;
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
+        // Where the inbox's mail goes out: the send stands only when its
+        // binding names this destination (campbooks-cloud#242).
+        let at = destinations::of_inbox(tx, requested.inbox_id).await?;
         let stored = state
             .outbound
-            .stored_send(&state, tx, workspace, requested.send_id.into())
+            .stored_send(&state, tx, workspace, requested.send_id.into(), at.as_ref())
             .await?;
         let Some(stored) = stored.filter(|s| s.inbox == Uuid::from(requested.inbox_id)) else {
             tracing::warn!(
@@ -58,13 +66,9 @@ impl EventConsumer for QueueSend {
             return Ok(());
         };
         let message = stored.message;
-        let stream = sqlx::query_scalar!(
-            r#"SELECT id AS "id: StreamId" FROM connectors.streams
-                WHERE inbox_id = $1 AND capability = 'messages'"#,
-            requested.inbox_id as InboxId,
-        )
-        .fetch_optional(&mut **tx)
-        .await?;
+        let stream = at
+            .as_ref()
+            .map(|at| StreamId::from_uuid(at.destination.stream));
         let inserted = sqlx::query_scalar!(
             r#"INSERT INTO connectors.sends (id, workspace_id, stream_id, inbox_id, document)
                VALUES ($1, $2, $3, $4, $5)

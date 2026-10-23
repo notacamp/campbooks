@@ -1470,6 +1470,104 @@ async fn a_scheduled_send_follows_its_authors_real_membership(db: PgPool) {
     }
 }
 
+/// campbooks-cloud#242, through the real ports: the sender's scheduled send
+/// once a messages stream feeds its inbox, with that stream pointed at
+/// another mailbox by SQL between the send and its release when `repoint`.
+/// The draft's state then, the `send_requested` events and the sends the
+/// connector recorded.
+async fn send_through_a_stream(db: PgPool, repoint: bool) -> (String, i64, i64) {
+    let world = World::new(db).await;
+    let stream = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO connectors.streams
+             (id, workspace_id, connection_id, capability, phase, interval_seconds, inbox_id)
+         VALUES ($1, $2, $3::uuid, 'messages', 'incremental', 60, $4::uuid)",
+    )
+    .bind(stream)
+    .bind(world.a.as_uuid())
+    .bind(&world.instances["connectors.connection"])
+    .bind(&world.instances["conversations.inbox"])
+    .execute(&world.db)
+    .await
+    .unwrap();
+    let draft = world.instances["conversations.draft"].clone();
+    let uri = format!("/api/v1/w/{}/drafts/{draft}", world.a);
+    let sender = world.token(Who::Sender.subject());
+    let (_, read, _) = world.call(Some(&sender), "GET", &uri, None).await;
+    let read: Value = serde_json::from_slice(&read).unwrap();
+    let body = json!({"version": 1, "subject": "Matrix", "to": [{"address": "leo@example.com"}],
+        "content_token": read["content_token"]});
+    let (status, bytes, _) = world.call(Some(&sender), "PATCH", &uri, Some(&body)).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let saved: Value = serde_json::from_slice(&bytes).unwrap();
+    let send = json!({"version": 2, "content_token": saved["content_token"]});
+    let (status, bytes, _) = world
+        .call(Some(&sender), "POST", &format!("{uri}/send"), Some(&send))
+        .await;
+    assert_eq!(
+        status,
+        StatusCode::ACCEPTED,
+        "{}",
+        String::from_utf8_lossy(&bytes)
+    );
+    if repoint {
+        sqlx::query("UPDATE connectors.streams SET mailbox_key = 'another-mailbox' WHERE id = $1")
+            .bind(stream)
+            .execute(&world.db)
+            .await
+            .unwrap();
+    }
+    sqlx::query(
+        "UPDATE kernel.jobs SET run_at = now()
+          WHERE kind = 'conversations.release_send' AND state = 'pending'",
+    )
+    .execute(&world.db)
+    .await
+    .unwrap();
+    Worker::new(world.state.clone()).run_until_idle().await;
+    let state: String =
+        sqlx::query_scalar("SELECT state FROM conversations.drafts WHERE id = $1::uuid")
+            .bind(&draft)
+            .fetch_one(&world.db)
+            .await
+            .unwrap();
+    let requested: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.events
+          WHERE name = 'conversations.send_requested' AND workspace_id = $1",
+    )
+    .bind(world.a.to_string())
+    .fetch_one(&world.db)
+    .await
+    .unwrap();
+    (state, requested, sends_recorded(&world).await)
+}
+
+/// campbooks-cloud#242: a send goes out where the member sent it. The
+/// author's request names the inbox's stream, connection and mailbox, the
+/// release verifies it against them and binds the stored send to the same,
+/// and the connector records it through that stream.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_scheduled_send_is_released_to_where_its_member_sent_it(db: PgPool) {
+    let (state, requested, recorded) = send_through_a_stream(db, false).await;
+    assert_ne!(state, "scheduled");
+    assert_eq!((requested, recorded), (1, 1));
+}
+
+/// The stream pointed at another mailbox by SQL after the member asked: the
+/// release refuses it (a WARN), so nothing is requested, recorded or sent,
+/// and the draft is left as it is.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_scheduled_send_whose_stream_was_repointed_is_never_released(db: PgPool) {
+    let (state, requested, recorded) = send_through_a_stream(db, true).await;
+    assert_eq!(state, "scheduled");
+    assert_eq!((requested, recorded), (0, 0));
+}
+
 /// The sends the connector recorded in workspace A.
 async fn sends_recorded(world: &World) -> i64 {
     sqlx::query_scalar("SELECT count(*) FROM connectors.sends WHERE workspace_id = $1")

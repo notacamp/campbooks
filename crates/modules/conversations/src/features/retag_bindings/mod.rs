@@ -22,6 +22,7 @@
 use campbooks_kernel::{
     Job, JobContext, JobError,
     binding::Binding,
+    outbound::DestinationsPort,
     tenancy::{Access, UserId, WorkspaceId},
 };
 use serde::{Deserialize, Serialize};
@@ -30,7 +31,7 @@ use sqlx::{PgConnection, types::Uuid};
 
 use crate::{
     domain::{
-        binding::{ChangeRequest, SendRequest, StoredSend, content_hash},
+        binding::{Bound, ChangeRequest, SendRequest, StoredSend, content_hash},
         drafts, rule_runs,
         rules::{self, Before, applications},
     },
@@ -75,8 +76,9 @@ impl Job for RetagBindings {
         if !key.has_previous() {
             return Ok(());
         }
+        let destinations = ctx.state().destinations.clone();
         let tx = ctx.tx().await?;
-        let tally = retag(tx, &key, workspace).await?;
+        let tally = retag(tx, &key, &destinations, workspace).await?;
         if tally.left == 0 {
             tracing::info!(
                 %workspace,
@@ -98,9 +100,12 @@ impl Job for RetagBindings {
 }
 
 /// One pass over `workspace` (the transaction's), every kind of bound row.
+/// A send is re-tagged for where its inbox sends from now (`destinations`),
+/// as its binding names it: one bound elsewhere does not verify, and is left.
 pub async fn retag(
     conn: &mut PgConnection,
     key: &Binding,
+    destinations: &DestinationsPort,
     workspace: WorkspaceId,
 ) -> campbooks_kernel::Result<Tally> {
     let mut tally = Tally::default();
@@ -108,8 +113,8 @@ pub async fn retag(
     retag_applications(conn, key, &mut tally).await?;
     retag_runs(conn, key, workspace, &mut tally).await?;
     retag_change_requests(conn, key, workspace, &mut tally).await?;
-    retag_scheduled_sends(conn, key, workspace, &mut tally).await?;
-    retag_stored_sends(conn, key, workspace, &mut tally).await?;
+    retag_scheduled_sends(conn, key, destinations, workspace, &mut tally).await?;
+    retag_stored_sends(conn, key, destinations, workspace, &mut tally).await?;
     Ok(tally)
 }
 
@@ -291,6 +296,7 @@ async fn retag_change_requests(
 async fn retag_scheduled_sends(
     conn: &mut PgConnection,
     key: &Binding,
+    destinations: &DestinationsPort,
     workspace: WorkspaceId,
     tally: &mut Tally,
 ) -> campbooks_kernel::Result<()> {
@@ -313,6 +319,9 @@ async fn retag_scheduled_sends(
         let Ok(content) = content_hash(&row) else {
             continue;
         };
+        let at = destinations
+            .destination(&mut *conn, row.inbox_id.into())
+            .await?;
         let request = SendRequest {
             workspace,
             draft: row.id,
@@ -320,8 +329,9 @@ async fn retag_scheduled_sends(
             author,
             inbox: row.inbox_id,
             content: &content,
+            destination: Bound::Before,
         };
-        let Some(new) = request.retag(key, Some(mac.as_slice())) else {
+        let Some(new) = request.retag_at(key, Some(mac.as_slice()), at.as_ref()) else {
             continue;
         };
         let done = sqlx::query(
@@ -346,6 +356,7 @@ type SendRow = (Uuid, Uuid, Uuid, Option<Uuid>, Value, Vec<u8>);
 async fn retag_stored_sends(
     conn: &mut PgConnection,
     key: &Binding,
+    destinations: &DestinationsPort,
     workspace: WorkspaceId,
     tally: &mut Tally,
 ) -> campbooks_kernel::Result<()> {
@@ -360,14 +371,16 @@ async fn retag_stored_sends(
         let Ok(document) = serde_json::from_value(document) else {
             continue;
         };
+        let at = destinations.destination(&mut *conn, inbox).await?;
         let stored = StoredSend {
             workspace,
             send: SendId::from_uuid(send),
             inbox: InboxId::from_uuid(inbox),
             author: author.map(UserId::from),
             document: &document,
+            destination: Bound::Before,
         };
-        let Some(new) = stored.retag(key, Some(mac.as_slice())) else {
+        let Some(new) = stored.retag_at(key, Some(mac.as_slice()), at.as_ref()) else {
             continue;
         };
         let done = sqlx::query(

@@ -832,15 +832,26 @@ async fn a_write_window_left_open_is_closed(db: PgPool) {
     let own = |backlog: crate::domain::outbound::Backlog| backlog.own[&m.ids[0]][0].to;
     kit.bind_planted_changes(m.ws).await;
     let binding = &kit.state.binding;
-    let fresh =
-        crate::domain::outbound::backlog(&kit.state.db, binding, m.ws, m.stream, kit.clock.now())
-            .await
-            .unwrap();
+    let (connection, mailbox) = kit.at_of(m.stream).await;
+    let at = crate::domain::outbound::At {
+        connection,
+        mailbox: &mailbox,
+    };
+    let fresh = crate::domain::outbound::backlog(
+        &kit.state.db,
+        binding,
+        m.ws,
+        (m.stream, at),
+        kit.clock.now(),
+    )
+    .await
+    .unwrap();
     assert_eq!(own(fresh), None);
     let later = kit.clock.now() + TimeDelta::minutes(11);
-    let stale = crate::domain::outbound::backlog(&kit.state.db, binding, m.ws, m.stream, later)
-        .await
-        .unwrap();
+    let stale =
+        crate::domain::outbound::backlog(&kit.state.db, binding, m.ws, (m.stream, at), later)
+            .await
+            .unwrap();
     assert_eq!(own(stale), row.applied_from);
 }
 
@@ -1428,4 +1439,108 @@ async fn gmail_says_where_a_message_is_by_its_tab_or_its_mark(db: PgPool) {
     for id in &m.ids {
         assert_eq!(kit.google.raw_fetches(id), 1, "downloaded once");
     }
+}
+
+/// Point `m`'s stream at another mailbox of its connection, as SQL in the
+/// workspace could (campbooks-cloud#242).
+async fn repoint(kit: &Kit, m: &Mailbox, mailbox: &str) {
+    sqlx::query("UPDATE connectors.streams SET mailbox_key = $2 WHERE id = $1")
+        .bind(m.stream)
+        .bind(mailbox)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+}
+
+/// campbooks-cloud#242: a member's change is bound to where it is made, the
+/// stream's connection and mailbox when it was recorded. The stream pointed
+/// at another mailbox by SQL after that: the change ends `skipped`
+/// (`unverified`) and nothing is written at the provider. A change recorded
+/// once the stream points there is the member's, and is made.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_change_whose_stream_was_repointed_after_it_was_recorded_is_never_made(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX"]]).await;
+    m.pause(&kit, true).await;
+    m.request(&kit, &[(m.ids[0].as_str(), json!({"kind": "archive"}))])
+        .await;
+    repoint(&kit, &m, "another-mailbox").await;
+    m.pause(&kit, false).await;
+    kit.google.clear_calls();
+    m.run(&kit).await;
+    assert!(kit.google.writes().is_empty(), "{:?}", kit.google.writes());
+    assert_eq!(kit.google.labels_of(&m.ids[0]), labels(&["INBOX"]));
+    assert_eq!(ends(&kit).await, [end("skipped", Some("unverified"))]);
+}
+
+/// The member stars message `n` of `m` while its stream is paused, and the
+/// change is bound as a version before destinations were bound did.
+async fn star_as_before(kit: &Kit, m: &Mailbox, n: usize) {
+    m.pause(kit, true).await;
+    m.request(kit, &[(m.ids[n].as_str(), json!({"kind": "star"}))])
+        .await;
+    let ids: Vec<uuid::Uuid> =
+        sqlx::query_scalar("SELECT id FROM connectors.outbound_changes WHERE state = 'pending'")
+            .fetch_all(&kit.db)
+            .await
+            .unwrap();
+    let mut tx = kit.state.db.begin_for(m.ws).await.unwrap();
+    crate::domain::outbound::bind_before_destinations(&mut tx, &kit.state.binding, m.ws, &ids)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+}
+
+/// A change recorded before destinations were bound (its MAC the `…/v1`
+/// encoding) is made only while its stream goes where it went at that
+/// deploy (`connectors.destinations_at_deploy`, which only the migration
+/// writes): not without that record, and not once the stream was
+/// repointed.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_change_recorded_before_destinations_is_made_only_where_its_stream_went_then(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX"], &["INBOX"], &["INBOX"]]).await;
+    // No record of the deploy: refused.
+    star_as_before(&kit, &m, 0).await;
+    m.pause(&kit, false).await;
+    m.run(&kit).await;
+    assert_eq!(kit.google.labels_of(&m.ids[0]), labels(&["INBOX"]));
+
+    // Recorded at the deploy as it still is: made.
+    let (connection, mailbox) = kit.at_of(m.stream).await;
+    sqlx::query(
+        "INSERT INTO connectors.destinations_at_deploy
+             (stream_id, workspace_id, inbox_id, connection_id, mailbox_key)
+         VALUES ($1, $2, $3::uuid, $4, $5)",
+    )
+    .bind(m.stream)
+    .bind(*m.ws.as_uuid())
+    .bind(&m.inbox)
+    .bind(connection)
+    .bind(&mailbox)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    star_as_before(&kit, &m, 1).await;
+    m.pause(&kit, false).await;
+    m.run(&kit).await;
+    assert_eq!(
+        kit.google.labels_of(&m.ids[1]),
+        labels(&["INBOX", "STARRED"])
+    );
+
+    // Repointed since the deploy: refused.
+    star_as_before(&kit, &m, 2).await;
+    repoint(&kit, &m, "another-mailbox").await;
+    m.pause(&kit, false).await;
+    m.run(&kit).await;
+    assert_eq!(kit.google.labels_of(&m.ids[2]), labels(&["INBOX"]));
+    assert_eq!(
+        ends(&kit).await,
+        [
+            end("skipped", Some("unverified")),
+            end("applied", None),
+            end("skipped", Some("unverified")),
+        ]
+    );
 }

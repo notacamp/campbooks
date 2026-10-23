@@ -10,6 +10,16 @@
 //! registers it with
 //! [`AppState::with_outbound`](crate::AppState::with_outbound). Until then
 //! nothing is ever confirmed, so nothing is sent or changed.
+//!
+//! Where a send goes is bound too (campbooks-cloud#242): the module that
+//! talks to outside accounts answers which connection, stream and mailbox
+//! an inbox goes out through ([`OutboundDestinations`], registered with
+//! [`AppState::with_destinations`](crate::AppState::with_destinations)), the
+//! asking module binds that [`Destination`] into the send's MACs when the
+//! member asks and when the send is released, and the sender passes the
+//! destination it resolved itself when it asks whether the send stands
+//! ([`OutboundRequests::stored_send`]): a send bound to another destination
+//! does not stand.
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
@@ -28,6 +38,62 @@ pub struct StoredSend {
     pub message: BlobRef,
 }
 
+/// Where a send or a change goes at the provider (campbooks-cloud#242): the
+/// connection whose grant makes it, the stream it goes through and that
+/// stream's mailbox at the provider (Zoho's account id; empty for Gmail).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Destination {
+    /// The connection (an id of the module that talks to outside accounts).
+    pub connection: Uuid,
+    /// The stream.
+    pub stream: Uuid,
+    /// The stream's mailbox key at the provider.
+    pub mailbox: String,
+}
+
+/// An inbox's [`Destination`] as resolved now.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Resolved {
+    /// Where it goes.
+    pub destination: Destination,
+    /// Whether it is the destination the inbox had when destinations were
+    /// first bound, as the migration that started binding them recorded it
+    /// (a table the runtime role cannot write). Only then may a binding made
+    /// before (which names no destination) still verify. Never bound itself.
+    pub as_at_deploy: bool,
+}
+
+/// A future returned by [`OutboundDestinations::destination`].
+pub type DestinationFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Option<Resolved>, Error>> + Send + 'a>>;
+
+/// Answers where an inbox's sends go: the module that talks to outside
+/// accounts implements it, the module that asks for sends binds what it
+/// answers (campbooks-cloud#242).
+pub trait OutboundDestinations: std::fmt::Debug + Send + Sync + 'static {
+    /// The destination of `inbox` (a container of the asking module), read
+    /// in `conn`, a transaction working in the inbox's workspace. `None`
+    /// when no connection feeds it, or when more than one stream claims it.
+    fn destination<'a>(&'a self, conn: &'a mut PgConnection, inbox: Uuid) -> DestinationFuture<'a>;
+}
+
+/// The port before a module provides one: no inbox goes anywhere.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoDestinations;
+
+impl OutboundDestinations for NoDestinations {
+    fn destination<'a>(
+        &'a self,
+        _conn: &'a mut PgConnection,
+        _inbox: Uuid,
+    ) -> DestinationFuture<'a> {
+        Box::pin(async { Ok(None) })
+    }
+}
+
+/// Shared handle to the registered [`OutboundDestinations`] port.
+pub type DestinationsPort = Arc<dyn OutboundDestinations>;
+
 /// A future returned by [`OutboundRequests::stored_send`].
 pub type StoredSendFuture<'a> =
     Pin<Box<dyn Future<Output = Result<Option<StoredSend>, Error>> + Send + 'a>>;
@@ -43,14 +109,16 @@ pub trait OutboundRequests: std::fmt::Debug + Send + Sync + 'static {
     /// that workspace): `Some` only while it waits for the provider (released,
     /// not sent, failed or cancelled), its stored binding verifies
     /// ([`state.binding`](crate::binding): the release that wrote it held
-    /// the key) and whoever asked for it may still send from its inbox.
-    /// `None` otherwise, or when there is no such send.
+    /// the key) for `at`, the destination the sender resolved for it
+    /// (`None`: none), and whoever asked for it may still send from its
+    /// inbox. `None` otherwise, or when there is no such send.
     fn stored_send<'a>(
         &'a self,
         state: &'a AppState,
         conn: &'a mut PgConnection,
         workspace: WorkspaceId,
         send: Uuid,
+        at: Option<&'a Resolved>,
     ) -> StoredSendFuture<'a>;
 
     /// For each of `items` (one requested change, as the asking module's
@@ -87,6 +155,7 @@ impl OutboundRequests for NoOutboundRequests {
         _conn: &'a mut PgConnection,
         _workspace: WorkspaceId,
         _send: Uuid,
+        _at: Option<&'a Resolved>,
     ) -> StoredSendFuture<'a> {
         Box::pin(async { Ok(None) })
     }

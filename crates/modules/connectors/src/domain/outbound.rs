@@ -16,8 +16,9 @@ use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use super::{
+    destinations,
     marks::{gmail_place, with_mark, zoho_mark},
-    model::StreamId,
+    model::{ConnectionId, StreamId},
 };
 use crate::{contract::ProviderStream, events::RequestedChange};
 
@@ -347,8 +348,27 @@ impl Backlog {
     }
 }
 
-/// The encoding of an outbound change's binding (campbooks-cloud#227).
+/// The encoding of an outbound change's binding as recorded before
+/// destinations were bound (campbooks-cloud#227): still verified for a
+/// change recorded before that deploy, while its stream goes where it went
+/// then.
 const OUTBOUND_CHANGE: &str = "campbooks/connectors.outbound-change/v1";
+
+/// The encoding of an outbound change's binding (campbooks-cloud#242): the
+/// row, where it is made (its stream's connection and mailbox) and, once
+/// the change put a message in the trash, where to put it back.
+const OUTBOUND_CHANGE_V2: &str = "campbooks/connectors.outbound-change/v2";
+
+/// Where a stream's changes are made: its connection and its mailbox at the
+/// provider (Zoho's account id; empty for Gmail). A change is bound to the
+/// one its stream had when it was recorded (campbooks-cloud#242).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct At<'a> {
+    /// The connection whose grant makes the change.
+    pub connection: ConnectionId,
+    /// The stream's mailbox key.
+    pub mailbox: &'a str,
+}
 
 /// An outbound change as recorded: what its binding covers.
 #[derive(sqlx::FromRow)]
@@ -361,17 +381,47 @@ struct Recorded {
     add_labels: Vec<String>,
     remove_labels: Vec<String>,
     mac: Option<Vec<u8>>,
+    restore_to: Option<Vec<String>>,
 }
 
 impl Recorded {
-    /// The row of `workspace`, field by field: the row, its stream, its
-    /// request, the message, the kind and the labels it adds and removes.
-    fn fields(&self, workspace: WorkspaceId) -> Fields {
+    /// The row of `workspace`, field by field, as bound before destinations
+    /// were: the row, its stream, its request, the message, the kind and
+    /// the labels it adds and removes.
+    fn fields_v1(&self, workspace: WorkspaceId) -> Fields {
         let mut fields = Fields::new(OUTBOUND_CHANGE);
+        self.common(&mut fields, workspace, None);
+        fields
+    }
+
+    /// The row of `workspace` made `at`, with `restore` (where a message it
+    /// put in the trash goes back to; `None` until the change was made).
+    fn fields(&self, workspace: WorkspaceId, at: At<'_>, restore: Option<&[String]>) -> Fields {
+        let mut fields = Fields::new(OUTBOUND_CHANGE_V2);
+        self.common(&mut fields, workspace, Some(at));
+        match restore {
+            None => {
+                fields.bytes(&[0]);
+            }
+            Some(tokens) => {
+                fields.bytes(&[1]).count(tokens.len());
+                for token in tokens {
+                    fields.str(token);
+                }
+            }
+        }
+        fields
+    }
+
+    fn common(&self, fields: &mut Fields, workspace: WorkspaceId, at: Option<At<'_>>) {
         fields
             .uuid(workspace.as_uuid())
             .uuid(&self.id)
-            .uuid(self.stream_id.as_uuid())
+            .uuid(self.stream_id.as_uuid());
+        if let Some(at) = at {
+            fields.uuid(at.connection.as_uuid()).str(at.mailbox);
+        }
+        fields
             .uuid(&self.request_id)
             .str(&self.provider_message_id)
             .str(&self.kind)
@@ -383,7 +433,14 @@ impl Recorded {
         for label in &self.remove_labels {
             fields.str(label);
         }
-        fields
+    }
+
+    /// Whether the row's binding holds as recorded (no restore yet), made
+    /// `at`: bound to it, or bound before destinations were and `pinned`
+    /// (`at` is where its stream went when they were first bound).
+    fn holds(&self, binding: &Binding, workspace: WorkspaceId, at: At<'_>, pinned: bool) -> bool {
+        binding.verify(&self.fields(workspace, at, None), self.mac.as_deref())
+            || (pinned && binding.verify(&self.fields_v1(workspace), self.mac.as_deref()))
     }
 }
 
@@ -391,7 +448,7 @@ impl Recorded {
 async fn recorded(conn: &mut PgConnection, ids: &[Uuid]) -> Result<Vec<Recorded>> {
     Ok(sqlx::query_as(
         "SELECT id, stream_id, request_id, provider_message_id, kind, add_labels, remove_labels,
-                mac
+                mac, restore_to
            FROM connectors.outbound_changes WHERE id = ANY($1)",
     )
     .bind(ids)
@@ -399,14 +456,15 @@ async fn recorded(conn: &mut PgConnection, ids: &[Uuid]) -> Result<Vec<Recorded>
     .await?)
 }
 
-/// Re-tag, with the current key, every pending outbound change of
-/// `workspace` (the transaction's) whose MAC verifies under the previous key
-/// only (a rotation of the instance secret key, campbooks-cloud#262): the
-/// MAC was just verified, so what was bound stays bound and nothing new is
-/// trusted. Each update is a compare-and-set on the old MAC. Returns how
-/// many were re-tagged, and how many changed while this ran (left for the
-/// next run). Changes no longer pending are never verified again, so they
-/// are left as they are.
+/// Re-tag, with the current key, every outbound change of `workspace` (the
+/// transaction's) still to be verified (pending, or holding where a message
+/// it trashed goes back to) whose MAC verifies under the previous key only
+/// (a rotation of the instance secret key, campbooks-cloud#262), for where
+/// its stream goes now (a change bound elsewhere is left): the MAC was just
+/// verified, so what was bound stays bound and nothing new is trusted. Each
+/// update is a compare-and-set on the old MAC. Returns how many were
+/// re-tagged, and how many changed while this ran (left for the next run).
+/// Other changes are never verified again, so they are left as they are.
 pub async fn retag(
     conn: &mut PgConnection,
     binding: &Binding,
@@ -414,15 +472,39 @@ pub async fn retag(
 ) -> Result<(u64, u64)> {
     let rows: Vec<Recorded> = sqlx::query_as(
         "SELECT id, stream_id, request_id, provider_message_id, kind, add_labels, remove_labels,
-                mac
+                mac, restore_to
            FROM connectors.outbound_changes
-          WHERE state = 'pending' AND mac IS NOT NULL ORDER BY id",
+          WHERE mac IS NOT NULL
+            AND (state = 'pending' OR (state = 'applied' AND restore_to IS NOT NULL))
+          ORDER BY id",
     )
     .fetch_all(&mut *conn)
     .await?;
+    let streams: HashMap<StreamId, (ConnectionId, String)> =
+        sqlx::query_as::<_, (StreamId, ConnectionId, String)>(
+            "SELECT id, connection_id, mailbox_key FROM connectors.streams",
+        )
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|(stream, connection, mailbox)| (stream, (connection, mailbox)))
+        .collect();
     let (mut retagged, mut left) = (0, 0);
     for row in rows {
-        let Some(mac) = binding.retag(&row.fields(workspace), row.mac.as_deref()) else {
+        let Some((connection, mailbox)) = streams.get(&row.stream_id) else {
+            continue;
+        };
+        let at = At {
+            connection: *connection,
+            mailbox,
+        };
+        let mac = row.mac.as_deref();
+        let restore = row.restore_to.as_deref();
+        let Some(mac) = restore
+            .and_then(|restore| binding.retag(&row.fields(workspace, at, Some(restore)), mac))
+            .or_else(|| binding.retag(&row.fields(workspace, at, None), mac))
+            .or_else(|| binding.retag(&row.fields_v1(workspace), mac))
+        else {
             continue;
         };
         let done = sqlx::query(
@@ -443,20 +525,23 @@ pub async fn retag(
 }
 
 /// Bind the outbound changes `ids` of `workspace`, just recorded in `conn`
-/// (campbooks-cloud#227): a MAC over each row as written, under a key the
-/// database never holds, which a run verifies before it makes the change
-/// ([`backlog`]). Without a key the rows stay unbound, and are not made.
+/// (campbooks-cloud#227), to be made `at` (the connection and mailbox of
+/// the stream they were recorded for, campbooks-cloud#242): a MAC over each
+/// row as written, under a key the database never holds, which a run
+/// verifies before it makes the change ([`backlog`]). Without a key the rows
+/// stay unbound, and are not made.
 pub async fn bind(
     conn: &mut PgConnection,
     binding: &Binding,
     workspace: WorkspaceId,
+    at: At<'_>,
     ids: &[Uuid],
 ) -> Result<()> {
     if ids.is_empty() {
         return Ok(());
     }
     for row in recorded(conn, ids).await? {
-        let mac = binding.tag(&row.fields(workspace));
+        let mac = binding.tag(&row.fields(workspace, at, None));
         sqlx::query("UPDATE connectors.outbound_changes SET mac = $2 WHERE id = $1")
             .bind(row.id)
             .bind(mac)
@@ -466,33 +551,76 @@ pub async fn bind(
     Ok(())
 }
 
-/// The changes of `pending` whose binding verifies. The others (planted or
-/// edited by SQL, or recorded by an older version) are never made: they end
-/// `skipped` (`unverified`) and their messages are re-read from the
-/// provider, so Campbooks shows the provider's state.
+/// Bind the outbound changes `ids` of `workspace` as a version before
+/// destinations were bound did (`…/v1`): for tests of what was in flight at
+/// that deploy.
+#[cfg(test)]
+pub async fn bind_before_destinations(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    workspace: WorkspaceId,
+    ids: &[Uuid],
+) -> Result<()> {
+    for row in recorded(conn, ids).await? {
+        sqlx::query("UPDATE connectors.outbound_changes SET mac = $2 WHERE id = $1")
+            .bind(row.id)
+            .bind(binding.tag(&row.fields_v1(workspace)))
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(())
+}
+
+/// The changes of `pending` whose binding verifies for a run made `at`. The
+/// others (planted or edited by SQL, recorded by an older version, or bound
+/// to another connection or mailbox than the stream has now) are never
+/// made: they end `skipped` (`unverified`) and their messages are re-read
+/// from the provider, so Campbooks shows the provider's state.
 async fn verified(
     conn: &mut PgConnection,
     binding: &Binding,
     workspace: WorkspaceId,
-    stream: StreamId,
+    (stream, at): (StreamId, At<'_>),
     pending: Vec<Pending>,
     now: DateTime<Utc>,
 ) -> Result<Vec<Pending>> {
     if pending.is_empty() {
         return Ok(pending);
     }
+    let pinned = destinations::as_at_deploy(conn, None, stream, at.connection, at.mailbox).await?;
     let ids: Vec<Uuid> = pending.iter().map(|p| p.id).collect();
     let bound: HashSet<Uuid> = recorded(conn, &ids)
         .await?
         .into_iter()
         .filter(|row| row.stream_id == stream)
-        .filter(|row| binding.verify(&row.fields(workspace), row.mac.as_deref()))
+        .filter(|row| row.holds(binding, workspace, at, pinned))
         .map(|row| row.id)
         .collect();
     let (kept, refused): (Vec<Pending>, Vec<Pending>) =
         pending.into_iter().partition(|p| bound.contains(&p.id));
+    refuse(conn, stream, &refused, now).await?;
+    if !refused.is_empty() {
+        tracing::warn!(
+            %workspace,
+            %stream,
+            refused = refused.len(),
+            "outbound changes not bound to the request they were recorded for, or to where \
+             their stream goes now; they are not made"
+        );
+    }
+    Ok(kept)
+}
+
+/// End `refused` (`skipped`, `unverified`) without making them, and flag
+/// their messages to be re-read from the provider.
+async fn refuse(
+    conn: &mut PgConnection,
+    stream: StreamId,
+    refused: &[Pending],
+    now: DateTime<Utc>,
+) -> Result<()> {
     if refused.is_empty() {
-        return Ok(kept);
+        return Ok(());
     }
     let ids: Vec<Uuid> = refused.iter().map(|p| p.id).collect();
     let messages: Vec<String> = refused
@@ -516,24 +644,21 @@ async fn verified(
     .bind(&messages)
     .execute(&mut *conn)
     .await?;
-    tracing::warn!(
-        %workspace,
-        %stream,
-        refused = refused.len(),
-        "outbound changes not bound to the request they were recorded for; they are not made"
-    );
-    Ok(kept)
+    Ok(())
 }
 
 /// The pending changes of `stream` (at most [`PUSH_LIMIT`]) with what the
-/// push needs to know about their messages. Only changes whose binding
-/// verifies (`binding`, campbooks-cloud#227) are taken; the others end
-/// `skipped` (`unverified`) and are never made.
+/// push needs to know about their messages, for a run made `at` (the
+/// stream's connection and mailbox as the run loaded them). Only changes
+/// whose binding verifies for it (`binding`, campbooks-cloud#227, #242) are
+/// taken; the others end `skipped` (`unverified`) and are never made. So is
+/// a change taking a message out of the trash or spam when where to put it
+/// back no longer verifies (Zoho's `restore_to`, edited by SQL).
 pub async fn backlog(
     pool: &PgPool,
     binding: &Binding,
     workspace: WorkspaceId,
-    stream: StreamId,
+    (stream, at): (StreamId, At<'_>),
     now: DateTime<Utc>,
 ) -> Result<Backlog> {
     let mut tx = pool.begin_for(workspace).await?;
@@ -559,7 +684,9 @@ pub async fn backlog(
         created_at: row.created_at,
     })
     .collect();
-    let pending = verified(&mut tx, binding, workspace, stream, pending, now).await?;
+    let pending = verified(&mut tx, binding, workspace, (stream, at), pending, now).await?;
+    let (pending, restore) =
+        with_restores(&mut tx, binding, workspace, (stream, at), pending, now).await?;
     if pending.is_empty() {
         tx.commit().await?;
         return Ok(Backlog::default());
@@ -614,7 +741,6 @@ pub async fn backlog(
                 }),
             });
     }
-    let restore = restore_of(&mut tx, stream, &ids).await?;
     tx.commit().await?;
     Ok(Backlog {
         pending,
@@ -624,36 +750,111 @@ pub async fn backlog(
     })
 }
 
+/// `pending` without the changes taking a message out of the trash or spam
+/// whose place to go back to does not verify ([`restore_of`]): those end
+/// `skipped` (`unverified`). With the places that verify.
+async fn with_restores(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    workspace: WorkspaceId,
+    (stream, at): (StreamId, At<'_>),
+    pending: Vec<Pending>,
+    now: DateTime<Utc>,
+) -> Result<(Vec<Pending>, HashMap<String, Vec<String>>)> {
+    let messages: Vec<String> = pending
+        .iter()
+        .map(|p| p.provider_message_id.clone())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    let (restore, unbound) =
+        restore_of(&mut *conn, binding, workspace, (stream, at), &messages).await?;
+    // Out of the trash or spam, and into neither: where it goes is the
+    // record's.
+    let bin = |l: &String| l == "TRASH" || l == "SPAM";
+    let (refused, pending): (Vec<Pending>, Vec<Pending>) = pending.into_iter().partition(|p| {
+        unbound.contains(&p.provider_message_id)
+            && p.remove.iter().any(bin)
+            && !p.add.iter().any(bin)
+    });
+    if !refused.is_empty() {
+        refuse(conn, stream, &refused, now).await?;
+        tracing::warn!(
+            %workspace,
+            %stream,
+            refused = refused.len(),
+            "where a message goes back to out of the trash is not bound to the change that \
+             trashed it; it is not put back"
+        );
+    }
+    Ok((pending, restore))
+}
+
 /// Where each of `ids` (messages of `stream`) was before Campbooks put it in
-/// the trash at Zoho, while that still holds.
+/// the trash at Zoho, while that still holds, and the messages whose record
+/// of it does not verify (campbooks-cloud#242): the run that made the trash
+/// change binds where the message was into that change's MAC; one edited
+/// by SQL, or recorded before that and not as the deploy recorded it
+/// (`connectors.restores_at_deploy`), is not used.
 async fn restore_of(
     conn: &mut PgConnection,
-    stream: StreamId,
+    binding: &Binding,
+    workspace: WorkspaceId,
+    (stream, at): (StreamId, At<'_>),
     ids: &[String],
-) -> Result<HashMap<String, Vec<String>>> {
+) -> Result<(HashMap<String, Vec<String>>, HashSet<String>)> {
     // Where each message was before Campbooks put it in the trash (Zoho):
     // only when that is the latest trash or spam change made to it, and
     // only while no sync has seen it leave the trash since (a sync clears
     // the record then, `forget_left_trash`).
-    Ok(sqlx::query!(
-        r#"SELECT o.provider_message_id, o.restore_to AS "restore_to!"
-             FROM connectors.outbound_changes o
-            WHERE o.stream_id = $1 AND o.provider_message_id = ANY($2)
-              AND o.kind = 'trash' AND o.state = 'applied' AND o.restore_to IS NOT NULL
-              AND NOT EXISTS (
-                  SELECT 1 FROM connectors.outbound_changes l
-                   WHERE l.stream_id = o.stream_id
-                     AND l.provider_message_id = o.provider_message_id
-                     AND l.kind IN ('trash', 'untrash', 'spam', 'unspam')
-                     AND l.state = 'applied' AND l.id > o.id)"#,
-        stream as StreamId,
-        ids,
+    let rows: Vec<Recorded> = sqlx::query_as(
+        "SELECT o.id, o.stream_id, o.request_id, o.provider_message_id, o.kind, o.add_labels,
+                o.remove_labels, o.mac, o.restore_to
+           FROM connectors.outbound_changes o
+          WHERE o.stream_id = $1 AND o.provider_message_id = ANY($2)
+            AND o.kind = 'trash' AND o.state = 'applied' AND o.restore_to IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM connectors.outbound_changes l
+                 WHERE l.stream_id = o.stream_id
+                   AND l.provider_message_id = o.provider_message_id
+                   AND l.kind IN ('trash', 'untrash', 'spam', 'unspam')
+                   AND l.state = 'applied' AND l.id > o.id)",
     )
-    .fetch_all(conn)
+    .bind(stream)
+    .bind(ids)
+    .fetch_all(&mut *conn)
+    .await?;
+    let (mut restore, mut unbound) = (HashMap::new(), HashSet::new());
+    if rows.is_empty() {
+        return Ok((restore, unbound));
+    }
+    let pinned = destinations::as_at_deploy(conn, None, stream, at.connection, at.mailbox).await?;
+    let changes: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
+    let at_deploy: HashMap<Uuid, Vec<String>> = sqlx::query_as::<_, (Uuid, Vec<String>)>(
+        "SELECT change_id, restore_to FROM connectors.restores_at_deploy
+          WHERE change_id = ANY($1)",
+    )
+    .bind(&changes)
+    .fetch_all(&mut *conn)
     .await?
     .into_iter()
-    .map(|row| (row.provider_message_id, row.restore_to))
-    .collect())
+    .collect();
+    for row in rows {
+        let Some(tokens) = row.restore_to.clone() else {
+            continue;
+        };
+        let mac = row.mac.as_deref();
+        let bound = binding.verify(&row.fields(workspace, at, Some(&tokens)), mac)
+            || (pinned
+                && at_deploy.get(&row.id) == Some(&tokens)
+                && binding.verify(&row.fields_v1(workspace), mac));
+        if bound {
+            restore.insert(row.provider_message_id, tokens);
+        } else {
+            unbound.insert(row.provider_message_id);
+        }
+    }
+    Ok((restore, unbound))
 }
 
 /// How one change ended in a run.
@@ -683,10 +884,15 @@ pub struct Outcome {
     pub restore: Vec<(Uuid, Vec<String>)>,
 }
 
-/// Record `outcome` for `stream`.
+/// Record `outcome` for `stream` of `workspace`, a run made `at`. Where a
+/// change put a message in the trash from is bound into that change's MAC
+/// (`binding`, campbooks-cloud#242), only while the change still verifies as
+/// recorded: one edited meanwhile gets no place to go back to.
 pub async fn record_outcome(
     conn: &mut PgConnection,
-    stream: StreamId,
+    binding: &Binding,
+    workspace: WorkspaceId,
+    (stream, at): (StreamId, At<'_>),
     outcome: &Outcome,
     now: DateTime<Utc>,
 ) -> Result<()> {
@@ -730,15 +936,7 @@ pub async fn record_outcome(
         .execute(&mut *conn)
         .await?;
     }
-    for (id, tokens) in &outcome.restore {
-        sqlx::query!(
-            "UPDATE connectors.outbound_changes SET restore_to = $2 WHERE id = $1",
-            id,
-            tokens,
-        )
-        .execute(&mut *conn)
-        .await?;
-    }
+    bind_restores(conn, binding, workspace, (stream, at), &outcome.restore).await?;
     if !outcome.reemit.is_empty() {
         sqlx::query!(
             r#"UPDATE connectors.messages SET reemit = true
@@ -746,6 +944,54 @@ pub async fn record_outcome(
             stream as StreamId,
             &outcome.reemit,
         )
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Record, for each change of `restores` (made by this run, `at`), where it
+/// put its message in the trash from, and bind it into the change's MAC.
+async fn bind_restores(
+    conn: &mut PgConnection,
+    binding: &Binding,
+    workspace: WorkspaceId,
+    (stream, at): (StreamId, At<'_>),
+    restores: &[(Uuid, Vec<String>)],
+) -> Result<()> {
+    if restores.is_empty() {
+        return Ok(());
+    }
+    let pinned = destinations::as_at_deploy(conn, None, stream, at.connection, at.mailbox).await?;
+    let ids: Vec<Uuid> = restores.iter().map(|(id, _)| *id).collect();
+    let rows: HashMap<Uuid, Recorded> = recorded(conn, &ids)
+        .await?
+        .into_iter()
+        .map(|row| (row.id, row))
+        .collect();
+    for (id, tokens) in restores {
+        let Some(row) = rows
+            .get(id)
+            .filter(|row| row.stream_id == stream && row.holds(binding, workspace, at, pinned))
+        else {
+            tracing::warn!(
+                %workspace,
+                %stream,
+                change = %id,
+                "a change that trashed a message is no longer bound as recorded; where it was \
+                 is not kept"
+            );
+            continue;
+        };
+        let mac = binding.tag(&row.fields(workspace, at, Some(tokens)));
+        sqlx::query(
+            "UPDATE connectors.outbound_changes SET restore_to = $2, mac = $3
+              WHERE id = $1 AND mac IS NOT DISTINCT FROM $4",
+        )
+        .bind(id)
+        .bind(tokens)
+        .bind(mac)
+        .bind(row.mac.as_deref())
         .execute(&mut *conn)
         .await?;
     }

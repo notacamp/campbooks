@@ -135,11 +135,13 @@ impl JobHandler for SyncStream {
         // late after a long pause.
         let retention = TimeDelta::days(i64::from(self.deps.config.batch_retention_days));
         outbound::expire(ctx.pool(), workspace, target.stream, now - retention, now).await?;
+        // Only changes bound to where this run makes them: the connection
+        // and mailbox loaded above (campbooks-cloud#242).
         let backlog = outbound::backlog(
             ctx.pool(),
             &ctx.state().binding,
             workspace,
-            target.stream,
+            (target.stream, target.at()),
             now,
         )
         .await?;
@@ -209,13 +211,22 @@ impl SyncStream {
     async fn record_push(
         ctx: &JobContext,
         workspace: WorkspaceId,
-        stream: StreamId,
+        target: &Target,
         provider: Provider,
         pushed: Push,
         now: DateTime<Utc>,
     ) -> Result<Option<ProviderError>, JobError> {
+        let stream = target.stream;
         let mut tx = ctx.pool().begin_for(workspace).await?;
-        outbound::record_outcome(&mut tx, stream, &pushed.outcome, now).await?;
+        outbound::record_outcome(
+            &mut tx,
+            &ctx.state().binding,
+            workspace,
+            (stream, target.at()),
+            &pushed.outcome,
+            now,
+        )
+        .await?;
         for (id, name) in &pushed.created {
             let insert = match provider {
                 // Gmail's own record (`kind`) says what it is.
@@ -320,8 +331,7 @@ impl SyncStream {
             // What Gmail now holds is recorded first; settling the budget
             // after is best effort (a miss only leaves the budget as taken).
             let trouble =
-                Self::record_push(ctx, workspace, target.stream, Provider::Google, pushed, now)
-                    .await?;
+                Self::record_push(ctx, workspace, target, Provider::Google, pushed, now).await?;
             if let Err(err) =
                 schedule::settle_budget(ctx.pool(), target.provider, cost, spent, rate).await
             {
@@ -471,8 +481,7 @@ impl SyncStream {
                 });
             }
             if let Some(err) =
-                Self::record_push(ctx, workspace, target.stream, Provider::Zoho, pushed, now)
-                    .await?
+                Self::record_push(ctx, workspace, target, Provider::Zoho, pushed, now).await?
             {
                 self.trouble(ctx, workspace, target, &err, now).await?;
                 return Ok(None);
@@ -1135,6 +1144,17 @@ async fn settle_outbound(
 ) -> Result<bool, JobError> {
     outbound::prune(tx, stream, before, read_up_to).await?;
     Ok(outbound::more_pending(tx, stream, pushed_up_to).await?)
+}
+
+impl Target {
+    /// Where this run makes the stream's changes: the connection and the
+    /// mailbox loaded with it.
+    fn at(&self) -> outbound::At<'_> {
+        outbound::At {
+            connection: self.connection,
+            mailbox: &self.mailbox_key,
+        }
+    }
 }
 
 /// The stream and its connection, read in a short transaction of its own.

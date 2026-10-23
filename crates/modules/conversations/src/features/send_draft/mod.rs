@@ -207,7 +207,7 @@ fn members_own_send<S: ScopeName>(workspace: &Workspace<S>, draft: DraftId) -> R
 /// `generation` (scheduled in `tx`) with a MAC the database cannot forge
 /// (campbooks-cloud#227): `release_send` releases only a draft whose
 /// content, recipients, inbox, author and generation are still the ones
-/// signed here. Without the instance secret there is no key, and nothing
+/// signed here, going to the destination signed here (campbooks-cloud#242). Without the instance secret there is no key, and nothing
 /// is scheduled.
 async fn bind_request(
     state: &AppState,
@@ -217,6 +217,13 @@ async fn bind_request(
     generation: i32,
 ) -> Result<()> {
     let (row, content) = draft;
+    // Where the inbox's mail goes out now (campbooks-cloud#242): bound
+    // with the request, so a stream repointed before the release does not
+    // verify.
+    let at = state
+        .destinations
+        .destination(&mut *tx, row.inbox_id.into())
+        .await?;
     let request = binding::SendRequest {
         workspace: access.workspace,
         draft: row.id,
@@ -224,6 +231,7 @@ async fn bind_request(
         author: access.user,
         inbox: row.inbox_id,
         content,
+        destination: binding::Bound::at(at.as_ref()),
     };
     let Some(mac) = request.sign(&state.binding) else {
         tracing::warn!(
