@@ -76,10 +76,12 @@ export function runnable(
   list: Readonly<Record<string, Runnable>> = RUNNABLE,
 ): Ready | undefined {
   const entry = Object.hasOwn(list, request.operation) ? list[request.operation] : undefined;
+  // Whatever the server's document says a method may be: only these two.
+  const method: string = request.method;
   if (
     entry === undefined ||
-    (request.method !== "POST" && request.method !== "DELETE") ||
-    request.method !== entry.method
+    (method !== "POST" && method !== "DELETE") ||
+    method !== entry.method
   ) {
     return undefined;
   }
