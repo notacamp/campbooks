@@ -198,12 +198,15 @@ Attention changes this requires:
 
 ## The `OpenTasks` port
 
-`kernel::tasks::OpenTasks::open_tasks(ws, inbox, conversation, sender_address)`
-returns at most 10 open tasks, newest first, whose source is that conversation
-or whose `source_sender` is that address **in that inbox**. Each comes with
-its RecordRef, title and due date. It is for the email read's prompt only:
-titles never go into an event. If campbooks-cloud#42 has already defined the
-trait on `next`, implement that one. Otherwise, define it here.
+`kernel::tasks::OpenTasks::open_tasks(conn, ws, inbox: Uuid, conversation:
+Uuid, sender_address)` is the file the calendar change (campbooks-cloud#42)
+also defines, taken from there verbatim so the second PR to merge merges
+cleanly. It returns at most `MAX_OPEN_TASKS` (10) open tasks, newest first,
+whoever holds them, whose source is that conversation or whose
+`source_sender` is that address **in that inbox**. Each is an `OpenTask`:
+`reference` (the task's id as a hyphenated uuid), `title`, `due_on` and
+`due_at`. It is for the email read's prompt only: titles never go into an
+event.
 
 ## Deviations while building
 

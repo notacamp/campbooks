@@ -15,10 +15,11 @@ async fn ask(
     conversation: &str,
     sender: &str,
 ) -> Vec<(String, Option<String>)> {
+    let id = |text: &str| text.parse::<sqlx::types::Uuid>().unwrap();
     let port = crate::open_tasks();
     let mut tx = kit.begin(workspace).await;
     let found = port
-        .open_tasks(&mut tx, workspace, inbox, conversation, sender)
+        .open_tasks(&mut tx, workspace, id(inbox), id(conversation), sender)
         .await
         .unwrap();
     found

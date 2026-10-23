@@ -65,6 +65,9 @@ pub struct AppState {
     /// campbooks-cloud#242). The server registers the `connectors` module's;
     /// until then no inbox goes anywhere.
     pub destinations: DestinationsPort,
+    /// Answers which tasks are open for an email ([`tasks`](crate::tasks)).
+    /// The server registers the owner of tasks'; until then none is.
+    pub open_tasks: OpenTasksPort,
     /// Answers which language a user chose, for the
     /// [`Locale`](crate::i18n::Locale) of their requests. The server
     /// registers the `workspaces` module's implementation; until then
@@ -132,9 +135,6 @@ pub struct AppState {
     /// Appends to the admin audit trail. The server registers the `admin`
     /// module's implementation; until then no admin request is answered.
     pub admin_audit: AdminAuditPort,
-    /// Answers which tasks are open about a message ([`tasks`](crate::tasks)).
-    /// The server registers the `tasks` module's; until then none are.
-    pub open_tasks: OpenTasksPort,
     /// Sends the instance's own mail ([`mail`](crate::mail)). The server
     /// installs the configured one; until then nothing is sent.
     pub mailer: crate::mail::MailerPort,
@@ -161,6 +161,7 @@ impl AppState {
             kept_mail: Arc::new(NoKeptMail),
             outbound: Arc::new(NoOutboundRequests),
             destinations: Arc::new(NoDestinations),
+            open_tasks: Arc::new(NoOpenTasks),
             grants: Arc::new(NoGrantIntake),
             consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
@@ -174,16 +175,8 @@ impl AppState {
             signer: Signer::default(),
             binding: Binding::disabled(),
             resources: authz::Catalogue::default(),
-            open_tasks: Arc::new(NoOpenTasks),
             mailer: Arc::new(crate::mail::NoMailer),
         }
-    }
-
-    /// The same state, reading open tasks through `open_tasks`.
-    #[must_use]
-    pub fn with_open_tasks(mut self, open_tasks: OpenTasksPort) -> Self {
-        self.open_tasks = open_tasks;
-        self
     }
 
     /// The same state, sending the instance's mail through `mailer`.
@@ -229,6 +222,13 @@ impl AppState {
     #[must_use]
     pub fn with_destinations(mut self, destinations: DestinationsPort) -> Self {
         self.destinations = destinations;
+        self
+    }
+
+    /// The same state, asking `open_tasks` which tasks are open for an email.
+    #[must_use]
+    pub fn with_open_tasks(mut self, open_tasks: OpenTasksPort) -> Self {
+        self.open_tasks = open_tasks;
         self
     }
 
