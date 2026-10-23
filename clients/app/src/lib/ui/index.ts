@@ -290,6 +290,7 @@ export {
 export { Steps, type StepsProps } from "./components/Steps/Steps";
 export { TabBar, type TabBarItem, type TabBarProps } from "./components/TabBar/TabBar";
 export { Tag, type TagProps } from "./components/Tag/Tag";
+export { TaskRow, type TaskRowChip, type TaskRowProps } from "./components/TaskRow/TaskRow";
 export { ThinkingTrace, type ThinkingTraceProps } from "./components/ThinkingTrace/ThinkingTrace";
 export {
   Toast,

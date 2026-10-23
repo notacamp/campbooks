@@ -19,7 +19,7 @@
 //!
 //! Any other mailbox is connected over IMAP and SMTP with its password
 //! (`imap/`: finding its servers and checking the password before it is
-//! kept; reading it comes with campbooks-cloud#311).
+//! kept, then reading it, each message once wherever it is filed).
 //!
 //! `lib.rs` assembles [`module`]; each use case is a slice under
 //! `features/`, shared rules live in `domain/`, what the mail adapters share
@@ -53,6 +53,8 @@ pub mod scopes;
 mod testkit;
 #[cfg(test)]
 mod testkit_imap;
+#[cfg(test)]
+mod testkit_imap_mailbox;
 #[cfg(test)]
 mod testkit_zoho;
 mod zoho;

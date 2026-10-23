@@ -2,7 +2,8 @@
 //! tombstone (campbooks-cloud#65).
 //!
 //! The workspaces module's purge job deletes a workspace's kernel rows (its
-//! change feed, its finished jobs, its events) in short batches
+//! change feed, its finished jobs, its events, its tracked events) in short
+//! batches
 //! ([`purge_workspace`]), then deletes the workspace's row and records its
 //! [`tombstone`] in one transaction. Rows of the workspace that appear
 //! afterwards (another module's purge running later publishes an event, its
@@ -38,6 +39,8 @@ pub struct Purged {
     pub events: u64,
     /// Changes of the change feed.
     pub changes: u64,
+    /// Tracked events in the outbox, published or not (ADR 0020).
+    pub tracked: u64,
     /// Idempotency keys first used on the workspace's routes, expired or not.
     pub keys: u64,
     /// Transactions it took for the change feed, the jobs and the events,
@@ -45,8 +48,10 @@ pub struct Purged {
     pub batches: u32,
 }
 
-/// Delete `workspace`'s change feed, finished jobs and events no pending or
-/// running delivery reads, [`PURGE_BATCH`] rows per table at a time, each
+/// Delete `workspace`'s change feed, finished jobs, events no pending or
+/// running delivery reads and tracked events (through
+/// `kernel.purge_workspace_tracked_events`: the runtime role may only append
+/// to the outbox), [`PURGE_BATCH`] rows per table at a time, each
 /// batch in a short transaction of its own working in `workspace` (row-level
 /// security applies), then its idempotency keys, expired or not, in short
 /// transactions of their own there too
@@ -59,13 +64,21 @@ pub async fn purge_workspace(pool: &PgPool, workspace: &str) -> Result<Purged, s
         let mut tx = crate::db::begin_in(pool, workspace).await?;
         let changes = crate::changes::purge_workspace(&mut tx, workspace, PURGE_BATCH).await?;
         let (jobs, events) = crate::jobs::purge_workspace(&mut tx, workspace, PURGE_BATCH).await?;
+        let tracked: i64 =
+            sqlx::query_scalar("SELECT kernel.purge_workspace_tracked_events($1, $2)")
+                .bind(workspace)
+                .bind(i32::try_from(PURGE_BATCH).unwrap_or(i32::MAX))
+                .fetch_one(&mut *tx)
+                .await?;
+        let tracked = tracked.unsigned_abs();
         tx.commit().await?;
         purged.batches += 1;
         purged.changes += changes;
         purged.jobs += jobs;
         purged.events += events;
+        purged.tracked += tracked;
         let full = PURGE_BATCH.unsigned_abs();
-        if changes < full && jobs < full && events < full {
+        if changes < full && jobs < full && events < full && tracked < full {
             break;
         }
     }
@@ -93,7 +106,7 @@ pub async fn tombstone(
 
 /// Delete what reached the kernel's tables of a purged workspace after its
 /// purge, for every tombstone ([`purge_workspace`]: changes, finished jobs,
-/// events no pending or running delivery reads), then drop the tombstones
+/// events no pending or running delivery reads, tracked events), then drop the tombstones
 /// older than 30 days whose workspace has nothing left. A workspace that is
 /// live again is skipped with a warning, its tombstone kept; a workspace
 /// whose purge fails is logged and tried again by the next sweep, and the
@@ -127,6 +140,7 @@ impl Job for SweepPurgedWorkspaces {
                     swept.jobs += purged.jobs;
                     swept.events += purged.events;
                     swept.changes += purged.changes;
+                    swept.tracked += purged.tracked;
                     swept.keys += purged.keys;
                 }
                 Ok(None) => kept.push(workspace.clone()),
@@ -164,6 +178,7 @@ impl Job for SweepPurgedWorkspaces {
             jobs = swept.jobs,
             events = swept.events,
             changes = swept.changes,
+            tracked = swept.tracked,
             keys = swept.keys,
             kept = kept.len(),
             dropped,

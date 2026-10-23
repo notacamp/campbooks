@@ -29,6 +29,8 @@ export {
   warningReasons,
 } from "./needs";
 export { useInboxes } from "./api/queries";
+// Where tasks made from conversations came from (the Tasks place, via the app).
+export { useConversationSources } from "./api/task-sources";
 // What the search results page reuses: the reader, the inbox actions and the
 // reply composer, so a hit opens and is tidied exactly as in the inbox.
 export { ConversationReader } from "./components/Reader/ConversationReader";

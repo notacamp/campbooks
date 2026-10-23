@@ -1,0 +1,18 @@
+{
+  "errors": {
+    "invalid_title": "Une tâche a besoin d’un titre de 1 à 200 caractères.",
+    "invalid_source_sender": "L’adresse de l’expéditeur n’est pas valide.",
+    "due_time_needs_day": "Une heure d’échéance a besoin d’un jour d’échéance.",
+    "invalid_ids": "Demandez de 1 à 100 identifiants de tâches, séparés par des virgules.",
+    "invalid_offset": "Le décalage par rapport à UTC doit rester dans les 14 heures.",
+    "task_changed": "Cette tâche a changé depuis que vous l’avez vue. Rechargez-la et réessayez.",
+    "task_closed": "Cette tâche est déjà fermée.",
+    "task_open": "Cette tâche est encore ouverte.",
+    "task_not_yours": "Cette tâche est maintenant chez quelqu’un d’autre.",
+    "plan_needs_day": "Choisissez un jour pour la planifier.",
+    "invalid_later": "Choisissez une heure postérieure à maintenant et à moins d’un an.",
+    "not_a_member": "Vous ne pouvez confier une tâche qu’à un membre de cet espace de travail.",
+    "hand_off_yourself": "Choisissez quelqu’un d’autre à qui la confier.",
+    "not_handed_off": "Cette tâche n’a été confiée à personne."
+  }
+}

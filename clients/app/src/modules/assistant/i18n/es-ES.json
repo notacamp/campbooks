@@ -299,7 +299,9 @@
       "find_people_one": "He buscado personas: {{count}} encontrada",
       "find_people_other": "He buscado personas: {{count}} encontradas",
       "what_needs_me": "He leído lo que te necesita",
-      "my_inboxes": "He leído tus bandejas de entrada y flujos"
+      "my_inboxes": "He leído tus bandejas de entrada y flujos",
+      "my_tasks": "He leído tus tareas",
+      "read_task": "He leído una tarea"
     },
     "working": {
       "find_conversations": "Buscando conversaciones…",
@@ -307,7 +309,9 @@
       "conversation_history": "Leyendo qué ha pasado con este correo…",
       "find_people": "Buscando personas…",
       "what_needs_me": "Leyendo lo que te necesita…",
-      "my_inboxes": "Leyendo tus bandejas de entrada…"
+      "my_inboxes": "Leyendo tus bandejas de entrada…",
+      "my_tasks": "Leyendo tus tareas…",
+      "read_task": "Leyendo la tarea…"
     },
     "proposal": {
       "label": "Scout propone",
@@ -372,12 +376,12 @@
     "aboutNothing": "tu correo",
     "ruleIntro": "Pregúntame sobre esta regla.",
     "ruleDoes": "¿Qué hace esta regla?",
-    "ruleChanged": "¿Qué ha cambiado?",
+    "ruleChanged": "¿Qué ha cambiado esta regla?",
     "noticeIntro": "Pregúntame sobre lo que he notado.",
     "noticeWhy": "¿Por qué sugieres esto?",
     "noticeChange": "¿Qué cambiaría?",
     "nothingIntro": "Pregúntame sobre tu correo: qué te necesita, a quién esperas, qué te ha enviado alguien.",
-    "nothingToday": "¿Qué necesita de mí hoy?",
+    "nothingToday": "¿Qué requiere mi atención hoy?",
     "nothingWaiting": "¿Qué estoy esperando?",
     "fieldNothing": "Pregunta sobre tu correo",
     "unreadableRule": "Scout no puede abrir un chat sobre esta regla.",

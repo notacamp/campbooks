@@ -37,6 +37,16 @@ exceptions = [
     # 0BSD (public-domain-equivalent, no attribution even): the quoted-printable
     # encoder of lettre (the instance's own mail). Scoped to it.
     { crate = "quoted_printable", allow = ["0BSD"] },
+    # BSD-2-Clause (permissive, attribution only, like the BSD-3-Clause
+    # already allowed): the AMQP client stack under lapin (MIT), which the
+    # tracked events relay publishes with (campbooks-cloud#321). Scoped to it.
+    { crate = "amq-protocol", allow = ["BSD-2-Clause"] },
+    { crate = "amq-protocol-tcp", allow = ["BSD-2-Clause"] },
+    { crate = "amq-protocol-types", allow = ["BSD-2-Clause"] },
+    { crate = "amq-protocol-uri", allow = ["BSD-2-Clause"] },
+    { crate = "async-rs", allow = ["BSD-2-Clause"] },
+    { crate = "rustls-connector", allow = ["BSD-2-Clause"] },
+    { crate = "tcp-stream", allow = ["BSD-2-Clause"] },
 ]
 
 [licenses.private]

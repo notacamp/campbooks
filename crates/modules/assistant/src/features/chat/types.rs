@@ -113,6 +113,10 @@ pub enum ChatTool {
     WhatNeedsMe,
     /// Read your inboxes and their streams.
     MyInboxes,
+    /// Read your tasks (campbooks-cloud#43).
+    MyTasks,
+    /// Read one task and what changed in it.
+    ReadTask,
 }
 
 /// One thing Scout looked at, built by the server from the tool that ran,

@@ -1,8 +1,10 @@
 //! Any mailbox over IMAP and SMTP (ADR 0010, campbooks-cloud#310): finding
 //! its servers from the address ([`discover`]) and checking that its
-//! password opens both ([`verify`]) before it becomes a connection.
-//! Reading (campbooks-cloud#311), write-back (#312) and sending (#313)
-//! come later, over the same [`session::Session`].
+//! password opens both ([`verify`]) before it becomes a connection; then
+//! reading it (campbooks-cloud#311, [`read`]): its folders as places
+//! ([`folders`]), each message once wherever it is ([`state`]).
+//! Write-back (#312) and sending (#313) come later, over the same
+//! [`session::Session`].
 //!
 //! Every host is reached through the kernel's SSRF guard
 //! ([`campbooks_kernel::net::guard`]), at the address it checked, on a mail
@@ -11,11 +13,15 @@
 //! or logged: what went wrong is a stable [`Refusal`] code.
 
 pub mod discover;
+pub mod folders;
 mod ispdb;
 mod ispdb_files;
 pub mod net;
+pub mod read;
 pub mod session;
 pub mod smtp;
+pub mod state;
+pub mod syntax;
 pub mod tls;
 
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -131,6 +137,9 @@ impl Source {
 pub enum Refusal {
     /// The IMAP server refused the username and password.
     ImapLoginRefused,
+    /// The IMAP server is busy (`UNAVAILABLE`, `INUSE`, `LIMIT`): it did
+    /// not refuse the password.
+    ImapBusy,
     /// The SMTP server refused them (or asks for no sign-in at all).
     SmtpLoginRefused,
     /// The IMAP server could not be reached, or did not answer in time.
@@ -156,6 +165,7 @@ impl Refusal {
     pub const fn code(self) -> &'static str {
         match self {
             Self::ImapLoginRefused => "imap_login_refused",
+            Self::ImapBusy => "imap_busy",
             Self::SmtpLoginRefused => "smtp_login_refused",
             Self::ImapUnreachable => "imap_unreachable",
             Self::SmtpUnreachable => "smtp_unreachable",

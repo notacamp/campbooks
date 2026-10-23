@@ -28,6 +28,8 @@ icu_plurals.workspace = true
 ipnet.workspace = true
 http-body-util = { workspace = true, optional = true }
 jsonwebtoken.workspace = true
+# The tracked events relay to RabbitMQ (`tracking::relay`).
+lapin.workspace = true
 lettre.workspace = true
 # sqlx's pool options take a `log` level (`db::connect_runtime`).
 log.workspace = true

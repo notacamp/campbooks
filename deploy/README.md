@@ -400,6 +400,29 @@ server's address; no Matomo setting has to change. No IP, user id, workspace or 
 dimension is sent. A slow or unreachable Matomo costs dropped views
 (`campbooks_screen_views_total{outcome="failed"}`), never a slower app.
 
+**Tracked events.** Campbooks can keep a record of every action (who did what, with
+ids, counts and states only, never mail; `docs/tracking.md`) and publish it to a
+[RabbitMQ](https://www.rabbitmq.com) 4 broker of your own, for a warehouse or any other
+subscriber. It is off by default and needs nothing new until you turn it on:
+
+```sh
+CAMPBOOKS_TRACKING__SINK=amqp
+CAMPBOOKS_TRACKING__AMQP_URL=amqp://campbooks:<password>@rabbitmq:5672/%2f   # secret; amqps:// for TLS
+```
+
+The worker publishes each event once the change that made it commits, to the topic
+exchange `campbooks.events` (routing key `<event>.v<version>`), and declares a stream
+`campbooks.events` bound to it, kept for 30 days (`CAMPBOOKS_TRACKING__STREAM_MAX_AGE`).
+If the broker user may write but not configure, declare those yourself and set
+`CAMPBOOKS_TRACKING__DECLARE_TOPOLOGY=false`. While the broker is down, events wait in
+the database and go out when it is back; published ones are deleted from the database
+after a day (`CAMPBOOKS_TRACKING__PUBLISHED_RETENTION_HOURS`). Every setting, the message
+format and how to subscribe: `docs/tracking.md`. Watch
+`campbooks_tracking_backlog` and `campbooks_tracking_oldest_unpublished_seconds`: a
+backlog that keeps growing means the broker refuses or cannot be reached (the worker's
+logs say which, never the URL). `CAMPBOOKS_TRACKING__SINK=outbox` writes the events to
+the database table `kernel.tracked_events` and publishes nothing.
+
 **What you get.**
 
 | Metric (Prometheus name) | What | Labels |
@@ -418,6 +441,9 @@ dimension is sent. A slow or unreachable Matomo costs dropped views
 | `campbooks_errors_reported_total` | Error reports sent to the tracker | `source` |
 | `campbooks_client_telemetry_items_total` | The app's errors, timings and events | `kind`, `outcome` (`forwarded`, `dropped`) |
 | `campbooks_screen_views_total` | Screen views relayed to usage analytics | `outcome` (`forwarded`, `failed`, `dropped`: the queue was full) |
+| `campbooks_tracking_published_total` | Tracked events published to the broker | `outcome` (`confirmed`, `nacked`, `error`) |
+| `campbooks_tracking_backlog` | Tracked events waiting to be published | |
+| `campbooks_tracking_oldest_unpublished_seconds` | Age of the oldest tracked event waiting | |
 | `campbooks_build_info` | Always 1 | `service_version`, `campbooks_role` |
 
 Good first alerts: a rising share of 5xx in `http_server_request_duration_seconds_count`,

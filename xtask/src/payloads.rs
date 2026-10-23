@@ -60,6 +60,16 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
         "a record's id (a UUID as text)",
     ),
     (
+        "tasks.task_changed",
+        "source.type",
+        "a record type, from the code (`<module>.<record>`)",
+    ),
+    (
+        "tasks.task_changed",
+        "source.id",
+        "a record's id (a UUID as text)",
+    ),
+    (
         "connectors.connection_added",
         "account_subject",
         PROVIDER_SUBJECT,
@@ -516,19 +526,19 @@ pub const JOB_ERROR_VALUES: &[(&str, &str, usize, &str)] = &[
     (
         "crates/modules/connectors/src/features/sync_stream/mod.rs",
         "other.to_string()",
-        2,
+        3,
         READ_ERROR,
     ),
     (
         "crates/modules/connectors/src/features/sync_stream/mod.rs",
         "redact::json(&e)",
-        5,
+        7,
         REDACTED_JSON,
     ),
     (
         "crates/modules/connectors/src/features/sync_stream/mod.rs",
         "target.stream",
-        2,
+        3,
         "the stream's id (a UUID)",
     ),
     (

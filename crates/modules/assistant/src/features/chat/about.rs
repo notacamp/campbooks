@@ -1,8 +1,8 @@
 //! What a chat may be about: the about registry, by record type. Each entry
 //! names the read operations that describe a record of its type (invoked as
 //! the member, by operation id only) and how their answers are projected for
-//! the model: a conversation, a rule, or one of Scout's noticed suggestions.
-//! Calendar events and tasks add an entry each (no migration: the stored
+//! the model: a conversation, a rule, one of Scout's noticed suggestions, or
+//! a task. Calendar events add an entry (no migration: the stored
 //! type is checked here).
 
 use campbooks_kernel::RecordRef;
@@ -37,6 +37,8 @@ const CONVERSATION: &str = "conversations.conversation";
 const RULE: &str = "conversations.rule";
 /// One of Scout's noticed suggestions (a smart rule it offers).
 const RULE_NOTICE: &str = "conversations.rule_notice";
+/// A task.
+const TASK: &str = "tasks.task";
 
 /// Every record type a chat may be about.
 pub const REGISTRY: &[AboutType] = &[
@@ -57,6 +59,12 @@ pub const REGISTRY: &[AboutType] = &[
         reads: &["conversations.get_rule_notice"],
         id_param: "notice_id",
         lost_line: "chat.about_lost_rule_notice",
+    },
+    AboutType {
+        record_type: TASK,
+        reads: &["tasks.get"],
+        id_param: "task_id",
+        lost_line: "chat.about_lost_task",
     },
 ];
 
@@ -120,6 +128,7 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
         CONVERSATION => project::conversation(first, answers.get(1)),
         RULE => project::rule(first),
         RULE_NOTICE => project::rule_notice(first),
+        TASK => project::task_detail(first),
         _ => return Ok(Seen::Lost),
     };
     let mut value = json!({ "type": entry.record_type, "id": about.id });

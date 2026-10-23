@@ -26,6 +26,7 @@
     "imap_login_refused_other": "Le serveur de messagerie a refusé la connexion. Vérifiez le nom d’utilisateur et le mot de passe. Si votre fournisseur propose des mots de passe d’application, utilisez-en un.",
     "smtp_login_refused_one": "Le serveur d’envoi a refusé la connexion. Ce fournisseur exige un mot de passe d’application : créez-en un dans les paramètres de sécurité de votre compte et utilisez-le ici.",
     "smtp_login_refused_other": "Le serveur d’envoi (SMTP) a refusé la connexion. Vérifiez le nom d’utilisateur et le mot de passe, et que le serveur vous permet d’envoyer.",
+    "imap_busy": "Le serveur de messagerie est occupé et n’a pas laissé entrer Campbooks. Réessayez dans quelques minutes.",
     "imap_unreachable": "Impossible de joindre le serveur de messagerie (IMAP). Vérifiez son nom et son port, puis réessayez.",
     "smtp_unreachable": "Impossible de joindre le serveur d’envoi (SMTP). Vérifiez son nom et son port, puis réessayez.",
     "imap_tls_failed": "Le certificat du serveur de messagerie n’est pas valide pour son nom : Campbooks ne s’est donc pas connecté. Vérifiez le nom du serveur.",

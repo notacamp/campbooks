@@ -45,7 +45,7 @@ pub use hub::ChangeHub;
 pub use sequence::{PruneChanges, SequenceChanges};
 pub use stream::{Subscription, open};
 pub use visibility::{
-    ContainersFuture, NoContainers, Visibility, VisibilityFuture, VisibilityPort,
+    ContainersFuture, NoContainers, Visibilities, Visibility, VisibilityFuture, VisibilityPort,
 };
 
 /// The `LISTEN/NOTIFY` channel the sequencer signals on; the payload is the

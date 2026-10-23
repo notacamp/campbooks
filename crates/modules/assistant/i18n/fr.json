@@ -19,6 +19,7 @@
   "chat": {
     "about_lost": "Je ne vois plus cette conversation, j’ai donc répondu sans elle.",
     "about_lost_rule": "Je ne vois plus cette règle, j’ai donc répondu sans elle.",
-    "about_lost_rule_notice": "Cette suggestion ne vous est plus proposée, j’ai donc répondu sans elle."
+    "about_lost_rule_notice": "Cette suggestion ne vous est plus proposée, j’ai donc répondu sans elle.",
+    "about_lost_task": "Je ne vois plus cette tâche, j’ai donc répondu sans elle."
   }
 }

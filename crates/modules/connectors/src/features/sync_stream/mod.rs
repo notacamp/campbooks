@@ -12,6 +12,10 @@
 //! The stream row is the schedule: provider trouble (throttling, outages)
 //! is recorded on it and the run ends normally, with the next run set by
 //! the backoff, rather than failing the job.
+//!
+//! An IMAP stream (`imap::read`) reads over one session to its server,
+//! holding one of the host's few session slots, and keeps where each
+//! message is (`connectors.imap_locations`) with the index.
 
 use campbooks_kernel::{
     JobContext, JobError,
@@ -22,16 +26,17 @@ use campbooks_kernel::{
     tenancy::{UserId, WorkspaceId},
 };
 use chrono::{DateTime, TimeDelta, Utc};
-use sqlx::{Postgres, Transaction};
+use secrecy::SecretString;
+use sqlx::{PgPool, Postgres, Transaction};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use crate::{
     contract::{BATCH_CONTENT_TYPE, MessageChange, MessageChangeBatch, ProviderStream},
     deps::Deps,
     domain::{
         credentials::{self, TokenError},
-        emit, health,
+        emit, health, imap_servers,
         marks::MarkIds,
         model::{ConnectionId, Health, InboxId, Phase, Provider, StreamId},
         outbound::{self, Backlog},
@@ -41,6 +46,12 @@ use crate::{
     },
     gmail::{self, Reader},
     google::LabelInfo,
+    imap::{
+        self, Refusal,
+        read::{Failure, Page},
+        session::Session,
+        state::{Cursor, LocationOp},
+    },
     mail::{IndexOp, ReadError},
     metrics::{self, SyncOutcome},
     provider::ProviderError,
@@ -106,6 +117,7 @@ impl JobHandler for SyncStream {
         let configured = match target.provider {
             Provider::Google => self.deps.google.is_some(),
             Provider::Zoho => self.deps.zoho.is_some(),
+            Provider::Imap if self.deps.imap.config.enabled && self.deps.cipher.is_some() => true,
             Provider::Imap => return self.idle_imap(ctx, workspace, &target, now).await,
         };
         let (true, Some(inbox)) = (configured, target.inbox) else {
@@ -114,6 +126,19 @@ impl JobHandler for SyncStream {
             tracing::debug!(stream = %target.stream, "no adapter for this stream");
             return Ok(());
         };
+        if target.provider == Provider::Imap {
+            let read = self
+                .run_imap(ctx, workspace, &target, now)
+                .await
+                .inspect_err(|_| metrics::sync_finished(target.provider, SyncOutcome::Failed))?;
+            return match read {
+                Some(read) => {
+                    self.finish(ctx, workspace, &target, inbox, read, None, now)
+                        .await
+                }
+                None => Ok(()),
+            };
+        }
 
         let token =
             match credentials::access_token(ctx.pool(), &self.deps, workspace, target.connection)
@@ -163,16 +188,8 @@ impl JobHandler for SyncStream {
         let Some(read) = read else {
             return Ok(());
         };
-        let applied = self
-            .apply(ctx, workspace, &target, inbox, read, backlog.last(), now)
-            .await;
-        let outcome = if applied.is_ok() {
-            SyncOutcome::Ok
-        } else {
-            SyncOutcome::Failed
-        };
-        metrics::sync_finished(target.provider, outcome);
-        applied
+        self.finish(ctx, workspace, &target, inbox, read, backlog.last(), now)
+            .await
     }
 }
 
@@ -194,6 +211,8 @@ struct RunPage {
     more: bool,
     /// Gmail's history id the run read up to (closes open write windows).
     read_up_to: Option<i64>,
+    /// Where IMAP messages now are (IMAP only).
+    imap: Vec<LocationOp>,
 }
 
 impl SyncStream {
@@ -403,6 +422,7 @@ impl SyncStream {
             index: page.index,
             labels: page.labels,
             zoho_labels: None,
+            imap: Vec::new(),
             phase: page.phase,
             more: page.more,
         }))
@@ -549,14 +569,16 @@ impl SyncStream {
             index: page.index,
             labels: None,
             zoho_labels: labels.as_ref().and_then(zoho::read::LabelCache::fresh),
+            imap: Vec::new(),
             phase: page.phase,
             more: page.more,
         }))
     }
 
-    /// An IMAP stream until reading lands (campbooks-cloud#311): its
-    /// password is opened, so one that no longer opens shows as
-    /// `needs_reauth`, and it waits at the slowest interval.
+    /// An IMAP stream on an instance that does not read IMAP (off, or no
+    /// instance secret): its password is opened, so one that no longer
+    /// opens shows as `needs_reauth`, and it waits at the slowest interval.
+    /// No server is contacted.
     async fn idle_imap(
         &self,
         ctx: &mut JobContext,
@@ -580,6 +602,188 @@ impl SyncStream {
         let idle = now + TimeDelta::seconds(i64::from(self.deps.config.poll.max_seconds));
         schedule::set_due(ctx.tx().await?, workspace, target.stream, idle).await?;
         Ok(())
+    }
+
+    /// An IMAP run: the account and its password, one of its host's
+    /// session slots, then one page over one session. `None` once the run
+    /// has ended without a page (waiting, trouble recorded).
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one run read top to bottom: account, slot, read, outcome"
+    )]
+    async fn run_imap(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        now: DateTime<Utc>,
+    ) -> Result<Option<RunPage>, JobError> {
+        let Some(cipher) = self.deps.cipher.clone() else {
+            return Ok(None);
+        };
+        let mut tx = ctx.pool().begin_for(workspace).await?;
+        let account = imap_servers::imap_server(&mut tx, target.connection).await?;
+        let address: Option<String> =
+            sqlx::query_scalar("SELECT address FROM connectors.streams WHERE id = $1")
+                .bind(target.stream)
+                .fetch_optional(&mut *tx)
+                .await?
+                .flatten();
+        let opened = credentials::password(&mut tx, &cipher, target.connection).await;
+        tx.commit().await?;
+        let password = match opened {
+            Ok(password) => password,
+            Err(TokenError::NeedsReauth(reason)) => {
+                metrics::sync_finished(target.provider, SyncOutcome::Refused);
+                self.needs_reauth(ctx, workspace, target, reason, now)
+                    .await?;
+                return Ok(None);
+            }
+            Err(TokenError::Provider(err)) => {
+                self.trouble(ctx, workspace, target, &err, now).await?;
+                return Ok(None);
+            }
+            Err(TokenError::Database(err)) => return Err(err.into()),
+        };
+        let Some((username, server)) = account else {
+            metrics::sync_finished(target.provider, SyncOutcome::Refused);
+            self.needs_reauth(ctx, workspace, target, "imap_settings_missing", now)
+                .await?;
+            return Ok(None);
+        };
+        let cursor: Cursor = serde_json::from_value(target.cursor.clone()).map_err(|e| {
+            JobError::fatal(format!(
+                "stream {} has an unreadable cursor: {}",
+                target.stream,
+                redact::json(&e)
+            ))
+        })?;
+        let imap = self.deps.imap.clone();
+        let slots = [
+            // The workspace's share of the host, then the host's.
+            (
+                imap_workspace_slots(&server.host, workspace),
+                imap_rate(imap.config.workspace_sessions_per_host),
+            ),
+            (
+                imap_slots(&server.host),
+                imap_rate(imap.config.sessions_per_host),
+            ),
+        ];
+        if !take_slots(ctx.pool(), &slots).await? {
+            // As many sessions as it may: the next dispatch.
+            metrics::sync_finished(target.provider, SyncOutcome::Throttled);
+            let wait = Duration::from_secs(u64::from(self.deps.config.poll.min_seconds));
+            Self::wait_for_budget(ctx, workspace, target.stream, wait, now).await?;
+            return Ok(None);
+        }
+        let state = ctx.state().clone();
+        let run = ImapRun {
+            imap: &imap,
+            server: &server,
+            username: &username,
+            password: &password,
+            pool: ctx.pool(),
+            blobs: &state.blobs,
+            workspace,
+            stream: target.stream,
+            phase: target.phase,
+            cursor: cursor.clone(),
+            now,
+            address,
+        };
+        let read = tokio::time::timeout(IMAP_RUN_LIMIT, Box::pin(read_imap(run)))
+            .await
+            .unwrap_or(Err(ImapTrouble::Failed(Failure::Server("imap_timed_out"))));
+        give_back_slots(ctx.pool(), &slots).await;
+        match read {
+            Ok(page) => imap_page(page).map(Some),
+            Err(ImapTrouble::Refused(refusal)) => {
+                self.imap_refused(ctx, workspace, target, &cursor, refusal, now)
+                    .await?;
+                Ok(None)
+            }
+            Err(ImapTrouble::Failed(Failure::Busy)) => {
+                self.imap_busy(ctx, workspace, target, now).await?;
+                Ok(None)
+            }
+            Err(ImapTrouble::Failed(Failure::Server(code))) => {
+                let err = ProviderError::Unavailable(code.to_owned());
+                self.trouble(ctx, workspace, target, &err, now).await?;
+                Ok(None)
+            }
+            Err(ImapTrouble::Failed(Failure::Read(other))) => {
+                Err(JobError::retry(other.to_string()))
+            }
+        }
+    }
+
+    /// The IMAP server would not let the run in: a refused password counts
+    /// towards [`LOGIN_REFUSALS`] (then the connection needs the member); a
+    /// busy server slows the stream down; anything else is a failed run.
+    async fn imap_refused(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        cursor: &Cursor,
+        refusal: Refusal,
+        now: DateTime<Utc>,
+    ) -> Result<(), JobError> {
+        match refusal {
+            Refusal::ImapLoginRefused => {
+                let refusals = cursor.login_refusals.saturating_add(1);
+                if refusals >= LOGIN_REFUSALS {
+                    metrics::sync_finished(target.provider, SyncOutcome::Refused);
+                    return self
+                        .needs_reauth(ctx, workspace, target, "imap_login_refused", now)
+                        .await;
+                }
+                let tx = ctx.tx().await?;
+                // The connection before the stream (removal's order).
+                health::lock(tx, target.connection).await?;
+                sqlx::query(
+                    "UPDATE connectors.streams
+                        SET cursor = jsonb_set(cursor, '{login_refusals}', to_jsonb($2::int))
+                      WHERE id = $1",
+                )
+                .bind(target.stream)
+                .bind(i32::try_from(refusals).unwrap_or(i32::MAX))
+                .execute(&mut **tx)
+                .await?;
+                let err = ProviderError::Unavailable(refusal.code().to_owned());
+                self.trouble(ctx, workspace, target, &err, now).await
+            }
+            Refusal::ImapBusy => self.imap_busy(ctx, workspace, target, now).await,
+            other => {
+                let err = ProviderError::Unavailable(other.code().to_owned());
+                self.trouble(ctx, workspace, target, &err, now).await
+            }
+        }
+    }
+
+    /// The IMAP server said it is busy (IMAP has no `Retry-After`): throttle
+    /// the stream for twice its interval.
+    async fn imap_busy(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        now: DateTime<Utc>,
+    ) -> Result<(), JobError> {
+        let poll = &self.deps.config.poll;
+        let wait = i64::from(target.interval_seconds)
+            .saturating_mul(2)
+            .clamp(i64::from(poll.min_seconds), i64::from(poll.max_seconds));
+        let retry_after = Some(Duration::from_secs(u64::try_from(wait).unwrap_or(60)));
+        self.trouble(
+            ctx,
+            workspace,
+            target,
+            &ProviderError::RateLimited { retry_after },
+            now,
+        )
+        .await
     }
 
     /// The grant stopped working (`reason`).
@@ -607,6 +811,33 @@ impl SyncStream {
 }
 
 impl SyncStream {
+    /// Apply a page and count the run.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one call site per provider; the values are distinct"
+    )]
+    async fn finish(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        inbox: InboxId,
+        read: RunPage,
+        pushed_up_to: Option<uuid::Uuid>,
+        now: DateTime<Utc>,
+    ) -> Result<(), JobError> {
+        let applied = self
+            .apply(ctx, workspace, target, inbox, read, pushed_up_to, now)
+            .await;
+        let outcome = if applied.is_ok() {
+            SyncOutcome::Ok
+        } else {
+            SyncOutcome::Failed
+        };
+        metrics::sync_finished(target.provider, outcome);
+        applied
+    }
+
     /// Apply a page in the job's transaction. `pushed_up_to` is the newest
     /// outbound change this run made: newer ones arrived during the run and
     /// call for another at once.
@@ -656,6 +887,7 @@ impl SyncStream {
             replace_zoho_labels(tx, workspace, target.stream, labels, now).await?;
         }
         emit::apply_index(tx, &state, workspace, target.stream, page.index).await?;
+        imap::state::apply(tx, workspace, target.stream, page.imap).await?;
         outbound::forget_left_trash(tx, target.stream).await?;
         for (batch, count) in &batches {
             emit::store_batch(
@@ -882,6 +1114,127 @@ impl SyncStream {
             }
         }
     }
+}
+
+/// Sign-ins an IMAP server refuses in a row before the connection needs the
+/// member.
+const LOGIN_REFUSALS: u32 = 3;
+
+/// The longest an IMAP run may take in all, well within a lease.
+const IMAP_RUN_LIMIT: Duration = Duration::from_mins(10);
+
+/// Seconds an IMAP host's session slots take to refill whole: a slot a
+/// process died holding comes back within a lease.
+const SLOT_SECONDS: f64 = 900.0;
+
+/// The budget of `host`'s IMAP sessions (`connectors.provider_budgets`).
+fn imap_slots(host: &str) -> String {
+    format!("imap:{host}")
+}
+
+/// The budget of `workspace`'s sessions to `host`: its share of the host's.
+fn imap_workspace_slots(host: &str, workspace: WorkspaceId) -> String {
+    format!("imap:{host}:{workspace}")
+}
+
+/// Take one slot of each of `slots` (key, rate), in order; none when one
+/// is full (those taken are given back). Whether they were taken.
+async fn take_slots(pool: &PgPool, slots: &[(String, Rate)]) -> Result<bool, JobError> {
+    for (n, (key, rate)) in slots.iter().enumerate() {
+        if schedule::take(pool, key, 1, *rate).await?.is_err() {
+            give_back_slots(pool, &slots[..n]).await;
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// Give back one slot of each of `slots` (best effort: a slot not given
+/// back comes back as its bucket refills).
+async fn give_back_slots(pool: &PgPool, slots: &[(String, Rate)]) {
+    for (key, rate) in slots {
+        if let Err(err) = schedule::settle(pool, key, 1, 0, *rate).await {
+            tracing::warn!(
+                error = %campbooks_kernel::redact::error(&err),
+                "could not give back an IMAP session slot"
+            );
+        }
+    }
+}
+
+/// `sessions` slots per host: taken one per run, given back when it ends.
+fn imap_rate(sessions: u32) -> Rate {
+    Rate {
+        per_second: f64::from(sessions) / SLOT_SECONDS,
+        burst_seconds: SLOT_SECONDS,
+    }
+}
+
+/// What one IMAP run reads with.
+struct ImapRun<'a> {
+    imap: &'a imap::Imap,
+    server: &'a imap::Server,
+    username: &'a str,
+    password: &'a SecretString,
+    pool: &'a PgPool,
+    blobs: &'a campbooks_kernel::blobs::BlobStore,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    phase: Phase,
+    cursor: Cursor,
+    now: DateTime<Utc>,
+    address: Option<String>,
+}
+
+/// Why an IMAP run read nothing.
+#[derive(Debug)]
+enum ImapTrouble {
+    /// The server would not let it in.
+    Refused(Refusal),
+    /// It failed once in.
+    Failed(Failure),
+}
+
+/// Sign in, read one page, sign out.
+async fn read_imap(run: ImapRun<'_>) -> Result<Page, ImapTrouble> {
+    let opening = Session::open(run.imap, run.server, run.username, run.password);
+    let mut session = tokio::time::timeout(run.imap.timeout(), opening)
+        .await
+        .unwrap_or(Err(Refusal::ImapUnreachable))
+        .map_err(ImapTrouble::Refused)?;
+    let page = imap::read::Reader {
+        session: &mut session,
+        pool: run.pool,
+        blobs: run.blobs,
+        workspace: run.workspace,
+        stream: run.stream,
+        phase: run.phase,
+        cursor: run.cursor,
+        now: run.now,
+        config: &run.imap.config,
+        address: run.address,
+    }
+    .read()
+    .await;
+    session.logout().await;
+    page.map_err(ImapTrouble::Failed)
+}
+
+/// An IMAP page as the run applies it.
+fn imap_page(page: Page) -> Result<RunPage, JobError> {
+    Ok(RunPage {
+        cursor: serde_json::to_value(&page.cursor)
+            .map_err(|e| JobError::fatal(format!("encoding a cursor: {}", redact::json(&e))))?,
+        token: page.cursor.token(),
+        read_up_to: None,
+        changes: page.changes,
+        index: page.index,
+        labels: None,
+        zoho_labels: None,
+        imap: page.locations,
+        phase: page.phase,
+        more: page.more,
+    })
 }
 
 /// When the stream's first sync completed, as its `cursor` keeps it
@@ -1307,5 +1660,7 @@ pub(crate) async fn read_page(
         .collect()
 }
 
+#[cfg(test)]
+mod imap_tests;
 #[cfg(test)]
 mod tests;

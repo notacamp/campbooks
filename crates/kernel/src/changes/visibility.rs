@@ -79,6 +79,75 @@ impl Visibility for NoContainers {
     }
 }
 
+/// Several modules' [`Visibility`] ports as one: a container is answered by
+/// the port that declares its type in
+/// [`container_types`](Visibility::container_types); a container of a type
+/// none declares is shown to nobody.
+#[derive(Debug, Clone)]
+pub struct Visibilities {
+    ports: Vec<VisibilityPort>,
+    access_records: &'static [&'static str],
+    container_types: &'static [&'static str],
+}
+
+impl Visibilities {
+    /// The ports as one. Built once, at start: the record and container
+    /// types they declare are kept for the life of the process.
+    pub fn new(ports: Vec<VisibilityPort>) -> Self {
+        let mut access_records: Vec<&'static str> = Vec::new();
+        let mut container_types: Vec<&'static str> = Vec::new();
+        for port in &ports {
+            access_records.extend(port.access_records());
+            container_types.extend(port.container_types());
+        }
+        Self {
+            ports,
+            access_records: Box::leak(access_records.into_boxed_slice()),
+            container_types: Box::leak(container_types.into_boxed_slice()),
+        }
+    }
+
+    fn answering(&self, container_type: &str) -> Option<&VisibilityPort> {
+        self.ports
+            .iter()
+            .find(|port| port.container_types().contains(&container_type))
+    }
+}
+
+impl Visibility for Visibilities {
+    fn container_visible<'a>(
+        &'a self,
+        db: &'a PgPool,
+        access: &'a Access,
+        container: &'a RecordRef,
+    ) -> VisibilityFuture<'a> {
+        match self.answering(&container.record_type) {
+            Some(port) => port.container_visible(db, access, container),
+            None => Box::pin(async { Ok(false) }),
+        }
+    }
+
+    fn access_records(&self) -> &'static [&'static str] {
+        self.access_records
+    }
+
+    fn container_types(&self) -> &'static [&'static str] {
+        self.container_types
+    }
+
+    fn visible_containers<'a>(
+        &'a self,
+        db: &'a PgPool,
+        access: &'a Access,
+        container_type: &'a str,
+    ) -> ContainersFuture<'a> {
+        match self.answering(container_type) {
+            Some(port) => port.visible_containers(db, access, container_type),
+            None => Box::pin(async { Ok(Vec::new()) }),
+        }
+    }
+}
+
 /// Shared handle to the registered [`Visibility`] port.
 pub type VisibilityPort = Arc<dyn Visibility>;
 
@@ -100,5 +169,71 @@ mod tests {
             .await
             .unwrap();
         assert!(listed.is_empty());
+    }
+
+    #[derive(Debug)]
+    struct Inboxes;
+
+    impl Visibility for Inboxes {
+        fn container_types(&self) -> &'static [&'static str] {
+            &["a.inbox"]
+        }
+
+        fn container_visible<'a>(
+            &'a self,
+            _db: &'a PgPool,
+            _access: &'a Access,
+            _container: &'a RecordRef,
+        ) -> VisibilityFuture<'a> {
+            Box::pin(async { Ok(true) })
+        }
+    }
+
+    #[derive(Debug)]
+    struct Mine;
+
+    impl Visibility for Mine {
+        fn container_types(&self) -> &'static [&'static str] {
+            &["b.mine"]
+        }
+
+        fn access_records(&self) -> &'static [&'static str] {
+            &["b.member"]
+        }
+
+        fn container_visible<'a>(
+            &'a self,
+            _db: &'a PgPool,
+            _access: &'a Access,
+            _container: &'a RecordRef,
+        ) -> VisibilityFuture<'a> {
+            Box::pin(async { Ok(false) })
+        }
+    }
+
+    #[tokio::test]
+    async fn several_ports_answer_each_for_its_own_container_types() {
+        let db = crate::testing::unreachable_pool();
+        let access = Access {
+            workspace: WorkspaceId::new(),
+            user: None,
+            role: None,
+        };
+        let port = Visibilities::new(vec![Arc::new(Inboxes), Arc::new(Mine)]);
+        let visible = |record_type: &'static str| {
+            let port = &port;
+            let (db, access) = (&db, &access);
+            async move {
+                port.container_visible(db, access, &RecordRef::new(record_type, "1"))
+                    .await
+                    .unwrap()
+            }
+        };
+        assert!(visible("a.inbox").await);
+        assert!(!visible("b.mine").await);
+        // A type no port declares is shown to nobody.
+        assert!(!visible("c.other").await);
+        assert_eq!(port.container_types(), ["a.inbox", "b.mine"]);
+        assert_eq!(port.access_records(), ["b.member"]);
     }
 }

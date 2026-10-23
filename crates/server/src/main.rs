@@ -537,6 +537,7 @@ async fn run(
         );
     }
     if role.worker() {
+        spawn_relay(&mut parts, &state, &stop);
         spawn_worker(&mut parts, state, !role.api(), &stop).await?;
     }
 
@@ -682,7 +683,7 @@ async fn migrate_locked(conn: &mut PgConnection) -> Result<(), String> {
 
 /// The schemas the migrations create and own (`<schema>__<name>.sql`): the
 /// only ones whose invalid indexes [`drop_invalid_indexes`] touches.
-const MIGRATED_SCHEMAS: [&str; 11] = [
+const MIGRATED_SCHEMAS: [&str; 12] = [
     "admin",
     "assistant",
     "attention",
@@ -693,6 +694,7 @@ const MIGRATED_SCHEMAS: [&str; 11] = [
     "kernel",
     "search",
     "system",
+    "tasks",
     "workspaces",
 ];
 
@@ -1104,6 +1106,22 @@ async fn shutdown_signal() {
         () = terminate => {},
     }
     tracing::info!("shutdown signal received, draining connections and jobs");
+}
+
+/// Run the tracked events relay until `stop` (campbooks-cloud#321): with
+/// the sink `amqp` only, stopped like the worker, with its grace period.
+fn spawn_relay(
+    parts: &mut JoinSet<Result<(), String>>,
+    state: &AppState,
+    stop: &watch::Sender<bool>,
+) {
+    if let Some(relay) = campbooks_kernel::tracking::Relay::from_state(state) {
+        let stopped = stopped(stop);
+        parts.spawn(async move {
+            relay.run(stopped).await;
+            Ok(())
+        });
+    }
 }
 
 /// Run the job worker until `stop`; a worker-only process (`alone`) also

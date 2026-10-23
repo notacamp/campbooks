@@ -490,6 +490,7 @@ impl Registry {
         let kernel = Background::new()
             .schedule::<PruneJobs>(PRUNE_EVERY)
             .schedule::<PruneEvents>(PRUNE_EVERY)
+            .schedule::<crate::tracking::PruneTrackedEvents>(PRUNE_EVERY)
             .schedule::<SweepBlobs>(SWEEP_EVERY)
             .schedule::<PruneIdempotency>(PRUNE_EVERY)
             .schedule::<PruneRateLimits>(PRUNE_EVERY)

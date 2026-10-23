@@ -1,0 +1,127 @@
+name: apt packages (cached)
+description: >-
+  Installs Ubuntu packages from a cache of the .deb files and package lists,
+  so a job only reaches the Ubuntu mirror when the runner image or the
+  package set changes. The Azure mirror the runners use can take 25+ minutes
+  for the WebKit packages, which timed out whole CI runs on next.
+
+inputs:
+  key:
+    description: Cache name for this package set, e.g. `tauri` (one per distinct set).
+    required: true
+  packages:
+    description: Space-separated packages for apt-get install. Optional when `run` installs them.
+    required: false
+    default: ""
+  run:
+    description: >-
+      Optional command that installs through apt itself, e.g. `playwright install --with-deps`.
+      It runs with apt already pointed at the cache, unless `run-cached` replaces it.
+    required: false
+    default: ""
+  run-cached:
+    description: >-
+      With `run`: on an exact cache hit, install every cached package without the
+      network and run this instead (e.g. `playwright install` without `--with-deps`,
+      whose own `apt-get update` would reach the mirror). Falls back to `run`.
+    required: false
+    default: ""
+  working-directory:
+    description: Where `run` runs.
+    required: false
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - id: setup
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        # A directory the runner user owns, so actions/cache can restore into
+        # it and save from it; apt (as root) reads and writes it through the
+        # config below. Every apt call in the job uses it, including the ones
+        # tools like Playwright make.
+        dir="$HOME/.cache/ci-apt"
+        mkdir -p "$dir/archives/partial" "$dir/lists/partial"
+        sudo tee /etc/apt/apt.conf.d/99ci-cache >/dev/null <<EOF
+        Dir::Cache::Archives "$dir/archives";
+        Dir::State::Lists "$dir/lists";
+        APT::Keep-Downloaded-Packages "true";
+        Binary::apt::APT::Keep-Downloaded-Packages "true";
+        Acquire::Retries "3";
+        Acquire::http::Timeout "30";
+        EOF
+        echo "dir=$dir" >> "$GITHUB_OUTPUT"
+        # A new runner image can ship newer versions of what these packages
+        # depend on, so the image version is part of the key.
+        echo "image=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+        echo "packages=$(echo "$PACKAGES" | tr -s ' ' '\n' | sort | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
+    - id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.setup.outputs.dir }}
+        key: apt-${{ inputs.key }}-${{ runner.arch }}-${{ steps.setup.outputs.image }}-${{ steps.setup.outputs.packages }}
+        restore-keys: |
+          apt-${{ inputs.key }}-${{ runner.arch }}-${{ steps.setup.outputs.image }}-
+          apt-${{ inputs.key }}-${{ runner.arch }}-
+
+    - name: Install
+      if: inputs.packages != ''
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+        EXACT: ${{ steps.restore.outputs.cache-hit }}
+      run: |
+        # An exact hit has the lists and every .deb: install without the
+        # network. Anything else (or a hit that turns out short) updates first.
+        if [ "$EXACT" = true ] && sudo apt-get install -y --no-download $PACKAGES; then
+          echo "installed from the cache"
+        else
+          sudo apt-get update
+          sudo apt-get install -y $PACKAGES
+        fi
+
+    - name: Run
+      if: inputs.run != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        DIR: ${{ steps.setup.outputs.dir }}
+        EXACT: ${{ steps.restore.outputs.cache-hit }}
+        RUN: ${{ inputs.run }}
+        RUN_CACHED: ${{ inputs.run-cached }}
+      run: |
+        if [ "$EXACT" = true ] && [ -n "$RUN_CACHED" ]; then
+          names=$(find "$DIR/archives" -maxdepth 1 -name '*.deb' -printf '%f\n' | cut -d_ -f1 | sort -u)
+          if [ -n "$names" ] && sudo apt-get install -y --no-download $names; then
+            echo "installed $(wc -w <<<"$names") packages from the cache"
+            eval "$RUN_CACHED"
+            exit 0
+          fi
+          echo "the cache fell short; installing through the mirror"
+        fi
+        eval "$RUN"
+
+    - id: tidy
+      if: steps.restore.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        DIR: ${{ steps.setup.outputs.dir }}
+      run: |
+        # apt leaves root-only lock and partial files; the cache saves as the
+        # runner user. Old versions carried over from a previous key go.
+        sudo apt-get autoclean -y >/dev/null || true
+        sudo rm -rf "$DIR/archives/partial"/* "$DIR/lists/partial"/* "$DIR/archives/lock" "$DIR/lists/lock"
+        sudo chown -R "$(id -u):$(id -g)" "$DIR"
+        n=$(find "$DIR/archives" -maxdepth 1 -name '*.deb' | wc -l)
+        echo "$n .deb files, $(du -sh "$DIR" | cut -f1) in all"
+        if [ "$n" -gt 0 ]; then echo "save=true"; else echo "save=false"; fi >> "$GITHUB_OUTPUT"
+
+    - if: steps.restore.outputs.cache-hit != 'true' && steps.tidy.outputs.save == 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.setup.outputs.dir }}
+        key: ${{ steps.restore.outputs.cache-primary-key }}
