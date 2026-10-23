@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useScoutChat } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   AsideSection,
@@ -82,6 +83,10 @@ type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 const CONVERSATION = "conversations.conversation";
 const TASK = "tasks.task";
+
+/** Continue with Scout: its action id and its key (`.`, the assistant's). */
+const SCOUT = "scout";
+const SCOUT_KEY = "scout.ask";
 
 /** The item's own actions take 1, 2 and 3, in order. */
 const CHOICE_KEYS = ["item.choice1", "item.choice2", "item.choice3"] as const;
@@ -237,6 +242,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const tt = typedTasks as unknown as Translate;
   const navigate = useNavigate();
   const undo = useUndoToast();
+  // Scout's chat, where the app mounted it: Continue with Scout (`.`).
+  const scout = useScoutChat();
 
   const open = useAttention(workspaceId, "open");
   const cleared = useAttention(workspaceId, "cleared");
@@ -701,11 +708,18 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
    */
   const actionsOf = (
     entry: Entry,
-  ): { own: ItemAction[]; universal: ItemAction[]; choices: OwnChoice[]; picked: boolean } => {
+  ): {
+    own: ItemAction[];
+    after: ItemAction[];
+    universal: ItemAction[];
+    choices: OwnChoice[];
+    picked: boolean;
+  } => {
     if (isTask(entry)) {
       // A task has no questions: Done (Paid), Later, Not needed.
       return {
         own: [],
+        after: [],
         universal: [
           {
             id: "done",
@@ -789,6 +803,11 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         ai: choice.steps.includes("reply") || choice.steps.includes("nudge"),
         key: CHOICE_KEYS[index] ?? "item.choice1",
       })),
+      // After its own actions, in the same style, never on 1 to 3.
+      after:
+        scout === undefined
+          ? []
+          : [{ id: SCOUT, label: t("actions.scout"), ai: true, key: SCOUT_KEY }],
       universal: universal.map((id) => ({
         id,
         label: universalLabel[id],
@@ -904,6 +923,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       }
     }
     const row = entry;
+    if (id === SCOUT) {
+      continueWithScout(row);
+      return;
+    }
     const choice = actionsOf(row).choices.find((c) => c.id === id);
     if (choice !== undefined) {
       const dialog = choice.steps.find((each) => DIALOG_STEPS.has(each));
@@ -919,6 +942,14 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     if (id === "done" || id === "snooze" || id === "not_needed") {
       step(row, id);
     }
+  };
+  // Continue with Scout: the panel opens on the need's conversation; the
+  // need stays selected, and the focus comes back to the button on close.
+  const continueWithScout = (row: Row) => {
+    // Only the selected row shows its actions: its button is the one.
+    const button =
+      list.current?.querySelector<HTMLElement>(`[data-action="${CSS.escape(SCOUT)}"]`) ?? null;
+    scout?.(row.conversation.id, button);
   };
   const selectedActions = selected === undefined ? undefined : actionsOf(selected);
   // Offered alone or within a pair (R presses Reply wherever it sits).
@@ -950,7 +981,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     if (selectedActions === undefined) {
       return;
     }
-    const all = [...selectedActions.own, ...selectedActions.universal];
+    const all = [...selectedActions.own, ...selectedActions.after, ...selectedActions.universal];
     const at = all.findIndex((action) => action.id === highlight);
     const next =
       at === -1
@@ -1079,6 +1110,15 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       }
     },
     { enabled: offered("reply") },
+  );
+  useShortcut(
+    SCOUT_KEY,
+    () => {
+      if (selected !== undefined && !isTask(selected)) {
+        continueWithScout(selected);
+      }
+    },
+    { enabled: hasRows && scout !== undefined },
   );
 
   const today = now ?? new Date();
@@ -1220,6 +1260,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
             <ItemActions
               label={t("actions.label", { name: task.title })}
               own={actions.own}
+              after={actions.after}
               universal={actions.universal}
               highlighted={highlight}
               onHighlight={setHighlight}
@@ -1320,6 +1361,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
                     <ItemActions
                       label={t("actions.label", { name: row.name })}
                       own={actions.own}
+                      after={actions.after}
                       universal={actions.universal}
                       highlighted={highlight}
                       onHighlight={setHighlight}

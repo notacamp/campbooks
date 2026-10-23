@@ -26,6 +26,11 @@ pub const NAME: &str = "attention";
 /// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
 pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
+/// This module's section of Scout's handbook (campbooks-cloud#305): how
+/// needs, their reasons and order, due dates, how they leave the list, their clock, Later work, for the model answering a member's questions. The server
+/// composes it into the assistant's handbook; at most 8 KiB.
+pub const HANDBOOK: &str = include_str!("../handbook.md");
+
 /// The `attention` module, ready for the server to mount.
 pub fn module() -> Module {
     Module {

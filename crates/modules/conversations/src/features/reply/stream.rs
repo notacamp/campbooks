@@ -167,8 +167,10 @@ where
                         return Some(delta_event("text", &delta));
                     }
                 }
-                // Nothing to send; the idle wait starts again.
-                Some(Ok(ChatEvent::Alive)) => {}
+                // Nothing to send; the idle wait starts again. A reply is
+                // asked for with no tools, so a tool call is only a sign of
+                // life, never run.
+                Some(Ok(ChatEvent::Alive | ChatEvent::ToolCall(_))) => {}
                 Some(Ok(ChatEvent::Done(summary))) => {
                     self.report.prompt_tokens = summary.usage.map(|u| u.prompt_tokens);
                     self.report.completion_tokens = summary.usage.map(|u| u.completion_tokens);

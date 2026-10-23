@@ -6,6 +6,16 @@
     "instruction_too_long": "Keep it to {{max}} characters: one or two sentences.",
     "instruction_has_link": "Leave links out. Say which mail, and what to do with it.",
     "instruction_pasted_mail": "This looks pasted from an email. Say in your own words which mail, and what to do with it.",
-    "compile_unavailable": "This server has no language model that may read sentences. Build the rule by hand instead."
+    "compile_unavailable": "This server has no language model that may read sentences. Build the rule by hand instead.",
+    "chat_needs_member": "Only a member of this workspace can chat with Scout.",
+    "chat_unavailable": "Scout can't chat on this server: no language model here may read mail.",
+    "chat_failed": "Scout couldn't answer that. Try again in a moment.",
+    "chat_full": "This chat is full: it holds {{max}} questions. Start over to keep asking.",
+    "question_empty": "Write a question for Scout.",
+    "question_too_long": "Keep your question to {{max}} characters.",
+    "about_unsupported": "Scout can't chat about this kind of record yet."
+  },
+  "chat": {
+    "about_lost": "I can no longer see this conversation, so I answered without it."
   }
 }

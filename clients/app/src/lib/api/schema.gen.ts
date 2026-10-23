@@ -368,6 +368,92 @@ export interface paths {
         patch: operations["workspaces.update"];
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/assistant/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a chat with Scout, or continue yours about the same record. */
+        post: operations["assistant.start_chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your chat, what it is about, and its messages, oldest first. */
+        get: operations["assistant.get_chat"];
+        put?: never;
+        post?: never;
+        /** Delete your chat and its messages. There is no undo. */
+        delete: operations["assistant.delete_chat"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask Scout, and get its answer whole (the desktop app, where answers
+         *     don't stream).
+         */
+        post: operations["assistant.ask_chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask Scout, and get its answer as it is written.
+         * @description The same request as `assistant.ask_chat`, answered as Server-Sent
+         *     Events once every check passed (a refusal is an ordinary problem
+         *     answer). Events, each `data` a JSON object: `thinking` (`{"delta"}`:
+         *     Scout's reasoning as it arrives, at most 8,000 characters in all),
+         *     `step` (`{"tool"}`: a tool starting), `text` (`{"delta"}`: the answer's
+         *     words as they arrive; words before a `step` are not part of the answer),
+         *     then exactly one of `done` (the stored Scout message, as `ask_chat`
+         *     answers it) or `error` (a problem: `chat_failed` or
+         *     `ai_daily_limit_reached`). A comment every 10 seconds keeps the
+         *     connection open. The question is stored when the stream opens; a
+         *     stream that ends before `done` leaves Scout's message stored as
+         *     `failed`, with no text.
+         */
+        post: operations["assistant.stream_chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/assistant/compile": {
         parameters: {
             query?: never;
@@ -602,6 +688,23 @@ export interface paths {
         put?: never;
         /** Archive a conversation. */
         post: operations["conversations.archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What happened to a conversation, and who did it. */
+        get: operations["conversations.get_history"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1552,144 +1655,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/w/{workspace_id}/tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List your tasks. */
-        get: operations["tasks.list"];
-        put?: never;
-        /** Make a task. */
-        post: operations["tasks.create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/tasks/{task_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read a task. */
-        get: operations["tasks.get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Change a task's title, verb or due date. */
-        patch: operations["tasks.update"];
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/done": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Mark a task done (paid, for a bill). */
-        post: operations["tasks.done"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/hand_off": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Hand an open task to a teammate. */
-        post: operations["tasks.hand_off"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/not_needed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Mark a task not needed. */
-        post: operations["tasks.not_needed"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/plan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Plan a task: a day, Later, or nothing. */
-        post: operations["tasks.plan"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/reopen": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Open a closed task again, with its plan. */
-        post: operations["tasks.reopen"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/take_back": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Take back a task you handed to someone, while it is open. */
-        post: operations["tasks.take_back"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -2312,6 +2277,16 @@ export interface components {
             /** @description Its value. */
             value: string;
         };
+        /** @description A question. */
+        AskChat: {
+            /** @description What you ask, 1 to 2,000 characters (line breaks kept). */
+            text: string;
+            /**
+             * @description Your time zone, an IANA name (`Europe/Lisbon`), for "today" and
+             *     "Thursday afternoon"; UTC when absent or unknown.
+             */
+            time_zone?: string | null;
+        };
         /** @description `AuthenticatorAssertionResponseJSON`: the authenticator's signature. */
         AssertionResponse: {
             /** @description The authenticator data, base64url. */
@@ -2443,6 +2418,94 @@ export interface components {
          * @enum {string}
          */
         Channel: "email";
+        /**
+         * @description Who wrote a chat message.
+         * @enum {string}
+         */
+        ChatAuthor: "member" | "scout";
+        /**
+         * @description How Scout's answer ended.
+         * @enum {string}
+         */
+        ChatFinish: "done" | "failed" | "cut_short";
+        /**
+         * Format: uuid
+         * @description ChatId (UUIDv7)
+         */
+        ChatId: string;
+        /**
+         * Format: uuid
+         * @description ChatMessageId (UUIDv7)
+         */
+        ChatMessageId: string;
+        /** @description A question or an answer. */
+        ChatMessageView: {
+            /** @description Who wrote it. */
+            author: components["schemas"]["ChatAuthor"];
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            created_at: string;
+            finish?: components["schemas"]["ChatFinish"] | null;
+            /** @description The message. */
+            id: components["schemas"]["ChatMessageId"];
+            /** @description What Scout looked at to answer (Scout's answers only). */
+            steps: components["schemas"]["ChatStep"][];
+            /**
+             * @description What was asked or answered, as plain text: show it as text only,
+             *     never as HTML and never with links made of it.
+             */
+            text: string;
+        };
+        /**
+         * @description One thing Scout looked at, built by the server from the tool that ran,
+         *     never from the model's words.
+         */
+        ChatStep: {
+            /**
+             * Format: int32
+             * @description How many it found.
+             */
+            count: number;
+            /** @description The records it returned, at most 10. */
+            records: components["schemas"]["RecordRef"][];
+            /** @description The tool. */
+            tool: components["schemas"]["ChatTool"];
+        };
+        /**
+         * @description A tool Scout used. Each reads as the member, and changes nothing.
+         * @enum {string}
+         */
+        ChatTool: "find_conversations" | "read_conversation" | "conversation_history" | "find_people" | "what_needs_me" | "my_inboxes";
+        /** @description A chat and its messages, oldest first. */
+        ChatView: {
+            about?: components["schemas"]["RecordRef"] | null;
+            /**
+             * Format: date-time
+             * @description When it was started.
+             */
+            created_at: string;
+            /** @description The chat. */
+            id: components["schemas"]["ChatId"];
+            /**
+             * Format: date-time
+             * @description When its last message was written; it is deleted 30 days after.
+             */
+            last_message_at: string;
+            /**
+             * Format: int32
+             * @description Questions it may hold; past them, start over.
+             */
+            max_questions: number;
+            /** @description Its messages, oldest first. */
+            messages: components["schemas"]["ChatMessageView"][];
+            /**
+             * Format: int32
+             * @description Questions asked so far.
+             */
+            questions: number;
+        };
         /** @description The browser or web view the app runs in. */
         ClientBrowser: {
             /** @description Whether the device is a phone or a tablet. */
@@ -2783,6 +2846,15 @@ export interface components {
              *     model may read mail on this server.
              */
             need_summary?: string | null;
+        };
+        /** @description What happened to a conversation, oldest first. */
+        ConversationHistory: {
+            /** @description The conversation. */
+            conversation_id: components["schemas"]["ConversationId"];
+            /** @description At most the 200 newest events, oldest first. */
+            events: components["schemas"]["HistoryEvent"][];
+            /** @description Older events were left out. */
+            truncated: boolean;
         };
         /**
          * Format: uuid
@@ -3191,16 +3263,6 @@ export interface components {
             /** @description Returned unchanged. */
             state?: string | null;
         };
-        /** @description Who to hand it to. */
-        HandOffTo: {
-            /**
-             * Format: int64
-             * @description The revision you saw.
-             */
-            revision: number;
-            /** @description A member of the workspace. */
-            to: components["schemas"]["UserId"];
-        };
         /** @description A header test: present, or equal to a value. */
         HeaderCondition: {
             /** @description Which header. */
@@ -3261,10 +3323,169 @@ export interface components {
             items: components["schemas"]["HeldGrant"][];
         };
         /**
-         * Format: uuid
-         * @description HistoryId (UUIDv7)
+         * @description Who did something.
+         * @enum {string}
          */
-        HistoryId: string;
+        HistoryActor: "you" | "member" | "rule" | "scout";
+        /** @description One thing that happened, by kind. */
+        HistoryEvent: {
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            at: string;
+            /** @description Who wrote it. */
+            from: components["schemas"]["Address"];
+            /** @enum {string} */
+            kind: "received";
+            /** @description The message. */
+            message_id: components["schemas"]["MessageId"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            at: string;
+            /** @description Who wrote it. */
+            from: components["schemas"]["Address"];
+            /** @enum {string} */
+            kind: "sent";
+            /** @description The message. */
+            message_id: components["schemas"]["MessageId"];
+        } | {
+            /** @description Whether it changed anything; otherwise it was a suggestion. */
+            acted: boolean;
+            /**
+             * Format: date-time
+             * @description When it was given.
+             */
+            at: string;
+            /**
+             * Format: int32
+             * @description How sure, 0 to 100, when the source says.
+             */
+            confidence?: number | null;
+            /** @enum {string} */
+            kind: "scout_read";
+            /** @description The message it is about. */
+            message_id: components["schemas"]["MessageId"];
+            /** @description The question (`stream`, `needs_reply`, `money`, …). */
+            question: string;
+            /** @description Who answered. */
+            source: components["schemas"]["DecisionSource"];
+            /** @description The answer. */
+            value: components["schemas"]["AnswerView"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @description `you` or `member`. */
+            by: components["schemas"]["HistoryActor"];
+            /** @description The answer before. */
+            from: string;
+            /** @enum {string} */
+            kind: "corrected";
+            /** @description The question. */
+            question: string;
+            /** @description The answer after. */
+            to: string;
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @enum {string} */
+            kind: "rule_applied";
+            /** @description The rule. */
+            rule: components["schemas"]["RuleRef"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @enum {string} */
+            kind: "rule_reverted";
+            /** @description The rule. */
+            rule: components["schemas"]["RuleRef"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @description `you` or `member`. */
+            by: components["schemas"]["HistoryActor"];
+            /** @enum {string} */
+            kind: "rule_excepted";
+            /** @description The rule. */
+            rule: components["schemas"]["RuleRef"];
+        } | {
+            /**
+             * Format: date-time
+             * @description When it was raised: Scout's answer raising it, else its last change.
+             */
+            at: string;
+            /** @description What raised it: `rules`, `model`, `taught` or `member`. */
+            basis: string;
+            /**
+             * Format: date
+             * @description When it is due, when known.
+             */
+            due_on?: string | null;
+            /** @enum {string} */
+            kind: "need_opened";
+            /**
+             * Format: date-time
+             * @description When it lapses on its own, when it does.
+             */
+            lapses_at?: string | null;
+            /** @description Whether it is still open. */
+            open: boolean;
+            /**
+             * @description `reply`, `do`, `pay`, `review`, `worth_a_look`, `waiting` or
+             *     `nudge`.
+             */
+            reason: string;
+            /**
+             * Format: date-time
+             * @description When it next changes with time alone, when it does.
+             */
+            wakes_at?: string | null;
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /**
+             * @description Why: `replied`, `archived`, `trashed`, `done`, `not_needed`,
+             *     `superseded`, `rule`, `opened`, `lapsed` or `heard_back`.
+             */
+            because: string;
+            /** @description Who. */
+            by: components["schemas"]["HistoryActor"];
+            /** @enum {string} */
+            kind: "need_cleared";
+        } | {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @description `you` or `member`. */
+            by: components["schemas"]["HistoryActor"];
+            /** @enum {string} */
+            kind: "need_verdict";
+            /**
+             * @description `done`, `not_needed`, `confirmed`, `already_paid` or
+             *     `still_to_pay`.
+             */
+            verdict: string;
+        };
         /** @description One result: a record the caller may open, with what a list row shows. */
         Hit: {
             /** @description Its container (an inbox). */
@@ -3787,28 +4008,6 @@ export interface components {
          * @enum {string}
          */
         NewRuleState: "active" | "proposed";
-        /** @description A new task. */
-        NewTask: {
-            /**
-             * Format: date-time
-             * @description The time it is due; needs `due_on`, its local day.
-             */
-            due_at?: string | null;
-            /**
-             * Format: date
-             * @description The day it is due.
-             */
-            due_on?: string | null;
-            source?: components["schemas"]["RecordRef"] | null;
-            /**
-             * @description The address of the source's sender, kept to recognise the same
-             *     sender's other tasks.
-             */
-            source_sender?: string | null;
-            /** @description What to do: 1 to 200 characters. */
-            title: string;
-            verb?: components["schemas"]["TaskVerb"] | null;
-        };
         /**
          * @description Why there is nothing to offer.
          * @enum {string}
@@ -3943,26 +4142,6 @@ export interface components {
          * @enum {string}
          */
         Phase: "backfill" | "incremental" | "resync";
-        /** @description The plan the task should have. */
-        PlanTask: {
-            /**
-             * Format: date-time
-             * @description Later than now and less than a year away, for `later`.
-             */
-            later_until?: string | null;
-            /** @description `none`, `date` or `later`. */
-            plan: components["schemas"]["TaskPlan"];
-            /**
-             * Format: date
-             * @description The day, for `date`.
-             */
-            plan_on?: string | null;
-            /**
-             * Format: int64
-             * @description The revision you saw.
-             */
-            revision: number;
-        };
         /** @description A rule to preview. */
         PreviewRule: {
             /** @description What it would do. */
@@ -4624,6 +4803,18 @@ export interface components {
             would_change: number;
         };
         /**
+         * @description A taught rule, as an event names it: its id, and its conditions and
+         *     actions, which clients read as its sentence.
+         */
+        RuleRef: {
+            /** @description What it does. */
+            actions: components["schemas"]["RuleAction"][];
+            /** @description When it applies. */
+            conditions: components["schemas"]["RuleCondition"][];
+            /** @description The rule. */
+            id: components["schemas"]["RuleId"];
+        };
+        /**
          * Format: uuid
          * @description RuleRunId (UUIDv7)
          */
@@ -4973,6 +5164,10 @@ export interface components {
              */
             until: string;
         };
+        /** @description Start a chat, or continue the one you have about the same record. */
+        StartChat: {
+            about?: components["schemas"]["RecordRef"] | null;
+        };
         /** @description What to connect. */
         StartConnection: {
             /** @description The capabilities to ask for (`messages` is offered today). */
@@ -5147,196 +5342,6 @@ export interface components {
              * @description How many streams will run now.
              */
             streams: number;
-        };
-        /**
-         * @description Who made a change.
-         * @enum {string}
-         */
-        TaskActor: "member" | "scout" | "calendar";
-        /**
-         * @description What changed: the event's `change` and the history's `what`.
-         * @enum {string}
-         */
-        TaskChange: "created" | "edited" | "due_changed" | "planned" | "done" | "not_needed" | "reopened" | "handed_off" | "taken_back";
-        /** @description A task and its history. */
-        TaskDetail: {
-            /** @description What changed in it, oldest first. */
-            history: components["schemas"]["TaskHistoryEntry"][];
-            /** @description The task. */
-            task: components["schemas"]["TaskView"];
-        };
-        /**
-         * @description A field `tasks.update` changed.
-         * @enum {string}
-         */
-        TaskEditedField: "title" | "task_verb" | "due";
-        /**
-         * @description What a history entry holds besides its kind: ids, enums and dates only,
-         *     never a title.
-         */
-        TaskHistoryDetail: {
-            /**
-             * Format: date
-             * @description The due day afterwards.
-             */
-            due_on?: string | null;
-            /** @description The fields an edit changed. */
-            fields?: components["schemas"]["TaskEditedField"][];
-            /**
-             * Format: date-time
-             * @description When Later ends.
-             */
-            later_until?: string | null;
-            member?: components["schemas"]["UserId"] | null;
-            plan?: components["schemas"]["TaskPlan"] | null;
-            /**
-             * Format: date
-             * @description The planned day.
-             */
-            plan_on?: string | null;
-        };
-        /** @description One entry of a task's history. */
-        TaskHistoryEntry: {
-            /** @description Who: the member, Scout or the calendar. */
-            actor: components["schemas"]["TaskActor"];
-            actor_member?: components["schemas"]["UserId"] | null;
-            /**
-             * Format: date-time
-             * @description When.
-             */
-            at: string;
-            /** @description Ids, enums and dates of the change. */
-            detail: components["schemas"]["TaskHistoryDetail"];
-            /** @description The entry. */
-            id: components["schemas"]["HistoryId"];
-            /** @description What changed. */
-            what: components["schemas"]["TaskChange"];
-        };
-        /**
-         * Format: uuid
-         * @description TaskId (UUIDv7)
-         */
-        TaskId: string;
-        /** @description The caller's tasks. */
-        TaskList: {
-            /** @description In order: overdue first, then by due date and time, then undated. */
-            tasks: components["schemas"]["TaskView"][];
-        };
-        /**
-         * @description How the task came to be.
-         * @enum {string}
-         */
-        TaskOrigin: "own" | "ask" | "deadline";
-        /**
-         * @description When the member will do it.
-         * @enum {string}
-         */
-        TaskPlan: "none" | "date" | "later";
-        /**
-         * @description The revision of a task the caller saw, for a change that needs nothing
-         *     else.
-         */
-        TaskRevision: {
-            /**
-             * Format: int64
-             * @description The revision you saw.
-             */
-            revision: number;
-        };
-        /**
-         * @description Whether it still needs doing.
-         * @enum {string}
-         */
-        TaskState: "open" | "done" | "not_needed";
-        /** @description The task as it should become. */
-        TaskUpdate: {
-            /**
-             * Format: date-time
-             * @description The time it is due; needs `due_on`.
-             */
-            due_at?: string | null;
-            /**
-             * Format: date
-             * @description The day it is due; none clears it.
-             */
-            due_on?: string | null;
-            /**
-             * Format: int64
-             * @description The revision you saw.
-             */
-            revision: number;
-            /** @description What to do: 1 to 200 characters. */
-            title: string;
-            /** @description Do or Pay. */
-            verb: components["schemas"]["TaskVerb"];
-        };
-        /**
-         * @description What kind of thing it is: something to do, or a bill to pay.
-         * @enum {string}
-         */
-        TaskVerb: "do" | "pay";
-        /** @description A task, as the caller sees it. */
-        TaskView: {
-            /** @description The member it is with. */
-            assignee: components["schemas"]["UserId"];
-            /**
-             * Format: date-time
-             * @description When it was closed.
-             */
-            closed_at?: string | null;
-            /**
-             * Format: date-time
-             * @description When it was made.
-             */
-            created_at: string;
-            /** @description The member who made it. */
-            created_by: components["schemas"]["UserId"];
-            /**
-             * Format: date-time
-             * @description The time it is due, when it has one (`due_on` is its local day).
-             */
-            due_at?: string | null;
-            /**
-             * Format: date
-             * @description The day it is due.
-             */
-            due_on?: string | null;
-            handed_by?: components["schemas"]["UserId"] | null;
-            /** @description The task. */
-            id: components["schemas"]["TaskId"];
-            /**
-             * Format: date-time
-             * @description When Later ends, for `later`.
-             */
-            later_until?: string | null;
-            /** @description How it came to be. */
-            origin: components["schemas"]["TaskOrigin"];
-            /** @description Whether it is open and its due day has passed (the caller's today). */
-            overdue: boolean;
-            /** @description The plan. A Later that has ended reads as `none`. */
-            plan: components["schemas"]["TaskPlan"];
-            /**
-             * Format: date
-             * @description The planned day, for `date`.
-             */
-            plan_on?: string | null;
-            /**
-             * Format: int64
-             * @description Grows with every change: send the one you saw with a change.
-             */
-            revision: number;
-            source?: components["schemas"]["RecordRef"] | null;
-            /** @description Open, done or not needed. */
-            state: components["schemas"]["TaskState"];
-            /** @description What to do, in the member's words. */
-            title: string;
-            /**
-             * Format: date-time
-             * @description When it last changed.
-             */
-            updated_at: string;
-            /** @description Do or Pay. */
-            verb: components["schemas"]["TaskVerb"];
         };
         /**
          * Format: uuid
@@ -6796,6 +6801,373 @@ export interface operations {
             };
         };
     };
+    "assistant.start_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartChat"];
+            };
+        };
+        responses: {
+            /** @description Your chat about that record, continued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatView"];
+                };
+            };
+            /** @description A new chat. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatView"];
+                };
+            };
+            /** @description Scout cannot chat about that type of record (`about_unsupported`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`chat_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace or record, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No language model may read mail here (`chat_unavailable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.get_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The chat. */
+                chat_id: components["schemas"]["ChatId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chat. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.delete_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The chat. */
+                chat_id: components["schemas"]["ChatId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.ask_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The chat. */
+                chat_id: components["schemas"]["ChatId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskChat"];
+            };
+        };
+        responses: {
+            /** @description Scout's answer, as stored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageView"];
+                };
+            };
+            /** @description An empty question (`question_empty`) or one over 2,000 characters (`question_too_long`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat holds 40 questions already (`chat_full`): start over; or no language model may read mail here (`chat_unavailable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many questions this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Scout couldn't answer (`chat_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.stream_chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The chat. */
+                chat_id: components["schemas"]["ChatId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskChat"];
+            };
+        };
+        responses: {
+            /** @description The answer as it is written: `thinking`, `step`, `text`, then `done` or `error`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description An empty question (`question_empty`) or one over 2,000 characters (`question_too_long`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat holds 40 questions already (`chat_full`): start over; or no language model may read mail here (`chat_unavailable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many questions this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Scout couldn't answer (`chat_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "assistant.compile_instruction": {
         parameters: {
             query?: never;
@@ -7698,6 +8070,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What happened to it, oldest first; no message text. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationHistory"];
                 };
             };
             /** @description No valid access token. */
@@ -11626,692 +12050,6 @@ export interface operations {
             };
             /** @description No such workspace or inbox, or you cannot see it. */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.list": {
-        parameters: {
-            query?: {
-                /**
-                 * @description `open` (the default), `done` or `not_needed`. Ignored when `ids`
-                 *     names the tasks, unless given.
-                 */
-                state?: "open" | "done" | "not_needed";
-                /** @description Due on or after this day. */
-                due_from?: string;
-                /** @description Due on or before this day. */
-                due_to?: string;
-                /** @description Only open tasks whose due day has passed. */
-                overdue?: boolean;
-                /** @description Only tasks with no due day. */
-                undated?: boolean;
-                /** @description Only tasks from this record type (with `source_id`). */
-                source_type?: string;
-                /** @description Only tasks from this record. */
-                source_id?: string;
-                /** @description `mine` (default) or `handed_off`. */
-                whose?: "mine" | "handed_off";
-                /**
-                 * @description 1 to 100 task ids, separated by commas: Home's batch read. Tasks the
-                 *     caller cannot see are left out.
-                 */
-                ids?: string;
-                /**
-                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
-                 *     where their day starts, for what is overdue.
-                 */
-                utc_offset?: number;
-            };
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The caller's tasks. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskList"];
-                };
-            };
-            /** @description Ids that are not 1 to 100 task ids (`invalid_ids`), or an offset beyond 14 hours (`invalid_offset`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such workspace, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewTask"];
-            };
-        };
-        responses: {
-            /** @description The task. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskView"];
-                };
-            };
-            /** @description A blank or too long title (`invalid_title`), a due time without a day, or a bad sender address. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such workspace, or a source you cannot see. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.get": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The task. */
-                task_id: components["schemas"]["TaskId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The task and its history. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskDetail"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such task, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.update": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The task. */
-                task_id: components["schemas"]["TaskId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaskUpdate"];
-            };
-        };
-        responses: {
-            /** @description The task afterwards. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskView"];
-                };
-            };
-            /** @description A blank or too long title (`invalid_title`), or a due time without a day. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such task, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.done": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The task. */
-                task_id: components["schemas"]["TaskId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaskRevision"];
-            };
-        };
-        responses: {
-            /** @description The task afterwards. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskView"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such task, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.hand_off": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The task. */
-                task_id: components["schemas"]["TaskId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["HandOffTo"];
-            };
-        };
-        responses: {
-            /** @description The task afterwards. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskView"];
-                };
-            };
-            /** @description Not a member of the workspace (`not_a_member`), or yourself (`hand_off_yourself`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such task, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.not_needed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The task. */
-                task_id: components["schemas"]["TaskId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaskRevision"];
-            };
-        };
-        responses: {
-            /** @description The task afterwards. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskView"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such task, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.plan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The task. */
-                task_id: components["schemas"]["TaskId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PlanTask"];
-            };
-        };
-        responses: {
-            /** @description The task afterwards. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskView"];
-                };
-            };
-            /** @description A `date` plan without a day (`plan_needs_day`), or a `later` time in the past or over a year away (`invalid_later`). */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such task, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.reopen": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The task. */
-                task_id: components["schemas"]["TaskId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaskRevision"];
-            };
-        };
-        responses: {
-            /** @description The task afterwards. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskView"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such task, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The task changed since you saw it (`task_changed`), or it is still open (`task_open`). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "tasks.take_back": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-                /** @description The task. */
-                task_id: components["schemas"]["TaskId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaskRevision"];
-            };
-        };
-        responses: {
-            /** @description The task afterwards. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskView"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope, or you did not hand it off (`task_not_yours`). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such task, or you cannot see it. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The task changed since you saw it (`task_changed`), it is closed (`task_closed`) or was not handed to anyone (`not_handed_off`). */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

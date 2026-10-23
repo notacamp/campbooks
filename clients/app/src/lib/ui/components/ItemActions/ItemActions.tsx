@@ -22,6 +22,11 @@ export interface ItemAction {
 export interface ItemActionsProps {
   /** The item's own actions, best first (keys 1 to 3). */
   own: readonly ItemAction[];
+  /**
+   * After the own actions, in the same style, with keys of their own
+   * (Continue with Scout, `.`): never one of 1 to 3.
+   */
+  after?: readonly ItemAction[] | undefined;
   /** Done, Snooze, Not needed: always there, after a thin divider. */
   universal: readonly ItemAction[];
   /** The action the arrow keys are on; focus follows it. */
@@ -50,6 +55,7 @@ export interface ItemActionsProps {
  */
 export function ItemActions({
   own,
+  after = [],
   universal,
   highlighted,
   onHighlight,
@@ -58,7 +64,7 @@ export function ItemActions({
   picked,
 }: ItemActionsProps) {
   const group = useRef<HTMLDivElement>(null);
-  const all = [...own, ...universal];
+  const all = [...own, ...after, ...universal];
   const current = all.some((action) => action.id === highlighted) ? highlighted : undefined;
   const tabStop = current ?? all[0]?.id;
 
@@ -111,7 +117,8 @@ export function ItemActions({
         </span>
       ) : null}
       {own.map(render)}
-      {own.length > 0 && universal.length > 0 ? (
+      {after.map(render)}
+      {own.length + after.length > 0 && universal.length > 0 ? (
         <span className={styles["divider"]} aria-hidden="true" />
       ) : null}
       {universal.map(render)}

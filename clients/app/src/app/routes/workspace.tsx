@@ -1,9 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { createWebChangeSource, followsChangesLive, subscribeToChanges } from "~/lib/api";
+import { ScoutChatProvider } from "~/lib/scout-chat";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   Button,
@@ -26,6 +27,7 @@ import {
   WorkspaceMenu,
   WorkspaceSwitcher,
 } from "~/lib/ui";
+import { ScoutChat } from "~/modules/assistant";
 import { useAttentionCount } from "~/modules/attention";
 import { StreamNav, isPlace, streamPath, type Place } from "~/modules/conversations";
 import { useTaskCount } from "~/modules/tasks";
@@ -134,6 +136,25 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const theme = useTheme();
   const link = useInAppLink();
   const [switching, setSwitching] = useState(false);
+  // Scout's chat: one panel, about one conversation at a time; the focus
+  // goes back to what opened it when it closes.
+  const [chat, setChat] = useState<{
+    conversationId: string;
+    from: HTMLElement | null | undefined;
+  }>();
+  const openChat = useCallback((conversationId: string, from?: HTMLElement | null) => {
+    setChat({ conversationId, from });
+  }, []);
+  const closeChat = () => {
+    const from = chat?.from;
+    setChat(undefined);
+    // After the panel is gone, so its focus trap gives nothing back first.
+    requestAnimationFrame(() => {
+      if (from?.isConnected === true) {
+        from.focus();
+      }
+    });
+  };
   useWorkspaceChanges(workspace.id);
 
   // The server's accent is the source of truth; the device remembers it so
@@ -202,7 +223,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   });
 
   return (
-    <>
+    <ScoutChatProvider open={openChat}>
       <Shell>
         <PhoneHeader>
           <WorkspaceSwitcher
@@ -299,6 +320,14 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
           </SidebarFooter>
         </Sidebar>
         <Outlet />
+        {chat === undefined ? null : (
+          <ScoutChat
+            key={chat.conversationId}
+            workspaceId={workspace.id}
+            conversationId={chat.conversationId}
+            onClose={closeChat}
+          />
+        )}
       </Shell>
       <TabBar
         phoneOnly
@@ -356,6 +385,6 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
         }}
         createShortcut="workspaces.create"
       />
-    </>
+    </ScoutChatProvider>
   );
 }

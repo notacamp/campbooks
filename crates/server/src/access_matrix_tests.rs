@@ -516,6 +516,33 @@ impl World {
         task
     }
 
+    /// `member`'s chat with Scout, about nothing (campbooks-cloud#305), with
+    /// a question.
+    async fn seed_chat(&self, member: UserId) -> Uuid {
+        let chat = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO assistant.chats (id, workspace_id, user_id, questions)
+             VALUES ($1, $2, $3, 1)",
+        )
+        .bind(chat)
+        .bind(self.a.as_uuid())
+        .bind(member.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO assistant.chat_messages (id, workspace_id, chat_id, author, text)
+             VALUES ($1, $2, $3, 'member', 'Why is this here?')",
+        )
+        .bind(Uuid::now_v7())
+        .bind(self.a.as_uuid())
+        .bind(chat)
+        .execute(&self.db)
+        .await
+        .unwrap();
+        chat
+    }
+
     /// Something Scout noticed in the inbox (campbooks-cloud#169).
     async fn seed_notice(&self, inbox: campbooks_conversations::model::InboxId) -> Uuid {
         let notice = Uuid::now_v7();
@@ -576,6 +603,7 @@ impl World {
         let notice = self.seed_notice(inbox).await;
         let note = self.seed_note(u(Who::Member)).await;
         let task = self.seed_task(u(Who::Member)).await;
+        let chat = self.seed_chat(u(Who::Member)).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
@@ -627,6 +655,8 @@ impl World {
             ("conversations.person_note", note.to_string()),
             // A member's own, in no inbox (campbooks-cloud#43).
             ("tasks.task", task.to_string()),
+            // A member's chat with Scout: theirs alone (campbooks-cloud#305).
+            ("assistant.chat", chat.to_string()),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
             "SELECT id::text FROM conversations.conversations WHERE inbox_id = $1
@@ -672,6 +702,7 @@ impl World {
             // person note is the member's, in no inbox.
             "workspaces.member"
             | "assistant.profile"
+            | "assistant.chat"
             | "conversations.person_note"
             | "tasks.task" => Facts::owned_by(OwnerFact::User(u(Who::Member))),
             "connectors.connection" => Facts::owned_by(OwnerFact::User(u(Who::Connector))),
@@ -942,7 +973,8 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "conversations.confirm_rule"
         | "conversations.restore_rule"
         | "conversations.suggest_replies"
-        | "conversations.write_nudge" => json!({}),
+        | "conversations.write_nudge"
+        | "assistant.start_chat" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
@@ -954,6 +986,7 @@ fn body(world: &World, id: &str) -> Option<Value> {
             json!({"revision": 1})
         }
         "tasks.hand_off" => json!({"revision": 1, "to": world.users[&Who::Owner]}),
+        "assistant.ask_chat" | "assistant.stream_chat" => json!({"text": "Why is this here?"}),
         "conversations.write_reply" | "conversations.stream_reply" => {
             json!({"intent": "Say yes"})
         }
@@ -975,6 +1008,7 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
         "conversations.draft" => "{draft_id}",
         "conversations.rule" => "{rule_id}",
         "conversations.person_note" => "{note_id}",
+        "assistant.chat" => "{chat_id}",
         "attention.item" => "{item_id}",
         "tasks.task" => "{task_id}",
         "conversations.inbox" if acts_in_the_inbox(id) => {
@@ -1054,6 +1088,7 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{rule_id}", &world.instances["conversations.rule"])
         .replace("{notice_id}", &world.instances["conversations.rule_notice"])
         .replace("{note_id}", &world.instances["conversations.person_note"])
+        .replace("{chat_id}", &world.instances["assistant.chat"])
         .replace("{id}", &Uuid::now_v7().to_string())
 }
 

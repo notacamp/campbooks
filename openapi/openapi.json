@@ -1763,6 +1763,584 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/assistant/chats": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Start a chat with Scout, or continue yours about the same record.",
+        "operationId": "assistant.start_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartChat"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Your chat about that record, continued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatView"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "A new chat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Scout cannot chat about that type of record (`about_unsupported`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`chat_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace or record, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No language model may read mail here (`chat_unavailable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Your chat, what it is about, and its messages, oldest first.",
+        "operationId": "assistant.get_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "description": "The chat.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The chat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Delete your chat and its messages. There is no undo.",
+        "operationId": "assistant.delete_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "description": "The chat.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Ask Scout, and get its answer whole (the desktop app, where answers\ndon't stream).",
+        "operationId": "assistant.ask_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "description": "The chat.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskChat"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Scout's answer, as stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessageView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty question (`question_empty`) or one over 2,000 characters (`question_too_long`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The chat holds 40 questions already (`chat_full`): start over; or no language model may read mail here (`chat_unavailable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many questions this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Scout couldn't answer (`chat_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/assistant/chats/{chat_id}/questions/stream": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Ask Scout, and get its answer as it is written.",
+        "description": "The same request as `assistant.ask_chat`, answered as Server-Sent\nEvents once every check passed (a refusal is an ordinary problem\nanswer). Events, each `data` a JSON object: `thinking` (`{\"delta\"}`:\nScout's reasoning as it arrives, at most 8,000 characters in all),\n`step` (`{\"tool\"}`: a tool starting), `text` (`{\"delta\"}`: the answer's\nwords as they arrive; words before a `step` are not part of the answer),\nthen exactly one of `done` (the stored Scout message, as `ask_chat`\nanswers it) or `error` (a problem: `chat_failed` or\n`ai_daily_limit_reached`). A comment every 10 seconds keeps the\nconnection open. The question is stored when the stream opens; a\nstream that ends before `done` leaves Scout's message stored as\n`failed`, with no text.",
+        "operationId": "assistant.stream_chat",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "description": "The chat.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskChat"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The answer as it is written: `thinking`, `step`, `text`, then `done` or `error`.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty question (`question_empty`) or one over 2,000 characters (`question_too_long`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The chat holds 40 questions already (`chat_full`): start over; or no language model may read mail here (`chat_unavailable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many questions this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Scout couldn't answer (`chat_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "assistant.chat"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.chat"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/assistant/compile": {
       "post": {
         "tags": [
@@ -3341,6 +3919,99 @@
           ],
           "risk": "low",
           "undo": "conversations.unarchive"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/history": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "What happened to a conversation, and who did it.",
+        "operationId": "conversations.get_history",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What happened to it, oldest first; no message text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationHistory"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.conversation",
+            "conversations.message",
+            "conversations.rule"
+          ],
+          "risk": "low"
         }
       }
     },
@@ -9905,1202 +10576,6 @@
         }
       }
     },
-    "/api/v1/w/{workspace_id}/tasks": {
-      "get": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "List your tasks.",
-        "operationId": "tasks.list",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          },
-          {
-            "name": "state",
-            "in": "query",
-            "description": "`open` (the default), `done` or `not_needed`. Ignored when `ids`\nnames the tasks, unless given.",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Whether it still needs doing.",
-              "enum": [
-                "open",
-                "done",
-                "not_needed"
-              ]
-            }
-          },
-          {
-            "name": "due_from",
-            "in": "query",
-            "description": "Due on or after this day.",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "due_to",
-            "in": "query",
-            "description": "Due on or before this day.",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "overdue",
-            "in": "query",
-            "description": "Only open tasks whose due day has passed.",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "undated",
-            "in": "query",
-            "description": "Only tasks with no due day.",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "source_type",
-            "in": "query",
-            "description": "Only tasks from this record type (with `source_id`).",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "source_id",
-            "in": "query",
-            "description": "Only tasks from this record.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "whose",
-            "in": "query",
-            "description": "`mine` (default) or `handed_off`.",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Whose tasks.",
-              "enum": [
-                "mine",
-                "handed_off"
-              ]
-            }
-          },
-          {
-            "name": "ids",
-            "in": "query",
-            "description": "1 to 100 task ids, separated by commas: Home's batch read. Tasks the\ncaller cannot see are left out.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "utc_offset",
-            "in": "query",
-            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The caller's tasks.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskList"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Ids that are not 1 to 100 task ids (`invalid_ids`), or an offset beyond 14 hours (`invalid_offset`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such workspace, or you cannot see it.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:read"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "read",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": false,
-          "mutates": false,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low"
-        }
-      },
-      "post": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "Make a task.",
-        "operationId": "tasks.create",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewTask"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "The task.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "A blank or too long title (`invalid_title`), a due time without a day, or a bad sender address.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such workspace, or a source you cannot see.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "create",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": true,
-          "mutates": true,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low",
-          "undo": "tasks.not_needed"
-        }
-      }
-    },
-    "/api/v1/w/{workspace_id}/tasks/{task_id}": {
-      "get": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "Read a task.",
-        "operationId": "tasks.get",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          },
-          {
-            "name": "task_id",
-            "in": "path",
-            "description": "The task.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/TaskId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The task and its history.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskDetail"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such task, or you cannot see it.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:read"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "read",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": false,
-          "mutates": false,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low"
-        }
-      },
-      "patch": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "Change a task's title, verb or due date.",
-        "operationId": "tasks.update",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          },
-          {
-            "name": "task_id",
-            "in": "path",
-            "description": "The task.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/TaskId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TaskUpdate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The task afterwards.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "A blank or too long title (`invalid_title`), or a due time without a day.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such task, or you cannot see it.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "write",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": true,
-          "mutates": true,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low"
-        }
-      }
-    },
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/done": {
-      "post": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "Mark a task done (paid, for a bill).",
-        "operationId": "tasks.done",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          },
-          {
-            "name": "task_id",
-            "in": "path",
-            "description": "The task.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/TaskId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TaskRevision"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The task afterwards.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such task, or you cannot see it.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "write",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": true,
-          "mutates": true,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low",
-          "undo": "tasks.reopen"
-        }
-      }
-    },
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/hand_off": {
-      "post": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "Hand an open task to a teammate.",
-        "operationId": "tasks.hand_off",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          },
-          {
-            "name": "task_id",
-            "in": "path",
-            "description": "The task.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/TaskId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HandOffTo"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The task afterwards.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Not a member of the workspace (`not_a_member`), or yourself (`hand_off_yourself`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such task, or you cannot see it.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "write",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": true,
-          "mutates": true,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low",
-          "undo": "tasks.take_back"
-        }
-      }
-    },
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/not_needed": {
-      "post": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "Mark a task not needed.",
-        "operationId": "tasks.not_needed",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          },
-          {
-            "name": "task_id",
-            "in": "path",
-            "description": "The task.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/TaskId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TaskRevision"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The task afterwards.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such task, or you cannot see it.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "write",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": true,
-          "mutates": true,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low",
-          "undo": "tasks.reopen"
-        }
-      }
-    },
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/plan": {
-      "post": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "Plan a task: a day, Later, or nothing.",
-        "operationId": "tasks.plan",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          },
-          {
-            "name": "task_id",
-            "in": "path",
-            "description": "The task.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/TaskId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PlanTask"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The task afterwards.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "A `date` plan without a day (`plan_needs_day`), or a `later` time in the past or over a year away (`invalid_later`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such task, or you cannot see it.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The task changed since you saw it (`task_changed`), or it is closed (`task_closed`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "write",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": true,
-          "mutates": true,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low"
-        }
-      }
-    },
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/reopen": {
-      "post": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "Open a closed task again, with its plan.",
-        "operationId": "tasks.reopen",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          },
-          {
-            "name": "task_id",
-            "in": "path",
-            "description": "The task.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/TaskId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TaskRevision"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The task afterwards.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such task, or you cannot see it.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The task changed since you saw it (`task_changed`), or it is still open (`task_open`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "write",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": true,
-          "mutates": true,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low"
-        }
-      }
-    },
-    "/api/v1/w/{workspace_id}/tasks/{task_id}/take_back": {
-      "post": {
-        "tags": [
-          "tasks"
-        ],
-        "summary": "Take back a task you handed to someone, while it is open.",
-        "operationId": "tasks.take_back",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          },
-          {
-            "name": "task_id",
-            "in": "path",
-            "description": "The task.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/TaskId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TaskRevision"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The task afterwards.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope, or you did not hand it off (`task_not_yours`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such task, or you cannot see it.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The task changed since you saw it (`task_changed`), it is closed (`task_closed`) or was not handed to anyone (`not_handed_off`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "tasks:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "access": {
-            "action": "share",
-            "resource": "tasks.task"
-          },
-          "assistant": true,
-          "automation": true,
-          "mutates": true,
-          "records": [
-            "tasks.task"
-          ],
-          "risk": "low"
-        }
-      }
-    },
     "/api/v1/workspaces": {
       "get": {
         "tags": [
@@ -14147,6 +13622,27 @@
           }
         }
       },
+      "AskChat": {
+        "type": "object",
+        "description": "A question.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "What you ask, 1 to 2,000 characters (line breaks kept)."
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your time zone, an IANA name (`Europe/Lisbon`), for \"today\" and\n\"Thursday afternoon\"; UTC when absent or unknown."
+          }
+        },
+        "additionalProperties": false
+      },
       "AssertionResponse": {
         "type": "object",
         "description": "`AuthenticatorAssertionResponseJSON`: the authenticator's signature.",
@@ -14412,6 +13908,179 @@
         "enum": [
           "email"
         ]
+      },
+      "ChatAuthor": {
+        "type": "string",
+        "description": "Who wrote a chat message.",
+        "enum": [
+          "member",
+          "scout"
+        ]
+      },
+      "ChatFinish": {
+        "type": "string",
+        "description": "How Scout's answer ended.",
+        "enum": [
+          "done",
+          "failed",
+          "cut_short"
+        ]
+      },
+      "ChatId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ChatId (UUIDv7)"
+      },
+      "ChatMessageId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ChatMessageId (UUIDv7)"
+      },
+      "ChatMessageView": {
+        "type": "object",
+        "description": "A question or an answer.",
+        "required": [
+          "id",
+          "author",
+          "text",
+          "steps",
+          "created_at"
+        ],
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/ChatAuthor",
+            "description": "Who wrote it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "finish": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ChatFinish",
+                "description": "How Scout's answer ended (Scout's answers only)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/ChatMessageId",
+            "description": "The message."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatStep"
+            },
+            "description": "What Scout looked at to answer (Scout's answers only)."
+          },
+          "text": {
+            "type": "string",
+            "description": "What was asked or answered, as plain text: show it as text only,\nnever as HTML and never with links made of it."
+          }
+        }
+      },
+      "ChatStep": {
+        "type": "object",
+        "description": "One thing Scout looked at, built by the server from the tool that ran,\nnever from the model's words.",
+        "required": [
+          "tool",
+          "records",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many it found.",
+            "minimum": 0
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordRef"
+            },
+            "description": "The records it returned, at most 10."
+          },
+          "tool": {
+            "$ref": "#/components/schemas/ChatTool",
+            "description": "The tool."
+          }
+        }
+      },
+      "ChatTool": {
+        "type": "string",
+        "description": "A tool Scout used. Each reads as the member, and changes nothing.",
+        "enum": [
+          "find_conversations",
+          "read_conversation",
+          "conversation_history",
+          "find_people",
+          "what_needs_me",
+          "my_inboxes"
+        ]
+      },
+      "ChatView": {
+        "type": "object",
+        "description": "A chat and its messages, oldest first.",
+        "required": [
+          "id",
+          "questions",
+          "max_questions",
+          "created_at",
+          "last_message_at",
+          "messages"
+        ],
+        "properties": {
+          "about": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "What it is about."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was started."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ChatId",
+            "description": "The chat."
+          },
+          "last_message_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its last message was written; it is deleted 30 days after."
+          },
+          "max_questions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions it may hold; past them, start over.",
+            "minimum": 0
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessageView"
+            },
+            "description": "Its messages, oldest first."
+          },
+          "questions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions asked so far.",
+            "minimum": 0
+          }
+        }
       },
       "ClientBrowser": {
         "type": "object",
@@ -15131,6 +14800,32 @@
               "null"
             ],
             "description": "Scout's summary of the email behind the conversation's open need, in\nyour language (English when it has none in yours), written once when\nthe need was raised. None when there is no open need, the summary is\nnot written yet (it arrives with a change to this conversation), or no\nmodel may read mail on this server."
+          }
+        }
+      },
+      "ConversationHistory": {
+        "type": "object",
+        "description": "What happened to a conversation, oldest first.",
+        "required": [
+          "conversation_id",
+          "events",
+          "truncated"
+        ],
+        "properties": {
+          "conversation_id": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEvent"
+            },
+            "description": "At most the 200 newest events, oldest first."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Older events were left out."
           }
         }
       },
@@ -16088,26 +15783,6 @@
           }
         }
       },
-      "HandOffTo": {
-        "type": "object",
-        "description": "Who to hand it to.",
-        "required": [
-          "revision",
-          "to"
-        ],
-        "properties": {
-          "revision": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The revision you saw."
-          },
-          "to": {
-            "$ref": "#/components/schemas/UserId",
-            "description": "A member of the workspace."
-          }
-        },
-        "additionalProperties": false
-      },
       "HeaderCondition": {
         "type": "object",
         "description": "A header test: present, or equal to a value.",
@@ -16231,10 +15906,383 @@
           }
         }
       },
-      "HistoryId": {
+      "HistoryActor": {
         "type": "string",
-        "format": "uuid",
-        "description": "HistoryId (UUIDv7)"
+        "description": "Who did something.",
+        "enum": [
+          "you",
+          "member",
+          "rule",
+          "scout"
+        ]
+      },
+      "HistoryEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A message arrived.",
+            "required": [
+              "at",
+              "message_id",
+              "from",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When it was sent."
+              },
+              "from": {
+                "$ref": "#/components/schemas/Address",
+                "description": "Who wrote it."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "received"
+                ]
+              },
+              "message_id": {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The inbox sent a message.",
+            "required": [
+              "at",
+              "message_id",
+              "from",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When it was sent."
+              },
+              "from": {
+                "$ref": "#/components/schemas/Address",
+                "description": "Who wrote it."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "sent"
+                ]
+              },
+              "message_id": {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "One of Scout's answers about a message.",
+            "required": [
+              "at",
+              "message_id",
+              "question",
+              "value",
+              "source",
+              "acted",
+              "kind"
+            ],
+            "properties": {
+              "acted": {
+                "type": "boolean",
+                "description": "Whether it changed anything; otherwise it was a suggestion."
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When it was given."
+              },
+              "confidence": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "How sure, 0 to 100, when the source says.",
+                "minimum": 0
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "scout_read"
+                ]
+              },
+              "message_id": {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message it is about."
+              },
+              "question": {
+                "type": "string",
+                "description": "The question (`stream`, `needs_reply`, `money`, …)."
+              },
+              "source": {
+                "$ref": "#/components/schemas/DecisionSource",
+                "description": "Who answered."
+              },
+              "value": {
+                "$ref": "#/components/schemas/AnswerView",
+                "description": "The answer."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A member changed an answer.",
+            "required": [
+              "at",
+              "question",
+              "from",
+              "to",
+              "by",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "by": {
+                "$ref": "#/components/schemas/HistoryActor",
+                "description": "`you` or `member`."
+              },
+              "from": {
+                "type": "string",
+                "description": "The answer before."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "corrected"
+                ]
+              },
+              "question": {
+                "type": "string",
+                "description": "The question."
+              },
+              "to": {
+                "type": "string",
+                "description": "The answer after."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A taught rule changed the conversation.",
+            "required": [
+              "at",
+              "rule",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "rule_applied"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/RuleRef",
+                "description": "The rule."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "What a rule did was put back (the rule was undone).",
+            "required": [
+              "at",
+              "rule",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "rule_reverted"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/RuleRef",
+                "description": "The rule."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A member changed back what a rule did: the rule leaves the\nconversation alone.",
+            "required": [
+              "at",
+              "rule",
+              "by",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "by": {
+                "$ref": "#/components/schemas/HistoryActor",
+                "description": "`you` or `member`."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "rule_excepted"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/RuleRef",
+                "description": "The rule."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The conversation's need, raised by one of its messages.",
+            "required": [
+              "at",
+              "reason",
+              "basis",
+              "open",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When it was raised: Scout's answer raising it, else its last change."
+              },
+              "basis": {
+                "type": "string",
+                "description": "What raised it: `rules`, `model`, `taught` or `member`."
+              },
+              "due_on": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date",
+                "description": "When it is due, when known."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "need_opened"
+                ]
+              },
+              "lapses_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When it lapses on its own, when it does."
+              },
+              "open": {
+                "type": "boolean",
+                "description": "Whether it is still open."
+              },
+              "reason": {
+                "type": "string",
+                "description": "`reply`, `do`, `pay`, `review`, `worth_a_look`, `waiting` or\n`nudge`."
+              },
+              "wakes_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When it next changes with time alone, when it does."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The need left the list.",
+            "required": [
+              "at",
+              "because",
+              "by",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "because": {
+                "type": "string",
+                "description": "Why: `replied`, `archived`, `trashed`, `done`, `not_needed`,\n`superseded`, `rule`, `opened`, `lapsed` or `heard_back`."
+              },
+              "by": {
+                "$ref": "#/components/schemas/HistoryActor",
+                "description": "Who."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "need_cleared"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A member's verdict on the need.",
+            "required": [
+              "at",
+              "verdict",
+              "by",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When."
+              },
+              "by": {
+                "$ref": "#/components/schemas/HistoryActor",
+                "description": "`you` or `member`."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "need_verdict"
+                ]
+              },
+              "verdict": {
+                "type": "string",
+                "description": "`done`, `not_needed`, `confirmed`, `already_paid` or\n`still_to_pay`."
+              }
+            }
+          }
+        ],
+        "description": "One thing that happened, by kind."
       },
       "Hit": {
         "type": "object",
@@ -17352,65 +17400,6 @@
           "proposed"
         ]
       },
-      "NewTask": {
-        "type": "object",
-        "description": "A new task.",
-        "required": [
-          "title"
-        ],
-        "properties": {
-          "due_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "The time it is due; needs `due_on`, its local day."
-          },
-          "due_on": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "description": "The day it is due."
-          },
-          "source": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/RecordRef",
-                "description": "The record it comes from (a conversation the caller can read)."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "source_sender": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The address of the source's sender, kept to recognise the same\nsender's other tasks."
-          },
-          "title": {
-            "type": "string",
-            "description": "What to do: 1 to 200 characters."
-          },
-          "verb": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/TaskVerb",
-                "description": "Do (the default) or Pay."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "additionalProperties": false
-      },
       "NoSuggestion": {
         "type": "string",
         "description": "Why there is nothing to offer.",
@@ -17666,42 +17655,6 @@
           "incremental",
           "resync"
         ]
-      },
-      "PlanTask": {
-        "type": "object",
-        "description": "The plan the task should have.",
-        "required": [
-          "revision",
-          "plan"
-        ],
-        "properties": {
-          "later_until": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "Later than now and less than a year away, for `later`."
-          },
-          "plan": {
-            "$ref": "#/components/schemas/TaskPlan",
-            "description": "`none`, `date` or `later`."
-          },
-          "plan_on": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "description": "The day, for `date`."
-          },
-          "revision": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The revision you saw."
-          }
-        },
-        "additionalProperties": false
       },
       "PreviewRule": {
         "type": "object",
@@ -19410,6 +19363,35 @@
           }
         }
       },
+      "RuleRef": {
+        "type": "object",
+        "description": "A taught rule, as an event names it: its id, and its conditions and\nactions, which clients read as its sentence.",
+        "required": [
+          "id",
+          "conditions",
+          "actions"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "What it does."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "When it applies."
+          },
+          "id": {
+            "$ref": "#/components/schemas/RuleId",
+            "description": "The rule."
+          }
+        }
+      },
       "RuleRunId": {
         "type": "string",
         "format": "uuid",
@@ -20161,6 +20143,24 @@
         },
         "additionalProperties": false
       },
+      "StartChat": {
+        "type": "object",
+        "description": "Start a chat, or continue the one you have about the same record.",
+        "properties": {
+          "about": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "What the chat is about: a record of a type Scout can read\n(`conversations.conversation`); nothing when absent."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "StartConnection": {
         "type": "object",
         "description": "What to connect.",
@@ -20528,409 +20528,6 @@
             "format": "int32",
             "description": "How many streams will run now.",
             "minimum": 0
-          }
-        }
-      },
-      "TaskActor": {
-        "type": "string",
-        "description": "Who made a change.",
-        "enum": [
-          "member",
-          "scout",
-          "calendar"
-        ]
-      },
-      "TaskChange": {
-        "type": "string",
-        "description": "What changed: the event's `change` and the history's `what`.",
-        "enum": [
-          "created",
-          "edited",
-          "due_changed",
-          "planned",
-          "done",
-          "not_needed",
-          "reopened",
-          "handed_off",
-          "taken_back"
-        ]
-      },
-      "TaskDetail": {
-        "type": "object",
-        "description": "A task and its history.",
-        "required": [
-          "task",
-          "history"
-        ],
-        "properties": {
-          "history": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TaskHistoryEntry"
-            },
-            "description": "What changed in it, oldest first."
-          },
-          "task": {
-            "$ref": "#/components/schemas/TaskView",
-            "description": "The task."
-          }
-        }
-      },
-      "TaskEditedField": {
-        "type": "string",
-        "description": "A field `tasks.update` changed.",
-        "enum": [
-          "title",
-          "task_verb",
-          "due"
-        ]
-      },
-      "TaskHistoryDetail": {
-        "type": "object",
-        "description": "What a history entry holds besides its kind: ids, enums and dates only,\nnever a title.",
-        "properties": {
-          "due_on": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "description": "The due day afterwards."
-          },
-          "fields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TaskEditedField"
-            },
-            "description": "The fields an edit changed."
-          },
-          "later_until": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "When Later ends."
-          },
-          "member": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/UserId",
-                "description": "The other member of a hand-off or a take-back."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "plan": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/TaskPlan",
-                "description": "The plan afterwards."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "plan_on": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "description": "The planned day."
-          }
-        }
-      },
-      "TaskHistoryEntry": {
-        "type": "object",
-        "description": "One entry of a task's history.",
-        "required": [
-          "id",
-          "at",
-          "actor",
-          "what",
-          "detail"
-        ],
-        "properties": {
-          "actor": {
-            "$ref": "#/components/schemas/TaskActor",
-            "description": "Who: the member, Scout or the calendar."
-          },
-          "actor_member": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/UserId",
-                "description": "The member Scout or the calendar acted for, or who acted."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When."
-          },
-          "detail": {
-            "$ref": "#/components/schemas/TaskHistoryDetail",
-            "description": "Ids, enums and dates of the change."
-          },
-          "id": {
-            "$ref": "#/components/schemas/HistoryId",
-            "description": "The entry."
-          },
-          "what": {
-            "$ref": "#/components/schemas/TaskChange",
-            "description": "What changed."
-          }
-        }
-      },
-      "TaskId": {
-        "type": "string",
-        "format": "uuid",
-        "description": "TaskId (UUIDv7)"
-      },
-      "TaskList": {
-        "type": "object",
-        "description": "The caller's tasks.",
-        "required": [
-          "tasks"
-        ],
-        "properties": {
-          "tasks": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TaskView"
-            },
-            "description": "In order: overdue first, then by due date and time, then undated."
-          }
-        }
-      },
-      "TaskOrigin": {
-        "type": "string",
-        "description": "How the task came to be.",
-        "enum": [
-          "own",
-          "ask",
-          "deadline"
-        ]
-      },
-      "TaskPlan": {
-        "type": "string",
-        "description": "When the member will do it.",
-        "enum": [
-          "none",
-          "date",
-          "later"
-        ]
-      },
-      "TaskRevision": {
-        "type": "object",
-        "description": "The revision of a task the caller saw, for a change that needs nothing\nelse.",
-        "required": [
-          "revision"
-        ],
-        "properties": {
-          "revision": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The revision you saw."
-          }
-        },
-        "additionalProperties": false
-      },
-      "TaskState": {
-        "type": "string",
-        "description": "Whether it still needs doing.",
-        "enum": [
-          "open",
-          "done",
-          "not_needed"
-        ]
-      },
-      "TaskUpdate": {
-        "type": "object",
-        "description": "The task as it should become.",
-        "required": [
-          "revision",
-          "title",
-          "verb"
-        ],
-        "properties": {
-          "due_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "The time it is due; needs `due_on`."
-          },
-          "due_on": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "description": "The day it is due; none clears it."
-          },
-          "revision": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The revision you saw."
-          },
-          "title": {
-            "type": "string",
-            "description": "What to do: 1 to 200 characters."
-          },
-          "verb": {
-            "$ref": "#/components/schemas/TaskVerb",
-            "description": "Do or Pay."
-          }
-        },
-        "additionalProperties": false
-      },
-      "TaskVerb": {
-        "type": "string",
-        "description": "What kind of thing it is: something to do, or a bill to pay.",
-        "enum": [
-          "do",
-          "pay"
-        ]
-      },
-      "TaskView": {
-        "type": "object",
-        "description": "A task, as the caller sees it.",
-        "required": [
-          "id",
-          "title",
-          "verb",
-          "origin",
-          "overdue",
-          "plan",
-          "state",
-          "assignee",
-          "created_by",
-          "revision",
-          "created_at",
-          "updated_at"
-        ],
-        "properties": {
-          "assignee": {
-            "$ref": "#/components/schemas/UserId",
-            "description": "The member it is with."
-          },
-          "closed_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "When it was closed."
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When it was made."
-          },
-          "created_by": {
-            "$ref": "#/components/schemas/UserId",
-            "description": "The member who made it."
-          },
-          "due_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "The time it is due, when it has one (`due_on` is its local day)."
-          },
-          "due_on": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "description": "The day it is due."
-          },
-          "handed_by": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/UserId",
-                "description": "The member who handed it to the assignee, while it is handed off."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "id": {
-            "$ref": "#/components/schemas/TaskId",
-            "description": "The task."
-          },
-          "later_until": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "When Later ends, for `later`."
-          },
-          "origin": {
-            "$ref": "#/components/schemas/TaskOrigin",
-            "description": "How it came to be."
-          },
-          "overdue": {
-            "type": "boolean",
-            "description": "Whether it is open and its due day has passed (the caller's today)."
-          },
-          "plan": {
-            "$ref": "#/components/schemas/TaskPlan",
-            "description": "The plan. A Later that has ended reads as `none`."
-          },
-          "plan_on": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "description": "The planned day, for `date`."
-          },
-          "revision": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Grows with every change: send the one you saw with a change."
-          },
-          "source": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/RecordRef",
-                "description": "The record it came from, when it came from one."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state": {
-            "$ref": "#/components/schemas/TaskState",
-            "description": "Open, done or not needed."
-          },
-          "title": {
-            "type": "string",
-            "description": "What to do, in the member's words."
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When it last changed."
-          },
-          "verb": {
-            "$ref": "#/components/schemas/TaskVerb",
-            "description": "Do or Pay."
           }
         }
       },
@@ -21560,7 +21157,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `tasks:read`: See your tasks and the ones you handed to someone.\n- `tasks:write`: Add tasks, change them, mark them done and hand them to a teammate.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -21602,10 +21199,6 @@
     {
       "name": "assistant",
       "description": "What you told Scout about how to act, and turning a sentence you type into rules to check. Compiling uses the `complete` AI role only when you ask, and sends it your sentence and your own addresses and label names, never your mail; nothing is saved until you save a rule through the conversations module."
-    },
-    {
-      "name": "tasks",
-      "description": "What you have to do: your tasks, with a due date, a plan (a day, or Later), a hand-off to one teammate and an undo for every change. Personal: a task is seen by who it is with, and by who handed it off."
     },
     {
       "name": "changes",

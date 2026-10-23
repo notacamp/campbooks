@@ -36,5 +36,5 @@ pub static MESSAGES: campbooks_kernel::i18n::Catalogue = campbooks_kernel::catal
 pub use gateway::{
     ChatRequest, ChatResponse, Content, ContentPart, DEFAULT_CONNECT_TIMEOUT,
     DEFAULT_REQUEST_TIMEOUT, Gateway, ImageUrl, JsonSchemaFormat, Message, MessageRole,
-    ResponseFormat, RetryPolicy, Usage,
+    ResponseFormat, RetryPolicy, ToolCall, ToolChoice, ToolDefinition, Usage,
 };
