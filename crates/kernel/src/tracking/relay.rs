@@ -45,6 +45,7 @@ use lapin::{
     },
     types::{AMQPValue, FieldTable, ShortString},
 };
+use secrecy::ExposeSecret as _;
 use serde_json::Value;
 use sqlx::{PgPool, postgres::PgListener};
 use tokio::{sync::Notify, time::Instant};
@@ -141,18 +142,23 @@ impl Publisher {
     /// Connect to `config`'s broker, declare the topology when
     /// `DECLARE_TOPOLOGY` is on, and turn publisher confirms on.
     pub async fn connect(config: &TrackingConfig) -> Result<Self, RelayError> {
-        let url = config.amqp_url().ok_or(RelayError::Broker("no_url"))?;
+        let url = config
+            .amqp_connection_url()
+            .map_err(|_| RelayError::Broker("password_file"))?
+            .ok_or(RelayError::Broker("no_url"))?;
         let exchange =
             ShortString::try_new(config.exchange.as_str()).map_err(|_| RelayError::Encode)?;
         let properties =
             ConnectionProperties::default().with_connection_name(CONNECTION_NAME.into());
-        let connection = Connection::connect(url, properties).await.map_err(|e| {
-            RelayError::Broker(if e.is_amqp_error() {
-                "connect_refused"
-            } else {
-                "connect"
-            })
-        })?;
+        let connection = Connection::connect(url.expose_secret(), properties)
+            .await
+            .map_err(|e| {
+                RelayError::Broker(if e.is_amqp_error() {
+                    "connect_refused"
+                } else {
+                    "connect"
+                })
+            })?;
         let channel = connection
             .create_channel()
             .await
