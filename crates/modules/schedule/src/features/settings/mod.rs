@@ -98,9 +98,9 @@ pub struct SettingsPatch {
     pub working_hours: Option<WorkingHours>,
     /// The kinds Scout adds.
     pub scout_kinds: Option<Vec<EventKind>>,
-    /// Per kind, the provider calendar an event is also added to; `null`
-    /// takes a kind off.
-    pub also_add_to: Option<BTreeMap<String, Option<CalendarId>>>,
+    /// Per kind, the provider calendar an event is also added to, replacing
+    /// the old map: a kind left out is taken off.
+    pub also_add_to: Option<BTreeMap<String, CalendarId>>,
 }
 
 /// Change your calendar settings.
@@ -159,31 +159,24 @@ pub async fn update(
     }
     if let Some(also) = patch.also_add_to {
         let calendars = calendars_of(&mut tx, access.workspace, member).await?;
-        for (kind, target) in also {
+        for (kind, id) in &also {
             let kind_ok = kind.parse::<EventKind>().is_ok_and(settings::scout_can_add);
             if !kind_ok {
                 return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_kind")));
             }
-            match target {
-                None => {
-                    current.also_add_to.remove(&kind);
-                }
-                Some(id) => {
-                    let usable = calendars
-                        .iter()
-                        .find(|calendar| calendar.id == id)
-                        .is_some_and(|calendar| {
-                            !calendar.is_campbooks() && calendar.writable && calendar.syncing
-                        });
-                    if !usable {
-                        return Err(Error::BadRequest(
-                            crate::MESSAGES.reason("invalid_calendar"),
-                        ));
-                    }
-                    current.also_add_to.insert(kind, id);
-                }
+            let usable = calendars
+                .iter()
+                .find(|calendar| calendar.id == *id)
+                .is_some_and(|calendar| {
+                    !calendar.is_campbooks() && calendar.writable && calendar.syncing
+                });
+            if !usable {
+                return Err(Error::BadRequest(
+                    crate::MESSAGES.reason("invalid_calendar"),
+                ));
             }
         }
+        current.also_add_to = also;
     }
     settings::save(&mut tx, access.workspace, member, &current).await?;
     tx.commit().await?;

@@ -54,11 +54,11 @@ impl EventHandler for ApplyCalendarChanges {
             ));
         }
         let tx = ctx.tx().await?;
-        let calendar = sqlx::query_as::<_, CalendarRow>(&format!(
+        let calendar = sqlx::query_as::<_, CalendarRow>(sqlx::AssertSqlSafe(format!(
             "SELECT {CALENDAR_COLUMNS} FROM schedule.calendars
               WHERE connection_id = $1 AND provider_calendar_id = $2 AND source = 'provider'
                 FOR SHARE"
-        ))
+        )))
         .bind(changed.connection)
         .bind(&batch.provider_calendar_id)
         .fetch_optional(&mut **tx)
@@ -106,12 +106,12 @@ impl EventHandler for ApplyCalendarChanges {
                 .iter()
                 .map(|upsert| upsert.provider_id.as_str())
                 .collect();
-            let gone = sqlx::query_as::<_, EventRow>(&format!(
+            let gone = sqlx::query_as::<_, EventRow>(sqlx::AssertSqlSafe(format!(
                 "SELECT {EVENT_COLUMNS} FROM schedule.events e
                   WHERE e.calendar_id = $1 AND e.provider_event_id IS NOT NULL
                     AND e.status <> 'cancelled' AND e.deleted_at IS NULL
                     AND e.outbound_pending IS NULL"
-            ))
+            )))
             .bind(calendar.id)
             .fetch_all(&mut **tx)
             .await?;
@@ -146,11 +146,11 @@ async fn by_provider_id(
     calendar: &CalendarRow,
     provider_id: &str,
 ) -> Result<Option<EventRow>, sqlx::Error> {
-    sqlx::query_as::<_, EventRow>(&format!(
+    sqlx::query_as::<_, EventRow>(sqlx::AssertSqlSafe(format!(
         "SELECT {EVENT_COLUMNS} FROM schedule.events e
           WHERE e.calendar_id = $1 AND e.provider_event_id = $2
             FOR UPDATE"
-    ))
+    )))
     .bind(calendar.id)
     .bind(provider_id)
     .fetch_optional(conn)
@@ -173,11 +173,11 @@ async fn adopt(
         .and_then(|private| private.campbooks_event.as_deref())
         .and_then(|id| id.parse::<EventId>().ok());
     if let Some(id) = written {
-        let row = sqlx::query_as::<_, EventRow>(&format!(
+        let row = sqlx::query_as::<_, EventRow>(sqlx::AssertSqlSafe(format!(
             "SELECT {EVENT_COLUMNS} FROM schedule.events e
               WHERE e.id = $1 AND e.calendar_id = $2 AND e.provider_event_id IS NULL
                 FOR UPDATE"
-        ))
+        )))
         .bind(id)
         .bind(calendar.id)
         .fetch_optional(&mut *conn)
@@ -187,11 +187,11 @@ async fn adopt(
         }
     }
     if let (Some(series), Some(original)) = (series, &parsed.original) {
-        return sqlx::query_as::<_, EventRow>(&format!(
+        return sqlx::query_as::<_, EventRow>(sqlx::AssertSqlSafe(format!(
             "SELECT {EVENT_COLUMNS} FROM schedule.events e
               WHERE e.series_id = $1 AND e.original_start = $2 AND e.provider_event_id IS NULL
                 FOR UPDATE"
-        ))
+        )))
         .bind(series.id)
         .bind(original)
         .fetch_optional(conn)

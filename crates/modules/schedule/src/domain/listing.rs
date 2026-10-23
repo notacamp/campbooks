@@ -64,7 +64,7 @@ pub async fn list(
 ) -> Result<Vec<Listed>> {
     let from_day = (from - TimeDelta::days(1)).date_naive();
     let to_day = to.date_naive();
-    let rows = sqlx::query_as::<_, EventRow>(&format!(
+    let rows = sqlx::query_as::<_, EventRow>(sqlx::AssertSqlSafe(format!(
         r"SELECT {EVENT_COLUMNS}
             FROM schedule.events e
             JOIN schedule.calendars c ON c.id = e.calendar_id
@@ -86,7 +86,7 @@ pub async fn list(
                       AND ((NOT e.all_day AND e.starts_at < $6)
                            OR (e.all_day AND e.starts_on <= $8)))
              )"
-    ))
+    )))
     .bind(member)
     .bind(filter.calendars.as_deref())
     .bind(filter.kinds.as_deref())

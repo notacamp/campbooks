@@ -113,12 +113,12 @@ async fn event_of_key(
     owner: UserId,
     key: &str,
 ) -> Result<Option<EventRow>, sqlx::Error> {
-    sqlx::query_as::<_, EventRow>(&format!(
+    sqlx::query_as::<_, EventRow>(sqlx::AssertSqlSafe(format!(
         "SELECT {EVENT_COLUMNS} FROM schedule.events e
            JOIN schedule.calendars c ON c.id = e.calendar_id
           WHERE c.member_id = $1 AND $2 = ANY(e.item_keys)
             FOR UPDATE OF e"
-    ))
+    )))
     .bind(owner)
     .bind(key)
     .fetch_optional(conn)
@@ -237,14 +237,14 @@ async fn add_item(
 
     // The sender's own invitation is already on one of the member's calendars.
     if let Some(uid) = text.and_then(|text| text.ical_uid.as_deref()) {
-        let linked = sqlx::query_as::<_, EventRow>(&format!(
+        let linked = sqlx::query_as::<_, EventRow>(sqlx::AssertSqlSafe(format!(
             "SELECT {EVENT_COLUMNS} FROM schedule.events e
                JOIN schedule.calendars c ON c.id = e.calendar_id
               WHERE c.member_id = $1 AND (c.source = 'campbooks' OR c.syncing)
                 AND e.ical_uid = $2 AND e.deleted_at IS NULL
               LIMIT 1
                 FOR UPDATE OF e"
-        ))
+        )))
         .bind(owner)
         .bind(uid)
         .fetch_optional(&mut **tx)

@@ -168,9 +168,9 @@ impl Job for PurgeWorkspace {
             "events",
             "calendars",
         ] {
-            sqlx::query(&format!(
+            sqlx::query(sqlx::AssertSqlSafe(format!(
                 "DELETE FROM schedule.{table} WHERE workspace_id = $1"
-            ))
+            )))
             .bind(workspace)
             .execute(&mut **tx)
             .await?;

@@ -555,10 +555,10 @@ fn vet_item(
     };
     // A cancellation of something never held adds nothing: the whole item
     // goes (the structured layer does the same).
-    if let Some(named) = string(raw, "cancels") {
-        if !veto.known.iter().any(|known| known == named) {
-            return Err(Dropped::Reference);
-        }
+    if let Some(named) = string(raw, "cancels")
+        && !veto.known.iter().any(|known| known == named)
+    {
+        return Err(Dropped::Reference);
     }
     let mut reference = |name: &str| {
         let named = string(raw, name)?;

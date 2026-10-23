@@ -31,8 +31,8 @@
 
 use campbooks_ai::decide::signals::facts::sender_authenticated;
 use campbooks_kernel::{
-    AppState, EventBus, JobContext, JobError, JobHandler,
-    blobs::{BlobRef, BlobStore},
+    AppState, JobContext, JobError, JobHandler,
+    blobs::BlobRef,
     db::BeginFor as _,
     jobs::{EnqueueOptions, Enqueued},
     tenancy::WorkspaceId,
@@ -168,17 +168,7 @@ pub async fn read(
         return Ok(());
     }
     let mut tx = state.db.begin_for(workspace).await?;
-    keep(
-        &mut tx,
-        &state.events,
-        &state.blobs,
-        needs,
-        workspace,
-        message,
-        &loaded,
-        found,
-    )
-    .await?;
+    keep(&mut tx, state, needs, workspace, message, &loaded, found).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -262,8 +252,7 @@ async fn still_there(
 /// Store the read of what the data named, once, and say so.
 async fn keep(
     tx: &mut Transaction<'_, Postgres>,
-    events: &EventBus,
-    blobs: &BlobStore,
+    state: &AppState,
     settings: &NeedSettings,
     workspace: WorkspaceId,
     message: MessageId,
@@ -298,8 +287,10 @@ async fn keep(
     }
     let owner = store::owner(tx, loaded.inbox_id).await?;
     let ws = workspace.to_string();
-    let texts = crate::features::read_message::put_texts(blobs, tx, &ws, message, &items).await?;
-    events
+    let texts =
+        crate::features::read_message::put_texts(&state.blobs, tx, &ws, message, &items).await?;
+    state
+        .events
         .publish(
             tx,
             &crate::events::MessageRead {
@@ -317,7 +308,7 @@ async fn keep(
         )
         .await?;
     // A payment due may be the date of the conversation's Pay need.
-    needs::refresh(tx, events, &ws, loaded.conversation_id, settings).await?;
+    needs::refresh(tx, &state.events, &ws, loaded.conversation_id, settings).await?;
     Ok(())
 }
 

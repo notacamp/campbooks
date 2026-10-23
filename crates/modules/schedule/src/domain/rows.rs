@@ -124,9 +124,9 @@ pub async fn calendar_of(
     member: UserId,
     id: CalendarId,
 ) -> Result<CalendarRow> {
-    sqlx::query_as::<_, CalendarRow>(&format!(
+    sqlx::query_as::<_, CalendarRow>(sqlx::AssertSqlSafe(format!(
         "SELECT {CALENDAR_COLUMNS} FROM schedule.calendars WHERE id = $1 AND member_id = $2"
-    ))
+    )))
     .bind(id)
     .bind(member)
     .fetch_optional(conn)
@@ -142,10 +142,10 @@ pub async fn calendars_of(
     member: UserId,
 ) -> Result<Vec<CalendarRow>> {
     ensure_campbooks_calendar(conn, workspace, member).await?;
-    let rows = sqlx::query_as::<_, CalendarRow>(&format!(
+    let rows = sqlx::query_as::<_, CalendarRow>(sqlx::AssertSqlSafe(format!(
         "SELECT {CALENDAR_COLUMNS} FROM schedule.calendars WHERE member_id = $1
           ORDER BY (source = 'campbooks') DESC, is_primary DESC, name, id"
-    ))
+    )))
     .bind(member)
     .fetch_all(conn)
     .await?;
@@ -169,10 +169,10 @@ pub async fn ensure_campbooks_calendar(
     .bind(member)
     .execute(&mut *conn)
     .await?;
-    let row = sqlx::query_as::<_, CalendarRow>(&format!(
+    let row = sqlx::query_as::<_, CalendarRow>(sqlx::AssertSqlSafe(format!(
         "SELECT {CALENDAR_COLUMNS} FROM schedule.calendars
           WHERE member_id = $1 AND source = 'campbooks'"
-    ))
+    )))
     .bind(member)
     .fetch_one(conn)
     .await?;
@@ -183,12 +183,12 @@ pub async fn ensure_campbooks_calendar(
 /// restore), locked for the change that follows. Another member's event, and
 /// one that does not exist, are both [`Error::NotFound`].
 pub async fn event_of(conn: &mut PgConnection, member: UserId, id: EventId) -> Result<EventRow> {
-    sqlx::query_as::<_, EventRow>(&format!(
+    sqlx::query_as::<_, EventRow>(sqlx::AssertSqlSafe(format!(
         "SELECT {EVENT_COLUMNS} FROM schedule.events e
            JOIN schedule.calendars c ON c.id = e.calendar_id
           WHERE e.id = $1 AND c.member_id = $2
             FOR UPDATE OF e"
-    ))
+    )))
     .bind(id)
     .bind(member)
     .fetch_optional(conn)
@@ -204,9 +204,9 @@ pub fn event_ref(id: EventId) -> RecordRef {
 /// A calendar by id, whoever's it is: for background work that already knows
 /// whose request it carries out.
 pub async fn calendar_by_id(conn: &mut PgConnection, id: CalendarId) -> Result<CalendarRow> {
-    sqlx::query_as::<_, CalendarRow>(&format!(
+    sqlx::query_as::<_, CalendarRow>(sqlx::AssertSqlSafe(format!(
         "SELECT {CALENDAR_COLUMNS} FROM schedule.calendars WHERE id = $1"
-    ))
+    )))
     .bind(id)
     .fetch_optional(conn)
     .await?
@@ -215,9 +215,9 @@ pub async fn calendar_by_id(conn: &mut PgConnection, id: CalendarId) -> Result<C
 
 /// An event by id, whoever's it is, locked: for background work.
 pub async fn event_by_id(conn: &mut PgConnection, id: EventId) -> Result<Option<EventRow>> {
-    let row = sqlx::query_as::<_, EventRow>(&format!(
+    let row = sqlx::query_as::<_, EventRow>(sqlx::AssertSqlSafe(format!(
         "SELECT {EVENT_COLUMNS} FROM schedule.events e WHERE e.id = $1 FOR UPDATE"
-    ))
+    )))
     .bind(id)
     .fetch_optional(conn)
     .await?;
