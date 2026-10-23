@@ -63,6 +63,7 @@
     "inZone": "{{time}} {{city}} time",
     "onlyYou": "Only you see it until you add it to a calendar",
     "synced": "Synced both ways",
+    "syncedWith": "Synced both ways with {{provider}}",
     "source": {
       "label": "From email",
       "meta": "{{sender}} · {{when}}",

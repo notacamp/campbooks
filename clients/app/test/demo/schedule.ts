@@ -32,6 +32,7 @@ const PERSONAL: Calendar = {
   id: id(2),
   name: "Personal",
   source: "provider",
+  provider: "google",
   primary: true,
   syncing: true,
   writable: true,
@@ -42,6 +43,7 @@ const WORK: Calendar = {
   id: id(3),
   name: "Work",
   source: "provider",
+  provider: "google",
   primary: false,
   syncing: true,
   writable: true,
@@ -52,6 +54,7 @@ export const HOLIDAYS: Calendar = {
   id: id(4),
   name: "Holidays in Portugal",
   source: "provider",
+  provider: "google",
   primary: false,
   syncing: false,
   writable: false,
@@ -87,9 +90,18 @@ const conversation = (n: number) =>
 
 const base: Pick<
   Event,
-  "busy" | "on_provider" | "origin" | "pending" | "recurring" | "status" | "all_day" | "calendar_id"
+  | "busy"
+  | "on_provider"
+  | "origin"
+  | "pending"
+  | "recurring"
+  | "status"
+  | "all_day"
+  | "calendar_id"
+  | "item_keys"
 > = {
   busy: true,
+  item_keys: [],
   on_provider: false,
   origin: "scout",
   pending: false,
@@ -159,6 +171,7 @@ export const DENTIST: Event = scout(1, {
   ends: "2026-10-27T15:45:00+00:00",
   place: "Clínica Sorriso, Rua Augusta 120, Lisboa",
   found_by: "model",
+  item_keys: [`${message(1)}:model:item:0`],
 });
 const NUVEM: Event = scout(2, {
   id: id(14),

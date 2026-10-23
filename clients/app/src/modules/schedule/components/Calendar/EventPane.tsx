@@ -31,7 +31,7 @@ import {
   type useEventActions,
 } from "../../api/queries";
 import { MEMBER_KINDS, type CalendarView, type EventView, type Response } from "../../api/types";
-import { whenLong, zoneNote, type T } from "../../labels";
+import { providerName, whenLong, zoneNote, type T } from "../../labels";
 import { canPush, dayLong, dayOf } from "../../model";
 import { AddToCalendar } from "./AddToCalendar";
 import { emailPath, useInAppLink } from "./links";
@@ -85,6 +85,9 @@ export function EventPane({
 
   const calendar = calendars.find((each) => each.id === event.calendar_id);
   const own = calendar?.source === "campbooks";
+  const provider = providerName(calendar);
+  const syncedNote =
+    provider === undefined ? t("sheet.synced") : t("sheet.syncedWith", { provider });
   const writable = calendars.filter((each) => each.source === "provider" && each.writable);
   const addable = !held && canPush(event, calendars);
   const elsewhere = calendars.find((each) => each.id === lastPushed)?.name;
@@ -174,15 +177,15 @@ export function EventPane({
           <SheetFact icon="pin">{event.place}</SheetFact>
         )}
         <SheetFact icon="event" main={calendar?.name}>
-          {own ? t("sheet.onlyYou") : t("sheet.synced")}
+          {own ? t("sheet.onlyYou") : syncedNote}
         </SheetFact>
       </SheetFacts>
       {event.notice === "kept_theirs" ? (
-        <SheetNotice>{t("notice.keptTheirs", { where: calendar?.name ?? "" })}</SheetNotice>
+        <SheetNotice>{t("notice.keptTheirs", { where: provider ?? calendar?.name ?? "" })}</SheetNotice>
       ) : null}
       {event.notice === "not_saved" ? <SheetNotice>{t("notice.notSaved")}</SheetNotice> : null}
       {event.pending ? (
-        <SheetNotice>{t("notice.pending", { where: calendar?.name ?? "" })}</SheetNotice>
+        <SheetNotice>{t("notice.pending", { where: provider ?? calendar?.name ?? "" })}</SheetNotice>
       ) : null}
       {source.data === undefined ? null : (
         <SourceLink

@@ -66,6 +66,7 @@ export function scheduleApi(
       const event: Event = {
         busy: true,
         on_provider: false,
+        item_keys: [],
         origin: "member",
         pending: false,
         recurring: false,

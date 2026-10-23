@@ -8,6 +8,7 @@
   "additionalProperties": false,
   "properties": {
     "version": { "const": 1 },
+    "provider": { "enum": ["google", "zoho"], "description": "Whose calendars they are (optional): the schedule module names it in the event sheet." },
     "calendars": {
       "type": "array",
       "maxItems": 500,

@@ -22,7 +22,6 @@ import {
   isShown,
   minutesOf,
   nowIn,
-  sameMoment,
 } from "../../model";
 import { AddToCalendar } from "../Calendar/AddToCalendar";
 import { EventDialog, type EventDraft } from "../Calendar/EventDialog";
@@ -110,7 +109,6 @@ export function FoundInMessage({
       <FoundEvent
         key={item.key}
         workspaceId={workspaceId}
-        messageId={messageId}
         item={item}
         first={index === 0}
         onAdd={() => {
@@ -118,6 +116,7 @@ export function FoundInMessage({
             day: dayOf(item.starts),
             kind: item.kind,
             subject,
+            source: { messageId, conversationId },
           });
         }}
       />
@@ -151,7 +150,7 @@ export function FoundInMessage({
         actions={
           <Button
             onClick={() => {
-              setDraft({ day: today, kind, subject });
+              setDraft({ day: today, kind, subject, source: { messageId, conversationId } });
             }}
           >
             {t("found.add")}
@@ -174,13 +173,11 @@ export function FoundInMessage({
 /** One thing Scout read from the message, and where it is now. */
 function FoundEvent({
   workspaceId,
-  messageId,
   item,
   first,
   onAdd,
 }: {
   workspaceId: string;
-  messageId: string;
   item: ReadItem;
   first: boolean;
   onAdd: () => void;
@@ -195,12 +192,9 @@ function FoundEvent({
   const actions = useEventActions(workspaceId);
   const [removed, setRemoved] = useState<{ token: string; id: string } | undefined>();
 
+  // The event the item became: the one that carries its key.
   const event = nearby.data?.events.find(
-    (each) =>
-      isShown(each) &&
-      each.source?.id === messageId &&
-      each.title === item.title &&
-      sameMoment(each.starts, item.starts),
+    (each) => isShown(each) && each.item_keys.includes(item.key),
   );
   const list = calendars.data ?? [];
   const writable = list.filter((each) => each.source === "provider" && each.writable);

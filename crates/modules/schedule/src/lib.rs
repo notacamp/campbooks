@@ -158,4 +158,26 @@ mod tests {
                 .unwrap();
         assert!(exists);
     }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_calendar_may_name_its_provider(db: PgPool) {
+        let column: Option<String> = sqlx::query_scalar(
+            "SELECT data_type FROM information_schema.columns
+              WHERE table_schema = 'schedule' AND table_name = 'calendars'
+                AND column_name = 'provider'",
+        )
+        .fetch_optional(&db)
+        .await
+        .unwrap();
+        assert_eq!(column.as_deref(), Some("text"));
+        let known: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM pg_constraint
+                             WHERE conrelid = 'schedule.calendars'::regclass
+                               AND pg_get_constraintdef(oid) LIKE '%google%zoho%')",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert!(known);
+    }
 }

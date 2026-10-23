@@ -143,6 +143,7 @@ fn an_outbound_request_follows_its_contract_and_carries_no_provider_id() {
 fn the_calendar_list_of_a_grant() {
     let list = json!({
         "version": 1,
+        "provider": "google",
         "calendars": [
             {"provider_id": "ines@example.com", "name": "Inês", "color": "#0b8043",
              "time_zone": "Europe/Lisbon", "primary": true, "writable": true},
@@ -154,6 +155,10 @@ fn the_calendar_list_of_a_grant() {
     let mut bad = list;
     bad["calendars"][0]["color"] = json!("green");
     assert!(!accepts("calendar-list.v1.schema.json", &bad));
+    let mut other = json!({"version": 1, "provider": "icloud", "calendars": []});
+    assert!(!accepts("calendar-list.v1.schema.json", &other));
+    other["provider"] = json!("zoho");
+    assert!(accepts("calendar-list.v1.schema.json", &other));
 }
 
 #[test]
