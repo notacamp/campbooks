@@ -58,6 +58,10 @@
       "description": "For a hand-off or a take-back, the member who had it before.",
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }]
     },
+    "previous_handed_by": {
+      "description": "For a hand-off or a take-back, the member who had handed it off before.",
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }]
+    },
     "source": {
       "description": "The record it came from, or null.",
       "oneOf": [

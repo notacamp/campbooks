@@ -3,8 +3,8 @@
 
 use crate::{
     domain::{
-        Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskState, TaskView, access,
-        actor_of, finish,
+        OffsetQuery, Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskState,
+        TaskView, access, actor_of, finish,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
@@ -17,6 +17,7 @@ use campbooks_kernel::{
     extract,
     tenancy::{Workspace, WorkspaceId},
 };
+use chrono::NaiveDate;
 
 /// Mark a task done (paid, for a bill).
 #[utoipa::path(
@@ -33,6 +34,7 @@ use campbooks_kernel::{
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("task_id" = TaskId, Path, description = "The task."),
+        OffsetQuery,
     ),
     request_body = TaskRevision,
     responses(
@@ -51,9 +53,11 @@ pub async fn done(
     State(state): State<AppState>,
     workspace: Workspace<TasksWrite>,
     extract::Path(path): extract::Path<TaskPath>,
+    extract::Query(offset): extract::Query<OffsetQuery>,
     extract::Json(body): extract::Json<TaskRevision>,
 ) -> Result<Json<TaskView>> {
-    set_state(&state, &workspace, path.task_id, body, TaskState::Done)
+    let today = offset.today()?;
+    set_state(&state, &workspace, path.task_id, body, today, TaskState::Done)
         .await
         .map(Json)
 }
@@ -73,6 +77,7 @@ pub async fn done(
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("task_id" = TaskId, Path, description = "The task."),
+        OffsetQuery,
     ),
     request_body = TaskRevision,
     responses(
@@ -91,9 +96,11 @@ pub async fn not_needed(
     State(state): State<AppState>,
     workspace: Workspace<TasksWrite>,
     extract::Path(path): extract::Path<TaskPath>,
+    extract::Query(offset): extract::Query<OffsetQuery>,
     extract::Json(body): extract::Json<TaskRevision>,
 ) -> Result<Json<TaskView>> {
-    set_state(&state, &workspace, path.task_id, body, TaskState::NotNeeded)
+    let today = offset.today()?;
+    set_state(&state, &workspace, path.task_id, body, today, TaskState::NotNeeded)
         .await
         .map(Json)
 }
@@ -112,6 +119,7 @@ pub async fn not_needed(
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("task_id" = TaskId, Path, description = "The task."),
+        OffsetQuery,
     ),
     request_body = TaskRevision,
     responses(
@@ -130,9 +138,11 @@ pub async fn reopen(
     State(state): State<AppState>,
     workspace: Workspace<TasksWrite>,
     extract::Path(path): extract::Path<TaskPath>,
+    extract::Query(offset): extract::Query<OffsetQuery>,
     extract::Json(body): extract::Json<TaskRevision>,
 ) -> Result<Json<TaskView>> {
-    set_state(&state, &workspace, path.task_id, body, TaskState::Open)
+    let today = offset.today()?;
+    set_state(&state, &workspace, path.task_id, body, today, TaskState::Open)
         .await
         .map(Json)
 }
@@ -143,6 +153,7 @@ async fn set_state(
     workspace: &Workspace<TasksWrite>,
     id: TaskId,
     body: TaskRevision,
+    today: NaiveDate,
     to: TaskState,
 ) -> Result<TaskView> {
     let access = &workspace.access;
@@ -181,7 +192,9 @@ async fn set_state(
             change,
             detail: TaskHistoryDetail::default(),
             previous_assignee: None,
+            previous_handed_by: None,
         },
+        today,
     )
     .await?;
     tx.commit().await?;

@@ -16,8 +16,8 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskVerb, TaskView, actor_of, clean_sender,
-        clean_title, finish, resources::TASK_RECORD,
+        OffsetQuery, Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskVerb, TaskView, actor_of,
+        clean_sender, clean_title, finish, resources::TASK_RECORD,
     },
     scopes::TasksWrite,
 };
@@ -58,7 +58,7 @@ pub struct NewTask {
         .automation()
         .assistant()
         .records(["tasks.task"]).access("tasks.task", campbooks_kernel::authz::Action::Create)))),
-    params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
+    params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), OffsetQuery),
     request_body = NewTask,
     responses(
         (status = CREATED, description = "The task.", body = TaskView),
@@ -75,9 +75,11 @@ pub struct NewTask {
 pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<TasksWrite>,
+    extract::Query(offset): extract::Query<OffsetQuery>,
     extract::Json(body): extract::Json<NewTask>,
 ) -> Result<(StatusCode, Json<TaskView>)> {
     let access = &workspace.access;
+    let today = offset.today()?;
     authz::require_type(&state, access, Action::Create, TASK_RECORD, || {
         Error::Forbidden
     })?;
@@ -149,7 +151,9 @@ pub async fn handler(
                 ..TaskHistoryDetail::default()
             },
             previous_assignee: None,
+            previous_handed_by: None,
         },
+        today,
     )
     .await?;
     tx.commit().await?;

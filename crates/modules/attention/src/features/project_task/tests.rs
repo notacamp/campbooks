@@ -96,6 +96,26 @@ async fn done_clears_it_whatever_order_the_events_arrive_in(db: PgPool) {
     }
     assert!(items(&kit, &ana, workspace).await.is_empty());
 
+    // A clear that outruns the hand-off before it still lands the item with
+    // the member who closed it, not the one who handed it over.
+    let (_, joao_id) = kit.member("joao", workspace);
+    let id = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9eaa";
+    let created = Task::open(id, 1, ana_id);
+    let handed = Task::open(id, 2, joao_id);
+    let mut done = handed.clone();
+    done.revision = 3;
+    done.state = TaskState::Done;
+    for event in [&created, &done, &handed] {
+        kit.task(workspace, event).await;
+    }
+    let (container,): (String,) =
+        sqlx::query_as("SELECT container_id FROM attention.items WHERE record_id = $1")
+            .bind(id)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(container, joao_id.to_string());
+
     // Without the clear, the newest open revision wins in any order.
     for (n, order) in [[0usize, 1], [1, 0]].iter().enumerate() {
         let id = format!("0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9f{n:02}");

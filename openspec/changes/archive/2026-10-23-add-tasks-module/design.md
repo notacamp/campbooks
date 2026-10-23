@@ -236,5 +236,13 @@ event.
 - **No self-undo in the catalogue.** `x-campbooks.undo` may not name the
   operation itself, so `tasks.update` and `tasks.plan` declare none: their undo
   is the same call with the previous values, which the client sends.
+  `tasks.reopen` and `tasks.take_back` declare no undo either: they ARE the
+  undos (of `done` / `not_needed` and of `hand_off`).
+- **`previous_handed_by`** is a second extra optional id on
+  `tasks.task_changed`: on a re-hand-off (Ana to João, João to Maria) Ana's
+  list gets a delete, and the giver gets an upsert only while the task is open
+  (a closed task is a delete, as `tasks.get` 404s it for them).
+- **`overdue` follows the caller's day everywhere**: `tasks.get` and every
+  write take the same optional `utc_offset` query parameter as `tasks.list`.
 - **Error code** `hand_off_yourself` (not `hand_off_to_other`: the catalogue
   reads a trailing `_other` as a plural form).

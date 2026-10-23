@@ -16,8 +16,8 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        Outcome, TaskChange, TaskEditedField, TaskHistoryDetail, TaskId, TaskVerb, TaskView,
-        access, actor_of, clean_title, finish,
+        OffsetQuery, Outcome, TaskChange, TaskEditedField, TaskHistoryDetail, TaskId, TaskVerb,
+        TaskView, access, actor_of, clean_title, finish,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
@@ -55,6 +55,7 @@ pub struct TaskUpdate {
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("task_id" = TaskId, Path, description = "The task."),
+        OffsetQuery,
     ),
     request_body = TaskUpdate,
     responses(
@@ -75,9 +76,11 @@ pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<TasksWrite>,
     extract::Path(path): extract::Path<TaskPath>,
+    extract::Query(offset): extract::Query<OffsetQuery>,
     extract::Json(body): extract::Json<TaskUpdate>,
 ) -> Result<Json<TaskView>> {
     let access = &workspace.access;
+    let today = offset.today()?;
     let title = clean_title(&body.title)?;
     if body.due_at.is_some() && body.due_on.is_none() {
         return Err(Error::BadRequest(
@@ -102,8 +105,7 @@ pub async fn handler(
     }
     if fields.is_empty() {
         tx.commit().await?;
-        let now = Utc::now();
-        return Ok(Json(row.view(now, now.date_naive())?));
+        return Ok(Json(row.view(Utc::now(), today)?));
     }
     sqlx::query(
         "UPDATE tasks.tasks SET title = $2, verb = $3, due_on = $4, due_at = $5,
@@ -136,7 +138,9 @@ pub async fn handler(
                 ..TaskHistoryDetail::default()
             },
             previous_assignee: None,
+            previous_handed_by: None,
         },
+        today,
     )
     .await?;
     tx.commit().await?;

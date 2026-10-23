@@ -178,7 +178,9 @@ async fn clear(
              cause_type, cause_id, since, state, cleared_because, cleared_at, producer_revision)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'cleared', $10, now(), $11)
         ON CONFLICT (workspace_id, record_type, record_id) DO UPDATE
-           SET state = 'cleared', cleared_because = EXCLUDED.cleared_because,
+           SET container_type = EXCLUDED.container_type,
+               container_id = EXCLUDED.container_id,
+               state = 'cleared', cleared_because = EXCLUDED.cleared_because,
                cleared_at = now(), hidden_until = NULL,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
          WHERE attention.items.producer_revision < EXCLUDED.producer_revision

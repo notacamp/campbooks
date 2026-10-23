@@ -15,8 +15,8 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskPlan, TaskView, access, actor_of,
-        finish,
+        OffsetQuery, Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskPlan, TaskView, access,
+        actor_of, finish,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
@@ -55,6 +55,7 @@ const LONGEST: TimeDelta = TimeDelta::days(366);
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("task_id" = TaskId, Path, description = "The task."),
+        OffsetQuery,
     ),
     request_body = PlanTask,
     responses(
@@ -75,9 +76,11 @@ pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<TasksWrite>,
     extract::Path(path): extract::Path<TaskPath>,
+    extract::Query(offset): extract::Query<OffsetQuery>,
     extract::Json(body): extract::Json<PlanTask>,
 ) -> Result<Json<TaskView>> {
     let access = &workspace.access;
+    let today = offset.today()?;
     let now = Utc::now();
     let (plan_on, later_until) = match body.plan {
         TaskPlan::None => (None, None),
@@ -127,7 +130,9 @@ pub async fn handler(
                 ..TaskHistoryDetail::default()
             },
             previous_assignee: None,
+            previous_handed_by: None,
         },
+        today,
     )
     .await?;
     tx.commit().await?;

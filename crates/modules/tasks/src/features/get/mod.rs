@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{HistoryRow, TaskHistoryEntry, TaskId, TaskView, access},
+    domain::{HistoryRow, OffsetQuery, TaskHistoryEntry, TaskId, TaskView, access},
     scopes::TasksRead,
 };
 
@@ -45,6 +45,7 @@ pub struct TaskDetail {
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("task_id" = TaskId, Path, description = "The task."),
+        OffsetQuery,
     ),
     responses(
         (status = OK, description = "The task and its history.", body = TaskDetail),
@@ -60,8 +61,10 @@ pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<TasksRead>,
     extract::Path(path): extract::Path<TaskPath>,
+    extract::Query(offset): extract::Query<OffsetQuery>,
 ) -> Result<Json<TaskDetail>> {
     let access = &workspace.access;
+    let today = offset.today()?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_task(&state, &mut tx, access, Action::Read, path.task_id, false).await?;
@@ -73,9 +76,8 @@ pub async fn handler(
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;
-    let now = Utc::now();
     Ok(Json(TaskDetail {
-        task: row.view(now, now.date_naive())?,
+        task: row.view(Utc::now(), today)?,
         history: history
             .into_iter()
             .map(HistoryRow::entry)

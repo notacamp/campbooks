@@ -54,7 +54,9 @@ be 404.
 overdue, undated, source, `mine` or `handed_off`, or by `ids` (1–100; any other
 count is 400; unseen ids are left out), with each task's title, verb, due,
 plan, state, assignee, source and revision. Overdue and today SHALL use the
-caller's UTC offset.
+caller's UTC offset, and so SHALL `overdue` in `tasks.get` and in every write's
+answer (the same optional `utc_offset` query parameter). A handed-off task
+SHALL be visible to its giver only while it is open, in a list by `ids` too.
 
 #### Scenario: What is open for me
 - **WHEN** Ana lists her open tasks
@@ -107,7 +109,10 @@ Each task SHALL keep a history of what changed, when, and by whom (`member`,
 Every change SHALL publish `tasks.task_changed` v1 holding the workspace, the
 task, a growing revision, what changed, the state, verb, origin, due date and
 time, plan, the Later time, the assignee, who handed it off, and the source
-record. It SHALL hold no title, address or amount.
+record. A hand-off or take-back SHALL also name the member who had it before
+and the one who had handed it off before, so the change feed removes the task
+from their lists, and closing a handed-off task SHALL remove it from the
+giver's. It SHALL hold no title, address or amount.
 
 #### Scenario: Planned for Thursday
 - **WHEN** Ana plans a task for Thursday

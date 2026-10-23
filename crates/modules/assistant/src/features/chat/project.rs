@@ -114,6 +114,7 @@ pub fn task(task: &Value) -> Value {
             "plan_on",
             "later_until",
             "closed_at",
+            "assignee",
             "handed_by",
             "source",
         ],
@@ -333,5 +334,15 @@ mod tests {
         assert!(cut && text.len() <= 1_000 && text.ends_with(CUT), "{text}");
         let (text, cut) = bounded(&json!({"text": "short"}), 1_000);
         assert!(!cut && !text.contains(CUT));
+    }
+
+    #[test]
+    fn a_task_says_who_it_is_with() {
+        let out = task(&json!({
+            "id": "t-1", "title": "Book the venue", "state": "open",
+            "assignee": "u-joao", "handed_by": "u-ana",
+        }));
+        assert_eq!(out["assignee"], "u-joao");
+        assert_eq!(out["handed_by"], "u-ana");
     }
 }

@@ -15,8 +15,8 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskView, access, actor_of,
-        finish,
+        OffsetQuery, Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskView, access,
+        actor_of, finish,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
@@ -47,6 +47,7 @@ pub struct HandOffTo {
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("task_id" = TaskId, Path, description = "The task."),
+        OffsetQuery,
     ),
     request_body = HandOffTo,
     responses(
@@ -67,9 +68,11 @@ pub async fn hand_off(
     State(state): State<AppState>,
     workspace: Workspace<TasksWrite>,
     extract::Path(path): extract::Path<TaskPath>,
+    extract::Query(offset): extract::Query<OffsetQuery>,
     extract::Json(body): extract::Json<HandOffTo>,
 ) -> Result<Json<TaskView>> {
     let access = &workspace.access;
+    let today = offset.today()?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_task(&state, &mut tx, access, Action::Write, path.task_id, true).await?;
@@ -116,7 +119,9 @@ pub async fn hand_off(
                 ..TaskHistoryDetail::default()
             },
             previous_assignee: Some(row.assignee),
+            previous_handed_by: row.handed_by,
         },
+        today,
     )
     .await?;
     tx.commit().await?;
@@ -137,6 +142,7 @@ pub async fn hand_off(
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("task_id" = TaskId, Path, description = "The task."),
+        OffsetQuery,
     ),
     request_body = TaskRevision,
     responses(
@@ -155,9 +161,11 @@ pub async fn take_back(
     State(state): State<AppState>,
     workspace: Workspace<TasksWrite>,
     extract::Path(path): extract::Path<TaskPath>,
+    extract::Query(offset): extract::Query<OffsetQuery>,
     extract::Json(body): extract::Json<TaskRevision>,
 ) -> Result<Json<TaskView>> {
     let access = &workspace.access;
+    let today = offset.today()?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_task(&state, &mut tx, access, Action::Share, path.task_id, true).await?;
@@ -196,7 +204,9 @@ pub async fn take_back(
                 ..TaskHistoryDetail::default()
             },
             previous_assignee: Some(row.assignee),
+            previous_handed_by: row.handed_by,
         },
+        today,
     )
     .await?;
     tx.commit().await?;

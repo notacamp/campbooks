@@ -90,7 +90,7 @@ const LIST: &str = concat!(
         AND ($3::uuid[] IS NULL OR id = ANY($3))
         AND (($4 = 'mine' AND assignee = $2)
              OR ($4 = 'handed_off' AND handed_by = $2 AND assignee <> $2 AND state = 'open')
-             OR ($4 = 'any' AND (assignee = $2 OR handed_by = $2)))
+             OR ($4 = 'any' AND (assignee = $2 OR (handed_by = $2 AND state = 'open'))))
         AND ($5::text IS NULL OR state = $5)
         AND ($6::date IS NULL OR due_on >= $6)
         AND ($7::date IS NULL OR due_on <= $7)

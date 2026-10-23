@@ -15,7 +15,7 @@ use campbooks_kernel::{
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 use crate::events::TaskChanged;
 
@@ -417,6 +417,27 @@ pub fn today(now: DateTime<Utc>, utc_offset_minutes: i32) -> NaiveDate {
 /// The widest offset from UTC a time zone has (UTC+14:00), in minutes.
 pub const MAX_OFFSET_MINUTES: i32 = 14 * 60;
 
+/// The caller's offset from UTC, which every read and write of a task takes
+/// the same way `tasks.list` does, so `overdue` is the same everywhere.
+#[derive(Debug, Clone, Copy, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct OffsetQuery {
+    /// The caller's offset from UTC, in minutes (-840 to 840; default 0):
+    /// where their day starts, for what is overdue.
+    #[serde(default)]
+    pub utc_offset: i32,
+}
+
+impl OffsetQuery {
+    /// The caller's today (refusing an offset beyond 14 hours).
+    pub fn today(self) -> Result<NaiveDate> {
+        if self.utc_offset.abs() > MAX_OFFSET_MINUTES {
+            return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_offset")));
+        }
+        Ok(today(Utc::now(), self.utc_offset))
+    }
+}
+
 /// Who is acting: the member, or Scout when the assistant or an automation
 /// runs the call for them.
 pub fn actor_of(invoked_by: Option<campbooks_kernel::operations::Caller>) -> TaskActor {
@@ -437,6 +458,8 @@ pub struct Outcome {
     pub detail: TaskHistoryDetail,
     /// The assignee before a hand-off or a take-back.
     pub previous_assignee: Option<UserId>,
+    /// The member who had handed it off before this change, if any.
+    pub previous_handed_by: Option<UserId>,
 }
 
 /// Finish a change to task `id` made in `tx`: append the history entry,
@@ -448,6 +471,7 @@ pub async fn finish(
     access: &Access,
     id: TaskId,
     outcome: &Outcome,
+    today: NaiveDate,
 ) -> Result<TaskView> {
     let row: TaskRow = sqlx::query_as(SELECT_ONE)
         .bind(id)
@@ -482,9 +506,9 @@ pub async fn finish(
         assignee: row.assignee,
         handed_by: row.handed_by,
         previous_assignee: outcome.previous_assignee,
+        previous_handed_by: outcome.previous_handed_by,
         source: row.source(),
     };
     state.events.publish(tx, &event).await?;
-    let now = Utc::now();
-    row.view(now, now.date_naive())
+    row.view(Utc::now(), today)
 }

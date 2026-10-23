@@ -1271,6 +1271,17 @@
               }
             ]
           },
+          "previous_handed_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "For a hand-off or a take-back, the member who had handed it off before, so a re-hand-off removes it from their list."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "revision": {
             "type": "integer",
             "format": "int64",

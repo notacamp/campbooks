@@ -148,3 +148,31 @@ async fn handed_off_lists_the_open_tasks_you_gave_away(db: PgPool) {
     assert_eq!(titles(&kit.get(&ana, &uri).await.json), ["Keep"]);
     assert_eq!(titles(&kit.get(&joao, &uri).await.json), ["Book the venue"]);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn ids_do_not_show_the_giver_a_closed_hand_off(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let (joao, joao_id) = kit.member("joao", workspace);
+    let task = kit.add(&ana, workspace, json!({"title": "Book"})).await;
+    let id = task["id"].as_str().unwrap();
+    let base = format!("/api/v1/w/{workspace}/tasks/{id}");
+    kit.post(
+        &ana,
+        &format!("{base}/hand_off"),
+        Some(json!({"revision": 1, "to": joao_id})),
+    )
+    .await;
+    let uri = format!("/api/v1/w/{workspace}/tasks?ids={id}");
+    assert_eq!(titles(&kit.get(&ana, &uri).await.json), ["Book"]);
+    let done = kit
+        .post(&joao, &format!("{base}/done"), Some(json!({"revision": 2})))
+        .await;
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json);
+    // The giver can no longer read it (tasks.get 404s), so a batch read
+    // leaves it out too.
+    assert_eq!(kit.get(&ana, &base).await.status, StatusCode::NOT_FOUND);
+    assert!(titles(&kit.get(&ana, &uri).await.json).is_empty());
+    assert_eq!(titles(&kit.get(&joao, &uri).await.json), ["Book"]);
+}
