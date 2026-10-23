@@ -157,12 +157,12 @@ async fn read_stream(url: &str, stream: &str, want: usize) -> Vec<Delivery> {
         .unwrap();
     let mut got = Vec::new();
     loop {
-        let wait = if got.len() < want {
+        let patience = if got.len() < want {
             Duration::from_secs(15)
         } else {
             Duration::from_millis(500)
         };
-        let Ok(Some(Ok(delivery))) = tokio::time::timeout(wait, consumer.next()).await else {
+        let Ok(Some(Ok(delivery))) = tokio::time::timeout(patience, consumer.next()).await else {
             break;
         };
         delivery
@@ -397,7 +397,7 @@ async fn events_wait_while_the_broker_is_down(db: PgPool) {
         }
     });
     outbox_rows(&db, 2).await;
-    until_published(&db, Duration::from_secs(60)).await;
+    until_published(&db, Duration::from_mins(1)).await;
 
     let _ = stop.send(());
     relay.await.unwrap();
@@ -427,7 +427,7 @@ async fn two_relays_publish_every_row_once(db: PgPool) {
         }));
         relays.push((stop, task));
     }
-    until_published(&db, Duration::from_secs(60)).await;
+    until_published(&db, Duration::from_mins(1)).await;
     for (stop, task) in relays {
         let _ = stop.send(());
         task.await.unwrap();
