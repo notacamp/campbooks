@@ -39,6 +39,8 @@ const RULE: &str = "conversations.rule";
 const RULE_NOTICE: &str = "conversations.rule_notice";
 /// A task.
 const TASK: &str = "tasks.task";
+/// An event of the member's calendar.
+const SCHEDULE_EVENT: &str = "schedule.event";
 
 /// Every record type a chat may be about.
 pub const REGISTRY: &[AboutType] = &[
@@ -66,6 +68,15 @@ pub const REGISTRY: &[AboutType] = &[
         id_param: "task_id",
         lost_line: "chat.about_lost_task",
     },
+    // An event of the member's calendar, and what Scout read in the email it
+    // came from (the second read is made only when the event has a source
+    // message, and only if the member can still read it).
+    AboutType {
+        record_type: SCHEDULE_EVENT,
+        reads: &["schedule.get_event", "conversations.get_message_read"],
+        id_param: "event_id",
+        lost_line: "chat.about_lost_event",
+    },
 ];
 
 /// The registry's entry for `record_type`.
@@ -80,6 +91,32 @@ fn input(param: &str, id: &str) -> Value {
     let mut fields = serde_json::Map::new();
     fields.insert(param.to_owned(), Value::String(id.to_owned()));
     Value::Object(fields)
+}
+
+/// The input of read number `step` of `entry`: the first names the record;
+/// a follow-up is made from what the earlier reads answered, or not at all.
+fn input_for(
+    entry: &AboutType,
+    step: usize,
+    about: &RecordRef,
+    earlier: &[Value],
+) -> Option<Value> {
+    if step == 0 {
+        return Some(input(entry.id_param, &about.id));
+    }
+    match entry.record_type {
+        // What Scout read in the event's source message.
+        SCHEDULE_EVENT => {
+            let event = earlier.first()?;
+            let source = &event["source"];
+            let message = source["id"]
+                .as_str()
+                .filter(|_| source["type"] == "conversations.message")?;
+            let conversation = event["source_conversation"].as_str()?;
+            Some(json!({ "conversation_id": conversation, "message_id": message }))
+        }
+        _ => Some(input(entry.id_param, &about.id)),
+    }
 }
 
 /// What the model is given about the record.
@@ -113,12 +150,20 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
         return Ok(Seen::Lost);
     };
     let mut answers: Vec<Value> = Vec::with_capacity(entry.reads.len());
-    for operation in entry.reads {
-        match member
-            .read(operation, input(entry.id_param, &about.id))
-            .await
-        {
+    for (step, operation) in entry.reads.iter().enumerate() {
+        let Some(request) = input_for(entry, step, about, &answers) else {
+            answers.push(Value::Null);
+            continue;
+        };
+        match member.read(operation, request).await {
             Ok(body) => answers.push(body),
+            // The email behind an event may be one the member cannot read:
+            // the event is still theirs to ask about.
+            Err(Unread::NotVisible | Unread::Refused)
+                if step > 0 && entry.record_type == SCHEDULE_EVENT =>
+            {
+                answers.push(Value::Null);
+            }
             Err(Unread::NotVisible | Unread::Refused) => return Ok(Seen::Lost),
             Err(broken) => return Err(broken),
         }
@@ -129,6 +174,7 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
         RULE => project::rule(first),
         RULE_NOTICE => project::rule_notice(first),
         TASK => project::task_detail(first),
+        SCHEDULE_EVENT => project::event(first, answers.get(1)),
         _ => return Ok(Seen::Lost),
     };
     let mut value = json!({ "type": entry.record_type, "id": about.id });

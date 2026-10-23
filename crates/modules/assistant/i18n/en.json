@@ -20,6 +20,7 @@
     "about_lost": "I can no longer see this conversation, so I answered without it.",
     "about_lost_rule": "I can no longer see this rule, so I answered without it.",
     "about_lost_rule_notice": "This suggestion is no longer offered to you, so I answered without it.",
-    "about_lost_task": "I can no longer see this task, so I answered without it."
+    "about_lost_task": "I can no longer see this task, so I answered without it.",
+    "about_lost_event": "I can no longer see this event, so I answered without it."
   }
 }

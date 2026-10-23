@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/calendar-change.v1.schema.json",
+  "title": "calendar-change v1 (blob)",
+  "description": "One change a member asked for to an event on a provider calendar: what to write, where, and against which version. A blob (`application/vnd.campbooks.calendar-change+json; version=1`) that `schedule.outbound_requested` v1 points at; the connectors module writes it at the provider once the schedule module confirms the request. Updates and deletes name the etag the member's version was based on, which is sent as `If-Match`. The provider's ids and the text are here and nowhere in the event log. Deleted with the workspace.",
+  "type": "object",
+  "required": ["version", "change", "provider_calendar_id"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "change": { "enum": ["create", "update", "update_occurrence", "delete", "respond"] },
+    "provider_calendar_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "provider_event_id": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "The event at the provider (not for a create). For `update_occurrence`, the series." },
+    "etag": { "type": "string", "maxLength": 256, "description": "The etag the member's version was based on (updates and deletes)." },
+    "occurrence": { "$ref": "#/$defs/start", "description": "`update_occurrence` only: the start of the occurrence that changes." },
+    "response": { "enum": ["accepted", "tentative", "declined"], "description": "`respond` only." },
+    "event": {
+      "description": "The event to write (create, update, update_occurrence).",
+      "type": "object",
+      "required": ["start"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "maxLength": 1000 },
+        "place": { "type": "string", "maxLength": 1000 },
+        "description": { "type": "string", "maxLength": 20000 },
+        "start": { "$ref": "#/$defs/start" },
+        "end": { "$ref": "#/$defs/start" },
+        "private": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "What to write on a created event so it keeps its kind and source when it comes back.",
+          "properties": {
+            "campbooks_event": { "$ref": "#/$defs/uuid" },
+            "campbooks_kind": {
+              "enum": ["charge", "appointment", "meeting", "travel", "stay", "show", "reservation", "delivery", "expiry", "hold", "none"]
+            },
+            "campbooks_source": { "type": "string", "maxLength": 200 }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "change": { "const": "create" } } },
+      "then": { "required": ["event"], "not": { "anyOf": [{ "required": ["provider_event_id"] }, { "required": ["etag"] }] } }
+    },
+    {
+      "if": { "properties": { "change": { "enum": ["update", "update_occurrence"] } } },
+      "then": { "required": ["event", "provider_event_id", "etag"] }
+    },
+    {
+      "if": { "properties": { "change": { "const": "update_occurrence" } } },
+      "then": { "required": ["occurrence"] }
+    },
+    {
+      "if": { "properties": { "change": { "const": "delete" } } },
+      "then": { "required": ["provider_event_id", "etag"] }
+    },
+    {
+      "if": { "properties": { "change": { "const": "respond" } } },
+      "then": { "required": ["provider_event_id", "response"] }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "start": {
+      "description": "A date (all-day), or a time with an offset and the zone it was written in.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["date"],
+          "additionalProperties": false,
+          "properties": { "date": { "type": "string", "format": "date" } }
+        },
+        {
+          "type": "object",
+          "required": ["date_time"],
+          "additionalProperties": false,
+          "properties": {
+            "date_time": { "type": "string", "format": "date-time" },
+            "time_zone": { "type": "string", "maxLength": 64 }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -33,6 +33,7 @@ pub mod purge;
 pub mod rate_limit;
 pub mod records;
 pub mod redact;
+pub mod schedule;
 pub mod search;
 pub mod signup;
 pub mod state;

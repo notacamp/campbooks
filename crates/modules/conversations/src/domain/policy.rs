@@ -64,6 +64,13 @@ impl Policy {
     /// | `money` | 90% | never answers | not measured | record |
     /// | `next_move` | not set | never answers | not measured | record |
     /// | `awaited` | not set | never answers | not measured | record |
+    /// | `has_dated_thing` | not set | never answers | not measured | record |
+    /// | `dated_kind` | not set | never answers | not measured | record |
+    ///
+    /// `has_dated_thing` and `dated_kind` (campbooks-cloud#42) only record
+    /// until the owner's labelled dated mail gives them an operating point:
+    /// they flag a message for Scout's read ([`super::dated`]) and name the
+    /// kind of dated thing for the fallback, and never act on their own.
     ///
     /// `next_move` and `awaited` (campbooks-cloud#293) only record until the
     /// owner's labels give them an operating point, so no answer to either
@@ -275,11 +282,17 @@ mod tests {
                 }
             }
             // Changing that is a reviewed change citing the owner's eval.
-            assert_eq!(
-                policy.switch(questions::MONEY, source),
-                Switch::Record,
-                "{name}: money"
-            );
+            for question in [
+                questions::MONEY,
+                questions::HAS_DATED_THING,
+                questions::DATED_KIND,
+            ] {
+                assert_eq!(
+                    policy.switch(question, source),
+                    Switch::Record,
+                    "{name}: {question}"
+                );
+            }
             assert!(
                 measured.iter().all(|id| asked.iter().any(|q| q.id == *id)),
                 "{name}: the report measures a question nobody asks"

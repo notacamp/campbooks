@@ -8,13 +8,21 @@
 //!   conversations, keeps bodies and attachments in blob storage, and
 //!   publishes [`events`] in the same transaction. The contract is
 //!   `contracts/message-change-batch.v1.schema.json`.
-//! - **Streams and the decide pass**: every inbound message is asked six
-//!   typed questions, by the facts when it is stored and by the `decide`
-//!   model afterwards (`conversations.decide_message`). Every answer is
-//!   stored in `decisions`; a per-question switch says which may act. The
+//! - **Streams and the decide pass**: every inbound message is asked the
+//!   typed triage questions, by the facts when it is stored and by the
+//!   `decide` model afterwards (`conversations.decide_message`). Every answer
+//!   is stored in `decisions`; a per-question switch says which may act. The
 //!   facts read headers and addresses only and may only say "no"; the
 //!   model reads the email, and its accepted answers sort the conversation
 //!   and raise its need (ADR 0018).
+//! - **Dates in mail** (campbooks-cloud#42): the pass also asks whether the
+//!   email tells of something dated, and flags it (`domain::dated`); the
+//!   sender's own machine-readable dates are read with no model
+//!   (`conversations.read_structured`, ADR 0021); and one `complete` call per
+//!   flagged message, when a need opens or a member opens it, reads the
+//!   summary, the need's dates, the things that happen at a time and the
+//!   obligations (`conversations.read_message`). Both reads are stored in
+//!   `message_reads` and published as `conversations.message_read`.
 //! - **Search**: the module is the search source of its conversations
 //!   ([`search_source`], ADR 0016) and lists the inboxes a caller may search
 //!   through its visibility port ([`visibility`]).
@@ -57,8 +65,8 @@ mod testkit;
 pub mod tracking;
 
 pub use config::{
-    ActionSettings, ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS, DEFAULT_NEEDS_WINDOW_DAYS,
-    NoticeSettings, WaitSettings,
+    ActionSettings, ConversationsConfig, DEFAULT_DATED_FLAG, DEFAULT_DECIDE_BACKFILL_DAYS,
+    DEFAULT_NEEDS_WINDOW_DAYS, DatedSettings, NoticeSettings, WaitSettings,
 };
 pub use domain::{
     decide::STATE_VERSION,
@@ -170,12 +178,12 @@ impl ConversationsDeps {
 /// to mount.
 #[allow(clippy::too_many_lines)]
 pub fn module(deps: ConversationsDeps) -> Module {
-    // Scout's summary of a need's email: only while the `complete` role may
-    // receive mail here.
+    // Scout's read of a message: only while the `complete` role may receive
+    // mail here.
     let summaries = deps
         .ai
         .clone()
-        .filter(features::summarize_need::may_read_mail);
+        .filter(features::read_message::may_read_mail);
     // Scout's replies ask the `complete` role, when it may read mail.
     let writer = features::reply::ReplyWriter::new(deps.ai.clone());
     let model = match deps.model {
@@ -190,7 +198,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
     let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy)
         .with_summaries(summaries.is_some())
         .with_wait_days(deps.config.wait.working_days)
-        .with_waits(deps.config.actions.enabled);
+        .with_waits(deps.config.actions.enabled)
+        .with_dated(deps.config.dated);
     Module {
         name: NAME,
         scopes: scopes::ALL,
@@ -216,6 +225,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::InboxRemoved>()
             .publishes::<events::NeedChanged>()
             .publishes::<events::NeedSummarised>()
+            .publishes::<events::MessageRead>()
             .publishes::<events::RuleChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
@@ -226,8 +236,11 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 deps.config.notices,
             ))
             .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
-            .handler(features::summarize_need::SummarizeNeed::new(
+            .handler(features::read_message::ReadMessage::new(
                 summaries,
+                needs.clone(),
+            ))
+            .handler(features::read_structured::ReadStructured::new(
                 needs.clone(),
             ))
             .handler(features::wake_needs::WakeNeeds::new(needs.clone()))
@@ -306,9 +319,10 @@ fn model_may_read_mail(gateway: &Gateway) -> bool {
 fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_history, get_message_body,
-        labels, list_conversations, list_correspondents, list_drafts, list_inboxes, list_labels,
-        list_senders, list_streams, mark_read, move_to_stream, needs, person_notes, reply,
-        rule_notices, rules, send_draft, spam, star, suggest_rules, trash, update_draft,
+        get_message_read, labels, list_conversations, list_correspondents, list_drafts,
+        list_inboxes, list_labels, list_senders, list_streams, mark_read, move_to_stream, needs,
+        person_notes, reply, request_message_read, rule_notices, rules, send_draft, spam, star,
+        suggest_rules, trash, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -320,6 +334,10 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(get_conversation::handler))
         .routes(routes!(get_history::handler))
         .routes(routes!(get_message_body::handler))
+        .routes(routes!(
+            get_message_read::handler,
+            request_message_read::handler
+        ))
         .routes(routes!(get_attachment::handler))
         .routes(routes!(mark_read::read))
         .routes(routes!(mark_read::unread))
@@ -400,7 +418,8 @@ mod tests {
             "conversations.fill_templates",
             "conversations.notice_rules",
             "conversations.refresh_need",
-            "conversations.summarize_need",
+            "conversations.read_message",
+            "conversations.read_structured",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
             "conversations.dispatch_rule_resigns",

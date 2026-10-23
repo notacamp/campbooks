@@ -1,0 +1,243 @@
+{
+  "title": "Calendar",
+  "loadError": "Couldn’t load your calendar.",
+  "retry": "Try again",
+  "period": {
+    "zone": "{{city}} time"
+  },
+  "views": {
+    "label": "View",
+    "agenda": "Agenda",
+    "week": "Week",
+    "month": "Month"
+  },
+  "toolbar": {
+    "label": "Calendar actions",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "today": "Today",
+    "newEvent": "New event"
+  },
+  "agenda": {
+    "today": "Today",
+    "empty": "Nothing on your calendar.",
+    "week": "This week"
+  },
+  "week": {
+    "label": "Week",
+    "due": "Due",
+    "allDay": "All day"
+  },
+  "month": {
+    "label": "Month",
+    "more": "+{{count}} more"
+  },
+  "when": {
+    "allDay": "All day",
+    "from": "From {{time}}",
+    "range": "{{start}} – {{end}}"
+  },
+  "kind": {
+    "charge": "Charge",
+    "appointment": "Appointment",
+    "meeting": "Meeting",
+    "travel": "Travel",
+    "stay": "Stay",
+    "show": "Show",
+    "reservation": "Reservation",
+    "delivery": "Delivery",
+    "expiry": "Expiry",
+    "hold": "Held",
+    "none": "Event",
+    "due": "Due"
+  },
+  "from": {
+    "email": "From email"
+  },
+  "sheet": {
+    "close": "Close",
+    "kind": "Kind: {{kind}}. Change",
+    "kindMenu": "Kind",
+    "inZone": "{{time}} {{city}} time",
+    "onlyYou": "Only you see it until you add it to a calendar",
+    "synced": "Synced both ways",
+    "source": {
+      "label": "From email",
+      "meta": "{{sender}} · {{when}}",
+      "open": "Open email"
+    },
+    "how": {
+      "label": "How Scout knew",
+      "structured": "Read from the details the sender attached for machines. No AI was used.",
+      "model": "Scout read the email and found the date in this sentence:"
+    },
+    "edit": "Edit",
+    "remove": "Remove",
+    "addToMine": "Add to my calendar",
+    "alsoIn": "Also in {{calendar}}",
+    "pick": "Add to which calendar?",
+    "always": "Always add {{kind}} to this calendar",
+    "rsvp": "Going?",
+    "series": "Repeats",
+    "release": "Release time",
+    "pushed": "Also on your calendar"
+  },
+  "rsvp": {
+    "needs_action": "Not answered",
+    "accepted": "Accept",
+    "tentative": "Maybe",
+    "declined": "Decline"
+  },
+  "notice": {
+    "keptTheirs": "Changed in {{where}} meanwhile; we kept theirs",
+    "notSaved": "We couldn’t save your last change.",
+    "pending": "Your change is on its way to {{where}}."
+  },
+  "due": {
+    "label": "Due",
+    "pay": "Pay · {{title}}",
+    "payAmount": "Pay · {{title}} · {{amount}}",
+    "do": "Do · {{title}}",
+    "today": "Due today",
+    "at": "Due {{time}}",
+    "overdue_one": "Overdue · {{count}} day",
+    "overdue_other": "Overdue · {{count}} days",
+    "meta": "Task",
+    "wasDue": "Was due {{day}}",
+    "dueOn": "Due {{day}}",
+    "note": "A task: it lives in your tasks and shows here on its due date",
+    "calendar": "Tasks",
+    "markPaid": "Mark it paid from the task",
+    "markDone": "Mark it done from the task",
+    "paid": "Paid",
+    "done": "Done",
+    "hold": "Hold time",
+    "later": "Later",
+    "open": "Open task",
+    "failed": "Couldn’t do that. Try again."
+  },
+  "form": {
+    "newTitle": "New event",
+    "editTitle": "Edit event",
+    "name": "Title",
+    "kind": "Kind",
+    "day": "Date",
+    "allDay": "All day",
+    "starts": "Starts",
+    "ends": "Ends",
+    "place": "Place",
+    "save": "Save",
+    "add": "Add event",
+    "cancel": "Cancel",
+    "error": "Couldn’t save that. Check the date and time.",
+    "fromEmail": "From the email “{{subject}}”"
+  },
+  "toast": {
+    "removed": "{{title}} removed. Scout won’t add it again.",
+    "created": "{{title}} added",
+    "kindChanged": "{{title}} is now {{kind}}",
+    "pushed": "Added to {{calendar}}",
+    "answered": "{{title}}: {{response}}",
+    "saved": "{{title}} saved"
+  },
+  "found": {
+    "label": "Scout noticed",
+    "reading": "Scout is reading this…",
+    "failed": "Scout couldn’t read this email.",
+    "added": "On your Campbooks calendar",
+    "alsoIn": "Also in {{calendar}}",
+    "undo": "Undo",
+    "removed": "Removed from your calendar. Scout won’t add it again.",
+    "putBack": "Put it back",
+    "add": "Add",
+    "cantRead": "Scout can’t read the details on this server. Add it and fill in the time.",
+    "has": {
+      "charge": "This email has a charge",
+      "appointment": "This email has an appointment",
+      "meeting": "This email has a meeting",
+      "travel": "This email has a trip",
+      "stay": "This email has a stay",
+      "show": "This email has a show",
+      "reservation": "This email has a reservation",
+      "delivery": "This email has a delivery",
+      "expiry": "This email has an expiry"
+    }
+  },
+  "settings": {
+    "label": "Calendar settings",
+    "title": "Calendar",
+    "lead": "Where your events come from, when you work, and what Scout adds from your mail.",
+    "calendars": {
+      "title": "Calendars",
+      "description": "Campbooks reads and writes these calendars both ways. Your Campbooks calendar holds what Scout finds in your mail; only you see it until you add an event to one of the others.",
+      "campbooks": "What Scout finds in your mail · only you",
+      "alwaysOn": "Always on",
+      "primary": "primary",
+      "readOnly": "read-only",
+      "show": "Show {{name}}",
+      "colour": "Colour of {{name}}",
+      "access": "Add calendar access",
+      "accessHint": "Mail only. Allow calendar access to see this account’s calendars here.",
+      "refused": "Couldn’t start that. Try again."
+    },
+    "kinds": {
+      "title": "What Scout adds from your mail",
+      "description": "Scout puts these on your Campbooks calendar, each linked to its email. Pick a calendar to also add them there yourself without asking. Pay-by and do-by dates become tasks, not events.",
+      "add": "Scout adds {{kind}}",
+      "alsoAdd": "Also add to",
+      "nowhere": "Nowhere else",
+      "travel": "Flights, trains, buses, car hire",
+      "stay": "Hotels and rentals, check-in to check-out",
+      "show": "Concerts, theatre, cinema, matches",
+      "reservation": "Restaurants and tables",
+      "appointment": "Doctors, services, viewings",
+      "meeting": "Invitations sent as a calendar file",
+      "delivery": "Parcels and their delivery windows",
+      "charge": "Renewals and direct debits taken automatically",
+      "expiry": "Things ending with nothing to do"
+    },
+    "kindNames": {
+      "travel": "Travel",
+      "stay": "Stays",
+      "show": "Shows and tickets",
+      "reservation": "Reservations",
+      "appointment": "Appointments",
+      "meeting": "Meetings",
+      "delivery": "Deliveries",
+      "charge": "Charges",
+      "expiry": "Expiries"
+    },
+    "time": {
+      "title": "Time zone and working hours",
+      "description": "Times show in your zone. Working hours are where Scout looks for free time when you hold time for a task.",
+      "zone": "Time zone",
+      "zoneHint": "Set from this device until you change it",
+      "days": "Working days",
+      "hours": "Working hours",
+      "from": "From",
+      "to": "to",
+      "weekdays": {
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat",
+        "sun": "Sun"
+      }
+    }
+  },
+  "shortcuts": {
+    "agenda": "Agenda",
+    "week": "Week",
+    "month": "Month",
+    "today": "Go to today",
+    "create": "New event",
+    "edit": "Edit event",
+    "remove": "Remove event",
+    "push": "Add to my calendar",
+    "openEmail": "Open the email"
+  }
+}

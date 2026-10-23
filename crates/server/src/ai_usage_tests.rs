@@ -81,7 +81,8 @@ async fn laya() -> MockServer {
                 "urgency": {"type": "score", "score": 0.2,
                     "probabilities": {"0": 0.8, "1": 0.2, "2": 0.0}},
                 "suspicious": noul,
-                "money": {"type": "choice", "choice": "neither", "probabilities": {"owed": 0.1, "paid": 0.1, "neither": 0.8}}
+                "money": {"type": "choice", "choice": "neither", "probabilities": {"owed": 0.1, "paid": 0.1, "neither": 0.8}},
+                "has_dated_thing": noul
             },
             "usage": {"input_tokens": 180, "output_tokens": 0}
         })))

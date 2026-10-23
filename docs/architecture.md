@@ -60,6 +60,12 @@ crates/
     search/                campbooks-search — one index over the records a member may
                            see, in Postgres (ADR 0016): kept current from events
                            through the kernel's `SearchSource` port; `search.query`.
+    schedule/              campbooks-schedule — calendars (a member's own Campbooks
+                           calendar and the provider calendars they connect), typed
+                           events, the member's time zone and working hours, free time,
+                           and the intents that write a change back to a provider.
+                           Answers the kernel's `TimeZones`, `Availability` and
+                           `CalendarRequests` ports (campbooks-cloud#42).
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema,
                            <ts>_bff__<desc>.sql for the web BFF's `bff` schema

@@ -1,0 +1,33 @@
+[package]
+name = "campbooks-schedule"
+description = "Campbooks schedule module: calendars, typed events, recurrence, member time zone and working hours, free time, and the intents that write a member's changes back to their provider."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum.workspace = true
+campbooks-kernel.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+# Reading blob streams.
+futures-util.workspace = true
+# Expanding recurring series when events are listed.
+rrule.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+
+[dev-dependencies]
+boon.workspace = true
+campbooks-kernel = { workspace = true, features = ["test-util"] }
+tokio.workspace = true
+
+[lints]
+workspace = true

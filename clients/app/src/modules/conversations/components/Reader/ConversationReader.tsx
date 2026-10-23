@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus } from "~/lib/api";
@@ -71,6 +71,14 @@ import { MovePicker } from "./MovePicker";
 import type { RenderReplySlot, ReplyMode, ReplyRequest, ReplySlotContext } from "./ReplySlot";
 import { ThreadMessage } from "./ThreadMessage";
 
+/** What the calendar read from a message: its "Scout noticed" strip (the schedule module's). */
+export type RenderFound = (found: {
+  workspaceId: string;
+  conversationId: string;
+  messageId: string;
+  subject: string;
+}) => ReactNode;
+
 export interface ConversationReaderProps {
   workspaceId: string;
   conversationId: string;
@@ -89,6 +97,8 @@ export interface ConversationReaderProps {
   onMove: (conversation: ConversationSummary, move: Move) => void;
   /** The send slice's composer; Reply, Reply all and Forward are hidden without it. */
   renderReplySlot?: RenderReplySlot | undefined;
+  /** The calendar's strip under each received message's header. */
+  renderFound?: RenderFound | undefined;
   /** Open the reply composer once the conversation is loaded (Home's R). */
   startReply?: boolean | undefined;
   /** The message that reply answers (a draft written for it), else the newest. */
@@ -115,6 +125,7 @@ export function ConversationReader({
   onNext,
   onMove,
   renderReplySlot: replySlot,
+  renderFound,
   startReply = false,
   replyTo,
   draftId,
@@ -911,6 +922,16 @@ export function ConversationReader({
               kind={entry.message.direction === "outbound" ? "person" : kind}
               inertLinks={inSpam || conversation.need?.question === "suspicious"}
               spam={inSpam}
+              found={
+                entry.message.direction === "inbound"
+                  ? renderFound?.({
+                      workspaceId,
+                      conversationId,
+                      messageId: entry.message.id,
+                      subject: entry.message.subject,
+                    })
+                  : undefined
+              }
               now={now}
             />
           ),

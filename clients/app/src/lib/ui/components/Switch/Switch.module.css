@@ -1,0 +1,40 @@
+.switch {
+  position: relative;
+  flex: none;
+  width: var(--space-10);
+  height: var(--space-6);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.switch::after {
+  position: absolute;
+  top: var(--space-0-5);
+  left: var(--space-0-5);
+  width: calc(var(--space-6) - var(--space-1));
+  height: calc(var(--space-6) - var(--space-1));
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  content: "";
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.switch[aria-checked="true"] {
+  background: var(--accent);
+}
+
+.switch[aria-checked="true"]::after {
+  background: var(--on-accent);
+  transform: translateX(calc(var(--space-10) - var(--space-6)));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch::after {
+    transition: none;
+  }
+}

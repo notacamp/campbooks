@@ -35,6 +35,7 @@ campbooks-admin = { path = "crates/modules/admin" }
 campbooks-attention = { path = "crates/modules/attention" }
 campbooks-search = { path = "crates/modules/search" }
 campbooks-assistant = { path = "crates/modules/assistant" }
+campbooks-schedule = { path = "crates/modules/schedule" }
 campbooks-tasks = { path = "crates/modules/tasks" }
 campbooks-tracking-plan = { path = "crates/tracking-plan" }
 
@@ -178,6 +179,22 @@ tokio-rustls = "0.26.6"
 mail-builder = { version = "1.0.0", default-features = false }
 mail-parser = { version = "0.11.9", default-features = false }
 
+# Email: the dates a sender structured for machines (conversations, ADR 0021,
+# campbooks-cloud#42), read with proper parsers and never with patterns.
+# `icalendar`: RFC 5545 content lines for `text/calendar` parts (parser only,
+# no builder features). `scraper`: the parsed HTML tree JSON-LD and microdata
+# are read from, on the html5ever, cssparser and selectors versions already
+# in the graph through ammonia. Pinned: 0.29.0 is newer than the two-week rule
+# but is the first release on html5ever 0.40; older ones would bring a second
+# copy of html5ever, cssparser and selectors. Relax to a caret requirement
+# after 2026-11-04. `chrono-tz`: the IANA zones of an invitation's `TZID`.
+icalendar = { version = "=0.17.13", default-features = false, features = ["parser"] }
+scraper = { version = "=0.29.0", default-features = false, features = ["errors"] }
+chrono-tz = "0.10.4"
+# Schedule: a series is stored once, with the provider's own RRULE/EXDATE/RDATE
+# lines, and its occurrences are expanded when events are listed
+# (campbooks-cloud#42). Pinned; 0.14.0 is the current release. Rust, no C.
+rrule = "=0.14.0"
 # Tracked events (ADR 0020, campbooks-cloud#321): the relay publishes the
 # outbox to RabbitMQ over AMQP 0-9-1 with publisher confirms. On tokio, TLS
 # (`amqps://`) through rustls with aws-lc-rs and the platform's verifier,

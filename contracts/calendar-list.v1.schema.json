@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/calendar-list.v1.schema.json",
+  "title": "calendar-list v1 (blob)",
+  "description": "The calendars of a connection's account at the provider, as the connectors module read them when a member granted calendar access. A blob (`application/vnd.campbooks.calendar-list+json; version=1`) that `connectors.capability_granted` v1 points at for the `calendar` capability; the schedule module creates one calendar per entry. The provider's calendar id can be an address, so it travels here and never in an event. Deleted with the workspace.",
+  "type": "object",
+  "required": ["version", "calendars"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "calendars": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["provider_id", "name", "primary", "writable"],
+        "additionalProperties": false,
+        "properties": {
+          "provider_id": { "type": "string", "minLength": 1, "maxLength": 512, "description": "The calendar's id at the provider." },
+          "name": { "type": "string", "maxLength": 200 },
+          "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "The provider's colour for it." },
+          "time_zone": { "type": "string", "maxLength": 64, "description": "An IANA time zone name." },
+          "primary": { "type": "boolean", "description": "The account's primary calendar: the one that syncs at first." },
+          "writable": { "type": "boolean", "description": "Whether events may be created and changed on it." }
+        }
+      }
+    }
+  }
+}

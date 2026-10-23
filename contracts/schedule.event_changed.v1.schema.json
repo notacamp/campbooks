@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/schedule.event_changed.v1.schema.json",
+  "title": "schedule.event_changed v1 (event payload)",
+  "description": "Published by the schedule module, in the transaction of the change, when an event changes: its time, its kind, its calendar, or the provider's version replaced the member's. The same fields as `schedule.event_created` v1 (see that contract). Ids, enums and times only. Workspace-scoped.",
+  "type": "object",
+  "required": [
+    "workspace",
+    "event",
+    "calendar",
+    "owner",
+    "kind",
+    "starts",
+    "all_day",
+    "origin"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": {
+      "type": "string"
+    },
+    "event": {
+      "$ref": "#/$defs/uuid"
+    },
+    "calendar": {
+      "$ref": "#/$defs/uuid"
+    },
+    "owner": {
+      "$ref": "#/$defs/uuid",
+      "description": "The member whose calendar it is."
+    },
+    "kind": {
+      "enum": [
+        "charge",
+        "appointment",
+        "meeting",
+        "travel",
+        "stay",
+        "show",
+        "reservation",
+        "delivery",
+        "expiry",
+        "hold",
+        "none"
+      ]
+    },
+    "starts": {
+      "$ref": "#/$defs/when"
+    },
+    "ends": {
+      "$ref": "#/$defs/when"
+    },
+    "all_day": {
+      "type": "boolean"
+    },
+    "origin": {
+      "enum": [
+        "provider",
+        "member",
+        "scout"
+      ]
+    },
+    "source": {
+      "description": "The record it was read from, if any: `conversations.message` and its id.",
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "when": {
+      "description": "An RFC 3339 time with an offset, or a date when the event is all-day.",
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "string",
+          "format": "date"
+        }
+      ]
+    }
+  }
+}

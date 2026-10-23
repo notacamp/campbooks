@@ -26,6 +26,7 @@ import {
   SuspendedAccounts,
   useMailboxConsent,
 } from "~/modules/identity";
+import { buildScheduleRoutes, SCHEDULE_SHORTCUTS } from "~/modules/schedule";
 import { buildSearchRoutes, SEARCH_SHORTCUTS } from "~/modules/search";
 import {
   buildSystemAdminRoutes,
@@ -89,6 +90,7 @@ export function buildModuleRoutes<
       ...assistant.workspace,
       // Tasks made from emails say where they came from: the conversations module knows.
       ...buildTasksRoutes(workspace, { useSources: useConversationSources }),
+      ...buildScheduleRoutes(workspace, { useConsent: useMailboxConsent }),
       // `cargo xtask new-module` inserts above this line.
     ],
   } as const;
@@ -130,4 +132,5 @@ export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...ASSISTANT_SHORTCUTS,
   ...CONNECTORS_SHORTCUTS,
   ...TASKS_SHORTCUTS,
+  ...SCHEDULE_SHORTCUTS,
 ];

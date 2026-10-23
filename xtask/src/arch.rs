@@ -636,9 +636,8 @@ pub fn check_operations(spec: &serde_json::Value, owners: &Owners) -> Vec<String
             Some((_, Some(false))) => violations.push(format!(
                 "operation `{id}`: undo target `{undo}` does not mutate"
             )),
-            Some(_) if undo == id => {
-                violations.push(format!("operation `{id}` names itself as its undo"));
-            }
+            // An operation may be its own undo when sending the previous values
+            // back to it reverses it (`schedule.update_event`).
             Some(_) => {}
         }
     }
@@ -719,6 +718,12 @@ const LOCATION_FIELD: &str = "Location";
 /// secret, each with the reason: `(operationId, field, reason)`. Every other
 /// such field needs its operation to declare `x-campbooks.secret_once`.
 pub const ANSWER_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
+    (
+        "schedule.delete_event",
+        "undo_token",
+        "a handle that only brings the member's own deleted event back, to the member who \
+         deleted it (`schedule.restore_event` checks ownership too); it grants no access",
+    ),
     (
         "bff.logout",
         "logout_url",

@@ -164,6 +164,9 @@ const TOOLS: ReadonlySet<string> = new Set<ChatTool>([
   "my_inboxes",
   "my_tasks",
   "read_task",
+  "my_calendar",
+  "free_time",
+  "read_event",
 ]);
 
 function isTool(value: unknown): value is ChatTool {

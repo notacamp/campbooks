@@ -262,6 +262,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
             ..composition.assistant.clone()
         }),
         campbooks_tasks::module(),
+        campbooks_schedule::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -283,6 +284,10 @@ pub fn handbook() -> campbooks_assistant::Handbook {
         Section {
             module: campbooks_tasks::NAME,
             text: campbooks_tasks::HANDBOOK,
+        },
+        Section {
+            module: campbooks_schedule::NAME,
+            text: campbooks_schedule::HANDBOOK,
         },
     ])
 }
@@ -313,6 +318,9 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_kept_mail(campbooks_conversations::kept_mail())
         .with_outbound(campbooks_conversations::outbound_requests())
         .with_destinations(campbooks_connectors::outbound_destinations())
+        .with_calendar_requests(campbooks_schedule::calendar_requests())
+        .with_time_zones(campbooks_schedule::time_zones())
+        .with_availability(campbooks_schedule::availability())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
         ]))
@@ -470,6 +478,10 @@ fn security_scheme() -> SecurityScheme {
             a sentence you type into rules to check. Compiling uses the `complete` AI role only \
             when you ask, and sends it your sentence and your own addresses and label names, never \
             your mail; nothing is saved until you save a rule through the conversations module."),
+        (name = "schedule", description = "Your calendars and their events: the provider \
+            calendars you connect and your own Campbooks calendar, where Scout puts the dated \
+            things it reads in your email. Events have a kind; free time is answered from your \
+            working hours."),
         (name = "tasks", description = "What you have to do: your tasks, with a due date, a \
             plan (a day, or Later), a hand-off to one teammate and an undo for every change. \
             Personal: a task is seen by who it is with, and by who handed it off."),
@@ -795,7 +807,13 @@ mod tests {
         let modules: Vec<&str> = handbook.sections().iter().map(|s| s.module).collect();
         assert_eq!(
             modules,
-            ["assistant", "conversations", "attention", "tasks"]
+            [
+                "assistant",
+                "conversations",
+                "attention",
+                "tasks",
+                "schedule"
+            ]
         );
         for section in handbook.sections() {
             assert!(

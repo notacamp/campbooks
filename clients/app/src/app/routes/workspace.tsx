@@ -134,6 +134,7 @@ export function WorkspaceLayout() {
 const SETTINGS_SECTIONS = [
   { id: "members", path: "members" },
   { id: "mailboxes", path: "mailboxes" },
+  { id: "calendar", path: "calendar" },
   { id: "waysIn", path: "sign-in" },
   { id: "memory", path: "memory" },
 ] as const;
@@ -220,11 +221,13 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const inInbox = pathname.startsWith(`${base}/inbox`);
   const inSearch = pathname.startsWith(`${base}/search`);
   const inTasks = pathname.startsWith(`${base}/tasks`);
-  const atHome = !inSettings && !inInbox && !inSearch && !inTasks;
+  const inSchedule = pathname.startsWith(`${base}/schedule`);
+  const atHome = !inSettings && !inInbox && !inSearch && !inTasks && !inSchedule;
   const needsYou = useAttentionCount(workspace.id);
   const openTasks = useTaskCount(workspace.id);
   const tasksPath = `${base}/tasks`;
   const inboxPath = streamPath(workspace.id, "primary");
+  const schedulePath = `${base}/schedule`;
   const searchPath = `${base}/search`;
   // The stream, view or Drafts on screen (`/inbox/sent`…): these are places, not streams.
   const place = /\/inbox\/([^/]+)/u.exec(pathname)?.[1];
@@ -245,6 +248,9 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   // N T, from anywhere: Tasks, with "Add a task…" focused.
   useShortcut("tasks.create", () => {
     void navigate({ to: tasksPath, search: { add: Date.now() } });
+  });
+  useShortcut("nav.schedule", () => {
+    void navigate({ to: schedulePath });
   });
   useShortcut("nav.settings", () => {
     void navigate({ to: membersPath });
@@ -338,6 +344,13 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
               current={inTasks}
               count={openTasks}
               {...link(tasksPath)}
+            />
+            <NavItem
+              label={tNav("nav.schedule")}
+              icon="schedule"
+              shortcut="nav.schedule"
+              current={inSchedule}
+              {...link(schedulePath)}
             />
             <NavItem
               label={tNav("nav.settings")}
@@ -438,6 +451,13 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
               current: inTasks,
               ...(openTasks === undefined ? {} : { badge: openTasks }),
               ...link(tasksPath),
+            },
+            {
+              id: "schedule",
+              label: tNav("nav.schedule"),
+              icon: "schedule",
+              current: inSchedule,
+              ...link(schedulePath),
             },
             {
               id: "settings",

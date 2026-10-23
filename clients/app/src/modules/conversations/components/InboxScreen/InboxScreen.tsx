@@ -39,7 +39,7 @@ import {
   type Translate,
 } from "../../model";
 import { ConversationList, rowId } from "../ConversationList/ConversationList";
-import { ConversationReader } from "../Reader/ConversationReader";
+import { ConversationReader, type RenderFound } from "../Reader/ConversationReader";
 import type { RenderReplySlot } from "../Reader/ReplySlot";
 import { StreamChips, streamPath } from "../StreamNav/StreamNav";
 
@@ -84,6 +84,8 @@ export interface InboxScreenProps {
    * ReplySlot.ts); the reader hides those actions without it.
    */
   renderReplySlot?: RenderReplySlot | undefined;
+  /** The calendar's "Scout noticed" strip under each received message's header. */
+  renderFound?: RenderFound | undefined;
   /** A list-header action from the send slice ("New message", C). */
   composeAction?: ReactNode | undefined;
   /** Open the reply composer once the conversation is loaded (Home's R). */
@@ -105,6 +107,7 @@ export function InboxScreen({
   stream,
   conversationId,
   renderReplySlot,
+  renderFound,
   composeAction,
   startReply = false,
   replyTo,
@@ -388,6 +391,7 @@ export function InboxScreen({
             }}
             onMove={leave}
             renderReplySlot={renderReplySlot}
+            renderFound={renderFound}
             startReply={startReply}
             replyTo={replyTo}
             now={now}

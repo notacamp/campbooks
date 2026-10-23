@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/read-texts.v1.schema.json",
+  "title": "read-texts v1 (blob)",
+  "description": "The text of the items of a stored read of one message: what `conversations.message_read` v1 points at in `texts` instead of carrying it. A blob (`application/vnd.campbooks.read-texts+json; version=1`) of the workspace, held by the message and deleted with it. The schedule module reads it to name the events it makes from the items; it holds titles and places and so appears nowhere in the event log.",
+  "type": "object",
+  "required": ["items"],
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["key"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "description": "The item's key, as in `message_read`." },
+          "title": { "type": "string", "maxLength": 200 },
+          "place": { "type": ["string", "null"], "maxLength": 400 },
+          "quote": { "type": ["string", "null"], "maxLength": 600, "description": "The sentence of the email that gave the date (a model read only)." },
+          "ical_uid": { "type": ["string", "null"], "maxLength": 1024, "description": "The `UID` of the sender's own iCalendar event, when the item came from one." }
+        }
+      }
+    }
+  }
+}

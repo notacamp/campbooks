@@ -117,6 +117,12 @@ pub enum ChatTool {
     MyTasks,
     /// Read one task and what changed in it.
     ReadTask,
+    /// Read your calendar: your events in a window.
+    MyCalendar,
+    /// Read when you are free.
+    FreeTime,
+    /// Read one event of your calendar.
+    ReadEvent,
 }
 
 /// One thing Scout looked at, built by the server from the tool that ran,

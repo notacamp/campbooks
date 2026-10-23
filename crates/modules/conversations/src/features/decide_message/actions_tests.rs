@@ -47,7 +47,8 @@ fn answers() -> Value {
                 "probabilities": {"0": 0.2, "1": 0.6, "2": 0.2}},
             "suspicious": noul(0.05),
             "money": {"type": "choice", "choice": "neither",
-                "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}}
+                "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}},
+            "has_dated_thing": noul(0.1)
         }
     });
     for id in question::ALL {
@@ -69,7 +70,8 @@ enum Answering {
 fn openai_answers() -> Value {
     let mut object = json!({
         "stream": "primary", "needs_reply": true, "asks_action": true,
-        "has_deadline": false, "urgency": 1, "suspicious": false, "money": "neither"
+        "has_deadline": false, "urgency": 1, "suspicious": false, "money": "neither",
+        "has_dated_thing": false
     });
     for id in question::ALL {
         object[id] = json!(true);

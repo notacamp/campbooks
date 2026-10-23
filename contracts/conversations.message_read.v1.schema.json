@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/conversations.message_read.v1.schema.json",
+  "title": "conversations.message_read v1 (event payload)",
+  "description": "Published by the conversations module, in the transaction that stores a read of one message, once per layer that produced something: `structured` (the sender's own machine-readable dates, read with no model) or `model` (Scout's one `complete` read of the message). The schedule module turns `items` (things that happen at a time) into events on the inbox owner's Campbooks calendar; the tasks module turns `asks` (obligations of the reader) into tasks. Ids, enums, keys and times only: no title, place, quote, amount or other text; a reader fetches them through `conversations.get_message_read` with their own access, and the schedule module through the `texts` blob. Keys are stable for the same message and position, so a repeated delivery changes nothing for a consumer. Workspace-scoped.",
+  "type": "object",
+  "required": ["workspace", "message", "conversation", "inbox", "layer", "items", "asks", "summary_ready"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string", "description": "The workspace id (the event bus keys deliveries by it)." },
+    "message": { "$ref": "#/$defs/uuid" },
+    "conversation": { "$ref": "#/$defs/uuid" },
+    "inbox": { "$ref": "#/$defs/uuid" },
+    "owner": {
+      "$ref": "#/$defs/uuid",
+      "description": "The inbox's personal owner (a user id): the only member who reads it. Absent for a shared inbox, which gets no Scout events."
+    },
+    "layer": { "enum": ["structured", "model"] },
+    "items": {
+      "type": "array",
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "asks": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/ask" }
+    },
+    "summary_ready": {
+      "type": "boolean",
+      "description": "Whether the read holds a summary of the message (written when a need was open)."
+    },
+    "texts": {
+      "description": "The `read-texts` v1 document, a blob of the workspace that the message holds (deleted with it): the title, place and calendar UID of each item, by its key. The schedule module reads it to name the events it makes. Present only when an item has any; the text is never in the event.",
+      "type": "object",
+      "required": ["hash", "size", "content_type"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 },
+        "content_type": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:(structured|model):(item|ask):[1-9][0-9]*$",
+      "description": "`<message id>:<layer>:item:<position>` or `<message id>:<layer>:ask:<position>`, positions from 1 in the order the layer read them. The layer is part of the key, so the structured and the model reads of one message never share one."
+    },
+    "when": {
+      "description": "An RFC 3339 time with an offset, or a date when the item lasts whole days.",
+      "oneOf": [
+        { "type": "string", "format": "date-time" },
+        { "type": "string", "format": "date" }
+      ]
+    },
+    "item": {
+      "type": "object",
+      "required": ["key", "kind", "starts", "all_day"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "kind": {
+          "enum": ["charge", "appointment", "meeting", "travel", "stay", "show", "reservation", "delivery", "expiry"]
+        },
+        "starts": { "$ref": "#/$defs/when" },
+        "ends": { "$ref": "#/$defs/when" },
+        "all_day": { "type": "boolean" },
+        "time_zone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "An IANA time zone name, checked against the database."
+        },
+        "updates": { "$ref": "#/$defs/key", "description": "The key of an earlier item of the same conversation that this one changes." },
+        "cancels": { "$ref": "#/$defs/key", "description": "The key of an earlier item of the same conversation that this one cancels." }
+      },
+      "not": { "required": ["updates", "cancels"] }
+    },
+    "ask": {
+      "type": "object",
+      "required": ["key", "verb", "has_amount"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "verb": { "enum": ["do", "pay"] },
+        "due": { "$ref": "#/$defs/when" },
+        "has_amount": { "type": "boolean", "description": "Whether the read holds an amount (pay only); the amount itself is not here." },
+        "same_as": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "The reference of an open task this ask repeats, as the OpenTasks port gave it."
+        }
+      }
+    }
+  }
+}
