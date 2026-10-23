@@ -137,10 +137,10 @@ pub fn parse(xml: &str) -> Option<ProviderConfig> {
                         }
                     }
                     ("incomingServer", Some("imap")) => {
-                        entry = Some((Kind::Imap, Entry::default()))
+                        entry = Some((Kind::Imap, Entry::default()));
                     }
                     ("outgoingServer", Some("smtp")) => {
-                        entry = Some((Kind::Smtp, Entry::default()))
+                        entry = Some((Kind::Smtp, Entry::default()));
                     }
                     ("incomingServer" | "outgoingServer", _) => entry = None,
                     _ => {}

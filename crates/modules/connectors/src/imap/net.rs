@@ -5,7 +5,7 @@
 use std::{future::Future, pin::Pin};
 
 use campbooks_kernel::net::guard;
-use hickory_resolver::{TokioResolver, proto::rr::RData};
+use hickory_resolver::{ResolverBuilder, TokioResolver, proto::rr::RData};
 use url::Url;
 
 /// A future of what the network answered.
@@ -58,7 +58,7 @@ impl SystemDns {
     async fn resolver(&self) -> Option<&TokioResolver> {
         self.resolver
             .get_or_init(|| async {
-                let built = TokioResolver::builder_tokio().and_then(|builder| builder.build());
+                let built = TokioResolver::builder_tokio().and_then(ResolverBuilder::build);
                 if built.is_err() {
                     tracing::warn!("the system's DNS configuration could not be read");
                 }

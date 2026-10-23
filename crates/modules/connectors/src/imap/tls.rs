@@ -62,7 +62,7 @@ pub fn is_tls_failure(err: &(dyn std::error::Error + 'static)) -> bool {
         if let Some(io) = err.downcast_ref::<std::io::Error>()
             && io
                 .get_ref()
-                .is_some_and(|inner| inner.is::<rustls::Error>())
+                .is_some_and(<dyn std::error::Error + Send + Sync>::is::<rustls::Error>)
         {
             return true;
         }
