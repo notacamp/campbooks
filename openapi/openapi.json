@@ -20092,6 +20092,13 @@
             ],
             "description": "Where it is."
           },
+          "quote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sentence of the email that gave the date, when Scout read one."
+          },
           "recurring": {
             "type": "boolean",
             "description": "Whether it is an occurrence of a series."
