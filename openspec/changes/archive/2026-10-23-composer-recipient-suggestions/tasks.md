@@ -19,6 +19,6 @@
 - [x] 3.1 OpenAPI regenerated
 - [x] 3.2 Client types regenerated
 - [x] 3.3 Changelog entry file in `changelog/unreleased/`
-- [ ] 3.4 Gates green (CI)
+- [x] 3.4 Gates green (CI)
 - [x] 3.5 Recording at 375px and desktop: typing in To, picking with the keyboard, then in Cc
-- [ ] 3.6 `openspec archive composer-recipient-suggestions --yes`
+- [x] 3.6 `openspec archive composer-recipient-suggestions --yes`
