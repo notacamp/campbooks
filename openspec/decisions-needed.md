@@ -68,6 +68,9 @@ chat calls, the cost the owner ruled out); (c) a per-workspace switch for
 `.ics`, so those land anyway. Measure on staging how many flagged,
 unmarked, unopened bookings are missed before revisiting.
 
+**Decided 2026-10-23:** the recommendation, (a). The owner approved the
+prototype and said to implement it.
+
 ## Calendar: no summary on arrival for a plain Reply need
 
 Today `summarize_need` reads the email behind every need. The message read
@@ -79,6 +82,9 @@ accept it; (b) keep reading every need's email on arrival. **Recommended:**
 (a). It costs fewer calls than today, and a Reply need's email is usually
 short enough to open.
 
+**Decided 2026-10-23:** the recommendation, (a). The owner approved the
+prototype and said to implement it.
+
 ## Calendar: shared inboxes add no Scout events
 
 An item read from mail in a shared inbox has no single owner whose calendar
@@ -86,6 +92,9 @@ it belongs on. Options: (a) add nothing; (b) add it to the calendar of the
 first member who opens the message; (c) a shared Campbooks calendar per
 shared inbox. **Recommended:** (a) in this change. Revisit with calendar
 sharing (reader/writer/manager), which is out of scope here.
+
+**Decided 2026-10-23:** the recommendation, (a). The owner approved the
+prototype and said to implement it.
 
 ## Calendar: machine-readable dates may assert (ADR 0020)
 
@@ -95,6 +104,9 @@ dated items and asks: typed fields only, a proper parser, never the prose
 around them. Options: (a) accept the carve-out; (b) markup may only veto, and
 the model reads everything (one chat call per booking). **Recommended:**
 (a). It is exact, free, and how mail clients already read bookings.
+
+**Decided 2026-10-23:** the recommendation, (a). The owner approved the
+prototype and said to implement it.
 
 ## Calendar: the flag threshold is unmeasured
 
@@ -108,6 +120,9 @@ Remove; (b) wait for a labelled set before shipping. **Recommended:** (a),
 with 30–50 owner-labelled emails (bookings, bills, renewals, newsletters
 with dates) added to the decide eval before the default is final.
 
+**Decided 2026-10-23:** the recommendation, (a). The owner approved the
+prototype and said to implement it.
+
 ## Calendar: Google calendar scopes and verification
 
 Calendar access asks Google for `calendar.events` and
@@ -117,3 +132,7 @@ campbooks-cloud#53. Until that is approved, more than 100 users see the
 unverified-app screen. Options: (a) add them to the #53 submission now; (b)
 ship calendar to the cloud only after verification. **Recommended:** (a).
 Self-hosters are unaffected.
+
+**Decided 2026-10-23:** the recommendation, (a). The owner approved the
+prototype and said to implement it.
+
