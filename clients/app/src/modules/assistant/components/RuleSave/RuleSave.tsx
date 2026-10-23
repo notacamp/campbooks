@@ -26,6 +26,8 @@ export interface RuleSaveProps {
   names?: Names | undefined;
   /** After saving (or Cancel). */
   onDone: () => void;
+  /** Saved in every inbox chosen (before {@link onDone}); not on Cancel. */
+  onSaved?: (() => void) | undefined;
   /**
    * The one shown first: ⌘↵ saves it while the focus stays where the member
    * was typing, and it is announced. Several rules shown at once each get a
@@ -49,6 +51,7 @@ export function RuleSave({
   originText,
   names,
   onDone,
+  onSaved,
   primary = false,
 }: RuleSaveProps) {
   const { t: typed, i18n } = useTranslation("assistant");
@@ -126,6 +129,7 @@ export function RuleSave({
               });
             },
           });
+          onSaved?.();
           onDone();
         },
         onError: () => {

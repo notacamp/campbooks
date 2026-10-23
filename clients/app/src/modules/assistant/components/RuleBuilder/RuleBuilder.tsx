@@ -113,7 +113,14 @@ function builtRules(
  * rule, each with what it matches, before Save; once every card is saved or
  * cancelled the builder starts again.
  */
-export function RuleBuilder({ workspaceId }: { workspaceId: string }) {
+export function RuleBuilder({
+  workspaceId,
+  onSaved,
+}: {
+  workspaceId: string;
+  /** A rule was saved (Teach Scout opened from Scout's chat settles its card). */
+  onSaved?: (() => void) | undefined;
+}) {
   const { t: typed } = useTranslation("assistant");
   const t = typed as unknown as Translate;
   const inboxes = useInboxes(workspaceId);
@@ -182,6 +189,7 @@ export function RuleBuilder({ workspaceId }: { workspaceId: string }) {
             origin="instruction"
             names={names}
             primary={index === 0}
+            onSaved={onSaved}
             onDone={() => {
               done(rule.key);
             }}

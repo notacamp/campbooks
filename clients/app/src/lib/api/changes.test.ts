@@ -7,6 +7,7 @@ import {
   createWebChangeSource,
   operationKey,
   parseFrame,
+  refreshRecords,
   subscribeToChanges,
   type ChangeFrame,
   type ChangeSource,
@@ -426,5 +427,23 @@ describe("the change feed", () => {
       source.open(WS, undefined, { onFrame: vi.fn(), onClosed: vi.fn() })();
       expect(urls).toStrictEqual([`https://app.example.com/bff/api/v1/w/${WS}/changes`]);
     });
+  });
+});
+
+describe("refreshRecords", () => {
+  it("refreshes the readers of the changed types in the workspace only", async () => {
+    const queryClient = new QueryClient();
+    const lists = operationKey("conversations.list", { workspace_id: WS });
+    const elsewhere = operationKey("conversations.list", { workspace_id: OTHER_WS });
+    const members = operationKey("workspaces.list_members", { workspace_id: WS });
+    for (const key of [lists, elsewhere, members]) {
+      queryClient.setQueryData(key, { ok: true });
+    }
+
+    await refreshRecords(queryClient, WS, ["conversations.conversation"]);
+
+    expect(queryClient.getQueryState(lists)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(elsewhere)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(members)?.isInvalidated).toBe(false);
   });
 });
