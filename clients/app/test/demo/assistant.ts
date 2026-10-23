@@ -116,7 +116,7 @@ export const ARCHIVE_PROPOSAL: Proposal = {
   },
 };
 
-export const RULE_SENTENCE = "Mail from Marta Ferreira always stays in my inbox";
+export const RULE_SENTENCE = "Mail from Marta Ferreira always needs a reply";
 
 /** Scout's proposal of a rule, for Teach Scout. */
 export const RULE_PROPOSAL: Proposal = {
@@ -142,7 +142,7 @@ export const CLEAR_ANSWER: Message = {
   author: "scout",
   text:
     "I proposed archiving Marta’s email: confirm on the card and it leaves your inbox. " +
-    "Her mail matters to you, so I also proposed a rule that keeps it in your inbox.",
+    "Her emails usually need an answer, so I also proposed a rule that marks her mail as needing one.",
   steps: [],
   finish: "done",
   proposals: [ARCHIVE_PROPOSAL, RULE_PROPOSAL],
@@ -177,7 +177,7 @@ export const MARTA_RULE = {
   proposals: [
     {
       conditions: [{ field: "sender_address", value: "marta@casa-lume.example" }],
-      actions: [{ action: "surface", value: "always" }],
+      actions: [{ action: "needs_reply", value: true }],
       inboxes: [
         {
           id: "0192f1a0-0000-7000-8000-0000000000b1",

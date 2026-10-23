@@ -34,5 +34,5 @@
 - [x] 5.1 OpenAPI and client types regenerated (CI artifacts)
 - [x] 5.2 Changelog entry file
 - [x] 5.3 Gates green
-- [ ] 5.4 UI recorded at 375px and desktop
-- [ ] 5.5 `openspec archive scout-proposes-actions --yes` before merge
+- [x] 5.4 UI recorded at 375px and desktop
+- [x] 5.5 `openspec archive scout-proposes-actions --yes` before merge
