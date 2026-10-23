@@ -3369,7 +3369,7 @@ dependencies = [
  "chrono-tz",
  "log",
  "regex",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
