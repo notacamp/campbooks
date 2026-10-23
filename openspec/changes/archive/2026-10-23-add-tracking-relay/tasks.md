@@ -23,5 +23,5 @@
 
 ## 5. Last
 - [x] 5.1 Changelog entry file (`changelog/unreleased/added/321-tracking-relay.md`)
-- [ ] 5.2 Gates green in CI; recording
-- [ ] 5.3 Archive the change
+- [x] 5.2 Gates green in CI; recording
+- [x] 5.3 Archive the change
