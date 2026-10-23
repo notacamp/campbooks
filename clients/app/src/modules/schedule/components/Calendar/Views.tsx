@@ -264,7 +264,9 @@ export function WeekView(props: ViewProps) {
       hours={{ from: hours.from, to: hours.to, format: (hour) => hourLabel(locale, hour) }}
       blocks={blocks}
       now={
-        todayColumn === -1 ? undefined : { day: todayColumn, minute: today.minute - hours.from * 60 }
+        todayColumn === -1
+          ? undefined
+          : { day: todayColumn, minute: today.minute - hours.from * 60 }
       }
     />
   );

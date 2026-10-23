@@ -157,7 +157,7 @@ button.kindChip:hover {
   flex: none;
   gap: var(--space-1-5);
   align-items: center;
-  max-width: 14rem;
+  max-width: calc(var(--space-10) * 5.6);
   color: var(--text-tertiary);
   font-size: var(--text-xs);
 }
@@ -411,8 +411,8 @@ button.kindChip:hover {
 @container (width < 6.5rem) {
   .pill > span {
     position: absolute;
-    width: 1px;
-    height: 1px;
+    width: var(--border-width);
+    height: var(--border-width);
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
@@ -867,7 +867,7 @@ button.kindChip:hover {
 
 .foundText {
   display: flex;
-  flex: 1 1 14rem;
+  flex: 1 1 calc(var(--space-10) * 5.6);
   flex-direction: column;
   min-width: 0;
 }
@@ -987,7 +987,7 @@ button.kindChip:hover {
   }
 
   .headTitle {
-    flex: 1 1 20rem;
+    flex: 1 1 calc(var(--space-10) * 8);
   }
 
   .headViews,
