@@ -57,9 +57,16 @@ pub async fn done(
     extract::Json(body): extract::Json<TaskRevision>,
 ) -> Result<Json<TaskView>> {
     let today = offset.today()?;
-    set_state(&state, &workspace, path.task_id, body, today, TaskState::Done)
-        .await
-        .map(Json)
+    set_state(
+        &state,
+        &workspace,
+        path.task_id,
+        body,
+        today,
+        TaskState::Done,
+    )
+    .await
+    .map(Json)
 }
 
 /// Mark a task not needed.
@@ -100,9 +107,16 @@ pub async fn not_needed(
     extract::Json(body): extract::Json<TaskRevision>,
 ) -> Result<Json<TaskView>> {
     let today = offset.today()?;
-    set_state(&state, &workspace, path.task_id, body, today, TaskState::NotNeeded)
-        .await
-        .map(Json)
+    set_state(
+        &state,
+        &workspace,
+        path.task_id,
+        body,
+        today,
+        TaskState::NotNeeded,
+    )
+    .await
+    .map(Json)
 }
 
 /// Open a closed task again, with its plan.
@@ -142,9 +156,16 @@ pub async fn reopen(
     extract::Json(body): extract::Json<TaskRevision>,
 ) -> Result<Json<TaskView>> {
     let today = offset.today()?;
-    set_state(&state, &workspace, path.task_id, body, today, TaskState::Open)
-        .await
-        .map(Json)
+    set_state(
+        &state,
+        &workspace,
+        path.task_id,
+        body,
+        today,
+        TaskState::Open,
+    )
+    .await
+    .map(Json)
 }
 
 /// Move task `id` to `to`: closing needs it open, opening needs it closed.

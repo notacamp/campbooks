@@ -15,8 +15,8 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        OffsetQuery, Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskView, access,
-        actor_of, finish,
+        OffsetQuery, Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskView,
+        access, actor_of, finish,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
