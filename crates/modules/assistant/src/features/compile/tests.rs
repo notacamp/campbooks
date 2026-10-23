@@ -38,6 +38,7 @@ async fn kit_with_model(db: PgPool, server: &MockServer) -> Kit {
         db,
         AssistantDeps {
             ai: Some(gateway(&server.uri())),
+            ..AssistantDeps::default()
         },
     )
     .await;
@@ -406,6 +407,7 @@ async fn an_external_model_without_the_opt_in_gets_nothing(db: PgPool) {
         db,
         AssistantDeps {
             ai: Some(external_gateway()),
+            ..AssistantDeps::default()
         },
     )
     .await;
@@ -625,6 +627,7 @@ async fn compiling_is_a_call_a_person_waits_on_and_stops_at_the_daily_limit(db: 
         db,
         AssistantDeps {
             ai: Some(gateway(&server.uri()).with_meter(limit.clone())),
+            ..AssistantDeps::default()
         },
     )
     .await;

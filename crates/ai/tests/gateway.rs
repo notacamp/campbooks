@@ -412,3 +412,130 @@ async fn a_request_timeout_bounds_one_call() {
         "{err:?}"
     );
 }
+
+/// What a test subscriber wrote: every log line of every level.
+#[derive(Clone, Default)]
+struct Captured(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Captured {
+    type Writer = Self;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        self.clone()
+    }
+}
+
+impl Captured {
+    fn text(&self) -> String {
+        String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
+    }
+}
+
+fn find_invoices() -> campbooks_ai::ToolDefinition {
+    campbooks_ai::ToolDefinition::new(
+        "find_conversations",
+        "Find conversations.",
+        json!({"type": "object", "additionalProperties": false,
+               "properties": {"query": {"type": "string"}}}),
+    )
+}
+
+#[tokio::test]
+async fn a_whole_answer_carries_its_tool_calls_and_logs_none_of_them() {
+    let captured = Captured::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::TRACE)
+        .with_writer(captured.clone())
+        .finish();
+    let _guard = tracing::subscriber::set_default(subscriber);
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .and(body_partial_json(json!({
+            "tools": [{"type": "function", "function": {"name": "find_conversations"}}],
+            "tool_choice": "auto",
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "model": "m",
+            "choices": [{
+                "message": {"role": "assistant", "content": null, "tool_calls": [
+                    {"id": "a", "type": "function",
+                     "function": {"name": "find_conversations", "arguments": "{\"query\": \"marta@clientes.example\"}"}},
+                    {"id": "b", "type": "function",
+                     "function": {"name": "what_needs_me", "arguments": "{}"}},
+                ]},
+                "finish_reason": "tool_calls",
+            }],
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
+    let mut request = ChatRequest::new(vec![Message::user("Has Marta written before?")]);
+    request.tools = vec![find_invoices()];
+    request.tool_choice = Some(campbooks_ai::ToolChoice::Auto);
+    let response = gw.chat(Role::Complete, request).await.unwrap();
+    assert_eq!(response.content, "");
+    assert_eq!(response.finish_kind(), "tool_calls");
+    let names: Vec<&str> = response
+        .tool_calls
+        .iter()
+        .map(|c| c.name.as_str())
+        .collect();
+    assert_eq!(names, ["find_conversations", "what_needs_me"]);
+    assert_eq!(
+        response.tool_calls[0].arguments,
+        "{\"query\": \"marta@clientes.example\"}"
+    );
+    let logged = captured.text();
+    assert!(!logged.contains("marta@clientes.example"), "{logged}");
+    assert!(!logged.contains("Has Marta"), "{logged}");
+}
+
+#[tokio::test]
+async fn a_streamed_tool_call_is_yielded_whole_and_never_logged() {
+    let captured = Captured::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::TRACE)
+        .with_writer(captured.clone())
+        .finish();
+    let _guard = tracing::subscriber::set_default(subscriber);
+    let body = "\
+data: {\"model\":\"m\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"function\":{\"name\":\"find_people\",\"arguments\":\"{\\\"query\\\": \"}}]}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"marta@clientes\"}}]}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\".example\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n\
+data: [DONE]\n\n";
+    let server = stream_server(body).await;
+    let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
+    let mut request = ChatRequest::new(vec![Message::user("Who is Marta?")]);
+    request.tools = vec![find_invoices()];
+    let events: Vec<ChatEvent> = all(&gw, request)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(Result::unwrap)
+        .filter(|event| *event != ChatEvent::Alive)
+        .collect();
+    assert_eq!(events.len(), 2, "{events:?}");
+    let ChatEvent::ToolCall(call) = &events[0] else {
+        panic!("{events:?}");
+    };
+    assert_eq!(call.id, "call_1");
+    assert_eq!(call.name, "find_people");
+    assert_eq!(call.arguments, "{\"query\": \"marta@clientes.example\"}");
+    assert!(matches!(&events[1], Done(summary) if summary.finish_kind() == "tool_calls"));
+    let logged = captured.text();
+    assert!(!logged.contains("marta@clientes"), "{logged}");
+    assert!(!logged.contains("Who is Marta"), "{logged}");
+}

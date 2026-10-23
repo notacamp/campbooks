@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
 import { Button } from "../Button/Button";
+import { Visor } from "../Visor/Visor";
 
 import { OverflowActions, type OverflowAction } from "./OverflowActions";
 
@@ -81,5 +82,15 @@ export const Folded: Story = {
     const menu = canvas.getByRole("dialog", { name: "More actions" });
     await expect(within(menu).getByRole("button", { name: /Report spam/u })).toBeVisible();
     await expect(within(menu).getByRole("button", { name: /Next/u })).toBeVisible();
+  },
+};
+
+/** An action that asks Scout: the visor stands for its icon. */
+export const WithScout: Story = {
+  args: {
+    actions: [
+      ...ACTIONS,
+      { id: "scout", label: "Ask Scout", icon: <Visor size="xs" />, onSelect: fn() },
+    ],
   },
 };

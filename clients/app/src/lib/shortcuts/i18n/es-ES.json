@@ -28,7 +28,8 @@
     "draft": "Redáctalo por mí",
     "send": "Enviar",
     "bold": "Negrita",
-    "italic": "Cursiva"
+    "italic": "Cursiva",
+    "ask": "Preguntar"
   },
   "command": {
     "open": "Buscar o preguntar"

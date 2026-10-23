@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from "react";
 
 import type { ShortcutId } from "~/lib/shortcuts";
 
@@ -14,7 +14,8 @@ export interface OverflowAction {
   id: string;
   /** The action's name: the icon's tooltip, the menu row's text. */
   label: string;
-  icon: IconName;
+  /** An icon name, or any glyph (the visor, for an action that asks Scout). */
+  icon: IconName | ReactElement;
   /** Its key, shown in the tooltip and in the menu row. */
   shortcut?: ShortcutId | undefined;
   /** A toggle's state (Pin), as aria-pressed on the icon. */
@@ -95,7 +96,8 @@ export function OverflowActions({ label, actions, end = [] }: OverflowActionsPro
                 <Button
                   key={action.id}
                   variant="ghost"
-                  icon={action.icon}
+                  icon={typeof action.icon === "string" ? action.icon : undefined}
+                  leading={typeof action.icon === "string" ? undefined : action.icon}
                   shortcut={action.shortcut}
                   onKeyDown={moveFocus}
                   onClick={() => {

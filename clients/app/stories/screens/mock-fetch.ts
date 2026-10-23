@@ -10,6 +10,8 @@ interface MockAnswer {
   status?: number;
   body?: unknown;
   stream?: string[];
+  /** Milliseconds between the stream's chunks, as a model writes (recordings). */
+  delay?: number;
 }
 export type MockRoute = MockAnswer | ((body: unknown, url: URL) => MockAnswer);
 
@@ -38,8 +40,11 @@ export function mockFetch(routes: Record<string, MockRoute>): () => void {
       const chunks = answer.stream;
       return new Response(
         new ReadableStream<Uint8Array>({
-          start(controller) {
+          async start(controller) {
             for (const chunk of chunks) {
+              if (answer.delay !== undefined) {
+                await new Promise((resolve) => setTimeout(resolve, answer.delay));
+              }
               controller.enqueue(encoder.encode(chunk));
             }
             controller.close();

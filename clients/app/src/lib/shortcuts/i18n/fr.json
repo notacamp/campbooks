@@ -28,7 +28,8 @@
     "draft": "Le rédiger pour moi",
     "send": "Envoyer",
     "bold": "Gras",
-    "italic": "Italique"
+    "italic": "Italique",
+    "ask": "Demander"
   },
   "command": {
     "open": "Chercher, demander"

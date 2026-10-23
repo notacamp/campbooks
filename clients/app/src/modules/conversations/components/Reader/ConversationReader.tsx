@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus } from "~/lib/api";
+import { useScoutChat } from "~/lib/scout-chat";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   ActionBar,
@@ -20,6 +21,7 @@ import {
   ReaderBody,
   ReaderFooter,
   SkeletonList,
+  Visor,
   type OverflowAction,
 } from "~/lib/ui";
 
@@ -316,6 +318,27 @@ export function ConversationReader({
     },
     { enabled: active },
   );
+  // Ask Scout (`.`): the chat about this conversation; the focus comes
+  // back to what it was asked from.
+  const scout = useScoutChat();
+  const askScout = () => {
+    if (conversation === undefined) {
+      return;
+    }
+    const active = document.activeElement;
+    scout?.(
+      conversation.id,
+      active instanceof HTMLElement && active !== document.body ? active : null,
+    );
+  };
+  useShortcut(
+    "scout.ask",
+    () => {
+      askScout();
+    },
+    // Asking changes nothing: a reader of the inbox asks too.
+    { enabled: scout !== undefined && conversation !== undefined },
+  );
   const viewing = conversation !== undefined;
   // Remote images never load in spam.
   useShortcut("inbox.show_images", showAllImages, { enabled: viewing && !inSpam });
@@ -537,6 +560,16 @@ export function ConversationReader({
         },
       ]
     : [];
+  // Asking changes nothing: offered to a reader of the inbox too.
+  if (scout !== undefined) {
+    moreActions.push({
+      id: "scout",
+      label: t("actions.askScout"),
+      icon: <Visor size="xs" />,
+      shortcut: "scout.ask",
+      onSelect: askScout,
+    });
+  }
   const listActions: OverflowAction[] = [
     {
       id: "previous",

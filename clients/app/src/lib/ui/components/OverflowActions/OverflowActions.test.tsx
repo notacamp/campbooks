@@ -2,6 +2,7 @@ import { fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
+import { Visor } from "../Visor/Visor";
 
 import { OverflowActions, type OverflowAction } from "./OverflowActions";
 
@@ -77,6 +78,27 @@ describe("OverflowActions", () => {
     fireEvent.click(row);
     expect(next).toHaveBeenCalledOnce();
     expect(screen.queryByRole("dialog", { name: "More actions" })).toBeNull();
+  });
+
+  it("takes a glyph for an icon, in the row and in the menu", () => {
+    measuring(200, 400);
+    const ask = vi.fn();
+    const scout: OverflowAction = {
+      id: "scout",
+      label: "Ask Scout",
+      icon: <Visor size="xs" />,
+      onSelect: ask,
+    };
+    const { unmount } = renderUi(<OverflowActions label="More actions" actions={[scout]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ask Scout" }));
+    expect(ask).toHaveBeenCalledOnce();
+    unmount();
+
+    measuring(400, 100);
+    renderUi(<OverflowActions label="More actions" actions={[scout]} />);
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Ask Scout/u }));
+    expect(ask).toHaveBeenCalledTimes(2);
   });
 
   it("moves between the menu's rows with the arrow keys", () => {

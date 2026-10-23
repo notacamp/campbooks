@@ -99,6 +99,33 @@ describe("ItemActions", () => {
     expect(onAction).toHaveBeenCalledWith("done");
   });
 
+  it("puts the actions after the own ones in the same style, before the divider", () => {
+    const onAction = vi.fn();
+    renderUi(
+      <ItemActions
+        label="Actions"
+        own={OWN}
+        after={[{ id: "scout", label: "Continue with Scout", key: "item.reply", ai: true }]}
+        universal={UNIVERSAL}
+        onAction={onAction}
+      />,
+    );
+    const buttons = [...screen.getByRole("group").querySelectorAll("button")];
+
+    expect(buttons.map((b) => b.dataset["action"])).toEqual([
+      "reply",
+      "calendar",
+      "scout",
+      "done",
+      "snooze",
+      "not_needed",
+    ]);
+    expect(buttons[2]).toHaveAttribute("data-ai", "true");
+    expect(buttons[2]).toHaveAttribute("data-variant", "secondary");
+    fireEvent.click(buttons[2] as HTMLElement);
+    expect(onAction).toHaveBeenCalledWith("scout");
+  });
+
   it("draws no divider when one group is empty", () => {
     const { container } = renderUi(
       <ItemActions label="Actions" own={[]} universal={UNIVERSAL} onAction={vi.fn()} />,

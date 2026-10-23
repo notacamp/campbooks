@@ -135,7 +135,8 @@
     "restore": "Restore",
     "reportSpam": "Report spam",
     "notSpam": "Not spam",
-    "toInbox": "Move to Inbox"
+    "toInbox": "Move to Inbox",
+    "askScout": "Ask Scout"
   },
   "toast": {
     "done": "Done · {{subject}}",
