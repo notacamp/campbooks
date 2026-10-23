@@ -153,6 +153,26 @@ impl Kit {
         self
     }
 
+    /// The same kit, reading the tasks open for an email through
+    /// `open_tasks` (campbooks-cloud#42).
+    #[must_use]
+    pub fn with_open_tasks(mut self, open_tasks: campbooks_kernel::tasks::OpenTasksPort) -> Self {
+        self.state = self.state.with_open_tasks(open_tasks);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
+    /// The same kit, reading members' time zones through `time_zones`.
+    #[must_use]
+    pub fn with_time_zones(
+        mut self,
+        time_zones: campbooks_kernel::schedule::TimeZonesPort,
+    ) -> Self {
+        self.state = self.state.with_time_zones(time_zones);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
     /// The same kit with no binding key (an instance with no secret): sends
     /// are neither scheduled nor released (campbooks-cloud#227).
     #[must_use]

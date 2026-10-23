@@ -57,8 +57,8 @@ pub enum Outcome {
     NotFlagged,
     /// The sender's own data holds its dates: nothing to ask the model.
     Covered,
-    /// No `complete` role may read mail on this server, or dated things are
-    /// switched off.
+    /// No `complete` role may read mail on this server, dated things are
+    /// switched off, or the inbox is kept read-only.
     Unavailable,
 }
 
@@ -133,9 +133,18 @@ async fn request(
     message: MessageId,
     settings: &NeedSettings,
 ) -> Result<Outcome> {
-    // Nothing to ask while no model may read mail here, or dated things are
-    // switched off.
-    if !settings.summaries || !settings.dated.enabled {
+    // Nothing to ask while no model may read mail here, dated things are
+    // switched off, or the inbox is kept read-only (its connection was
+    // removed): nothing in it is sent to a model again.
+    let kept: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM conversations.messages m
+                          JOIN conversations.inboxes i ON i.id = m.inbox_id
+                         WHERE m.id = $1 AND i.detached_at IS NOT NULL)",
+    )
+    .bind(message)
+    .fetch_one(&mut **tx)
+    .await?;
+    if !settings.summaries || !settings.dated.enabled || kept {
         return Ok(Outcome::Unavailable);
     }
     let answers = needs::answers(&mut **tx, message).await?;

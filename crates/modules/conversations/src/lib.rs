@@ -8,13 +8,21 @@
 //!   conversations, keeps bodies and attachments in blob storage, and
 //!   publishes [`events`] in the same transaction. The contract is
 //!   `contracts/message-change-batch.v1.schema.json`.
-//! - **Streams and the decide pass**: every inbound message is asked six
-//!   typed questions, by the facts when it is stored and by the `decide`
-//!   model afterwards (`conversations.decide_message`). Every answer is
-//!   stored in `decisions`; a per-question switch says which may act. The
+//! - **Streams and the decide pass**: every inbound message is asked the
+//!   typed triage questions, by the facts when it is stored and by the
+//!   `decide` model afterwards (`conversations.decide_message`). Every answer
+//!   is stored in `decisions`; a per-question switch says which may act. The
 //!   facts read headers and addresses only and may only say "no"; the
 //!   model reads the email, and its accepted answers sort the conversation
 //!   and raise its need (ADR 0018).
+//! - **Dates in mail** (campbooks-cloud#42): the pass also asks whether the
+//!   email tells of something dated, and flags it (`domain::dated`); the
+//!   sender's own machine-readable dates are read with no model
+//!   (`conversations.read_structured`, ADR 0020); and one `complete` call per
+//!   flagged message, when a need opens or a member opens it, reads the
+//!   summary, the need's dates, the things that happen at a time and the
+//!   obligations (`conversations.read_message`). Both reads are stored in
+//!   `message_reads` and published as `conversations.message_read`.
 //! - **Search**: the module is the search source of its conversations
 //!   ([`search_source`], ADR 0016) and lists the inboxes a caller may search
 //!   through its visibility port ([`visibility`]).

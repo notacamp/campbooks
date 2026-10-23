@@ -19,6 +19,11 @@ use wiremock::{
     matchers::{method, path},
 };
 
+use campbooks_kernel::{
+    schedule::{TimeZoneFuture, TimeZones},
+    tasks::{OpenTask as KernelTask, OpenTasks, OpenTasksFuture},
+};
+
 use super::*;
 use crate::{
     ConversationsDeps,
@@ -602,6 +607,169 @@ async fn with_dated_things_off_opening_a_message_queues_nothing(db: PgPool) {
     assert_eq!(asked.json["outcome"], "unavailable");
     kit.run_jobs().await;
     assert_eq!(calls(&server).await, 0);
+}
+
+/// What the model was given for each call so far: the user message, parsed.
+async fn inputs(server: &MockServer) -> Vec<Value> {
+    server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .map(|request| {
+            let chat: Value = request.body_json().unwrap();
+            serde_json::from_str(chat["messages"][1]["content"].as_str().unwrap()).unwrap()
+        })
+        .collect()
+}
+
+/// The module that owns tasks, as far as this test needs it: the hosting
+/// company's bill is already a task.
+#[derive(Debug)]
+struct HostingBill;
+
+impl OpenTasks for HostingBill {
+    fn open_tasks<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        _workspace: WorkspaceId,
+        _inbox: sqlx::types::Uuid,
+        _conversation: sqlx::types::Uuid,
+        sender_address: &'a str,
+    ) -> OpenTasksFuture<'a> {
+        Box::pin(async move {
+            Ok(if sender_address == "billing@acme-hosting.example" {
+                vec![KernelTask {
+                    reference: "task-17".into(),
+                    title: "Pay the hosting bill".into(),
+                    due_on: None,
+                    due_at: None,
+                }]
+            } else {
+                Vec::new()
+            })
+        })
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_bill_that_repeats_an_open_task_is_told_about_it_and_may_name_it(db: PgPool) {
+    let answer = json!({
+        "en": "A bill.", "pt-PT": "Uma fatura.", "es-ES": "Una factura.", "fr": "Une facture.",
+        "lapses_at": null, "due_on": null, "items": [],
+        "asks": [{"title": "Pay Acme Hosting", "quote": "Payment due by 30 October",
+                  "due": "2026-10-30", "verb": "pay", "amount_minor": null,
+                  "amount_currency": null, "same_as": "task-17"}]
+    });
+    let server = complete(&answer).await;
+    let kit = kit(db, &server)
+        .await
+        .with_open_tasks(std::sync::Arc::new(HostingBill));
+    sams_needs(&kit).await;
+
+    // The model is shown the task for the hosting company's bill, and for
+    // nobody else's.
+    let given = inputs(&server).await;
+    assert_eq!(given.len(), 3);
+    for input in &given {
+        let bill = input["email"]["from"] == "Acme Hosting";
+        assert_eq!(
+            input["open_tasks"].as_array().unwrap().len(),
+            usize::from(bill)
+        );
+        if bill {
+            assert_eq!(input["open_tasks"][0]["task_ref"], "task-17");
+            assert_eq!(input["open_tasks"][0]["title"], "Pay the hosting bill");
+        }
+    }
+    // Its ask says it is the same one, and the event carries only the
+    // reference.
+    let asks: Value = sqlx::query_scalar(
+        "SELECT s.asks FROM conversations.message_reads s
+           JOIN conversations.messages m ON m.id = s.message_id
+          WHERE m.provider_message_id = 'needs-3' AND s.layer = 'model'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(asks[0]["same_as"], "task-17");
+    let events = kit.events("conversations.message_read").await;
+    let bill = events
+        .iter()
+        .find(|e| !e["asks"].as_array().unwrap().is_empty())
+        .unwrap();
+    assert_eq!(bill["asks"][0]["same_as"], "task-17");
+    assert!(!bill.to_string().contains("hosting bill"));
+}
+
+/// Members' time zones as the schedule module would answer: Sam is in Lisbon.
+#[derive(Debug)]
+struct Lisbon;
+
+impl TimeZones for Lisbon {
+    fn time_zone<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        _workspace: WorkspaceId,
+        _member: campbooks_kernel::tenancy::UserId,
+    ) -> TimeZoneFuture<'a> {
+        Box::pin(async { Ok(Some("Europe/Lisbon".to_owned())) })
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_model_is_told_the_zone_of_the_inboxes_owner_and_utc_for_a_shared_one(db: PgPool) {
+    let server = complete(&good()).await;
+    let kit = kit(db, &server)
+        .await
+        .with_time_zones(std::sync::Arc::new(Lisbon));
+    // Sam's own inbox.
+    sams_needs(&kit).await;
+    let own = inputs(&server).await;
+    assert!(!own.is_empty());
+    assert!(
+        own.iter()
+            .all(|input| input["time_zone"] == "Europe/Lisbon")
+    );
+
+    // An inbox Sam and Leo both read has no single owner.
+    let workspace = WorkspaceId::new();
+    let (_, sam) = kit.member("sam2", workspace);
+    let (_, leo) = kit.member("leo2", workspace);
+    let shared = kit
+        .inbox(
+            workspace,
+            "team@example.com",
+            &[(sam, InboxRole::Manager), (leo, InboxRole::Reader)],
+        )
+        .await;
+    let before = calls(&server).await;
+    kit.ingest(workspace, shared, "needs").await;
+    let all = inputs(&server).await;
+    assert!(all.len() > before);
+    assert!(
+        all[before..]
+            .iter()
+            .all(|input| input["time_zone"] == "UTC")
+    );
+    // Nothing from a shared inbox names an owner.
+    let events = kit.events("conversations.message_read").await;
+    assert!(events[before..].iter().all(|e| e.get("owner").is_none()));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reply_takes_the_due_date_scout_reads_and_a_do_takes_its_ask_s(db: PgPool) {
+    let mut answer = good();
+    answer["due_on"] = json!("2026-10-14");
+    let server = complete(&answer).await;
+    let kit = kit(db, &server).await;
+    sams_needs(&kit).await;
+    // Marta's reply is due when the read says; Pedro's lease (a `do`, whose
+    // date comes from its ask) and the bill (a `pay`) take nothing from it.
+    let (_, _, due_on, _) = need_of(&kit, "needs-1").await;
+    assert_eq!(due_on, chrono::NaiveDate::from_ymd_opt(2026, 10, 14));
+    assert_eq!(need_of(&kit, "needs-2").await.2, None);
+    assert_eq!(need_of(&kit, "needs-3").await.2, None);
 }
 
 /// The upgrade's needs backfill of `inbox`, as the migration queues it and
