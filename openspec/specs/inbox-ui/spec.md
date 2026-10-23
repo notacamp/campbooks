@@ -153,7 +153,8 @@ bottom of the reader after the thread and never between or after its
 messages in the flow, with Reply (R), Reply all (Shift+R) and Forward (F) that
 tell the slot which message to answer and how; without a composer those
 actions SHALL be hidden. From 48rem Reply, Reply all and Forward SHALL sit
-together in the reader's header, in that order and in one style, and the
+together in the reader's header right after Done, in that order and in one
+style, so they stay on its first row when the header wraps, and the
 pinned area SHALL hold only the open composer: it stays in view while the
 thread scrolls under it, growing upward to 60% of the window's height and
 then scrolling inside itself; while the composer is closed nothing SHALL be
@@ -174,7 +175,7 @@ composer directly.
 
 #### Scenario: Reply beside Reply all and Forward
 - **WHEN** the member opens a conversation at 1280px
-- **THEN** the reader's header shows Reply (R), Reply all (Shift+R) and Forward (F) side by side, and no "Reply to <name>" button sits at the bottom of the reader
+- **THEN** the reader's header shows Done, then Reply (R), Reply all (Shift+R) and Forward (F) side by side on its first row, and no "Reply to <name>" button sits at the bottom of the reader
 
 #### Scenario: A long thread on a desktop
 - **WHEN** the member opens a twelve-message thread at 1440px and scrolls it

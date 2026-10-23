@@ -441,6 +441,7 @@ export function ConversationReader({
   const unread = conversation.unread_count > 0;
   const replyButtons =
     renderReplySlot === undefined ? null : (
+      // Done's neighbours, so they stay on the first row when the header wraps.
       // Phones: Reply is the floating bar's.
       <span className="flex flex-wrap gap-1 max-md:hidden">
         <Button
@@ -505,6 +506,7 @@ export function ConversationReader({
                 </Button>
               </span>
             )}
+            {replyButtons}
             {trashTo === "trash" ? (
               <IconButton
                 label={t("actions.delete")}
@@ -548,7 +550,6 @@ export function ConversationReader({
             />
           </>
         ) : null}
-        {replyButtons}
         {renderReplySlot === undefined ? null : (
           // Phones: Reply is in the floating bar; these two stay in the header.
           <span className="flex gap-1 md:hidden">

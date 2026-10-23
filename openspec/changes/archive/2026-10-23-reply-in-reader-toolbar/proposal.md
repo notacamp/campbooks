@@ -12,7 +12,9 @@ one was the farthest from the others.
 ## What changes
 
 - From 48rem Reply (R) sits in the reader's header, right before Reply all
-  and Forward, in the same style. The three stay together.
+  and Forward, in the same style. The three stay together, right after
+  Done: when the header is too narrow for one row, Delete, Spam, Pin,
+  Unread and Move wrap, not the ways to answer.
 - The footer pinned at the bottom holds only the open composer. While the
   composer is closed nothing is pinned there, so the thread gets that room.
 - Phones are unchanged: Reply and Done float above the tab bar, and Reply
