@@ -29,4 +29,4 @@
 - [x] 5.1 `cargo xtask openapi` regenerated; client types regenerated
 - [x] 5.2 `docs/self-hosting` note: the IMAP settings and the password-at-rest trade-off
 - [x] 5.3 Changelog entry `changelog/unreleased/added/310-imap-connection.md`
-- [ ] 5.4 Gates green in CI; vhs terminal recording of discover + connect against the fake servers in the PR
+- [x] 5.4 Gates green in CI; vhs terminal recording (schema and row-level security on a throwaway database, then the CI run of discover + connect against the fake servers) in the PR
