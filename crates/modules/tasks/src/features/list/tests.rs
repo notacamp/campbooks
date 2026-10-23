@@ -111,7 +111,7 @@ async fn ids_read_a_batch_and_leave_out_what_you_cannot_see(db: PgPool) {
     assert_eq!(titles(&batch.json), ["Mine"]);
 
     for bad in [
-        "".to_owned(),
+        String::new(),
         "not-an-id".to_owned(),
         vec![ids.clone(); 60].join(","),
     ] {

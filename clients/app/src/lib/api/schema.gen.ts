@@ -1535,6 +1535,144 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List your tasks. */
+        get: operations["tasks.list"];
+        put?: never;
+        /** Make a task. */
+        post: operations["tasks.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a task. */
+        get: operations["tasks.get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a task's title, verb or due date. */
+        patch: operations["tasks.update"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a task done (paid, for a bill). */
+        post: operations["tasks.done"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/hand_off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hand an open task to a teammate. */
+        post: operations["tasks.hand_off"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/not_needed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a task not needed. */
+        post: operations["tasks.not_needed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan a task: a day, Later, or nothing. */
+        post: operations["tasks.plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open a closed task again, with its plan. */
+        post: operations["tasks.reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/take_back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back a task you handed to someone, while it is open. */
+        post: operations["tasks.take_back"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -3005,6 +3143,16 @@ export interface components {
             /** @description Returned unchanged. */
             state?: string | null;
         };
+        /** @description Who to hand it to. */
+        HandOffTo: {
+            /**
+             * Format: int64
+             * @description The revision you saw.
+             */
+            revision: number;
+            /** @description A member of the workspace. */
+            to: components["schemas"]["UserId"];
+        };
         /** @description A header test: present, or equal to a value. */
         HeaderCondition: {
             /** @description Which header. */
@@ -3064,6 +3212,11 @@ export interface components {
             /** @description Oldest first. */
             items: components["schemas"]["HeldGrant"][];
         };
+        /**
+         * Format: uuid
+         * @description HistoryId (UUIDv7)
+         */
+        HistoryId: string;
         /** @description One result: a record the caller may open, with what a list row shows. */
         Hit: {
             /** @description Its container (an inbox). */
@@ -3586,6 +3739,28 @@ export interface components {
          * @enum {string}
          */
         NewRuleState: "active" | "proposed";
+        /** @description A new task. */
+        NewTask: {
+            /**
+             * Format: date-time
+             * @description The time it is due; needs `due_on`, its local day.
+             */
+            due_at?: string | null;
+            /**
+             * Format: date
+             * @description The day it is due.
+             */
+            due_on?: string | null;
+            source?: components["schemas"]["RecordRef"] | null;
+            /**
+             * @description The address of the source's sender, kept to recognise the same
+             *     sender's other tasks.
+             */
+            source_sender?: string | null;
+            /** @description What to do: 1 to 200 characters. */
+            title: string;
+            verb?: components["schemas"]["TaskVerb"] | null;
+        };
         /**
          * @description Why there is nothing to offer.
          * @enum {string}
@@ -3720,6 +3895,26 @@ export interface components {
          * @enum {string}
          */
         Phase: "backfill" | "incremental" | "resync";
+        /** @description The plan the task should have. */
+        PlanTask: {
+            /**
+             * Format: date-time
+             * @description Later than now and less than a year away, for `later`.
+             */
+            later_until?: string | null;
+            /** @description `none`, `date` or `later`. */
+            plan: components["schemas"]["TaskPlan"];
+            /**
+             * Format: date
+             * @description The day, for `date`.
+             */
+            plan_on?: string | null;
+            /**
+             * Format: int64
+             * @description The revision you saw.
+             */
+            revision: number;
+        };
         /** @description A rule to preview. */
         PreviewRule: {
             /** @description What it would do. */
@@ -4904,6 +5099,196 @@ export interface components {
              * @description How many streams will run now.
              */
             streams: number;
+        };
+        /**
+         * @description Who made a change.
+         * @enum {string}
+         */
+        TaskActor: "member" | "scout" | "calendar";
+        /**
+         * @description What changed: the event's `change` and the history's `what`.
+         * @enum {string}
+         */
+        TaskChange: "created" | "edited" | "due_changed" | "planned" | "done" | "not_needed" | "reopened" | "handed_off" | "taken_back";
+        /** @description A task and its history. */
+        TaskDetail: {
+            /** @description What changed in it, oldest first. */
+            history: components["schemas"]["TaskHistoryEntry"][];
+            /** @description The task. */
+            task: components["schemas"]["TaskView"];
+        };
+        /**
+         * @description A field `tasks.update` changed.
+         * @enum {string}
+         */
+        TaskEditedField: "title" | "task_verb" | "due";
+        /**
+         * @description What a history entry holds besides its kind: ids, enums and dates only,
+         *     never a title.
+         */
+        TaskHistoryDetail: {
+            /**
+             * Format: date
+             * @description The due day afterwards.
+             */
+            due_on?: string | null;
+            /** @description The fields an edit changed. */
+            fields?: components["schemas"]["TaskEditedField"][];
+            /**
+             * Format: date-time
+             * @description When Later ends.
+             */
+            later_until?: string | null;
+            member?: components["schemas"]["UserId"] | null;
+            plan?: components["schemas"]["TaskPlan"] | null;
+            /**
+             * Format: date
+             * @description The planned day.
+             */
+            plan_on?: string | null;
+        };
+        /** @description One entry of a task's history. */
+        TaskHistoryEntry: {
+            /** @description Who: the member, Scout or the calendar. */
+            actor: components["schemas"]["TaskActor"];
+            actor_member?: components["schemas"]["UserId"] | null;
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @description Ids, enums and dates of the change. */
+            detail: components["schemas"]["TaskHistoryDetail"];
+            /** @description The entry. */
+            id: components["schemas"]["HistoryId"];
+            /** @description What changed. */
+            what: components["schemas"]["TaskChange"];
+        };
+        /**
+         * Format: uuid
+         * @description TaskId (UUIDv7)
+         */
+        TaskId: string;
+        /** @description The caller's tasks. */
+        TaskList: {
+            /** @description In order: overdue first, then by due date and time, then undated. */
+            tasks: components["schemas"]["TaskView"][];
+        };
+        /**
+         * @description How the task came to be.
+         * @enum {string}
+         */
+        TaskOrigin: "own" | "ask" | "deadline";
+        /**
+         * @description When the member will do it.
+         * @enum {string}
+         */
+        TaskPlan: "none" | "date" | "later";
+        /**
+         * @description The revision of a task the caller saw, for a change that needs nothing
+         *     else.
+         */
+        TaskRevision: {
+            /**
+             * Format: int64
+             * @description The revision you saw.
+             */
+            revision: number;
+        };
+        /**
+         * @description Whether it still needs doing.
+         * @enum {string}
+         */
+        TaskState: "open" | "done" | "not_needed";
+        /** @description The task as it should become. */
+        TaskUpdate: {
+            /**
+             * Format: date-time
+             * @description The time it is due; needs `due_on`.
+             */
+            due_at?: string | null;
+            /**
+             * Format: date
+             * @description The day it is due; none clears it.
+             */
+            due_on?: string | null;
+            /**
+             * Format: int64
+             * @description The revision you saw.
+             */
+            revision: number;
+            /** @description What to do: 1 to 200 characters. */
+            title: string;
+            /** @description Do or Pay. */
+            verb: components["schemas"]["TaskVerb"];
+        };
+        /**
+         * @description What kind of thing it is: something to do, or a bill to pay.
+         * @enum {string}
+         */
+        TaskVerb: "do" | "pay";
+        /** @description A task, as the caller sees it. */
+        TaskView: {
+            /** @description The member it is with. */
+            assignee: components["schemas"]["UserId"];
+            /**
+             * Format: date-time
+             * @description When it was closed.
+             */
+            closed_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When it was made.
+             */
+            created_at: string;
+            /** @description The member who made it. */
+            created_by: components["schemas"]["UserId"];
+            /**
+             * Format: date-time
+             * @description The time it is due, when it has one (`due_on` is its local day).
+             */
+            due_at?: string | null;
+            /**
+             * Format: date
+             * @description The day it is due.
+             */
+            due_on?: string | null;
+            handed_by?: components["schemas"]["UserId"] | null;
+            /** @description The task. */
+            id: components["schemas"]["TaskId"];
+            /**
+             * Format: date-time
+             * @description When Later ends, for `later`.
+             */
+            later_until?: string | null;
+            /** @description How it came to be. */
+            origin: components["schemas"]["TaskOrigin"];
+            /** @description Whether it is open and its due day has passed (the caller's today). */
+            overdue: boolean;
+            /** @description The plan. A Later that has ended reads as `none`. */
+            plan: components["schemas"]["TaskPlan"];
+            /**
+             * Format: date
+             * @description The planned day, for `date`.
+             */
+            plan_on?: string | null;
+            /**
+             * Format: int64
+             * @description Grows with every change: send the one you saw with a change.
+             */
+            revision: number;
+            source?: components["schemas"]["RecordRef"] | null;
+            /** @description Open, done or not needed. */
+            state: components["schemas"]["TaskState"];
+            /** @description What to do, in the member's words. */
+            title: string;
+            /**
+             * Format: date-time
+             * @description When it last changed.
+             */
+            updated_at: string;
+            /** @description Do or Pay. */
+            verb: components["schemas"]["TaskVerb"];
         };
         /**
          * Format: uuid
@@ -11125,6 +11510,692 @@ export interface operations {
             };
             /** @description No such workspace or inbox, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.list": {
+        parameters: {
+            query?: {
+                /**
+                 * @description `open` (the default), `done` or `not_needed`. Ignored when `ids`
+                 *     names the tasks, unless given.
+                 */
+                state?: "open" | "done" | "not_needed";
+                /** @description Due on or after this day. */
+                due_from?: string;
+                /** @description Due on or before this day. */
+                due_to?: string;
+                /** @description Only open tasks whose due day has passed. */
+                overdue?: boolean;
+                /** @description Only tasks with no due day. */
+                undated?: boolean;
+                /** @description Only tasks from this record type (with `source_id`). */
+                source_type?: string;
+                /** @description Only tasks from this record. */
+                source_id?: string;
+                /** @description `mine` (default) or `handed_off`. */
+                whose?: "mine" | "handed_off";
+                /**
+                 * @description 1 to 100 task ids, separated by commas: Home's batch read. Tasks the
+                 *     caller cannot see are left out.
+                 */
+                ids?: string;
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's tasks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskList"];
+                };
+            };
+            /** @description Ids that are not 1 to 100 task ids (`invalid_ids`), or an offset beyond 14 hours (`invalid_offset`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTask"];
+            };
+        };
+        responses: {
+            /** @description The task. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description A blank or too long title (`invalid_title`), a due time without a day, or a bad sender address. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or a source you cannot see. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The task and its history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description A blank or too long title (`invalid_title`), or a due time without a day. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.hand_off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandOffTo"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description Not a member of the workspace (`not_a_member`), or yourself (`hand_off_yourself`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.not_needed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanTask"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description A `date` plan without a day (`plan_needs_day`), or a `later` time in the past or over a year away (`invalid_later`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is closed (`task_closed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), or it is still open (`task_open`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.take_back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you did not hand it off (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), it is closed (`task_closed`) or was not handed to anyone (`not_handed_off`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
