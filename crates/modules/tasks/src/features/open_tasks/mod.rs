@@ -12,6 +12,9 @@ use sqlx::{PgConnection, types::Uuid};
 
 use crate::domain::TaskId;
 
+/// An open task's columns: id, title, due day, due time.
+type OpenRow = (TaskId, String, Option<NaiveDate>, Option<DateTime<Utc>>);
+
 /// The port, for the server to register.
 pub fn open_tasks() -> OpenTasksPort {
     Arc::new(OpenTaskReader)
@@ -32,22 +35,21 @@ impl OpenTasks for OpenTaskReader {
     ) -> OpenTasksFuture<'a> {
         Box::pin(async move {
             let sender = sender_address.trim().to_lowercase();
-            let rows: Vec<(TaskId, String, Option<NaiveDate>, Option<DateTime<Utc>>)> =
-                sqlx::query_as(
-                    "SELECT id, title, due_on, due_at FROM tasks.tasks
+            let rows: Vec<OpenRow> = sqlx::query_as(
+                "SELECT id, title, due_on, due_at FROM tasks.tasks
                   WHERE workspace_id = $1 AND state = 'open'
                     AND ((source_type = 'conversations.conversation' AND source_id = $3)
                          OR ($4 <> '' AND source_container = $2 AND source_sender = $4))
                   ORDER BY created_at DESC, id DESC
                   LIMIT $5",
-                )
-                .bind(workspace.as_uuid())
-                .bind(inbox.to_string())
-                .bind(conversation.to_string())
-                .bind(&sender)
-                .bind(i64::try_from(MAX_OPEN_TASKS).unwrap_or(10))
-                .fetch_all(conn)
-                .await?;
+            )
+            .bind(workspace.as_uuid())
+            .bind(inbox.to_string())
+            .bind(conversation.to_string())
+            .bind(&sender)
+            .bind(i64::try_from(MAX_OPEN_TASKS).unwrap_or(10))
+            .fetch_all(conn)
+            .await?;
             Ok(rows
                 .into_iter()
                 .map(|(id, title, due_on, due_at)| OpenTask {
