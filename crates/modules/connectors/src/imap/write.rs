@@ -7,25 +7,30 @@
 //! leave, for the run to record before it reads.
 //!
 //! - `UNREAD` / `STARRED`: `\Seen` / `\Flagged` off or on, on every copy
-//!   (`UID STORE … ±FLAGS.SILENT`); with CONDSTORE, `UNCHANGEDSINCE` the
-//!   modseq the folder was last read at, so a later change at the server
-//!   wins (`[MODIFIED …]`: `superseded`).
+//!   (`UID STORE … ±FLAGS.SILENT`, read back); with CONDSTORE,
+//!   `UNCHANGEDSINCE` the modseq the folder was last read at, so a later
+//!   change at the server wins (`[MODIFIED …]`: `superseded`).
 //! - `INBOX` off: the copies in the Inbox or a stream folder to Archive; on:
 //!   the copies in Archive to the Inbox (or a member's folder's copied).
-//! - `TRASH` / `SPAM` on: every other copy to Trash / Junk; off: those
-//!   copies to the Inbox for mail the inbox received, else to Sent (or
-//!   Archive).
+//! - `TRASH` / `SPAM` on: the copies in the Inbox, a stream folder, Archive
+//!   (and the other bin) to Trash / Junk, where each was kept (bound into the
+//!   change, as Zoho's); the member's own folders and Sent are left alone.
+//!   Off: those copies back where they were, else to the Inbox for mail the
+//!   inbox received, else to Sent (or Archive).
 //! - `mark:<stream>`: the inbox copies to that stream's folder
-//!   (`Campbooks/<Stream>`, created and subscribed first when the server
-//!   has none); every mark off: to the Inbox.
+//!   (`Campbooks/<Stream>`, created and subscribed first when a move needs
+//!   it and the server has none); every mark off: to the Inbox.
 //!
-//! A move is `UID MOVE` (RFC 6851), else `UID COPY`, `UID STORE
-//! +FLAGS.SILENT (\Deleted)` and `UID EXPUNGE` of those UIDs only (UIDPLUS,
-//! RFC 4315), else not made (`unsupported_here`). Nothing here ever sends
-//! `EXPUNGE` without UIDs, `CLOSE`, `DELETE` or `RENAME`. A folder whose
-//! UIDVALIDITY is not the copies' is not written; a UID the server no longer
-//! has is dropped, and looked up by the next complete read. Logs carry ids
-//! and counts only.
+//! A move is `UID MOVE` (RFC 6851), else (UIDPLUS, RFC 4315) `UID COPY`,
+//! then, only for the UIDs its `COPYUID` names, `UID STORE +FLAGS.SILENT
+//! (\Deleted)` and `UID EXPUNGE` of those UIDs; never when another message
+//! of the folder is already `\Deleted` (it would ride along on a server that
+//! expunges more than it is asked). Else it is not made
+//! (`unsupported_here`). Nothing here ever sends `EXPUNGE` without UIDs,
+//! `CLOSE`, `DELETE` or `RENAME`; a written folder is left with `UNSELECT`,
+//! or `EXAMINE` of it. A folder whose UIDVALIDITY is not the copies' is not
+//! written; a UID the server no longer has is dropped, and looked up by the
+//! next complete read. Logs carry ids, codes and counts only.
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
@@ -57,9 +62,15 @@ use crate::{
 /// Most UIDs one command names.
 pub const UID_CHUNK: usize = 500;
 
-/// The reason a move the server cannot make (neither MOVE nor UIDPLUS)
-/// ends with.
+/// The reason a move the server cannot make safely (neither MOVE nor
+/// UIDPLUS, or another message of the folder already `\Deleted`) ends with.
 pub const UNSUPPORTED_HERE: &str = "unsupported_here";
+
+/// The prefix of a restore token: the folder a trashed copy was in.
+const FROM: &str = "from:";
+
+/// Most UIDs a `UID SEARCH DELETED` answer is read into.
+const MAX_DELETED: usize = 100_000;
 
 /// Whether a change may put on or take off `token` at an IMAP server: read,
 /// starred, the inbox, the trash, spam and stream marks only.
@@ -75,6 +86,9 @@ pub enum Trouble {
     Busy,
     /// The session was cut short, and must not be used again.
     Wire(WireError),
+    /// The server did something it was not asked to (a stable code): the
+    /// push stops there.
+    Hostile(&'static str),
 }
 
 /// What a push did, for the run to record before it reads.
@@ -149,6 +163,8 @@ struct Places {
     trash: Option<String>,
     archive: Option<String>,
     streams: BTreeMap<ProviderStream, String>,
+    /// Every folder read, with its role.
+    roles: HashMap<String, Role>,
 }
 
 impl Places {
@@ -167,7 +183,21 @@ impl Places {
             trash: name(Role::Trash),
             archive: name(Role::Archive),
             streams,
+            roles: cursor
+                .folders
+                .iter()
+                .map(|f| (f.name.clone(), f.role))
+                .collect(),
         }
+    }
+
+    /// The folder a restore token names, while it is read and not a bin.
+    fn restored(&self, token: &str) -> Option<String> {
+        let folder = token.strip_prefix(FROM)?;
+        self.roles
+            .get(folder)
+            .filter(|role| !matches!(role, Role::Trash | Role::Junk))
+            .map(|_| folder.to_owned())
     }
 }
 
@@ -180,6 +210,9 @@ struct Ops {
     moves: Vec<(Place, String)>,
     /// Copies to copy, and where to.
     copies: Vec<(Place, String)>,
+    /// Where the copies a trash change moves were (`from:<folder>`), for
+    /// untrash to put them back.
+    origins: Vec<String>,
     /// Part of it has nowhere to go (a place the reader does not track, or
     /// no copy to move): that part is not made.
     unmovable: bool,
@@ -207,12 +240,19 @@ const fn in_inbox(role: Role) -> bool {
 
 /// What `change` (tokens to put on and take off) asks of the server for a
 /// message whose copies are `held`, in a mailbox whose places are `places`
-/// (`can_move`: the server offers MOVE or UIDPLUS).
+/// (`can_move`: the server offers MOVE or UIDPLUS; `restore`: where its
+/// copies were before Campbooks put it in the trash, as bound).
 #[allow(
     clippy::too_many_lines,
     reason = "one table of intents to moves, read top to bottom"
 )]
-fn ops(change: &LabelChange, held: &[Located], places: &Places, can_move: bool) -> Ops {
+fn ops(
+    change: &LabelChange,
+    held: &[Located],
+    places: &Places,
+    can_move: bool,
+    restore: Option<&[String]>,
+) -> Ops {
     let (add, remove) = change;
     let adds = |token: &str| add.iter().any(|l| l == token);
     let removes = |token: &str| remove.iter().any(|l| l == token);
@@ -252,27 +292,43 @@ fn ops(change: &LabelChange, held: &[Located], places: &Places, can_move: bool) 
         .find(|(token, role)| removes(token) && any(&|r| r == *role))
         .map(|(_, role)| role);
     if adds("TRASH") || adds("SPAM") {
-        let (role, to) = if adds("TRASH") {
-            (Role::Trash, &places.trash)
+        let trash = adds("TRASH");
+        let (role, other, to) = if trash {
+            (Role::Trash, Role::Junk, &places.trash)
         } else {
-            (Role::Junk, &places.junk)
+            (Role::Junk, Role::Trash, &places.junk)
         };
-        moving.extend(
-            held.iter()
-                .filter(|c| c.role != role)
-                .map(|c| (c, to.clone())),
-        );
+        // The inbox, Archive and the other bin; never the member's own
+        // folders or Sent.
+        let binned: Vec<&Located> = held
+            .iter()
+            .filter(|c| c.role != role)
+            .filter(|c| in_inbox(c.role) || matches!(c.role, Role::Archive) || c.role == other)
+            .collect();
+        if binned.is_empty() && !held.iter().any(|c| c.role == role) {
+            ops.unmovable = true;
+        }
+        if trash {
+            ops.origins = binned
+                .iter()
+                .map(|c| format!("{FROM}{}", c.place.folder))
+                .collect();
+        }
+        moving.extend(binned.into_iter().map(|c| (c, to.clone())));
     } else if let Some(bin) = bin_out {
-        let to = if adds("INBOX") {
+        let fallback = if adds("INBOX") {
             inbox_place.clone()
         } else {
             places.sent.clone().or_else(|| places.archive.clone())
         };
-        moving.extend(
-            held.iter()
-                .filter(|c| c.role == bin)
-                .map(|c| (c, to.clone())),
-        );
+        let mut back = restore
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|token| places.restored(token));
+        for copy in held.iter().filter(|c| c.role == bin) {
+            let to = back.next().or_else(|| fallback.clone());
+            moving.push((copy, to));
+        }
     } else if removes("INBOX") && any(&in_inbox) {
         moving.extend(
             held.iter()
@@ -350,13 +406,20 @@ struct Wrote {
     placed: Vec<Placed>,
     /// Copies the server no longer has.
     gone: HashSet<Place>,
-    /// Messages a write of the server refused.
+    /// Messages a write of the server refused, or did not make as asked.
     refused: HashSet<String>,
     /// Messages changed at the server since their folder was last read.
     modified: HashSet<String>,
     /// Messages not (all) written: a stale UIDVALIDITY, a folder that would
     /// not open, or the push stopped before them. They wait for a later run.
     left: HashSet<String>,
+    /// Messages whose move this server cannot make safely.
+    unsupported: HashSet<String>,
+    /// Where messages a trash change moved were, per message.
+    origins: HashMap<String, Vec<String>>,
+    /// Somewhere a copy may be that is not recorded: the next complete read
+    /// looks for it.
+    recheck: bool,
 }
 
 /// Everything a push needs.
@@ -382,6 +445,33 @@ enum Hierarchy {
     Known(Option<char>),
     /// The server would not say.
     Unknown,
+}
+
+/// The merged plan of `backlog`, flags written whatever the index says (it
+/// may be behind the server), and anything of a message with no recorded
+/// copy left unsure.
+fn planned(backlog: &Backlog, copies: &HashMap<String, Vec<Located>>) -> Plan {
+    let mut plan = Plan::merge(backlog);
+    let unsure: HashSet<(String, String)> = plan
+        .wants
+        .iter()
+        .flat_map(|(message, labels)| {
+            let located = copies.contains_key(message);
+            labels
+                .keys()
+                .filter(move |label| !located || matches!(label.as_str(), "UNREAD" | "STARRED"))
+                .map(move |label| (message.clone(), label.clone()))
+        })
+        .collect();
+    plan.in_place(backlog, Some(&unsure));
+    plan.atomic();
+    plan
+}
+
+/// A stand-in name for `stream`'s folder while it does not exist: no
+/// server name holds a control character.
+fn placeholder(stream: ProviderStream) -> String {
+    format!("\u{1}{}", stream.as_str())
 }
 
 impl Writer<'_> {
@@ -414,30 +504,18 @@ impl Writer<'_> {
             .iter()
             .map(|(key, tokens)| (key.clone(), state::view(tokens, &self.cursor)))
             .collect();
-        let unmade = match self.make_folders(&viewed).await {
+        let can_move = caps.moves || caps.uidplus;
+        // The stream folders a move the plan makes needs and the server
+        // does not have: created first, and only those.
+        let needed = self.needed(&viewed, &copies, can_move);
+        let unmade = match self.make_folders(needed).await {
             Ok(unmade) => unmade,
             Err(trouble) => return Ok(self.stopped(backlog, pushed, trouble)),
         };
         let kept = without_marks(&viewed, &unmade, &mut pushed.push.outcome);
-        let mut plan = Plan::merge(&kept);
-        // Flags are written whatever the index says (it may be behind the
-        // server); so is anything of a message with no recorded copy.
-        let unsure: HashSet<(String, String)> = plan
-            .wants
-            .iter()
-            .flat_map(|(message, labels)| {
-                let located = copies.contains_key(message);
-                labels
-                    .keys()
-                    .filter(move |label| !located || matches!(label.as_str(), "UNREAD" | "STARRED"))
-                    .map(move |label| (message.clone(), label.clone()))
-            })
-            .collect();
-        plan.in_place(&kept, Some(&unsure));
-        plan.atomic();
+        let mut plan = planned(&kept, &copies);
 
         let places = Places::of(&self.cursor);
-        let can_move = caps.moves || caps.uidplus;
         let mut work: BTreeMap<String, FolderWork> = BTreeMap::new();
         let mut asked: HashMap<String, Ops> = HashMap::new();
         for (change, messages) in plan.groups() {
@@ -446,32 +524,33 @@ impl Writer<'_> {
                     // No copy recorded (yet): it waits for the read.
                     continue;
                 };
-                let wanted = ops(&change, held, &places, can_move);
+                let restore = kept.restore.get(&message).map(Vec::as_slice);
+                let wanted = ops(&change, held, &places, can_move, restore);
                 register(&mut work, &wanted, &message);
                 asked.insert(message, wanted);
             }
         }
         let mut wrote = Wrote::default();
         let mut trouble = None;
-        let mut selected = false;
+        let mut selected: Option<&String> = None;
         for (folder, todo) in &work {
             if trouble.is_some() {
                 wrote.left.extend(todo.messages.values().cloned());
                 continue;
             }
-            selected = true;
+            selected = Some(folder);
             if let Err(stop) = self.write_folder(folder, todo, caps, &mut wrote).await {
                 wrote.left.extend(todo.messages.values().cloned());
                 trouble = Some(stop);
             }
         }
-        if selected && caps.unselect && trouble.is_none() {
-            // Back to no folder, expunging nothing (never `CLOSE`).
-            let limits = self.small();
-            if let Err(stop) = self.command("UNSELECT", limits).await {
+        if let (Some(folder), None) = (selected, trouble) {
+            // Leave no folder selected, expunging nothing (never `CLOSE`).
+            if let Err(stop) = self.deselect(folder, caps).await {
                 trouble = Some(stop);
             }
         }
+        self.foreign(&copies, &mut wrote).await?;
         self.settle(
             backlog,
             &kept,
@@ -598,21 +677,46 @@ impl Writer<'_> {
         Ok(copies)
     }
 
-    /// Make the stream folders the winning changes of `viewed` move messages
-    /// to and the server does not have yet (each into the cursor). The
+    /// The streams whose folder a move of `viewed`'s plan would put a copy
+    /// in and the server does not have yet.
+    fn needed(
+        &self,
+        viewed: &Backlog,
+        copies: &HashMap<String, Vec<Located>>,
+        can_move: bool,
+    ) -> BTreeSet<ProviderStream> {
+        let mut places = Places::of(&self.cursor);
+        let missing: Vec<ProviderStream> = ProviderStream::ALL
+            .into_iter()
+            .filter(|stream| self.cursor.stream_folder(*stream).is_none())
+            .collect();
+        for stream in &missing {
+            places.streams.insert(*stream, placeholder(*stream));
+        }
+        let mut needed = BTreeSet::new();
+        for (change, messages) in planned(viewed, copies).groups() {
+            for message in messages {
+                let Some(held) = copies.get(&message) else {
+                    continue;
+                };
+                let restore = viewed.restore.get(&message).map(Vec::as_slice);
+                let wanted = ops(&change, held, &places, can_move, restore);
+                for (_, to) in wanted.moves.iter().chain(&wanted.copies) {
+                    if let Some(stream) = missing.iter().find(|s| placeholder(**s) == *to) {
+                        needed.insert(*stream);
+                    }
+                }
+            }
+        }
+        needed
+    }
+
+    /// Make the stream folders of `wanted` (each into the cursor). The
     /// streams whose folder could not be made, with why.
     async fn make_folders(
         &mut self,
-        viewed: &Backlog,
+        wanted: BTreeSet<ProviderStream>,
     ) -> Result<BTreeMap<ProviderStream, &'static str>, Trouble> {
-        let wanted: BTreeSet<ProviderStream> = Plan::merge(viewed)
-            .wants
-            .values()
-            .flat_map(BTreeMap::iter)
-            .filter(|(_, want)| want.present)
-            .filter_map(|(label, _)| marks::of_token(label))
-            .filter(|stream| self.cursor.stream_folder(*stream).is_none())
-            .collect();
         let mut unmade = BTreeMap::new();
         if wanted.is_empty() {
             return Ok(unmade);
@@ -706,6 +810,26 @@ impl Writer<'_> {
             return Err(Trouble::Busy);
         }
         Ok(Some(!existed))
+    }
+
+    /// Leave no folder selected, expunging nothing: `UNSELECT` (RFC 3691)
+    /// where offered, else `EXAMINE` of the folder last selected, which
+    /// closes it read-write without expunging. Never `CLOSE`.
+    async fn deselect(&mut self, folder: &str, caps: Caps) -> Result<(), Trouble> {
+        let limits = self.small();
+        let command = if caps.unselect {
+            "UNSELECT".to_owned()
+        } else {
+            let Some(name) = quoted(folder) else {
+                return Ok(());
+            };
+            format!("EXAMINE {name}")
+        };
+        let done = self.command(&command, limits).await?;
+        if done.is_busy() {
+            return Err(Trouble::Busy);
+        }
+        Ok(())
     }
 
     /// Make `todo` in `folder`: open it read-write, check its UIDVALIDITY,
@@ -840,18 +964,19 @@ impl Writer<'_> {
                             wrote.modified.insert(message.clone());
                         }
                     }
-                    // What the server holds now: one that says `OK` and
-                    // makes nothing is told apart, never retried.
+                    // What the server holds now: a flag it does not show as
+                    // written (or will not show at all) was not made, and is
+                    // never taken as made.
                     let now = self.flags_now(&taken).await?;
                     for uid in taken {
-                        let holds = now.get(&uid).is_none_or(|flags| made(*write, *flags));
+                        let holds = now.get(&uid).is_some_and(|flags| made(*write, *flags));
                         if holds {
                             checked.insert(uid);
                             wrote.stored.push((place(uid), *write));
                         } else if let Some(message) = todo.messages.get(&uid) {
                             tracing::info!(
                                 stream = %self.stream,
-                                "an IMAP server took a flag change without making it"
+                                "an IMAP server did not show a flag change as made"
                             );
                             wrote.refused.insert(message.clone());
                         }
@@ -962,10 +1087,46 @@ impl Writer<'_> {
         Ok(found)
     }
 
+    /// The UIDs of the open folder marked `\Deleted` (`UID SEARCH DELETED`);
+    /// `None` when the server will not say, or says more than is read.
+    async fn deleted(&mut self) -> Result<Option<HashSet<u32>>, Trouble> {
+        let mut found = HashSet::new();
+        let mut over = false;
+        let limits = Limits {
+            response: 16 * 1024 * 1024,
+            responses: 1_000,
+            total: 32 * 1024 * 1024,
+            time: self.timeout() * 2,
+        };
+        let done = self
+            .session
+            .command("UID SEARCH DELETED", limits, |untagged| {
+                if let Untagged::Search(uids) = untagged {
+                    if found.len().saturating_add(uids.len()) > MAX_DELETED {
+                        over = true;
+                    } else {
+                        found.extend(uids);
+                    }
+                }
+            })
+            .await
+            .map_err(Trouble::Wire)?;
+        if done.is_busy() {
+            return Err(Trouble::Busy);
+        }
+        Ok((done.is_ok() && !over).then_some(found))
+    }
+
     /// Move `uids` of the open folder to `to`: `UID MOVE`, or (UIDPLUS)
-    /// `UID COPY`, `\Deleted` and `UID EXPUNGE` of those UIDs only. A
-    /// failure after the copy takes `\Deleted` off again: the copies stay,
-    /// nothing is lost.
+    /// `UID COPY`, then for the UIDs its `COPYUID` names only, `\Deleted` and
+    /// `UID EXPUNGE` of those UIDs. Never while another message of the
+    /// folder is `\Deleted`; never `\Deleted` without a `COPYUID` naming the
+    /// copy. A failure after the mark takes it off again, from the UIDs this
+    /// push marked only: the copies stay, nothing is lost.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one move read top to bottom: guard, copy, mark, expunge, undo"
+    )]
     async fn move_to(
         &mut self,
         uids: &[u32],
@@ -979,15 +1140,57 @@ impl Writer<'_> {
             refuse(wrote, todo, uids);
             return Ok(());
         };
-        let set = sequence(uids);
         let limits = self.over(uids.len());
+        if caps.moves {
+            let mut copied = None;
+            let mut expunged = 0_usize;
+            let done = self
+                .session
+                .command(
+                    &format!("UID MOVE {} {dest}", sequence(uids)),
+                    limits,
+                    |untagged| {
+                        expunged = expunged.saturating_add(expunges(&untagged));
+                        copy_uid(&untagged, &mut copied);
+                    },
+                )
+                .await
+                .map_err(Trouble::Wire)?;
+            if done.is_busy() {
+                return Err(Trouble::Busy);
+            }
+            if !done.is_ok() {
+                refuse(wrote, todo, uids);
+                return Ok(());
+            }
+            let copied = copied.or_else(|| copy_map(done.code.as_ref()));
+            placed(wrote, uids, to, copied.as_ref(), place, true);
+            return guard_expunged(expunged, uids.len());
+        }
+        // UIDPLUS. Another message of the folder already `\Deleted` (the
+        // member's, in another app) would go with ours on a server that
+        // expunges more than it is asked: no move here.
+        let Some(deleted) = self.deleted().await? else {
+            unsupported(wrote, todo, uids);
+            return Ok(());
+        };
+        let ours: HashSet<u32> = uids.iter().copied().collect();
+        if deleted.iter().any(|uid| !ours.contains(uid)) {
+            tracing::info!(
+                stream = %self.stream,
+                "an IMAP folder holds messages marked deleted elsewhere: no copy-and-expunge move there"
+            );
+            unsupported(wrote, todo, uids);
+            return Ok(());
+        }
         let mut copied = None;
-        let verb = if caps.moves { "MOVE" } else { "COPY" };
         let done = self
             .session
-            .command(&format!("UID {verb} {set} {dest}"), limits, |untagged| {
-                copy_uid(&untagged, &mut copied);
-            })
+            .command(
+                &format!("UID COPY {} {dest}", sequence(uids)),
+                limits,
+                |untagged| copy_uid(&untagged, &mut copied),
+            )
             .await
             .map_err(Trouble::Wire)?;
         if done.is_busy() {
@@ -998,37 +1201,140 @@ impl Writer<'_> {
             return Ok(());
         }
         let copied = copied.or_else(|| copy_map(done.code.as_ref()));
-        if caps.moves {
-            placed(wrote, uids, to, copied.as_ref(), place, true);
+        // Only what the server says it copied is ever marked: no `COPYUID`
+        // (which a UIDPLUS server owes), or a UID it does not name, is a
+        // copy that may not exist.
+        let named: HashSet<u32> = copied
+            .as_ref()
+            .map(|(_, map)| map.keys().copied().collect())
+            .unwrap_or_default();
+        let (covered, unnamed): (Vec<u32>, Vec<u32>) =
+            uids.iter().copied().partition(|uid| named.contains(uid));
+        if !unnamed.is_empty() {
+            tracing::warn!(
+                stream = %self.stream,
+                unnamed = unnamed.len(),
+                "an IMAP server copied without naming every copy: the originals are kept"
+            );
+            placed(wrote, &unnamed, to, None, place, false);
+            refuse(wrote, todo, &unnamed);
+            wrote.recheck = true;
+        }
+        if covered.is_empty() {
             return Ok(());
         }
-        // UIDPLUS: the originals are marked, then expunged by UID.
+        let set = sequence(&covered);
         let marked = self
             .command(
                 &format!("UID STORE {set} +FLAGS.SILENT (\\Deleted)"),
                 limits,
             )
             .await?;
-        let expunged = if marked.is_ok() {
-            Some(self.command(&format!("UID EXPUNGE {set}"), limits).await?)
+        let mut expunged = 0_usize;
+        let swept = if marked.is_ok() {
+            let done = self
+                .session
+                .command(&format!("UID EXPUNGE {set}"), limits, |untagged| {
+                    expunged = expunged.saturating_add(expunges(&untagged));
+                })
+                .await
+                .map_err(Trouble::Wire)?;
+            Some(done)
         } else {
             None
         };
-        if expunged.as_ref().is_some_and(Done::is_ok) {
-            placed(wrote, uids, to, copied.as_ref(), place, true);
+        if swept.as_ref().is_some_and(Done::is_ok) {
+            placed(wrote, &covered, to, copied.as_ref(), place, true);
+            return guard_expunged(expunged, covered.len());
+        }
+        // The copies are made; the originals stay as they were: the mark
+        // comes off the UIDs this push marked, never one marked before.
+        let undo: Vec<u32> = covered
+            .iter()
+            .copied()
+            .filter(|uid| !deleted.contains(uid))
+            .collect();
+        if !undo.is_empty() {
+            let _ = self
+                .command(
+                    &format!("UID STORE {} -FLAGS.SILENT (\\Deleted)", sequence(&undo)),
+                    limits,
+                )
+                .await?;
+        }
+        placed(wrote, &covered, to, copied.as_ref(), place, false);
+        refuse(wrote, todo, &covered);
+        if marked.is_busy() || swept.as_ref().is_some_and(Done::is_busy) {
+            return Err(Trouble::Busy);
+        }
+        Ok(())
+    }
+
+    /// Forget a moved copy's new place when it is already recorded for
+    /// another message, or named twice (a `COPYUID` that would overwrite a
+    /// location): the next complete read looks for it.
+    async fn foreign(
+        &self,
+        copies: &HashMap<String, Vec<Located>>,
+        wrote: &mut Wrote,
+    ) -> Result<(), ReadError> {
+        let key_of: HashMap<&Place, &str> = copies
+            .values()
+            .flatten()
+            .map(|copy| (&copy.place, copy.location.key.as_str()))
+            .collect();
+        let mut named: HashMap<Place, usize> = HashMap::new();
+        for at in wrote.placed.iter().filter_map(|p| p.at.as_ref()) {
+            *named.entry(at.clone()).or_default() += 1;
+        }
+        if named.is_empty() {
             return Ok(());
         }
-        // The copies are made; the originals stay as they were.
-        let _ = self
-            .command(
-                &format!("UID STORE {set} -FLAGS.SILENT (\\Deleted)"),
-                limits,
-            )
-            .await?;
-        placed(wrote, uids, to, copied.as_ref(), place, false);
-        refuse(wrote, todo, uids);
-        if marked.is_busy() || expunged.as_ref().is_some_and(Done::is_busy) {
-            return Err(Trouble::Busy);
+        let folders: Vec<String> = named.keys().map(|p| p.folder.clone()).collect();
+        let uids: Vec<i64> = named.keys().map(|p| i64::from(p.uid)).collect();
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        let rows: Vec<(String, i64, i64, String)> = sqlx::query_as(
+            "SELECT folder, uidvalidity, uid, message_key FROM connectors.imap_locations
+              WHERE stream_id = $1 AND folder = ANY($2) AND uid = ANY($3)",
+        )
+        .bind(self.stream)
+        .bind(&folders)
+        .bind(&uids)
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        let held: HashMap<Place, String> = rows
+            .into_iter()
+            .filter_map(|(folder, uidvalidity, uid, key)| {
+                Some((
+                    Place {
+                        folder,
+                        uidvalidity: u32::try_from(uidvalidity).ok()?,
+                        uid: u32::try_from(uid).ok()?,
+                    },
+                    key,
+                ))
+            })
+            .collect();
+        let mut dropped = 0_usize;
+        for moved in &mut wrote.placed {
+            let Some(at) = moved.at.as_ref() else {
+                continue;
+            };
+            let ours = key_of.get(&moved.from).copied();
+            let taken = held.get(at).is_some_and(|key| Some(key.as_str()) != ours);
+            if taken || named.get(at).is_some_and(|n| *n > 1) {
+                moved.at = None;
+                dropped += 1;
+            }
+        }
+        if dropped > 0 {
+            tracing::warn!(
+                stream = %self.stream,
+                dropped,
+                "an IMAP server named new UIDs already taken: they are looked for instead"
+            );
+            wrote.recheck = true;
         }
         Ok(())
     }
@@ -1074,8 +1380,11 @@ impl Writer<'_> {
                 done.gone.insert(message.clone());
             } else {
                 done.written.insert(message.clone());
+                if !wanted.origins.is_empty() {
+                    done.restore.insert(message.clone(), wanted.origins.clone());
+                }
             }
-            if wanted.unsupported {
+            if wanted.unsupported || wrote.unsupported.contains(message) {
                 unsupported.insert(message.clone());
                 done.unmovable.insert(message.clone());
             } else if wanted.unmovable {
@@ -1085,6 +1394,7 @@ impl Writer<'_> {
         }
         let outcome = &mut pushed.push.outcome;
         plan.ends(kept, &done, outcome);
+        plan.restores(&done, outcome);
         // A change that only moves the message, and could not be: why.
         let place_only = |labels: &[String]| {
             labels.iter().all(|t| {
@@ -1110,7 +1420,12 @@ impl Writer<'_> {
                 if reason == UNSUPPORTED_HERE {
                     outcome.reemit.push(message.clone());
                 }
+                // Nothing moved: no place to put it back is kept.
+                outcome.restore.retain(|(row, _)| *row != change.id);
             }
+        }
+        if wrote.recheck {
+            self.cursor.recheck = true;
         }
         self.locations(backlog, copies, wrote, pushed);
         let outcome = &mut pushed.push.outcome;
@@ -1284,11 +1599,53 @@ fn made(write: FlagWrite, (seen, flagged): (bool, bool)) -> bool {
     (!names.contains("\\Seen") || seen == on) && (!names.contains("\\Flagged") || flagged == on)
 }
 
+/// How many messages `untagged` says were expunged (`EXPUNGE`, or the UIDs
+/// of a `VANISHED`).
+fn expunges(untagged: &Untagged<'_>) -> usize {
+    match untagged {
+        Untagged::Expunge(_) => 1,
+        Untagged::Vanished(ranges) => ranges
+            .iter()
+            .map(|(low, high)| {
+                usize::try_from(high - low)
+                    .unwrap_or(usize::MAX)
+                    .saturating_add(1)
+            })
+            .fold(0, usize::saturating_add),
+        _ => 0,
+    }
+}
+
+/// A server that says it expunged more messages than it was asked to is
+/// not written to again in this push.
+fn guard_expunged(expunged: usize, asked: usize) -> Result<(), Trouble> {
+    if expunged > asked {
+        tracing::error!(
+            code = "imap_expunged_more",
+            asked,
+            expunged,
+            "an IMAP server expunged more messages than it was asked to"
+        );
+        return Err(Trouble::Hostile("imap_expunged_more"));
+    }
+    Ok(())
+}
+
 /// The messages of `uids` (of `todo`'s folder) refused.
 fn refuse(wrote: &mut Wrote, todo: &FolderWork, uids: &[u32]) {
     for uid in uids {
         if let Some(message) = todo.messages.get(uid) {
             wrote.refused.insert(message.clone());
+        }
+    }
+}
+
+/// The messages of `uids` (of `todo`'s folder) this server cannot move
+/// safely.
+fn unsupported(wrote: &mut Wrote, todo: &FolderWork, uids: &[u32]) {
+    for uid in uids {
+        if let Some(message) = todo.messages.get(uid) {
+            wrote.unsupported.insert(message.clone());
         }
     }
 }
@@ -1330,8 +1687,9 @@ fn copy_uid(untagged: &Untagged<'_>, copied: &mut Option<(u32, HashMap<u32, u32>
     }
 }
 
-/// The destination UIDVALIDITY and each source UID's new UID a `COPYUID`
-/// code says; `None` for any other code, or sets that do not pair up.
+/// The destination UIDVALIDITY (non-zero) and each source UID's new UID a
+/// `COPYUID` code says; `None` for any other code, or sets that do not pair
+/// up or name a UID twice.
 fn copy_map(code: Option<&Code>) -> Option<(u32, HashMap<u32, u32>)> {
     let code = code.filter(|code| code.name == "COPYUID")?;
     let uidvalidity = code
@@ -1341,7 +1699,8 @@ fn copy_map(code: Option<&Code>) -> Option<(u32, HashMap<u32, u32>)> {
     let [from, to] = code.sets.as_slice() else {
         return None;
     };
-    if from.len() != to.len() {
+    let distinct = |set: &[u32]| set.iter().collect::<HashSet<_>>().len() == set.len();
+    if from.len() != to.len() || !distinct(from) || !distinct(to) {
         return None;
     }
     Some((
@@ -1383,6 +1742,7 @@ impl Trouble {
         match self {
             Self::Busy => "imap_busy",
             Self::Wire(err) => err.code(),
+            Self::Hostile(code) => code,
         }
     }
 }
@@ -1417,6 +1777,17 @@ mod tests {
             trash: Some("Trash".into()),
             archive: Some("Archive".into()),
             streams: [(ProviderStream::Updates, "Campbooks.Updates".to_owned())].into(),
+            roles: [
+                ("INBOX", Role::Inbox),
+                ("Sent", Role::Sent),
+                ("Junk", Role::Junk),
+                ("Trash", Role::Trash),
+                ("Archive", Role::Archive),
+                ("Bakery", Role::User),
+                ("Campbooks.Updates", Role::Stream),
+            ]
+            .map(|(name, role)| (name.to_owned(), role))
+            .into(),
         }
     }
 
@@ -1440,7 +1811,13 @@ mod tests {
             located("INBOX", 1, Role::Inbox, false, false),
             located("Bakery", 4, Role::User, false, false),
         ];
-        let read_and_star = ops(&change(&["STARRED"], &["UNREAD"]), &held, &places(), true);
+        let read_and_star = ops(
+            &change(&["STARRED"], &["UNREAD"]),
+            &held,
+            &places(),
+            true,
+            None,
+        );
         assert_eq!(
             read_and_star
                 .stores
@@ -1452,7 +1829,13 @@ mod tests {
                 (4, (true, "\\Seen \\Flagged"))
             ]
         );
-        let unread_and_star = ops(&change(&["UNREAD", "STARRED"], &[]), &held, &places(), true);
+        let unread_and_star = ops(
+            &change(&["UNREAD", "STARRED"], &[]),
+            &held,
+            &places(),
+            true,
+            None,
+        );
         assert_eq!(unread_and_star.stores.len(), 4);
         assert!(unread_and_star.moves.is_empty());
     }
@@ -1462,35 +1845,55 @@ mod tests {
         let inbox = [located("INBOX", 1, Role::Inbox, true, false)];
         let places = places();
         // Archive.
-        let archived = ops(&change(&[], &["INBOX"]), &inbox, &places, true);
+        let archived = ops(&change(&[], &["INBOX"]), &inbox, &places, true, None);
         assert_eq!(moves(&archived), [("INBOX", 1, "Archive")]);
-        // Trash: every copy not already there.
+        // Trash: the inbox copy, never the member's own folder; where it was
+        // is kept.
         let both = [
             located("INBOX", 1, Role::Inbox, true, false),
             located("Bakery", 4, Role::User, true, false),
+            located("Sent", 6, Role::Sent, true, false),
         ];
-        let trashed = ops(&change(&["TRASH"], &["SPAM"]), &both, &places, true);
-        assert_eq!(
-            moves(&trashed),
-            [("INBOX", 1, "Trash"), ("Bakery", 4, "Trash")]
-        );
-        // Untrash received mail: to the Inbox; the member's own: to Sent.
+        let trashed = ops(&change(&["TRASH"], &["SPAM"]), &both, &places, true, None);
+        assert_eq!(moves(&trashed), [("INBOX", 1, "Trash")]);
+        assert_eq!(trashed.origins, ["from:INBOX"]);
+        // Only in the member's own folder: nothing to put in the trash.
+        let filed = [located("Bakery", 4, Role::User, true, false)];
+        let kept = ops(&change(&["TRASH"], &["SPAM"]), &filed, &places, true, None);
+        assert!(kept.unmovable && kept.moves.is_empty());
+        // Untrash: back where it was, else the Inbox (received) or Sent.
         let in_trash = [located("Trash", 9, Role::Trash, true, false)];
-        let back = ops(&change(&["INBOX"], &["TRASH"]), &in_trash, &places, true);
-        assert_eq!(moves(&back), [("Trash", 9, "INBOX")]);
-        let own = ops(&change(&[], &["TRASH"]), &in_trash, &places, true);
+        let restore = ["from:Archive".to_owned()];
+        let back = ops(
+            &change(&["INBOX"], &["TRASH"]),
+            &in_trash,
+            &places,
+            true,
+            Some(&restore),
+        );
+        assert_eq!(moves(&back), [("Trash", 9, "Archive")]);
+        let gone_folder = ["from:Projects".to_owned()];
+        let fallback = ops(
+            &change(&["INBOX"], &["TRASH"]),
+            &in_trash,
+            &places,
+            true,
+            Some(&gone_folder),
+        );
+        assert_eq!(moves(&fallback), [("Trash", 9, "INBOX")]);
+        let own = ops(&change(&[], &["TRASH"]), &in_trash, &places, true, None);
         assert_eq!(moves(&own), [("Trash", 9, "Sent")]);
         // Unarchive: from Archive, or a copy from a member's folder.
         let in_archive = [located("Archive", 3, Role::Archive, true, false)];
-        let unarchived = ops(&change(&["INBOX"], &[]), &in_archive, &places, true);
+        let unarchived = ops(&change(&["INBOX"], &[]), &in_archive, &places, true, None);
         assert_eq!(moves(&unarchived), [("Archive", 3, "INBOX")]);
         let in_folder = [located("Bakery", 4, Role::User, true, false)];
-        let copied = ops(&change(&["INBOX"], &[]), &in_folder, &places, true);
+        let copied = ops(&change(&["INBOX"], &[]), &in_folder, &places, true, None);
         assert!(copied.moves.is_empty());
         assert_eq!(copied.copies.len(), 1);
         // The member's own reply in Sent stays there.
         let sent = [located("Sent", 2, Role::Sent, true, false)];
-        let stays = ops(&change(&["INBOX"], &[]), &sent, &places, true);
+        let stays = ops(&change(&["INBOX"], &[]), &sent, &places, true, None);
         assert!(stays.unmovable && stays.moves.is_empty() && stays.copies.is_empty());
         // A stream: the inbox copy to its folder; back to Primary: the Inbox.
         let to_updates = ops(
@@ -1501,9 +1904,10 @@ mod tests {
             &inbox,
             &places,
             true,
+            None,
         );
         assert_eq!(moves(&to_updates), [("INBOX", 1, "Campbooks.Updates")]);
-        let filed = [located("Campbooks.Updates", 5, Role::Stream, true, false)];
+        let in_stream = [located("Campbooks.Updates", 5, Role::Stream, true, false)];
         let primary = ops(
             &change(
                 &[],
@@ -1514,26 +1918,39 @@ mod tests {
                     "mark:newsletters",
                 ],
             ),
-            &filed,
+            &in_stream,
             &places,
             true,
+            None,
         );
         assert_eq!(moves(&primary), [("Campbooks.Updates", 5, "INBOX")]);
         // An archived message has no place in a stream.
-        let archived_stream = ops(&change(&["mark:updates"], &[]), &in_archive, &places, true);
+        let archived_stream = ops(
+            &change(&["mark:updates"], &[]),
+            &in_archive,
+            &places,
+            true,
+            None,
+        );
         assert!(archived_stream.unmovable && archived_stream.moves.is_empty());
         // Nowhere tracked to go: unmade.
         let no_archive = Places {
             archive: None,
             ..places
         };
-        assert!(ops(&change(&[], &["INBOX"]), &inbox, &no_archive, true).unmovable);
+        assert!(ops(&change(&[], &["INBOX"]), &inbox, &no_archive, true, None).unmovable);
     }
 
     #[test]
     fn a_server_without_move_or_uidplus_gets_no_move() {
         let inbox = [located("INBOX", 1, Role::Inbox, false, false)];
-        let archived = ops(&change(&[], &["INBOX", "UNREAD"]), &inbox, &places(), false);
+        let archived = ops(
+            &change(&[], &["INBOX", "UNREAD"]),
+            &inbox,
+            &places(),
+            false,
+            None,
+        );
         assert!(archived.unsupported && archived.moves.is_empty());
         // Its flags are still written.
         assert_eq!(archived.stores.len(), 1);
@@ -1554,11 +1971,34 @@ mod tests {
             ..code.clone()
         };
         assert!(copy_map(Some(&unpaired)).is_none());
+        // One new UID named for two copies would overwrite a location.
+        let twice = Code {
+            sets: vec![vec![304, 319], vec![1, 1]],
+            ..code.clone()
+        };
+        assert!(copy_map(Some(&twice)).is_none());
+        let no_validity = Code {
+            number: Some(0),
+            ..code.clone()
+        };
+        assert!(copy_map(Some(&no_validity)).is_none());
         let other = Code {
             name: "UIDNEXT".into(),
             ..code
         };
         assert!(copy_map(Some(&other)).is_none());
+    }
+
+    #[test]
+    fn expunges_are_counted() {
+        assert_eq!(expunges(&Untagged::Expunge(3)), 1);
+        assert_eq!(expunges(&Untagged::Vanished(vec![(4, 6), (9, 9)])), 4);
+        assert_eq!(expunges(&Untagged::Exists(3)), 0);
+        assert!(guard_expunged(2, 2).is_ok());
+        assert_eq!(
+            guard_expunged(3, 2),
+            Err(Trouble::Hostile("imap_expunged_more"))
+        );
     }
 
     #[test]

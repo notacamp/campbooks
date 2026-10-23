@@ -82,9 +82,14 @@ of the copies the stream recorded:
 |---|---|---|
 | archive | those in the Inbox or a stream folder | Archive |
 | unarchive | those in Archive; else one copy in a member's folder is **copied** | the Inbox (or the stream folder a move asked for) |
-| trash / spam | every copy not already there | Trash / Junk |
-| untrash / unspam | those in Trash / Junk | the Inbox for received mail; Sent, else Archive, for the member's own |
+| trash / spam | those in the Inbox, a stream folder, Archive or the other bin; never the member's own folders or Sent | Trash / Junk; where each was is bound into the trash change (`restore_to`, `from:<folder>`), as Zoho's |
+| untrash / unspam | those in Trash / Junk | where each was (the bound `restore_to`, while that folder is read and not a bin); else the Inbox for received mail, Sent (else Archive) for the member's own |
 | move to a stream | those in the Inbox or a stream folder | that stream's folder (the Inbox for Primary) |
+
+A message is in the trash (or spam) when a copy is there and none is in
+the Inbox, a stream folder, Archive or the other bin: copies the member
+filed in their own folders, or in Sent, do not hold it out, so trashing a
+filed message leaves the filed copy where the member put it.
 
 A destination the reader does not track (no Archive folder, say) leaves
 that part unmade (`not_movable`); a copy outside the tracked folders is
@@ -94,18 +99,47 @@ the inbox (archived) to a stream is `skipped` (`not_movable`).
 | | How a copy is moved |
 |---|---|
 | **`UID MOVE` (RFC 6851)**, where offered (chosen first) | atomic; with UIDPLUS it says the new UIDs (`COPYUID`) |
-| **`UID COPY` + `UID STORE +FLAGS.SILENT (\Deleted)` + `UID EXPUNGE <those UIDs>`**, with UIDPLUS (RFC 4315) only (chosen second) | `UID EXPUNGE` removes only the UIDs named, so a message the member marked `\Deleted` in another app survives |
+| **`UID COPY` + `UID STORE +FLAGS.SILENT (\Deleted)` + `UID EXPUNGE <those UIDs>`**, with UIDPLUS (RFC 4315) only (chosen second), under the guards below | `UID EXPUNGE` removes only the UIDs named |
 | `COPY` + `\Deleted` + `EXPUNGE` | **never**: a plain `EXPUNGE` (or `CLOSE`) deletes for good every `\Deleted` message of the folder |
 | Neither MOVE nor UIDPLUS: copy only, original left | a duplicate that is not a move: archive would leave the Inbox as it was and add a copy in Archive |
 | Neither: copy, then mark the original `\Deleted` | the original disappears whenever any client next expunges, and meanwhile shows as deleted in other apps: Campbooks would be deciding a deletion it cannot finish |
 | **Neither: no move** (chosen) | the change is `skipped` (`unsupported_here`), the message's state emitted again; flags still work. Servers without both are rare today (Dovecot, Cyrus, Gmail, Outlook, Yahoo, Fastmail and iCloud offer MOVE) |
 
-If `UID COPY` worked but marking or expunging the originals did not, the
-originals' `\Deleted` is taken off again (`-FLAGS.SILENT (\Deleted)`), the
-copies stay (nothing is lost), and the change is `failed` (`refused`). The
-write path never sends `EXPUNGE`, `CLOSE`, `DELETE`, `RENAME` or anything
-that empties a folder; it leaves a written folder with `UNSELECT` (RFC
-3691) where offered, which expunges nothing.
+The copy-and-expunge move is guarded so that no answer of the server can
+turn an archive into a deletion:
+
+- **Before anything**, `UID SEARCH DELETED` in the folder. Any message
+  outside the move's UIDs already `\Deleted` (the member's, in another app)
+  means no copy-and-expunge move there (`skipped`, `unsupported_here`): a
+  server that ran `UID EXPUNGE` as a plain `EXPUNGE` would take it along.
+  An answer that cannot be read counts the same.
+- **Only what the server says it copied is ever marked**: `UID COPY` must
+  answer with a `COPYUID` (RFC 4315 owes it) whose UIDVALIDITY is not zero,
+  whose sets pair up and name no UID twice; `\Deleted` and `UID EXPUNGE`
+  then go to the UIDs its source set names, and only those. A UID it does
+  not name (or no `COPYUID` at all: a proxy, a full quota, a server that
+  answered `OK` and copied nothing) is never marked: the original stays, the
+  change is `failed` (`refused`) and the next complete read looks for any
+  copy that was made.
+- **Counted**: a `UID EXPUNGE` (or a `UID MOVE`) whose answer reports more
+  messages expunged than it named stops the push (`imap_expunged_more`, an
+  error log with counts only) and the run fails.
+- **Undone from what we marked only**: when marking or expunging fails, the
+  mark comes off the UIDs this push marked, never one the search found
+  already `\Deleted`; the copies stay (a duplicate, never a loss) and the
+  change is `failed` (`refused`).
+- A session cut between the mark and the expunge leaves the originals
+  `\Deleted` beside their copies: a duplicate, not a loss. The next run's
+  `UID SEARCH DELETED` then finds those marks outside its own UIDs and makes
+  no copy-and-expunge move in that folder until something expunges them
+  (`unsupported_here`, the server's state emitted). Finishing or undoing
+  our own leftover marks from the recorded operation is a follow-up.
+
+The write path never sends `EXPUNGE` without UIDs, `CLOSE`, `DELETE`,
+`RENAME` or anything that empties a folder. It leaves the last folder it
+wrote with `UNSELECT` (RFC 3691) where offered, else by `EXAMINE` of that
+folder (which closes it without expunging), before the read asks any folder
+for its `STATUS`.
 
 ### 4. Streams mirrored as folders
 
@@ -124,7 +158,9 @@ named like its stream mark, `Campbooks/Updates`, `Campbooks/Receipts`,
   (`Campbooks.Updates`, `INBOX.Campbooks.Updates`), is a stream mark's
   (`marks::of_name`, case-insensitive) is a stream folder (new role
   `stream`). A member's folder already named so is adopted, as at Zoho.
-- **Created on first use**: `LIST "" ""` gives the hierarchy delimiter; the
+- **Created on first use**: only once the plan has decided a move puts a
+  copy there (a stream move of an archived message creates nothing).
+  `LIST "" ""` gives the hierarchy delimiter; the
   name is `Campbooks<d><Stream>`, under `INBOX<d>` when every folder the
   server lists is there (a server whose personal namespace is the Inbox's
   children); `CREATE`, then `SUBSCRIBE` (so other apps show it). An
@@ -198,11 +234,15 @@ run (debounced as #318); that run reads the same way and emits nothing. One
 - Every command goes through the session's bounded framer (#311): sizes,
   counts and time are set before a byte is read; `COPYUID` and `MODIFIED`
   sets are read only when they name at most 10,000 UIDs, and a `COPYUID`
-  whose sets do not pair up is ignored (the new UIDs are then found by the
-  read).
+  whose sets do not pair up, or that names a destination UID twice, is
+  ignored (the new UIDs are then found by the read). A new UID it names
+  that is already recorded for another message is not recorded (that
+  message keeps its location); the read looks for the copy (`recheck`).
 - A server that answers `OK` but does not apply the change: each flag
   write is read back (`UID FETCH … (UID FLAGS)`, one command per write); a
-  copy whose flags did not change ends the change `failed` (`refused`) and
+  copy whose flags did not change, or that the answer leaves out (or a
+  fetch the server refuses), is never taken as made: it ends the change
+  `failed` (`refused`) and
   the message is emitted again with the server's state; nothing is retried.
   A move it pretends to make (no `COPYUID`, the message still there) is
   found by the read, which looks the message up (`recheck`) and emits where

@@ -337,6 +337,18 @@ pub struct Offers {
     pub busy_writes: bool,
     /// It answers every write `OK` and makes none of them.
     pub inert_writes: bool,
+    /// UIDPLUS, but `COPY` answers without `COPYUID`.
+    pub copyuid_missing: bool,
+    /// `COPYUID` names the first copy only.
+    pub copyuid_partial: bool,
+    /// `COPYUID` names UID 1 of the destination for every copy.
+    pub copyuid_lies: bool,
+    /// Every expunge it reports comes with one `EXPUNGE` more.
+    pub extra_expunges: bool,
+    /// `UID EXPUNGE` is refused.
+    pub refuse_uid_expunge: bool,
+    /// `UID FETCH … (UID FLAGS)` answers with no message.
+    pub hide_flags: bool,
 }
 
 /// The answer to one signed-in command (`verb` and its `args`), on a
@@ -386,10 +398,16 @@ pub fn answer(
                             "STORE" => store_flags(store, offers, tag, &folder, rest),
                             "MOVE" if offers.moves => copy(store, offers, tag, &folder, rest, true),
                             "COPY" => copy(store, offers, tag, &folder, rest, false),
+                            "EXPUNGE" if offers.refuse_uid_expunge => {
+                                format!("{tag} NO cannot expunge now\r\n")
+                            }
                             "EXPUNGE" if offers.uidplus => {
                                 let set = rest.first().cloned().unwrap_or_default();
-                                let lines = store
+                                let mut lines = store
                                     .expunge_deleted(&folder, |uid| in_set(&set, uid, u32::MAX));
+                                if offers.extra_expunges {
+                                    lines.push_str("* 1 EXPUNGE\r\n");
+                                }
                                 format!("{lines}{tag} OK expunged\r\n")
                             }
                             _ => format!("{tag} BAD not here\r\n"),
@@ -552,9 +570,17 @@ fn copy(
         pairs.push((*uid, new));
     }
     let uidvalidity = store.folder(&dest).uidvalidity;
-    let from: Vec<String> = pairs.iter().map(|p| p.0.to_string()).collect();
-    let to: Vec<String> = pairs.iter().map(|p| p.1.to_string()).collect();
-    let copyuid = if offers.uidplus && !pairs.is_empty() {
+    let reported = if offers.copyuid_partial {
+        &pairs[..pairs.len().min(1)]
+    } else {
+        &pairs[..]
+    };
+    let from: Vec<String> = reported.iter().map(|p| p.0.to_string()).collect();
+    let to: Vec<String> = reported
+        .iter()
+        .map(|p| if offers.copyuid_lies { 1 } else { p.1 }.to_string())
+        .collect();
+    let copyuid = if offers.uidplus && !offers.copyuid_missing && !pairs.is_empty() {
         format!(
             "[COPYUID {uidvalidity} {} {}] ",
             from.join(","),
@@ -580,6 +606,9 @@ fn copy(
             + 1;
         store.expunge(name, uid);
         let _ = write!(out, "* {seq} EXPUNGE\r\n");
+    }
+    if offers.extra_expunges {
+        out.push_str("* 1 EXPUNGE\r\n");
     }
     format!("{out}{tag} OK moved\r\n")
 }
@@ -735,6 +764,7 @@ fn matches(tokens: &[String], at: &mut usize, mail: &FakeMail, max: u32) -> bool
             a || b
         }
         "ALL" => true,
+        "DELETED" => mail.deleted,
         _ => false,
     }
 }
@@ -818,6 +848,12 @@ fn fetch(
         .and_then(|at| modifiers.get(at + 1))
         .and_then(|n| n.parse::<u64>().ok());
     let vanished = modifiers.iter().any(|m| m.eq_ignore_ascii_case("VANISHED"));
+    let flags_only = items.len() == 2
+        && items.iter().any(|i| i.eq_ignore_ascii_case("UID"))
+        && items.iter().any(|i| i.eq_ignore_ascii_case("FLAGS"));
+    if offers.hide_flags && flags_only && modifiers.is_empty() {
+        return format!("{tag} OK FETCH done\r\n").into_bytes();
+    }
     let mut out = Vec::new();
     if offers.chatty {
         for _ in 0..50_000 {

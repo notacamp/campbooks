@@ -9,16 +9,29 @@ before it reads. Read and unread, starred and unstarred SHALL set or clear
 (`UID STORE … +FLAGS.SILENT` / `-FLAGS.SILENT`). Archive SHALL move the
 copies in the Inbox or a stream folder to the Archive folder; unarchive
 SHALL move the copies in Archive to the Inbox, or copy one from a member's
-folder when none is in Archive; trash and spam SHALL move every other copy
-to the Trash or Junk folder; untrash and unspam SHALL move those copies to
-the Inbox for received mail, and to Sent (else Archive) for the member's
-own. A move SHALL use `UID MOVE` when the server offers MOVE, else
-`UID COPY`, `UID STORE +FLAGS.SILENT (\Deleted)` and `UID EXPUNGE` of
-exactly those UIDs when it offers UIDPLUS, and SHALL NOT be made at all on
-a server with neither (`skipped`, `unsupported_here`). The module SHALL
-never send `EXPUNGE` without UIDs, `CLOSE`, `DELETE` or `RENAME`, never move
-a copy into or out of a folder the reader does not track, and never empty
-the Trash. A destination the reader does not track SHALL leave that part
+folder when none is in Archive; trash and spam SHALL move the copies in the
+Inbox, a stream folder, Archive or the other bin to the Trash or Junk
+folder, never the copies in the member's own folders or Sent, and the trash
+change SHALL keep, bound into it, the folder each copy was in; untrash and
+unspam SHALL move those copies back to that folder while the reader tracks
+it, else to the Inbox for received mail and to Sent (else Archive) for the
+member's own. A message SHALL count as in the trash (or spam) when a copy is
+there and none is in the Inbox, a stream folder, Archive or the other bin.
+A move SHALL use `UID MOVE` when the server offers MOVE, else, when it offers
+UIDPLUS, `UID COPY`, then `UID STORE +FLAGS.SILENT (\Deleted)` and
+`UID EXPUNGE` of only the UIDs the `COPYUID` answer names as copied (a
+`COPYUID` with a UIDVALIDITY of zero, sets that do not pair up, or none at
+all, names none: the originals are kept and the change is `failed`,
+`refused`); it SHALL NOT be made at all on a server with neither, nor by
+copy-and-expunge in a folder where `UID SEARCH DELETED` finds a message
+outside the move already `\Deleted` (`skipped`, `unsupported_here`). An
+expunge reported for more messages than were named SHALL stop the push. A
+mark taken back after a failed expunge SHALL be taken off only the UIDs the
+push marked. The module SHALL never send `EXPUNGE` without UIDs, `CLOSE`,
+`DELETE` or `RENAME`, SHALL leave a written folder with `UNSELECT` where
+offered, else `EXAMINE` of it, before any `STATUS`, SHALL never move a copy
+into or out of a folder the reader does not track, and SHALL never empty the
+Trash. A destination the reader does not track SHALL leave that part
 unmade (`not_movable`). Label changes SHALL be recorded `skipped`
 (`unsupported`). UIDs SHALL be sent as ranges, at most 500 a command.
 
@@ -44,14 +57,30 @@ unmade (`not_movable`). Label changes SHALL be recorded `skipped`
 
 #### Scenario: Another app's deleted message survives
 - **WHEN** a message in the Inbox is marked `\Deleted` in another app and a member archives another message of that Inbox on a server offering UIDPLUS only
-- **THEN** the other app's message is still in the Inbox, still `\Deleted`
+- **THEN** no copy or expunge is sent, the other app's message is still in the Inbox, still `\Deleted`, and the archive is `skipped` (`unsupported_here`)
+
+#### Scenario: A copy without COPYUID
+- **WHEN** a server offering UIDPLUS answers a member's archive's `UID COPY` with `OK` and no `COPYUID`
+- **THEN** no `\Deleted` and no `UID EXPUNGE` are sent, the message stays in the Inbox, and the archive is `failed` (`refused`)
+
+#### Scenario: A COPYUID naming part of the copies
+- **WHEN** members archive two Inbox messages in one run and the `COPYUID` names only the first
+- **THEN** only the first is marked and expunged, the second stays in the Inbox unmarked, and its archive is `failed` (`refused`)
+
+#### Scenario: More expunged than asked
+- **WHEN** a server answers a `UID EXPUNGE` of one UID with two `EXPUNGE` responses
+- **THEN** the push stops there and the run counts as failed
+
+#### Scenario: Taking a mark back
+- **WHEN** a `UID EXPUNGE` is refused after marking two messages, one of which the member had already marked `\Deleted`
+- **THEN** `\Deleted` comes off the other one only, and both stay in the Inbox
 
 #### Scenario: Trash
-- **WHEN** a member puts a message with copies in the Inbox and a member's folder in the trash
-- **THEN** both copies move to the Trash folder, the change is `applied`, and no run announces the message
+- **WHEN** a member puts a message with copies in the Inbox and a member's folder in the trash, then takes it out
+- **THEN** only the Inbox copy moves to the Trash folder and back to the Inbox, the copy in the member's folder never moves, and no run announces the message
 
 #### Scenario: Untrash received mail
-- **WHEN** a member takes a received message out of the trash
+- **WHEN** a member takes a received message out of the trash that Campbooks did not put there
 - **THEN** its copy moves from Trash to the Inbox
 
 #### Scenario: Unarchive the member's own reply
@@ -76,12 +105,17 @@ empty, `.` or `..`, or holds the delimiter, `/`, `*`, `%`, or a control or
 direction character; the whole name SHALL be at most 255 bytes. A mailbox
 SHALL get at most `CAMPBOOKS_CONNECTORS__IMAP__MAX_CREATED_FOLDERS` (default
 10) folders from Campbooks (`skipped`, `folder_cap` past it); no folder SHALL
-ever be deleted or renamed. The reader SHALL count a copy in a stream folder
+ever be deleted or renamed, and a folder SHALL be created only once a move
+the push makes puts a copy in it. The reader SHALL count a copy in a stream folder
 as in the inbox and not as a label, and a received message's upsert SHALL
 carry `provider_stream` when the server shows where it is: its stream
 folder's stream (none for several), `primary` for a new message in the
 Inbox or one moved there from a stream folder at the server; otherwise it
 SHALL carry none.
+
+#### Scenario: No folder for a move that moves nothing
+- **WHEN** a member moves an archived IMAP conversation to Updates and the mailbox has no `Campbooks/Updates`
+- **THEN** no folder is created and the change is `skipped` (`not_movable`)
 
 #### Scenario: A stream folder created once and reused
 - **WHEN** members move two IMAP conversations to Newsletters in two runs and the mailbox has no `Campbooks/Newsletters`
@@ -117,11 +151,14 @@ writes SHALL be conditional on the folder's modseq as last read
 (`UNCHANGEDSINCE`): a message changed at the server since SHALL keep the
 server's state, the change `superseded` (`changed_at_provider`) and the
 message emitted again. After a write, the locations (flags; a moved copy at
-the UID `COPYUID` names) and the index SHALL hold what was written, in the
+the UID `COPYUID` names, unless that UID is already recorded for another
+message or named twice, when the read looks for the copy instead) and the
+index SHALL hold what was written, in the
 transaction that ends the change and before the run reads, so neither that
 read nor a run an IDLE session asks for after hearing the write announces
 it. A flag write SHALL be checked by reading the copies' flags back: one
-the server answered `OK` to without making it SHALL be `failed`
+the server answered `OK` to without showing it made (a flag unchanged, a
+copy left out of the answer, a refused fetch) SHALL be `failed`
 (`refused`), the message emitted again, and never retried. A change SHALL
 meet trouble at most eight times before it is `failed` (`provider_errors`).
 
@@ -148,6 +185,14 @@ meet trouble at most eight times before it is `failed` (`provider_errors`).
 #### Scenario: A server that does not apply what it accepts
 - **WHEN** the server answers `OK` to a member's mark read without marking the message read
 - **THEN** the change is `failed` (`refused`), the run announces the message unread as the server has it, and no further `STORE` is sent
+
+#### Scenario: A COPYUID naming a taken UID
+- **WHEN** a server's `COPYUID` names, as a moved copy's new UID, a UID already recorded for another message of the folder
+- **THEN** the other message keeps its location and the moved message is located where the read finds it
+
+#### Scenario: A flag the server will not show
+- **WHEN** the server answers the read-back of a member's mark read without the message
+- **THEN** the change is `failed` (`refused`), never `applied`
 
 #### Scenario: The retry cap
 - **WHEN** the server answers every write of a change `[UNAVAILABLE]` for eight runs

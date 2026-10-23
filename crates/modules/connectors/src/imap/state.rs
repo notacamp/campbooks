@@ -263,28 +263,34 @@ pub fn tokens<'a>(
     tokens
 }
 
+/// Whether a message with `tokens` is in the bin `role` (Junk or Trash): a
+/// copy is there and none is in the Inbox, a stream folder, Archive or the
+/// other bin. Copies in Sent or the member's own folders do not hold it out:
+/// putting a message in the trash leaves those alone.
+fn bin_only(tokens: &[String], role: Role) -> bool {
+    let has = |role: Role| tokens.iter().any(|t| t == role.token());
+    let other = if role == Role::Trash {
+        Role::Junk
+    } else {
+        Role::Trash
+    };
+    has(role)
+        && ![Role::Inbox, Role::Stream, Role::Archive, other]
+            .into_iter()
+            .any(has)
+}
+
 /// The contract's state of a message with `tokens`, its folders named as
 /// `cursor` shows them: in the inbox when a copy is in the Inbox or a
-/// stream folder; in spam (or the trash) only when every copy is; read when
+/// stream folder; in spam (or the trash) when a copy is and none is in the
+/// inbox, Archive or the other bin ([`bin_only`]); read when
 /// a copy is seen; starred when one is flagged; sent when a copy is in Sent
 /// (or the mailbox sent it and no copy is in the inbox); labelled with the
 /// member's folders it is in (never a stream folder). IMAP has no
 /// categories; where a message's stream shows is [`provider_stream`]'s.
 pub fn flags(tokens: &[String], cursor: &Cursor) -> Flags {
     let has = |token: &str| tokens.iter().any(|t| t == token);
-    let places = [
-        Role::Inbox,
-        Role::Stream,
-        Role::Sent,
-        Role::Junk,
-        Role::Trash,
-        Role::Archive,
-        Role::User,
-    ]
-    .iter()
-    .filter(|role| has(role.token()))
-    .count();
-    let only = |role: Role| has(role.token()) && places == 1;
+    let binned = |role: Role| bin_only(tokens, role);
     let in_inbox = has(Role::Inbox.token()) || has(Role::Stream.token());
     let names: HashMap<&str, &str> = cursor
         .folders
@@ -306,8 +312,8 @@ pub fn flags(tokens: &[String], cursor: &Cursor) -> Flags {
     Flags {
         mailbox: Mailbox {
             in_inbox,
-            in_spam: only(Role::Junk),
-            in_trash: only(Role::Trash),
+            in_spam: binned(Role::Junk),
+            in_trash: binned(Role::Trash),
         },
         read: !has(UNREAD),
         starred: has(STARRED),
@@ -373,22 +379,10 @@ pub fn provider_stream(
 
 /// `tokens` as an outbound change's plan sees them (`imap/write.rs`): read
 /// (`UNREAD`) and starred as they are; `INBOX` when a copy is in the Inbox
-/// or a stream folder; `TRASH` or `SPAM` when every copy is in the trash or
-/// spam; and the token of each stream folder's mark (`mark:updates`).
+/// or a stream folder; `TRASH` or `SPAM` when the message is in the trash or
+/// spam ([`bin_only`]); and the token of each stream folder's mark (`mark:updates`).
 pub fn view(tokens: &[String], cursor: &Cursor) -> Vec<String> {
     let has = |token: &str| tokens.iter().any(|t| t == token);
-    let places = [
-        Role::Inbox,
-        Role::Stream,
-        Role::Sent,
-        Role::Junk,
-        Role::Trash,
-        Role::Archive,
-        Role::User,
-    ]
-    .iter()
-    .filter(|role| has(role.token()))
-    .count();
     let mut view = Vec::new();
     for token in [UNREAD, STARRED] {
         if has(token) {
@@ -398,10 +392,10 @@ pub fn view(tokens: &[String], cursor: &Cursor) -> Vec<String> {
     if has(Role::Inbox.token()) || has(Role::Stream.token()) {
         view.push("INBOX".to_owned());
     }
-    if places == 1 && has(Role::Trash.token()) {
+    if bin_only(tokens, Role::Trash) {
         view.push("TRASH".to_owned());
     }
-    if places == 1 && has(Role::Junk.token()) {
+    if bin_only(tokens, Role::Junk) {
         view.push("SPAM".to_owned());
     }
     view.extend(streams_in(tokens, cursor).into_iter().map(marks::token));
@@ -714,6 +708,16 @@ mod tests {
         assert_eq!(view(&both, &cursor), ["INBOX"]);
         let spam = tokens([(Role::Junk, "Spam", true, false)], false);
         assert_eq!(view(&spam, &cursor), ["SPAM"]);
+        // The member's own filed copy does not hold it out of the trash.
+        let filed_too = tokens(
+            [
+                (Role::Trash, "Trash", true, false),
+                (Role::User, "INBOX.Bakery", true, false),
+            ],
+            false,
+        );
+        assert_eq!(view(&filed_too, &cursor), ["TRASH"]);
+        assert!(super::flags(&filed_too, &cursor).mailbox.in_trash);
         // A pending change shows as made.
         let mut flags = flags(&filed, &cursor);
         overlay(

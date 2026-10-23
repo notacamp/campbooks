@@ -270,6 +270,22 @@ async fn read_and_starred_round_trip_without_echo(db: PgPool) {
         );
     }
     assert!(seen.selected, "opened read-write to write");
+    // Without UNSELECT, the written folder is left by examining it, before
+    // the read asks any folder for its STATUS (never CLOSE).
+    let last_store = seen
+        .commands
+        .iter()
+        .rposition(|c| c == "UID STORE")
+        .unwrap();
+    let next = seen.commands[last_store..]
+        .iter()
+        .find(|c| matches!(c.as_str(), "EXAMINE" | "UNSELECT" | "STATUS" | "SELECT"));
+    assert_eq!(
+        next.map(String::as_str),
+        Some("EXAMINE"),
+        "{:?}",
+        seen.commands
+    );
     // Neither the run that wrote nor the next announces it.
     assert_eq!(m.batches().await, batches);
     m.kit.next_run().await;
@@ -339,6 +355,7 @@ async fn archive_with_move(db: PgPool) {
         "located at its new UID"
     );
     assert_eq!(m.ends().await, [end("archive", "applied", None)]);
+    assert_eq!(m.imap.seen().count("UNSELECT"), 1, "left with UNSELECT");
     assert_eq!(m.batches().await, batches);
     m.kit.next_run().await;
     assert_eq!(m.batches().await, batches, "no echo");
@@ -434,10 +451,242 @@ async fn another_apps_deleted_message_survives(db: PgPool) {
 
     m.request(&[(key.as_str(), json!({"kind": "archive"}))])
         .await;
-    assert_eq!(m.uids("INBOX"), [doomed]);
+    // Another message of the folder is marked deleted: no copy-and-expunge
+    // move there at all, so nothing of the member's can ride along.
+    assert_eq!(m.uids("INBOX").len(), 2);
     assert!(m.imap.mailbox(|store| store.mail("INBOX", doomed).deleted));
-    assert_eq!(m.uids("Archive").len(), 1);
+    assert!(m.uids("Archive").is_empty());
+    let seen = m.imap.seen();
+    for verb in ["UID COPY", "UID EXPUNGE"] {
+        assert_eq!(seen.count(verb), 0, "{verb}");
+    }
+    assert_eq!(
+        m.ends().await,
+        [end("archive", "skipped", Some("unsupported_here"))]
+    );
     never_destroyed(&m.imap);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_copy_without_copyuid_deletes_nothing(db: PgPool) {
+    let mut uid = 0;
+    let m = mailbox(
+        db,
+        |_| {},
+        |script| {
+            script.offers.uidplus = true;
+            script.offers.copyuid_missing = true;
+        },
+        |imap, now| {
+            uid = imap.deliver("INBOX", &from_bea("a@bakery.example", "Hello"), now);
+        },
+    )
+    .await;
+    let key = m.key("Hello").await;
+
+    m.request(&[(key.as_str(), json!({"kind": "archive"}))])
+        .await;
+    assert_eq!(m.uids("INBOX"), [uid], "the original stays");
+    assert!(!m.imap.mailbox(|store| store.mail("INBOX", uid).deleted));
+    let seen = m.imap.seen();
+    assert_eq!(seen.count("UID COPY"), 1);
+    assert_eq!(seen.count("UID EXPUNGE"), 0);
+    assert!(!seen.lines.iter().any(|l| l.contains("\\Deleted")));
+    assert_eq!(m.ends().await, [end("archive", "failed", Some("refused"))]);
+    never_destroyed(&m.imap);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_copyuid_naming_part_expunges_only_that_part(db: PgPool) {
+    let (mut first, mut second) = (0, 0);
+    let m = mailbox(
+        db,
+        |_| {},
+        |script| {
+            script.offers.uidplus = true;
+            script.offers.copyuid_partial = true;
+        },
+        |imap, now| {
+            first = imap.deliver("INBOX", &from_bea("a@bakery.example", "First"), now);
+            second = imap.deliver("INBOX", &from_bea("b@bakery.example", "Second"), now);
+        },
+    )
+    .await;
+    let (a, b) = (m.key("First").await, m.key("Second").await);
+
+    m.request(&[
+        (a.as_str(), json!({"kind": "archive"})),
+        (b.as_str(), json!({"kind": "archive"})),
+    ])
+    .await;
+    let seen = m.imap.seen();
+    assert!(
+        seen.lines
+            .iter()
+            .any(|l| l == &format!("UID EXPUNGE {first}")),
+        "{:?}",
+        seen.lines
+    );
+    assert_eq!(m.uids("INBOX"), [second], "the copy not named stays");
+    assert!(!m.imap.mailbox(|store| store.mail("INBOX", second).deleted));
+    let mut ends = m.ends().await;
+    ends.sort();
+    assert_eq!(
+        ends,
+        [
+            end("archive", "applied", None),
+            end("archive", "failed", Some("refused"))
+        ]
+    );
+    never_destroyed(&m.imap);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_server_that_expunges_more_than_asked_is_stopped(db: PgPool) {
+    let m = mailbox(
+        db,
+        |_| {},
+        |script| {
+            script.offers.uidplus = true;
+            script.offers.extra_expunges = true;
+        },
+        |imap, now| {
+            imap.deliver("INBOX", &from_bea("a@bakery.example", "Hello"), now);
+            imap.deliver("INBOX", &from_bea("b@bakery.example", "Other"), now);
+        },
+    )
+    .await;
+    let key = m.key("Hello").await;
+
+    m.request(&[(key.as_str(), json!({"kind": "archive"}))])
+        .await;
+    let failures = m.kit.stream().await["consecutive_failures"]
+        .as_i64()
+        .unwrap();
+    assert!(failures >= 1, "the run is stopped: {failures}");
+    assert_eq!(m.imap.seen().count("UNSELECT"), 0, "nothing more is sent");
+    never_destroyed(&m.imap);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_undone_mark_clears_only_ours(db: PgPool) {
+    let (mut theirs, mut ours) = (0, 0);
+    let m = mailbox(
+        db,
+        |_| {},
+        |script| {
+            script.offers.uidplus = true;
+            script.offers.refuse_uid_expunge = true;
+        },
+        |imap, now| {
+            theirs = imap.deliver("INBOX", &from_bea("a@bakery.example", "Marked"), now);
+            ours = imap.deliver("INBOX", &from_bea("b@bakery.example", "Plain"), now);
+        },
+    )
+    .await;
+    let (marked, plain) = (m.key("Marked").await, m.key("Plain").await);
+    // The member marked one of them deleted in another app.
+    m.imap.mailbox(|store| store.set_deleted("INBOX", theirs));
+
+    m.request(&[
+        (marked.as_str(), json!({"kind": "archive"})),
+        (plain.as_str(), json!({"kind": "archive"})),
+    ])
+    .await;
+    assert_eq!(m.uids("INBOX").len(), 2, "nothing expunged");
+    assert!(m.imap.mailbox(|store| store.mail("INBOX", theirs).deleted));
+    assert!(!m.imap.mailbox(|store| store.mail("INBOX", ours).deleted));
+    let seen = m.imap.seen();
+    let undone: Vec<&String> = seen
+        .lines
+        .iter()
+        .filter(|l| l.contains("-FLAGS.SILENT (\\Deleted)"))
+        .collect();
+    assert_eq!(
+        undone,
+        [&format!("UID STORE {ours} -FLAGS.SILENT (\\Deleted)")]
+    );
+    assert!(
+        m.ends()
+            .await
+            .iter()
+            .all(|(_, state, reason)| state == "failed" && reason.as_deref() == Some("refused"))
+    );
+    never_destroyed(&m.imap);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_copyuid_naming_a_taken_uid_is_not_recorded(db: PgPool) {
+    let m = mailbox(
+        db,
+        |_| {},
+        |script| {
+            moving(script);
+            script.offers.copyuid_lies = true;
+        },
+        |imap, now| {
+            imap.deliver("Archive", &from_bea("old@bakery.example", "Old"), now);
+            imap.deliver("INBOX", &from_bea("a@bakery.example", "Hello"), now);
+        },
+    )
+    .await;
+    let (old, hello) = (m.key("Old").await, m.key("Hello").await);
+    assert_eq!(m.locations(&old).await, [("Archive".to_owned(), 1)]);
+
+    m.request(&[(hello.as_str(), json!({"kind": "archive"}))])
+        .await;
+    // The server said the new copy is UID 1, which is Old's: Old keeps it,
+    // and the read finds where Hello really is.
+    assert_eq!(m.locations(&old).await, [("Archive".to_owned(), 1)]);
+    assert_eq!(m.locations(&hello).await, [("Archive".to_owned(), 2)]);
+    assert_eq!(m.ends().await, [end("archive", "applied", None)]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_flag_the_server_will_not_show_is_not_applied(db: PgPool) {
+    let m = mailbox(
+        db,
+        |_| {},
+        |script| script.offers.hide_flags = true,
+        |imap, now| {
+            imap.deliver("INBOX", &from_bea("a@bakery.example", "Hello"), now);
+        },
+    )
+    .await;
+    let key = m.key("Hello").await;
+
+    m.request(&[(key.as_str(), json!({"kind": "mark_read"}))])
+        .await;
+    assert_eq!(
+        m.ends().await,
+        [end("mark_read", "failed", Some("refused"))]
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn no_stream_folder_for_a_move_that_moves_nothing(db: PgPool) {
+    let m = mailbox(
+        db,
+        |_| {},
+        moving,
+        |imap, now| {
+            imap.deliver("Archive", &from_bea("a@bakery.example", "Shipped"), now);
+        },
+    )
+    .await;
+    let key = m.key("Shipped").await;
+
+    m.request(&[(
+        key.as_str(),
+        json!({"kind": "move_to_stream", "stream": "updates"}),
+    )])
+    .await;
+    assert_eq!(m.imap.seen().count("CREATE"), 0);
+    assert!(m.imap.mailbox(|store| store.created.is_empty()));
+    assert_eq!(
+        m.ends().await,
+        [end("move_to_stream", "skipped", Some("not_movable"))]
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -457,17 +706,42 @@ async fn trash(db: PgPool) {
     let batches = m.batches().await;
 
     m.request(&[(key.as_str(), json!({"kind": "trash"}))]).await;
-    assert!(m.uids("INBOX").is_empty() && m.uids("Bakery").is_empty());
-    assert_eq!(m.uids("Trash").len(), 2);
+    // Only the inbox copy goes to the trash: the member's own filed copy
+    // stays where they put it.
+    assert!(m.uids("INBOX").is_empty());
+    assert_eq!(m.uids("Bakery").len(), 1);
+    assert_eq!(m.uids("Trash").len(), 1);
     assert_eq!(m.ends().await, [end("trash", "applied", None)]);
-    assert!(
-        m.locations(&key)
-            .await
-            .iter()
-            .all(|(folder, _)| folder == "Trash")
-    );
+    let folders: Vec<String> = m
+        .locations(&key)
+        .await
+        .into_iter()
+        .map(|(f, _)| f)
+        .collect();
+    assert_eq!(folders, ["Bakery", "Trash"]);
+    let restore: Option<Vec<String>> = sqlx::query_scalar(
+        "SELECT restore_to FROM connectors.outbound_changes WHERE kind = 'trash'",
+    )
+    .fetch_one(&m.kit.db)
+    .await
+    .unwrap();
+    assert_eq!(restore.unwrap(), ["from:INBOX"], "where it was is kept");
     m.kit.next_run().await;
     assert_eq!(m.batches().await, batches, "no echo");
+
+    // Out of the trash: back to the Inbox; the filed copy is untouched.
+    m.request(&[(key.as_str(), json!({"kind": "untrash", "inbound": true}))])
+        .await;
+    assert!(m.uids("Trash").is_empty());
+    assert_eq!(m.uids("INBOX").len(), 1);
+    assert_eq!(m.uids("Bakery").len(), 1);
+    assert_eq!(
+        m.ends().await,
+        [
+            end("trash", "applied", None),
+            end("untrash", "applied", None)
+        ]
+    );
     never_destroyed(&m.imap);
 }
 

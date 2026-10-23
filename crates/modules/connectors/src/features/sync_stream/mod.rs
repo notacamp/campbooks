@@ -1360,9 +1360,7 @@ async fn push_imap(run: &ImapRun<'_>, session: &mut Session) -> Result<Cursor, I
     match trouble {
         None => Ok(cursor),
         Some(imap::write::Trouble::Busy) => Err(ImapTrouble::Failed(Failure::Busy)),
-        Some(imap::write::Trouble::Wire(err)) => {
-            Err(ImapTrouble::Failed(Failure::Server(err.code())))
-        }
+        Some(other) => Err(ImapTrouble::Failed(Failure::Server(other.code()))),
     }
 }
 
