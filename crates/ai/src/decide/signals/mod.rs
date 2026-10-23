@@ -20,8 +20,11 @@ pub mod inbox;
 pub mod moves;
 
 /// Whether an answer to question `id` that is missing or does not fit is
-/// dropped instead of failing the call: the catalogue's and the move
-/// questions', which only add to what triage records.
+/// dropped instead of failing the call: the catalogue's, the move
+/// questions' and the kind of dated thing, which only add to what triage
+/// records.
 pub fn is_tolerant(id: &str) -> bool {
-    actions::question::is_catalogue(id) || moves::question::is_move(id)
+    actions::question::is_catalogue(id)
+        || moves::question::is_move(id)
+        || id == email::triage::DATED_KIND
 }

@@ -38,8 +38,8 @@
     },
     "key": {
       "type": "string",
-      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:(item|ask):[1-9][0-9]*$",
-      "description": "`<message id>:item:<position>` or `<message id>:ask:<position>`, positions from 1."
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:(structured|model):(item|ask):[1-9][0-9]*$",
+      "description": "`<message id>:<layer>:item:<position>` or `<message id>:<layer>:ask:<position>`, positions from 1 in the order the layer read them. The layer is part of the key, so the structured and the model reads of one message never share one."
     },
     "when": {
       "description": "An RFC 3339 time with an offset, or a date when the item lasts whole days.",

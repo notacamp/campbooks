@@ -317,14 +317,14 @@ fn a_message_read_is_ids_enums_and_times() {
         "workspace": UUID, "message": message, "conversation": UUID, "inbox": UUID,
         "owner": UUID, "layer": "model", "summary_ready": false,
         "items": [
-            {"key": format!("{message}:item:1"), "kind": "travel",
+            {"key": format!("{message}:model:item:1"), "kind": "travel",
              "starts": "2026-11-06T07:40:00+00:00", "ends": "2026-11-06T11:55:00+01:00",
              "all_day": false, "time_zone": "Europe/Lisbon"},
-            {"key": format!("{message}:item:2"), "kind": "stay", "starts": "2026-11-06",
-             "all_day": true, "updates": format!("{UUID}:item:1")}
+            {"key": format!("{message}:model:item:2"), "kind": "stay", "starts": "2026-11-06",
+             "all_day": true, "updates": format!("{UUID}:model:item:1")}
         ],
         "asks": [
-            {"key": format!("{message}:ask:1"), "verb": "pay", "due": "2026-11-30",
+            {"key": format!("{message}:model:ask:1"), "verb": "pay", "due": "2026-11-30",
              "has_amount": true, "same_as": "task-17"}
         ]
     });
@@ -346,14 +346,14 @@ fn a_message_read_is_ids_enums_and_times() {
         assert!(!accepts(file, &text), "{field}");
     }
     let mut both = read.clone();
-    both["items"][1]["cancels"] = json!(format!("{UUID}:item:2"));
+    both["items"][1]["cancels"] = json!(format!("{UUID}:model:item:2"));
     assert!(!accepts(file, &both));
     // At most five items and three asks; kinds from the set.
     let mut many = read.clone();
     many["items"] = json!(
         (1..=6)
             .map(
-                |n| json!({"key": format!("{message}:item:{n}"), "kind": "show",
+                |n| json!({"key": format!("{message}:model:item:{n}"), "kind": "show",
                         "starts": "2026-11-06", "all_day": true})
             )
             .collect::<Vec<_>>()

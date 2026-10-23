@@ -26,8 +26,13 @@ pub const DEFAULT_WAIT_WORKING_DAYS: u32 = 3;
 /// The working days a wait may be configured to last.
 pub const WAIT_WORKING_DAYS: std::ops::RangeInclusive<u32> = 1..=15;
 
+/// The confidence from which the decide pass's answer flags a message for a
+/// read, unless configured otherwise (campbooks-cloud#42). A starting point,
+/// not an operating point from the eval report.
+pub const DEFAULT_DATED_FLAG: f64 = 0.6;
+
 /// Settings of the `conversations` module.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConversationsConfig {
     /// The model pass skips inbound messages sent more than this many days
@@ -58,6 +63,36 @@ pub struct ConversationsConfig {
     /// (`CAMPBOOKS_CONVERSATIONS__WAIT__*`).
     #[serde(default)]
     pub wait: WaitSettings,
+    /// Which messages are flagged for Scout's read of their dates
+    /// (`CAMPBOOKS_CONVERSATIONS__DATED__*`).
+    #[serde(default)]
+    pub dated: DatedSettings,
+}
+
+/// Dated things in mail (campbooks-cloud#42). The decide pass flags a
+/// message when it asks for an action, has a deadline or tells of something
+/// dated; only a flag lets Scout's read (the one `complete` call) run, and
+/// only when a need opens for the message or a member opens it.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DatedSettings {
+    /// Whether `has_dated_thing` flags a message and whether opening a
+    /// message queues its read (`ENABLED`, default true). Off, the other
+    /// flags (`asks_action`, `has_deadline`) still gate the reads that a
+    /// need's arrival queues.
+    pub enabled: bool,
+    /// The confidence from which a true answer flags a message (`FLAG`,
+    /// default 0.6, from 0 to 1).
+    pub flag: f64,
+}
+
+impl Default for DatedSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            flag: DEFAULT_DATED_FLAG,
+        }
+    }
 }
 
 /// Waiting on someone (campbooks-cloud#293).
@@ -177,6 +212,7 @@ impl Default for ConversationsConfig {
             notices: NoticeSettings::default(),
             actions: ActionSettings::default(),
             wait: WaitSettings::default(),
+            dated: DatedSettings::default(),
         }
     }
 }
@@ -209,6 +245,12 @@ impl ConversationsConfig {
                 WAIT_WORKING_DAYS.end()
             ));
         }
+        if !(0.0..=1.0).contains(&config.dated.flag) {
+            return Err(format!(
+                "CAMPBOOKS_CONVERSATIONS__DATED__FLAG={}: from 0 to 1",
+                config.dated.flag
+            ));
+        }
         Ok(config)
     }
 }
@@ -226,6 +268,33 @@ mod tests {
         assert_eq!(config.undo_send_seconds, 10);
         assert_eq!(config.needs_window_days, 14);
         assert_eq!(config.wait.working_days, 3);
+    }
+
+    #[test]
+    fn dated_things_are_flagged_from_0_6_and_on_by_default() {
+        let config = ConversationsConfig::from_figment(&Figment::new()).unwrap();
+        assert_eq!(config.dated, DatedSettings::default());
+        assert!(config.dated.enabled);
+        assert!((config.dated.flag - 0.6).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn reads_and_bounds_the_dated_flag() {
+        let with = |dated: serde_json::Value| {
+            ConversationsConfig::from_figment(&Figment::from(Serialized::defaults(
+                serde_json::json!({"conversations": {"dated": dated}}),
+            )))
+        };
+        let config = with(serde_json::json!({"flag": 0.8, "enabled": false})).unwrap();
+        assert!((config.dated.flag - 0.8).abs() < f64::EPSILON);
+        assert!(!config.dated.enabled);
+        // A whole number is a confidence too.
+        assert!((with(serde_json::json!({"flag": 1})).unwrap().dated.flag - 1.0).abs() < 1e-9);
+        for refused in [-0.1, 1.5] {
+            let error = with(serde_json::json!({"flag": refused})).unwrap_err();
+            assert!(error.contains("DATED__FLAG"), "{refused}: {error}");
+        }
+        assert!(with(serde_json::json!({"flagg": 0.5})).is_err());
     }
 
     #[test]

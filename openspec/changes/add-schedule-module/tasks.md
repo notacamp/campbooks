@@ -21,9 +21,9 @@ time.
 
 ## 3. Decide pass (L1)
 
-- [ ] 3.1 `has_dated_thing` (noul) and `dated_kind` (choice) in `triage_questions()`; recorded only (`Policy::baseline` treats them as unmeasured)
-- [ ] 3.2 Flags: `CAMPBOOKS_CONVERSATIONS__DATED__FLAG` (0.6) and `__DATED__ENABLED`; a flagged marker on the message; tests for newsletters and suspicious
-- [ ] 3.3 Answers-check fixtures updated for the ten questions
+- [x] 3.1 `has_dated_thing` (noul) and `dated_kind` (choice) in `triage_questions()`; recorded only (`Policy::baseline` treats them as unmeasured)
+- [x] 3.2 Flags: `CAMPBOOKS_CONVERSATIONS__DATED__FLAG` (0.6) and `__DATED__ENABLED`; a flagged marker on the message; tests for newsletters and suspicious
+- [x] 3.3 Answers-check fixtures updated for the ten questions
 
 ## 4. Structured data (L0)
 

@@ -55,7 +55,7 @@
 
 use std::time::Duration;
 
-use campbooks_ai::decide::signals::email::triage_questions;
+use campbooks_ai::decide::signals::{email::triage_questions, is_tolerant};
 use campbooks_kernel::{
     EventBus, Job, JobContext, JobError, JobHandler, db,
     jobs::{self, EnqueueOptions, Enqueued},
@@ -445,7 +445,13 @@ impl BackfillNeeds {
         conversations: &[ConversationId],
     ) -> Result<(), JobError> {
         let since = Utc::now() - self.decide_window;
-        let questions: Vec<String> = triage_questions().into_iter().map(|q| q.id).collect();
+        // The tolerant questions (the kind of dated thing) are not asked
+        // for again when a model left them out.
+        let questions: Vec<String> = triage_questions()
+            .into_iter()
+            .filter(|q| !is_tolerant(&q.id))
+            .map(|q| q.id)
+            .collect();
         let unanswered = sqlx::query_scalar!(
             r#"SELECT newest.id AS "id!: MessageId"
                  FROM (SELECT DISTINCT ON (m.conversation_id) m.id, m.sent_at

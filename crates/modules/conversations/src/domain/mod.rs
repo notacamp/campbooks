@@ -6,6 +6,7 @@ pub mod attachments;
 pub mod binding;
 pub mod blobs;
 pub mod conversation;
+pub mod dated;
 pub mod decide;
 pub mod decisions;
 pub mod drafts;

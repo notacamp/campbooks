@@ -18,7 +18,8 @@
 //! enqueued by the needs backfill (`backfill_needs`) for recent mail that a
 //! trusted model never answered, or answered before a triage question was
 //! added: mail stored before the upgrade to the facts (ADR 0018), or before
-//! the money question (campbooks-cloud#167). It asks every question again;
+//! the money question (campbooks-cloud#167) or the dated-thing question
+//! (campbooks-cloud#42). It asks every question again;
 //! the checked answers already stored are kept, and only the missing ones
 //! are added. A backlog pass waits while the answers check has not
 //! run or the provider did not answer it (about a day at most); when the
@@ -45,6 +46,7 @@ use campbooks_ai::{
         signals::{
             actions::{action_questions, likelihoods},
             email::{Attachment, Envelope, Recipient, triage_questions},
+            is_tolerant,
             moves::{move_questions, next_move_question},
         },
         strategy::Strategy,
@@ -251,10 +253,18 @@ impl Pass {
             return Ok(Passed::NotTrusted);
         }
         let questions = triage_questions();
+        // The answers a checked model must have given for the message to
+        // count as answered: all but the tolerant ones (the kind of dated
+        // thing), which a model may leave out without it being asked again.
+        let required: Vec<Question> = questions
+            .iter()
+            .filter(|q| !is_tolerant(&q.id))
+            .cloned()
+            .collect();
         // Every triage answer on record (the backlog): with the catalogue
         // on, only whose move it is may still be missing.
         let mut moves_only = false;
-        let loaded = match load(ctx, workspace, message, &questions, answered).await? {
+        let loaded = match load(ctx, workspace, message, &required, answered).await? {
             Some(loaded) => loaded,
             None if answered == Answered::Every && self.actions.enabled => {
                 let moves = [next_move_question()];
@@ -717,7 +727,8 @@ mod tests {
                     "probabilities": {"0": 0.2, "1": 0.6, "2": 0.2}},
                 "suspicious": noul(0.05),
                 "money": {"type": "choice", "choice": "neither",
-                    "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}}
+                    "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}},
+                "has_dated_thing": noul(0.1)
             }
         })
     }
@@ -831,7 +842,9 @@ mod tests {
         .fetch_all(&db)
         .await
         .unwrap();
-        assert_eq!(rows.len(), 3 * 7);
+        // Seven triage answers and the dated-thing one; this model leaves
+        // the kind of dated thing out, which records nothing.
+        assert_eq!(rows.len(), 3 * 8);
         // Recorded with the envelope version (context 3, copied-only) and the
         // stamp of the passed answers check.
         assert!(rows.iter().all(
@@ -878,6 +891,112 @@ mod tests {
             .unwrap();
         assert_eq!(replayed, 3);
         kit.run_jobs().await;
+    }
+
+    /// The model reading a hotel's booking: it names a dated thing and its
+    /// kind with the rest.
+    fn booking_answers() -> Value {
+        let mut answers = laya_answers();
+        let kinds = [
+            "deadline",
+            "charge",
+            "appointment",
+            "meeting",
+            "travel",
+            "stay",
+            "show",
+            "reservation",
+            "delivery",
+            "expiry",
+            "none",
+        ];
+        let probabilities: serde_json::Map<String, Value> = kinds
+            .iter()
+            .map(|kind| {
+                (
+                    (*kind).to_owned(),
+                    json!(if *kind == "stay" { 0.5 } else { 0.05 }),
+                )
+            })
+            .collect();
+        answers["answers"]["has_dated_thing"] =
+            json!({"type": "noul", "noul": 0.93, "confidence": 0.93});
+        answers["answers"]["dated_kind"] =
+            json!({"type": "choice", "choice": "stay", "probabilities": probabilities});
+        answers
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_booking_is_recorded_with_its_kind_from_the_same_call(db: PgPool) {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/systemone"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(booking_answers()))
+            .expect(3)
+            .mount(&server)
+            .await;
+        let kit = kit_with_model(db.clone(), &server, 100_000).await;
+        let workspace = WorkspaceId::new();
+        let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
+        kit.ingest(workspace, inbox, "en").await;
+
+        let rows: Vec<(String, String, Value, bool)> = sqlx::query_as(
+            "SELECT m.provider_message_id, d.question, d.value, d.acted
+               FROM conversations.decisions d
+               JOIN conversations.messages m ON m.id = d.message_id
+              WHERE d.source = 'model' AND d.question IN ('has_dated_thing', 'dated_kind')
+              ORDER BY 1, 2",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        // Both answers of each of the three messages, from the one call each
+        // (the mock expects three), and only suggestions: the committed
+        // report measures neither question.
+        assert_eq!(rows.len(), 3 * 2);
+        for (_, question, value, acted) in &rows {
+            assert!(!acted, "{question} only records");
+            match question.as_str() {
+                "has_dated_thing" => assert_eq!(value, &json!(true)),
+                _ => assert_eq!(value, &json!("stay")),
+            }
+        }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_kind_the_model_leaves_out_or_invents_fails_nothing(db: PgPool) {
+        let server = MockServer::start().await;
+        let mut answers = laya_answers();
+        answers["answers"]["has_dated_thing"] = json!({"type": "noul", "noul": 0.9});
+        // Outside the options: nothing to record for it, and no failure.
+        answers["answers"]["dated_kind"] = json!({
+            "type": "choice", "choice": "party", "probabilities": {"party": 1.0}
+        });
+        Mock::given(method("POST"))
+            .and(path("/v1/systemone"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(answers))
+            .expect(3)
+            .mount(&server)
+            .await;
+        let kit = kit_with_model(db.clone(), &server, 100_000).await;
+        let workspace = WorkspaceId::new();
+        let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
+        kit.ingest(workspace, inbox, "en").await;
+        let kinds: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM conversations.decisions WHERE question = 'dated_kind'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(kinds, 0);
+        let dated: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM conversations.decisions
+              WHERE question = 'has_dated_thing' AND source = 'model'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(dated, 3);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
@@ -1021,7 +1140,8 @@ mod tests {
                     "probabilities": {"0": 0.2, "1": 0.6, "2": 0.2}},
                 "suspicious": noul(0.02),
                 "money": {"type": "choice", "choice": "neither",
-                    "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}}
+                    "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}},
+                "has_dated_thing": noul(0.1)
             }
         })
     }
@@ -1043,7 +1163,8 @@ mod tests {
                     "probabilities": {"0": 0.8, "1": 0.2, "2": 0.0}},
                 "suspicious": noul(0.02),
                 "money": {"type": "choice", "choice": "neither",
-                    "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}}
+                    "probabilities": {"owed": 0.02, "paid": 0.02, "neither": 0.96}},
+                "has_dated_thing": noul(0.1)
             }
         })
     }

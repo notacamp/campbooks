@@ -45,6 +45,32 @@ pub mod triage {
     pub const NEITHER: &str = "neither";
     /// The money question's options, in option order.
     pub const MONEY_OPTIONS: [&str; 3] = [OWED, PAID, NEITHER];
+    /// The email tells the recipient about something of theirs on a date or
+    /// at a time (`noul`, campbooks-cloud#42).
+    pub const HAS_DATED_THING: &str = "has_dated_thing";
+    /// Which kind of dated thing it is (`choice`: [`DATED_KINDS`]). Asked in
+    /// the same call; like the move questions it only adds to what triage
+    /// records, so a missing or unfitting answer is dropped, not an error
+    /// ([`super::is_tolerant`]).
+    pub const DATED_KIND: &str = "dated_kind";
+    /// An obligation of the recipient with a date: it becomes an ask.
+    pub const DEADLINE: &str = "deadline";
+    /// The `dated_kind` options, in option order. `deadline` is an
+    /// obligation (an ask for the `tasks` module); the rest are things that
+    /// happen at a time (events for the `schedule` module).
+    pub const DATED_KINDS: [&str; 11] = [
+        DEADLINE,
+        "charge",
+        "appointment",
+        "meeting",
+        "travel",
+        "stay",
+        "show",
+        "reservation",
+        "delivery",
+        "expiry",
+        "none",
+    ];
 }
 
 /// The triage questions, worded for a `decide` model. The labels and their
@@ -53,7 +79,8 @@ pub mod triage {
 /// statement got the same answer as its negation (campbooks-cloud#128).
 /// Changing a wording changes what the model reads: bump
 /// [`super::inbox::CONTEXT_VERSION`] with it. Adding a question (as `money`
-/// was) leaves the others' answers valid and does not.
+/// and the dated-thing pair were) leaves the others' answers valid and does
+/// not.
 pub fn triage_questions() -> Vec<Question> {
     vec![
         Question::choice(
@@ -131,6 +158,51 @@ pub fn triage_questions() -> Vec<Question> {
                     triage::NEITHER,
                     "Neither: it asks for no payment and confirms none",
                 ),
+            ],
+        ),
+        Question::noul(
+            triage::HAS_DATED_THING,
+            "Does the email tell the recipient about something of theirs on a specific date or \
+             time: an appointment, a booking, a trip, a ticketed event, a delivery, a charge to \
+             their account, something expiring, or a date by which they must act? Sales and \
+             offers ending, newsletters, and dates only in quoted older messages do not count.",
+        ),
+        Question::choice(
+            triage::DATED_KIND,
+            "If the email tells the recipient about something dated, which kind of thing is it? \
+             If it holds several, choose the main one.",
+            [
+                (
+                    triage::DEADLINE,
+                    "The recipient must do something by a date, such as pay, sign, submit, reply \
+                     or renew",
+                ),
+                (
+                    "charge",
+                    "Money will be taken automatically on a date: a renewal, a subscription, a \
+                     direct debit, a trial ending",
+                ),
+                (
+                    "appointment",
+                    "A booked slot with a provider: a doctor, a dentist, a haircut, a service visit",
+                ),
+                ("meeting", "A meeting or a call with other people"),
+                ("travel", "A trip: a flight, a train, a bus, a rental car"),
+                ("stay", "A hotel or a rental stay"),
+                (
+                    "show",
+                    "A ticketed event: a concert, a film, a match, a night at the theatre",
+                ),
+                (
+                    "reservation",
+                    "A table or a visit booked: a restaurant, a museum slot",
+                ),
+                ("delivery", "A parcel or an order arriving"),
+                (
+                    "expiry",
+                    "Something expiring with nothing to do before it: a card, a plan, a pass",
+                ),
+                ("none", "None of these: nothing in the email is dated"),
             ],
         ),
     ]

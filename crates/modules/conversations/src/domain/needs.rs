@@ -59,6 +59,7 @@ use super::{
     policy::Policy,
 };
 use crate::{
+    config::DatedSettings,
     events::{NeedChanged, NeedFacts},
     ingest::Headers,
     model::{
@@ -108,6 +109,9 @@ pub struct NeedSettings {
     /// switched on (`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`). Off, an
     /// open wait keeps its course; none opens.
     pub waits: bool,
+    /// Which messages are flagged for Scout's read of their dates
+    /// (`CAMPBOOKS_CONVERSATIONS__DATED__*`).
+    pub dated: DatedSettings,
 }
 
 impl NeedSettings {
@@ -119,7 +123,15 @@ impl NeedSettings {
             summaries: false,
             wait_days: crate::config::DEFAULT_WAIT_WORKING_DAYS,
             waits: true,
+            dated: DatedSettings::default(),
         }
+    }
+
+    /// The same settings, flagging messages for a read as `dated` says.
+    #[must_use]
+    pub const fn with_dated(mut self, dated: DatedSettings) -> Self {
+        self.dated = dated;
+        self
     }
 
     /// The same settings, raising new waits only when `on`.
@@ -186,7 +198,7 @@ pub struct StoredReason {
 }
 
 impl Answer {
-    fn is_true(&self) -> bool {
+    pub(crate) fn is_true(&self) -> bool {
         self.value.as_bool() == Some(true)
     }
 
@@ -1099,7 +1111,7 @@ async fn set_clock(
 /// The answers stored about `message`. A model's answer counts only when it
 /// was given while the model passed its answers check
 /// (`campbooks_ai::decide::check::STAMP`): the rest are kept, never read.
-async fn answers(conn: &mut PgConnection, message: MessageId) -> Result<Vec<Answer>> {
+pub(crate) async fn answers(conn: &mut PgConnection, message: MessageId) -> Result<Vec<Answer>> {
     // A runtime query, so the column read since (`options`) needs no entry
     // in the `.sqlx` offline cache.
     let rows: Vec<AnswerRow> = sqlx::query_as(
