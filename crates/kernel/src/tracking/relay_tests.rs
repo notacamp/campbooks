@@ -75,6 +75,7 @@ fn settings(url: &str, test: &str) -> TrackingConfig {
     TrackingConfig {
         sink: TrackingSink::Amqp,
         amqp_url: Some(SecretString::from(url)),
+        amqp_password_file: None,
         exchange: format!("test.{test}.{id}"),
         stream: format!("test.{test}.{id}.stream"),
         stream_max_age: "1h".to_owned(),
@@ -578,6 +579,41 @@ async fn declaring_is_idempotent_and_optional(db: PgPool) {
         assert!(!passive, "the {what} was declared with declaring off");
     }
     let _ = admin.close(200, "OK".into()).await;
+}
+
+/// The password in `AMQP_PASSWORD_FILE` replaces the URL's: the relay signs
+/// in with the file's, and a wrong one in the file is refused.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_password_file_replaces_the_urls_password(db: PgPool) {
+    let Some(url) = broker() else { return };
+    let state = runtime(&db).await;
+    let mut parsed = url::Url::parse(&url).unwrap();
+    // The test broker's password is plain (CI: guest), so its URL form is the password.
+    let password = parsed.password().unwrap_or("guest").to_owned();
+    parsed.set_password(Some("not-the-password")).unwrap();
+    let dir = std::env::temp_dir().join(format!("cb-amqp-pw-{}", uuid::Uuid::now_v7()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("relay-password");
+
+    std::fs::write(&file, format!("{password}\n")).unwrap();
+    let mut config = settings(parsed.as_str(), "password-file");
+    config.amqp_password_file = Some(file.clone());
+    let publisher = Relay::new(&state, config)
+        .connect()
+        .await
+        .expect("signs in with the file's password");
+    publisher.close().await;
+
+    // The URL's own password is right, the file's wrong: the file wins.
+    std::fs::write(&file, "also-not-the-password\n").unwrap();
+    let mut config = settings(&url, "password-file");
+    config.amqp_password_file = Some(file.clone());
+    let refused = Relay::new(&state, config).connect().await;
+    assert!(
+        matches!(refused, Err(RelayError::Broker(_))),
+        "the file's wrong password is used, not ignored"
+    );
+    std::fs::remove_dir_all(dir).unwrap();
 }
 
 /// The prune deletes published rows past their retention and keeps the

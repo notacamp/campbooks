@@ -281,6 +281,7 @@ or on the routing keys it wants.
 | --- | --- | --- |
 | `SINK` | `none` | `none`, `outbox` or `amqp` |
 | `AMQP_URL` | | `amqp://user:password@host:5672/%2f` or `amqps://…`; required with `amqp`. Secret |
+| `AMQP_PASSWORD_FILE` | | a file holding the broker password (a trailing newline dropped); it replaces the URL's, so the URL can omit it. Missing or empty stops the start |
 | `EXCHANGE` | `campbooks.events` | the topic exchange |
 | `STREAM` | `campbooks.events` | the stream queue declared and bound to it |
 | `STREAM_MAX_AGE` | `30D` | how long the stream keeps events (`Y`, `M`, `D`, `h`, `m`, `s`) |
