@@ -797,7 +797,8 @@ minted codes, and the setting needs no value when you only use minted ones.
 
 ## Connected accounts
 
-Members connect outside accounts (Gmail and Zoho Mail); Campbooks asks Google for consent through
+Members connect outside accounts (Gmail, Zoho Mail and, when turned on, any mailbox over
+IMAP); Campbooks asks Google for consent through
 its built-in sign-in (the same redirect URI, `/auth/callback/google`), keeps the grant
 encrypted with the instance secret key (schema `connectors`), and
 syncs mail on its own: every minute while an account is busy, backing off to every few
@@ -830,6 +831,28 @@ inbox. Campbooks reads and writes each account's mail at its own data centre
 (`accounts.zoho.eu` → `mail.zoho.eu`), polls it (Zoho has no push), and keeps to
 `CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` per Zoho login. Zoho labels are not
 synced yet.
+
+**Any other mailbox over IMAP** (Yahoo, iCloud, Fastmail, GMX, a custom domain at a hosting
+company) is connected with its password, usually an app password made in the account's
+security settings. It is off until reading these mailboxes lands: set
+`CAMPBOOKS_CONNECTORS__IMAP__ENABLED=true` to offer it (it needs the instance secret key,
+like any connection). Campbooks finds the servers from the address (a copy of Thunderbird's
+provider database bundled with it, then the domain's own autoconfig document, its SRV
+records and its MX host; the address is never sent to a third party), signs in to the IMAP
+server and authenticates to the SMTP server before it keeps anything, over TLS or STARTTLS
+only, with the certificate checked against the server's name.
+
+Mind the trade-off: a mailbox password is worth more than an OAuth grant (it has no scope,
+and Campbooks cannot revoke it at the provider). Campbooks keeps it encrypted with
+the instance secret key, bound to its connection, never shows it again, never logs it, and
+deletes it when the mailbox is disconnected; members should use app passwords, which they
+can revoke at their provider. Mail servers are reached only at public addresses on ports
+993, 143, 465 and 587. A self-hosted instance whose mail server is on its own network can
+set `CAMPBOOKS_CONNECTORS__IMAP__ALLOW_PRIVATE_HOSTS=true` (private, loopback and CGNAT
+addresses; never link-local or cloud metadata addresses) and
+`CAMPBOOKS_CONNECTORS__IMAP__ALLOW_ANY_PORT=true`. Connect attempts are limited to 10 per
+member and 30 per workspace an hour, and 5 failed sign-ins an hour per mailbox address
+across the instance, so the endpoint cannot be used to guess passwords.
 
 Connecting needs the built-in sign-in: an install that sets `CAMPBOOKS_AUTH__ISSUER` to an
 outside issuer cannot connect mail. `connectors.start_connection` answers with the
