@@ -86,3 +86,32 @@ pub async fn imap_server(
         Some((username, server))
     }))
 }
+
+/// Connection `id`'s SMTP submission server and the username it signs in
+/// with; `None` when it has none (or one this version cannot read).
+pub async fn smtp_server(
+    conn: &mut PgConnection,
+    id: ConnectionId,
+) -> Result<Option<(String, Server)>> {
+    let row: Option<(String, String, i32, String)> = sqlx::query_as(
+        "SELECT username, smtp_host, smtp_port, smtp_security
+           FROM connectors.imap_servers WHERE connection_id = $1",
+    )
+    .bind(id)
+    .fetch_optional(conn)
+    .await?;
+    Ok(row.and_then(|(username, host, port, security)| {
+        let security = match security.as_str() {
+            "tls" => Security::Tls,
+            "starttls" => Security::Starttls,
+            _ => return None,
+        };
+        let server = Server {
+            host,
+            port: u16::try_from(port).ok()?,
+            security,
+        }
+        .normalized()?;
+        Some((username, server))
+    }))
+}

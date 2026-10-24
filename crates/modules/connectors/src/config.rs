@@ -160,6 +160,26 @@ pub struct ImapConfig {
     /// Folders Campbooks creates in one mailbox at most (stream folders,
     /// `Campbooks/<Stream>`; default 10, at most 100).
     pub max_created_folders: u32,
+    /// Messages one mailbox login sends an hour at most, across every
+    /// workspace and connection it is in (default 50).
+    pub send_per_hour: u32,
+    /// Recipients one message may have at most (default 50).
+    pub send_recipients_per_message: u32,
+    /// Recipients one mailbox login sends to a day at most (default 500).
+    pub send_recipients_per_day: u32,
+    /// Messages one workspace sends an hour at most through IMAP mailboxes
+    /// (default 200).
+    pub send_workspace_per_hour: u32,
+    /// Messages sent an hour at most through one SMTP host, every workspace
+    /// together (default 1000).
+    pub send_host_per_hour: u32,
+    /// The largest message sent, in bytes as it goes out (default 25 MiB, at
+    /// most 35 MiB).
+    pub send_max_message_bytes: u64,
+    /// How long one submission may take in all, connecting to the server's
+    /// last answer, in seconds (default 300, at most 600: within the login's
+    /// 15-minute SMTP session slot).
+    pub send_timeout_seconds: u32,
 }
 
 /// `CAMPBOOKS_CONNECTORS__POLL__*`.
@@ -255,6 +275,13 @@ impl Default for ImapConfig {
             idle_poll_seconds: 900,
             workspace_idle_sessions_per_host: 10,
             max_created_folders: 10,
+            send_per_hour: 50,
+            send_recipients_per_message: 50,
+            send_recipients_per_day: 500,
+            send_workspace_per_hour: 200,
+            send_host_per_hour: 1_000,
+            send_max_message_bytes: 25 * 1024 * 1024,
+            send_timeout_seconds: 300,
         }
     }
 }
@@ -382,6 +409,9 @@ impl ConnectorsConfig {
                 "CAMPBOOKS_CONNECTORS__IMAP__MAX_CREATED_FOLDERS must be 1 to 100".to_owned(),
             );
         }
+        if imap.enabled {
+            self.check_send()?;
+        }
         if self.failing_after == 0 {
             return Err("CAMPBOOKS_CONNECTORS__FAILING_AFTER must be positive".to_owned());
         }
@@ -393,6 +423,60 @@ impl ConnectorsConfig {
 }
 
 impl ConnectorsConfig {
+    /// The IMAP send settings: checked only where IMAP runs, and tied to no
+    /// poll bound.
+    fn check_send(&self) -> Result<(), String> {
+        let imap = &self.imap;
+        if imap.send_per_hour == 0 || imap.send_per_hour > 10_000 {
+            return Err("CAMPBOOKS_CONNECTORS__IMAP__SEND_PER_HOUR must be 1 to 10000".to_owned());
+        }
+        if imap.send_recipients_per_message == 0 || imap.send_recipients_per_message > 1_000 {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__SEND_RECIPIENTS_PER_MESSAGE must be 1 to 1000"
+                    .to_owned(),
+            );
+        }
+        if imap.send_recipients_per_day < imap.send_recipients_per_message
+            || imap.send_recipients_per_day > 100_000
+        {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__SEND_RECIPIENTS_PER_DAY must be at least \
+                 …__SEND_RECIPIENTS_PER_MESSAGE and at most 100000"
+                    .to_owned(),
+            );
+        }
+        if imap.send_workspace_per_hour == 0 || imap.send_workspace_per_hour > 100_000 {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__SEND_WORKSPACE_PER_HOUR must be 1 to 100000"
+                    .to_owned(),
+            );
+        }
+        if imap.send_host_per_hour == 0 || imap.send_host_per_hour > 1_000_000 {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__SEND_HOST_PER_HOUR must be 1 to 1000000".to_owned(),
+            );
+        }
+        let max =
+            u64::try_from(crate::features::send_message::MAX_MESSAGE_BYTES).unwrap_or(u64::MAX);
+        if imap.send_max_message_bytes < 64 * 1024 || imap.send_max_message_bytes > max {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__SEND_MAX_MESSAGE_BYTES must be 65536 to 36700160 \
+                 (35 MiB)"
+                    .to_owned(),
+            );
+        }
+        // A submission ends well within the 15 minutes its login's SMTP
+        // session slot takes to come back, so it never outlives the slot.
+        if imap.send_timeout_seconds < imap.timeout_seconds || imap.send_timeout_seconds > 600 {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__SEND_TIMEOUT_SECONDS must be at least \
+                 …__TIMEOUT_SECONDS and at most 600"
+                    .to_owned(),
+            );
+        }
+        Ok(())
+    }
+
     /// The IDLE settings, and the known providers' session cap.
     fn check_idle(&self) -> Result<(), String> {
         let imap = &self.imap;
@@ -694,6 +778,89 @@ mod tests {
             })))
             .unwrap();
         }
+    }
+
+    #[test]
+    fn imap_send_settings_are_checked_only_while_imap_is_on() {
+        let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
+        let imap = &config.imap;
+        assert_eq!(
+            (
+                imap.send_per_hour,
+                imap.send_recipients_per_message,
+                imap.send_recipients_per_day,
+                imap.send_workspace_per_hour,
+                imap.send_host_per_hour,
+                imap.send_max_message_bytes,
+                imap.send_timeout_seconds,
+            ),
+            (50, 50, 500, 200, 1_000, 25 * 1024 * 1024, 300)
+        );
+        for (bad, setting) in [
+            (serde_json::json!({"send_per_hour": 0}), "SEND_PER_HOUR"),
+            (
+                serde_json::json!({"send_recipients_per_message": 0}),
+                "SEND_RECIPIENTS_PER_MESSAGE",
+            ),
+            (
+                serde_json::json!({"send_recipients_per_day": 10}),
+                "SEND_RECIPIENTS_PER_DAY",
+            ),
+            (
+                serde_json::json!({"send_workspace_per_hour": 0}),
+                "SEND_WORKSPACE_PER_HOUR",
+            ),
+            (
+                serde_json::json!({"send_host_per_hour": 0}),
+                "SEND_HOST_PER_HOUR",
+            ),
+            (
+                serde_json::json!({"send_max_message_bytes": 1024}),
+                "SEND_MAX_MESSAGE_BYTES",
+            ),
+            (
+                serde_json::json!({"send_max_message_bytes": 64_u64 << 20}),
+                "SEND_MAX_MESSAGE_BYTES",
+            ),
+            (
+                serde_json::json!({"send_timeout_seconds": 5}),
+                "SEND_TIMEOUT_SECONDS",
+            ),
+            (
+                serde_json::json!({"send_timeout_seconds": 601}),
+                "SEND_TIMEOUT_SECONDS",
+            ),
+        ] {
+            let mut on = bad.clone();
+            on["enabled"] = true.into();
+            let refused = ConnectorsConfig::from_figment(&figment(
+                serde_json::json!({"connectors": {"imap": on}}),
+            ))
+            .unwrap_err();
+            assert!(refused.contains(setting), "{refused}");
+            // IMAP off: it starts, whatever the value (the 2026-10-23 outage).
+            ConnectorsConfig::from_figment(&figment(
+                serde_json::json!({"connectors": {"imap": bad}}),
+            ))
+            .unwrap();
+        }
+        // The defaults start with production's poll bounds, IMAP on or off,
+        // and IDLE on or off.
+        for (enabled, idle) in [(false, false), (true, false), (false, true)] {
+            ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {
+                    "poll": {"min_seconds": 60, "max_seconds": 120},
+                    "imap": {"enabled": enabled, "idle_enabled": idle}
+                }
+            })))
+            .unwrap();
+        }
+        let read = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"imap": {"enabled": true, "send_per_hour": 5, "send_timeout_seconds": 30}}
+        })))
+        .unwrap();
+        assert_eq!(read.imap.send_per_hour, 5);
+        assert_eq!(read.imap.send_timeout_seconds, 30);
     }
 
     #[test]
