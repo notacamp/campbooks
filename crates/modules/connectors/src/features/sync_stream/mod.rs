@@ -1397,7 +1397,7 @@ async fn read_imap(run: ImapRun<'_>) -> Result<Page, ImapTrouble> {
         cursor,
         now: run.now,
         config: &run.imap.config,
-        address: run.address,
+        address: run.address.clone(),
     }
     .read()
     .await;
