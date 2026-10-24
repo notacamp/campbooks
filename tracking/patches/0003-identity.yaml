@@ -1,0 +1,1220 @@
+# The identity module's tracked events (campbooks-cloud#326, OpenSpec change
+# track-identity-events): every mutating operation, state-changing read, event handler and
+# schedule of the module gets a Coverage row. Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0003-identity.yaml`.
+changelog:
+  - date: "2026-10-24"
+    plan_version: 3
+    change: "The identity module instrumented (campbooks-cloud#326): 27 events for sign-ins succeeded and refused, accounts created, sessions ended, ways in and passkeys added and removed, suspensions, workspace and registered apps, consents, held mailbox grants, and token exchanges, reuse and revocation; records account, session, way_in, passkey, client and consent; Coverage for every operation, handler and schedule of the module."
+    pr: ""
+
+events:
+  - name: "identity.sign_in_succeeded"
+    version: 1
+    module: "identity"
+    object: "sign_in"
+    action: "succeeded"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A person signed in: an issuer session started. The snapshot is the new session."
+    fires_when: "A known provider identity comes back to the callback (identity.finish_sign_in), a new account is created (identity.create_account, identity.finish_passkey_sign_up), or a passkey verifies (identity.finish_passkey_sign_in); in the transaction that starts the session."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.sign_in_failed"
+    version: 1
+    module: "identity"
+    object: "sign_in"
+    action: "failed"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A sign-in was refused. Nothing changed; no account and no address is named."
+    fires_when: "The provider callback of a sign-in round trip, the new-account screen or a passkey sign-in refuses (identity.finish_sign_in, identity.create_account, identity.finish_passkey_sign_in), in a transaction of its own. Requests refused before any flow is looked at (CSRF, rate limits) track nothing."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.account_created"
+    version: 1
+    module: "identity"
+    object: "account"
+    action: "created"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "An account was created. The snapshot is the new account."
+    fires_when: "The new-account screen creates the account a provider round trip found no account for (identity.create_account), or a passkey sign-up creates one (identity.finish_passkey_sign_up)."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.passkey_counter_regressed"
+    version: 1
+    module: "identity"
+    object: "passkey_counter"
+    action: "regressed"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A passkey signed in with a signature counter that did not move forward: a cloned authenticator, or a synced passkey that reports none."
+    fires_when: "A passkey sign-in verifies with a counter at or below the stored one (identity.finish_passkey_sign_in), in the sign-in's transaction."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.session_ended"
+    version: 1
+    module: "identity"
+    object: "session"
+    action: "ended"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "An issuer session was ended by logging out, with the refresh tokens of that sign-in."
+    fires_when: "Logout with a valid ID token hint ends a live session (identity.end_session, identity.end_session_post). A session already ended tracks nothing."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.sessions_ended"
+    version: 1
+    module: "identity"
+    object: "sessions"
+    action: "ended"
+    scope: "instance"
+    status: "live"
+    actor_types: [user]
+    description: "A person signed out everywhere: every session and refresh token of the account ended, and every access token issued so far is refused."
+    fires_when: "identity.sign_out_everywhere commits."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.way_in_added"
+    version: 1
+    module: "identity"
+    object: "way_in"
+    action: "added"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A provider identity became a way into an account. The snapshot is the way in."
+    fires_when: "A signed-in round trip (link, or connect that adds a way in) links a provider identity that was no way in (identity.finish_sign_in). One that already was tracks nothing."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.way_in_removed"
+    version: 1
+    module: "identity"
+    object: "way_in"
+    action: "removed"
+    scope: "instance"
+    status: "live"
+    actor_types: [user, anonymous, system]
+    description: "A provider way in was removed, with the sessions signed in with it."
+    fires_when: "The person removes it (identity.remove_way_in), a failed mailbox hand-over takes back the way in its round trip added (identity.finish_sign_in), or the prune finds its mailbox never got a connection (identity.prune)."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.connected_way_in_removed"
+    version: 1
+    module: "identity"
+    object: "connected_way_in"
+    action: "removed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A way in that came only from connecting a mailbox went with its last connection, in the workspace where that connection was removed."
+    fires_when: "identity.forget_connected_way_in removes it after connectors.connection_removed, in the delivery's transaction."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.passkey_registered"
+    version: 1
+    module: "identity"
+    object: "passkey"
+    action: "registered"
+    scope: "instance"
+    status: "live"
+    actor_types: [user]
+    description: "A passkey was added to an account while signed in. The snapshot is the passkey."
+    fires_when: "identity.register_passkey stores it."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.passkey_renamed"
+    version: 1
+    module: "identity"
+    object: "passkey"
+    action: "renamed"
+    scope: "instance"
+    status: "live"
+    actor_types: [user]
+    description: "A passkey was renamed. The name is never kept."
+    fires_when: "identity.rename_passkey changes its name; the same name again tracks nothing."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.passkey_removed"
+    version: 1
+    module: "identity"
+    object: "passkey"
+    action: "removed"
+    scope: "instance"
+    status: "live"
+    actor_types: [user]
+    description: "A passkey was removed, with the sessions signed in with it. The snapshot is the passkey as it was."
+    fires_when: "identity.remove_passkey deletes it."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.account_suspended"
+    version: 1
+    module: "identity"
+    object: "account"
+    action: "suspended"
+    scope: "instance"
+    status: "live"
+    actor_types: [admin]
+    description: "An administrator suspended an account: its sessions and refresh tokens ended. The snapshot is the account afterwards."
+    fires_when: "identity.admin_suspend_account suspends an account that was not; a retry tracks nothing."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.account_unsuspended"
+    version: 1
+    module: "identity"
+    object: "account"
+    action: "unsuspended"
+    scope: "instance"
+    status: "live"
+    actor_types: [admin]
+    description: "An administrator lifted an account's suspension."
+    fires_when: "identity.admin_unsuspend_account lifts it; one not suspended tracks nothing."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.client_registered"
+    version: 1
+    module: "identity"
+    object: "client"
+    action: "registered"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A workspace registered an app of its own. The snapshot is the client, never its name, secret or redirect URIs."
+    fires_when: "identity.register_client stores it."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.client_secret_rotated"
+    version: 1
+    module: "identity"
+    object: "client_secret"
+    action: "rotated"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A workspace app got a new secret; the old one stopped working."
+    fires_when: "identity.rotate_client_secret stores the new secret's hash."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.client_removed"
+    version: 1
+    module: "identity"
+    object: "client"
+    action: "removed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, system]
+    description: "A workspace app was removed, with every consent and refresh token it held."
+    fires_when: "A workspace admin removes it (identity.remove_client), or the member who registered it left the workspace (identity.revoke_departed_consents)."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.dynamic_client_registered"
+    version: 1
+    module: "identity"
+    object: "dynamic_client"
+    action: "registered"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A client registered itself (RFC 7591). The snapshot is the client, never its name or redirect URIs."
+    fires_when: "/oauth2/register stores it (identity.register)."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.consent_granted"
+    version: 1
+    module: "identity"
+    object: "consent"
+    action: "granted"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A person let an app in. The snapshot is the consent."
+    fires_when: "The consent screen's Allow (identity.answer_consent) stores or renews the consent."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.consent_denied"
+    version: 1
+    module: "identity"
+    object: "consent"
+    action: "denied"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A person said no to an app on the consent screen. Nothing is stored."
+    fires_when: "The consent screen's Deny (identity.answer_consent) takes the waiting request."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.consent_revoked"
+    version: 1
+    module: "identity"
+    object: "consent"
+    action: "revoked"
+    scope: "instance"
+    status: "live"
+    actor_types: [user]
+    description: "A person took an app's consent back, with every refresh token it held for them."
+    fires_when: "identity.revoke_consent revokes a live consent."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.consents_revoked"
+    version: 1
+    module: "identity"
+    object: "consents"
+    action: "revoked"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "The apps a departed member let into the workspace lost their access: their consents and refresh tokens."
+    fires_when: "identity.revoke_departed_consents revokes at least one consent after workspaces.member_left; none tracks nothing."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.held_grant_discarded"
+    version: 1
+    module: "identity"
+    object: "held_grant"
+    action: "discarded"
+    scope: "instance"
+    status: "live"
+    actor_types: [user]
+    description: "A person discarded the mailbox grant held from their sign-up."
+    fires_when: "identity.discard_held_grant deletes it."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.held_grant_adopted"
+    version: 1
+    module: "identity"
+    object: "held_grant"
+    action: "adopted"
+    scope: "instance"
+    status: "live"
+    actor_types: [user]
+    description: "A person put the mailbox grant held from their sign-up in a workspace (the connection it became is tracked by connectors)."
+    fires_when: "identity.adopt_held_grant hands it over and deletes it."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.tokens_issued"
+    version: 1
+    module: "identity"
+    object: "tokens"
+    action: "issued"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "An app exchanged an authorization code for tokens: once per sign-in per client. Refresh rotations and client-credentials tokens are not tracked (routine renewals)."
+    fires_when: "/oauth2/token redeems a code (identity.token, grant authorization_code), in the exchange's transaction."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.refresh_reuse_detected"
+    version: 1
+    module: "identity"
+    object: "refresh_reuse"
+    action: "detected"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A spent authorization code or a rotated refresh token was presented again: the tokens of that sign-in are revoked."
+    fires_when: "/oauth2/token refuses a replayed code or refresh token (identity.token)."
+    added_in: 3
+    openspec_change: "track-identity-events"
+  - name: "identity.refresh_token_revoked"
+    version: 1
+    module: "identity"
+    object: "refresh_token"
+    action: "revoked"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A client revoked a refresh token and every token rotated from the same sign-in (RFC 7009)."
+    fires_when: "/oauth2/revoke revokes a live refresh family (identity.revoke); an unknown or revoked token tracks nothing."
+    added_in: 3
+    openspec_change: "track-identity-events"
+
+properties:
+  - event: "identity.sign_in_succeeded"
+    version: 1
+    property: "session"
+    type: "record"
+    of: "identity.session"
+    required: true
+    classification: "operational"
+    description: "The session that started."
+  - event: "identity.sign_in_succeeded"
+    version: 1
+    property: "new_account"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether the account was created by this sign-in."
+  - event: "identity.sign_in_failed"
+    version: 1
+    property: "method"
+    type: "enum"
+    of: "identity.sign_in_method"
+    required: true
+    classification: "operational"
+    description: "How the person tried to sign in."
+  - event: "identity.sign_in_failed"
+    version: 1
+    property: "provider"
+    type: "enum"
+    of: "identity.provider"
+    required: false
+    classification: "operational"
+    description: "The provider, for a provider round trip."
+  - event: "identity.sign_in_failed"
+    version: 1
+    property: "failure"
+    type: "enum"
+    of: "identity.sign_in_failure"
+    required: true
+    classification: "operational"
+    description: "Why it was refused."
+  - event: "identity.account_created"
+    version: 1
+    property: "account"
+    type: "record"
+    of: "identity.account"
+    required: true
+    classification: "operational"
+    description: "The new account."
+  - event: "identity.account_created"
+    version: 1
+    property: "method"
+    type: "enum"
+    of: "identity.sign_in_method"
+    required: true
+    classification: "operational"
+    description: "Its first way in."
+  - event: "identity.account_created"
+    version: 1
+    property: "provider"
+    type: "enum"
+    of: "identity.provider"
+    required: false
+    classification: "operational"
+    description: "The provider of its first way in, for a provider sign-up."
+  - event: "identity.account_created"
+    version: 1
+    property: "mailbox_held"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether the sign-up's mailbox grant is held for a workspace."
+  - event: "identity.passkey_counter_regressed"
+    version: 1
+    property: "passkey"
+    type: "record"
+    of: "identity.passkey"
+    required: true
+    classification: "operational"
+    description: "The passkey after the sign-in."
+  - event: "identity.session_ended"
+    version: 1
+    property: "session"
+    type: "record"
+    of: "identity.session"
+    required: true
+    classification: "operational"
+    description: "The session afterwards."
+  - event: "identity.sessions_ended"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account."
+  - event: "identity.sessions_ended"
+    version: 1
+    property: "sessions_ended"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many live sessions ended."
+  - event: "identity.sessions_ended"
+    version: 1
+    property: "refresh_families_revoked"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many live refresh-token families were revoked."
+  - event: "identity.way_in_added"
+    version: 1
+    property: "way_in"
+    type: "record"
+    of: "identity.way_in"
+    required: true
+    classification: "operational"
+    description: "The way in."
+  - event: "identity.way_in_removed"
+    version: 1
+    property: "way_in_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The way in that went."
+  - event: "identity.way_in_removed"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account it was a way into."
+  - event: "identity.way_in_removed"
+    version: 1
+    property: "provider"
+    type: "enum"
+    of: "identity.provider"
+    required: true
+    classification: "operational"
+    description: "The provider."
+  - event: "identity.way_in_removed"
+    version: 1
+    property: "cause"
+    type: "enum"
+    of: "identity.way_in_removal"
+    required: true
+    classification: "operational"
+    description: "Why it went."
+  - event: "identity.way_in_removed"
+    version: 1
+    property: "sessions_ended"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many sessions signed in with it ended."
+  - event: "identity.connected_way_in_removed"
+    version: 1
+    property: "way_in_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The way in that went."
+  - event: "identity.connected_way_in_removed"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account it was a way into."
+  - event: "identity.connected_way_in_removed"
+    version: 1
+    property: "provider"
+    type: "enum"
+    of: "identity.provider"
+    required: true
+    classification: "operational"
+    description: "The provider."
+  - event: "identity.connected_way_in_removed"
+    version: 1
+    property: "sessions_ended"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many sessions signed in with it ended."
+  - event: "identity.passkey_registered"
+    version: 1
+    property: "passkey"
+    type: "record"
+    of: "identity.passkey"
+    required: true
+    classification: "operational"
+    description: "The new passkey."
+  - event: "identity.passkey_renamed"
+    version: 1
+    property: "passkey"
+    type: "record"
+    of: "identity.passkey"
+    required: true
+    classification: "operational"
+    description: "The passkey afterwards."
+  - event: "identity.passkey_removed"
+    version: 1
+    property: "passkey"
+    type: "record"
+    of: "identity.passkey"
+    required: true
+    classification: "operational"
+    description: "The passkey as it was."
+  - event: "identity.passkey_removed"
+    version: 1
+    property: "sessions_ended"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many sessions signed in with it ended."
+  - event: "identity.account_suspended"
+    version: 1
+    property: "account"
+    type: "record"
+    of: "identity.account"
+    required: true
+    classification: "operational"
+    description: "The account afterwards."
+  - event: "identity.account_unsuspended"
+    version: 1
+    property: "account"
+    type: "record"
+    of: "identity.account"
+    required: true
+    classification: "operational"
+    description: "The account afterwards."
+  - event: "identity.client_registered"
+    version: 1
+    property: "client"
+    type: "record"
+    of: "identity.client"
+    required: true
+    classification: "operational"
+    description: "The new client."
+  - event: "identity.client_secret_rotated"
+    version: 1
+    property: "client"
+    type: "record"
+    of: "identity.client"
+    required: true
+    classification: "operational"
+    description: "The client afterwards."
+  - event: "identity.client_removed"
+    version: 1
+    property: "client_id"
+    type: "code"
+    required: true
+    classification: "id"
+    pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$"
+    description: "The client's id."
+  - event: "identity.client_removed"
+    version: 1
+    property: "cause"
+    type: "enum"
+    of: "identity.client_removal"
+    required: true
+    classification: "operational"
+    description: "Why it went."
+  - event: "identity.client_removed"
+    version: 1
+    property: "consents_revoked"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many live consents it held were revoked."
+  - event: "identity.dynamic_client_registered"
+    version: 1
+    property: "client"
+    type: "record"
+    of: "identity.client"
+    required: true
+    classification: "operational"
+    description: "The new client."
+  - event: "identity.consent_granted"
+    version: 1
+    property: "consent"
+    type: "record"
+    of: "identity.consent"
+    required: true
+    classification: "operational"
+    description: "The consent afterwards."
+  - event: "identity.consent_denied"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account that said no."
+  - event: "identity.consent_denied"
+    version: 1
+    property: "client_kind"
+    type: "enum"
+    of: "identity.client_kind"
+    required: true
+    classification: "operational"
+    description: "What kind of client it is."
+  - event: "identity.consent_denied"
+    version: 1
+    property: "client_id"
+    type: "code"
+    required: false
+    classification: "id"
+    pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$"
+    description: "Its client id, when Campbooks minted it; absent for a metadata-document client."
+  - event: "identity.consent_revoked"
+    version: 1
+    property: "consent"
+    type: "record"
+    of: "identity.consent"
+    required: true
+    classification: "operational"
+    description: "The consent afterwards (revoked)."
+  - event: "identity.consents_revoked"
+    version: 1
+    property: "member_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The member who left."
+  - event: "identity.consents_revoked"
+    version: 1
+    property: "consents"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many consents were revoked."
+  - event: "identity.held_grant_discarded"
+    version: 1
+    property: "held_grant_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The held grant."
+  - event: "identity.held_grant_discarded"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account."
+  - event: "identity.held_grant_discarded"
+    version: 1
+    property: "provider"
+    type: "enum"
+    of: "identity.provider"
+    required: true
+    classification: "operational"
+    description: "The provider."
+  - event: "identity.held_grant_adopted"
+    version: 1
+    property: "held_grant_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The held grant."
+  - event: "identity.held_grant_adopted"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account."
+  - event: "identity.held_grant_adopted"
+    version: 1
+    property: "provider"
+    type: "enum"
+    of: "identity.provider"
+    required: true
+    classification: "operational"
+    description: "The provider."
+  - event: "identity.held_grant_adopted"
+    version: 1
+    property: "in_workspace_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The workspace it went to."
+  - event: "identity.tokens_issued"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account."
+  - event: "identity.tokens_issued"
+    version: 1
+    property: "session_id"
+    type: "id"
+    required: false
+    classification: "id"
+    description: "The issuer session the code was issued in."
+  - event: "identity.tokens_issued"
+    version: 1
+    property: "client_kind"
+    type: "enum"
+    of: "identity.client_kind"
+    required: true
+    classification: "operational"
+    description: "What kind of client it is."
+  - event: "identity.tokens_issued"
+    version: 1
+    property: "client_id"
+    type: "code"
+    required: false
+    classification: "id"
+    pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$"
+    description: "Its client id, when Campbooks minted it; absent for a metadata-document client."
+  - event: "identity.tokens_issued"
+    version: 1
+    property: "refresh_token_issued"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether a refresh token came with it (offline access)."
+  - event: "identity.tokens_issued"
+    version: 1
+    property: "scope_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many scopes were granted (never their names)."
+  - event: "identity.tokens_issued"
+    version: 1
+    property: "workspace_bound"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether the tokens are bound to one workspace."
+  - event: "identity.refresh_reuse_detected"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account whose tokens were revoked."
+  - event: "identity.refresh_reuse_detected"
+    version: 1
+    property: "client_kind"
+    type: "enum"
+    of: "identity.client_kind"
+    required: true
+    classification: "operational"
+    description: "What kind of client it is."
+  - event: "identity.refresh_reuse_detected"
+    version: 1
+    property: "client_id"
+    type: "code"
+    required: false
+    classification: "id"
+    pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$"
+    description: "Its client id, when Campbooks minted it; absent for a metadata-document client."
+  - event: "identity.refresh_token_revoked"
+    version: 1
+    property: "family_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The refresh-token family revoked."
+  - event: "identity.refresh_token_revoked"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account."
+  - event: "identity.refresh_token_revoked"
+    version: 1
+    property: "client_kind"
+    type: "enum"
+    of: "identity.client_kind"
+    required: true
+    classification: "operational"
+    description: "What kind of client it is."
+  - event: "identity.refresh_token_revoked"
+    version: 1
+    property: "client_id"
+    type: "code"
+    required: false
+    classification: "id"
+    pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$"
+    description: "Its client id, when Campbooks minted it; absent for a metadata-document client."
+
+records:
+  - record: "identity.account"
+    field: "id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account's id."
+  - record: "identity.account"
+    field: "suspended"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether an administrator suspended it."
+  - record: "identity.account"
+    field: "provider_ways_in"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many provider identities are ways into it."
+  - record: "identity.account"
+    field: "passkeys"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many passkeys are ways into it."
+  - record: "identity.account"
+    field: "created_at"
+    type: "timestamp"
+    required: true
+    classification: "operational"
+    description: "When it was created."
+  - record: "identity.session"
+    field: "id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The issuer session's id."
+  - record: "identity.session"
+    field: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account signed in."
+  - record: "identity.session"
+    field: "method"
+    type: "enum"
+    enum: "identity.sign_in_method"
+    required: true
+    classification: "operational"
+    description: "How the person signed in."
+  - record: "identity.session"
+    field: "provider"
+    type: "enum"
+    enum: "identity.provider"
+    required: false
+    classification: "operational"
+    description: "The provider signed in with, for a provider sign-in whose way in still exists."
+  - record: "identity.session"
+    field: "auth_time"
+    type: "timestamp"
+    required: true
+    classification: "operational"
+    description: "When the person authenticated."
+  - record: "identity.session"
+    field: "expires_at"
+    type: "timestamp"
+    required: true
+    classification: "operational"
+    description: "When it ends at the latest."
+  - record: "identity.session"
+    field: "ended_at"
+    type: "timestamp"
+    required: false
+    classification: "operational"
+    description: "When it was ended, if it was."
+  - record: "identity.way_in"
+    field: "id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The provider identity's id (never its subject)."
+  - record: "identity.way_in"
+    field: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account it is a way into."
+  - record: "identity.way_in"
+    field: "provider"
+    type: "enum"
+    enum: "identity.provider"
+    required: true
+    classification: "operational"
+    description: "Its provider."
+  - record: "identity.way_in"
+    field: "linked_via"
+    type: "enum"
+    enum: "identity.linked_via"
+    required: true
+    classification: "operational"
+    description: "How it was linked."
+  - record: "identity.way_in"
+    field: "address_verified"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether the provider verified its address when it was linked (the address is never kept)."
+  - record: "identity.way_in"
+    field: "linked_at"
+    type: "timestamp"
+    required: true
+    classification: "operational"
+    description: "When it was linked."
+  - record: "identity.way_in"
+    field: "last_used_at"
+    type: "timestamp"
+    required: false
+    classification: "operational"
+    description: "When it was last used to sign in."
+  - record: "identity.passkey"
+    field: "id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The passkey's id (never its credential id)."
+  - record: "identity.passkey"
+    field: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account it is a way into."
+  - record: "identity.passkey"
+    field: "added_via"
+    type: "enum"
+    enum: "identity.passkey_added_via"
+    required: true
+    classification: "operational"
+    description: "How it was added."
+  - record: "identity.passkey"
+    field: "backup_eligible"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether it may be synced (a multi-device passkey)."
+  - record: "identity.passkey"
+    field: "backup_state"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether it is synced now."
+  - record: "identity.passkey"
+    field: "created_at"
+    type: "timestamp"
+    required: true
+    classification: "operational"
+    description: "When it was added."
+  - record: "identity.passkey"
+    field: "last_used_at"
+    type: "timestamp"
+    required: false
+    classification: "operational"
+    description: "When it was last used to sign in."
+  - record: "identity.client"
+    field: "client_id"
+    type: "code"
+    required: false
+    classification: "id"
+    pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$"
+    description: "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL."
+  - record: "identity.client"
+    field: "kind"
+    type: "enum"
+    enum: "identity.client_kind"
+    required: true
+    classification: "operational"
+    description: "What kind of client it is."
+  - record: "identity.client"
+    field: "confidential"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether it authenticates with a secret."
+  - record: "identity.client"
+    field: "scope_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many scopes it may ask for."
+  - record: "identity.client"
+    field: "redirect_uri_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many redirect URIs it registered (never the URIs)."
+  - record: "identity.client"
+    field: "created_at"
+    type: "timestamp"
+    required: true
+    classification: "operational"
+    description: "When it was registered."
+  - record: "identity.client"
+    field: "secret_rotated_at"
+    type: "timestamp"
+    required: false
+    classification: "operational"
+    description: "When its secret was last rotated."
+  - record: "identity.consent"
+    field: "id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The consent's id."
+  - record: "identity.consent"
+    field: "account_id"
+    type: "id"
+    required: true
+    classification: "pseudonymous"
+    description: "The account that gave it."
+  - record: "identity.consent"
+    field: "client_id"
+    type: "code"
+    required: false
+    classification: "id"
+    pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$"
+    description: "The client it lets in, when Campbooks minted its id; absent for a metadata-document client."
+  - record: "identity.consent"
+    field: "client_kind"
+    type: "enum"
+    enum: "identity.client_kind"
+    required: true
+    classification: "operational"
+    description: "What kind of client it lets in."
+  - record: "identity.consent"
+    field: "bound_workspace_id"
+    type: "id"
+    required: false
+    classification: "pseudonymous"
+    description: "The workspace the client may use, when it binds one."
+  - record: "identity.consent"
+    field: "scope_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many scopes it allows (never their names)."
+  - record: "identity.consent"
+    field: "remembered"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether a later authorization may skip the screen."
+  - record: "identity.consent"
+    field: "granted_at"
+    type: "timestamp"
+    required: true
+    classification: "operational"
+    description: "When it was given."
+  - record: "identity.consent"
+    field: "revoked_at"
+    type: "timestamp"
+    required: false
+    classification: "operational"
+    description: "When it was revoked, if it was."
+
+enums:
+  - { enum: "identity.provider", value: "google", description: "Google." }
+  - { enum: "identity.provider", value: "microsoft", description: "Microsoft 365 (work or school)." }
+  - { enum: "identity.provider", value: "zoho", description: "Zoho." }
+  - { enum: "identity.sign_in_method", value: "provider", description: "A provider round trip (Google, Microsoft, Zoho)." }
+  - { enum: "identity.sign_in_method", value: "passkey", description: "A passkey." }
+  - { enum: "identity.linked_via", value: "sign_up", description: "Signing up: the account's first way in." }
+  - { enum: "identity.linked_via", value: "link", description: "Added while signed in (Ways to sign in)." }
+  - { enum: "identity.linked_via", value: "connect", description: "Connecting a mailbox while signed in." }
+  - { enum: "identity.passkey_added_via", value: "sign_up", description: "Signing up with a passkey alone." }
+  - { enum: "identity.passkey_added_via", value: "passkey", description: "Added while signed in." }
+  - { enum: "identity.client_kind", value: "first_party", description: "Campbooks' own (web, desktop and mobile)." }
+  - { enum: "identity.client_kind", value: "workspace", description: "A workspace's own app." }
+  - { enum: "identity.client_kind", value: "dynamic", description: "Registered itself (RFC 7591)." }
+  - { enum: "identity.client_kind", value: "metadata_document", description: "Known by its Client ID Metadata Document (its id is a URL, never kept)." }
+  - { enum: "identity.sign_in_failure", value: "invalid_state", description: "The round trip came back unknown, expired, or to another browser." }
+  - { enum: "identity.sign_in_failure", value: "cancelled_at_provider", description: "The person cancelled at the provider." }
+  - { enum: "identity.sign_in_failure", value: "provider_unavailable", description: "The provider could not be reached or answered with an error." }
+  - { enum: "identity.sign_in_failure", value: "login_failed", description: "The provider refused to finish (its code or ID token did not verify)." }
+  - { enum: "identity.sign_in_failure", value: "account_suspended", description: "An administrator suspended the account." }
+  - { enum: "identity.sign_in_failure", value: "signup_invite_only", description: "No account yet, and the instance takes invited people only." }
+  - { enum: "identity.sign_in_failure", value: "sign_in_not_allowed", description: "The instance's allow-list does not let the address in." }
+  - { enum: "identity.sign_in_failure", value: "passkey_not_accepted", description: "The passkey did not verify, or is no way into any account." }
+  - { enum: "identity.sign_in_failure", value: "passkey_expired", description: "No passkey ceremony waits for this browser (too slow, or used)." }
+  - { enum: "identity.way_in_removal", value: "member", description: "The person removed it (Ways to sign in)." }
+  - { enum: "identity.way_in_removal", value: "connect_failed", description: "The mailbox hand-over of the round trip that added it failed, so it was taken back." }
+  - { enum: "identity.way_in_removal", value: "mailbox_never_connected", description: "It came from connecting a mailbox that never got a connection." }
+  - { enum: "identity.client_removal", value: "removed", description: "A workspace admin removed it." }
+  - { enum: "identity.client_removal", value: "member_left", description: "The member who registered it left the workspace." }
+
+coverage:
+  - kind: "operation"
+    name: "identity.finish_sign_in"
+    events: [identity.sign_in_succeeded, identity.sign_in_failed, identity.way_in_added, identity.way_in_removed]
+  - kind: "operation"
+    name: "identity.create_account"
+    events: [identity.account_created, identity.sign_in_succeeded, identity.sign_in_failed]
+  - kind: "operation"
+    name: "identity.finish_passkey_sign_in"
+    events: [identity.sign_in_succeeded, identity.sign_in_failed, identity.passkey_counter_regressed]
+  - kind: "operation"
+    name: "identity.finish_passkey_sign_up"
+    events: [identity.account_created, identity.sign_in_succeeded]
+  - kind: "operation"
+    name: "identity.end_session"
+    events: [identity.session_ended]
+  - kind: "operation"
+    name: "identity.end_session_post"
+    events: [identity.session_ended]
+  - kind: "operation"
+    name: "identity.sign_out_everywhere"
+    events: [identity.sessions_ended]
+  - kind: "operation"
+    name: "identity.remove_way_in"
+    events: [identity.way_in_removed]
+  - kind: "operation"
+    name: "identity.register_passkey"
+    events: [identity.passkey_registered]
+  - kind: "operation"
+    name: "identity.rename_passkey"
+    events: [identity.passkey_renamed]
+  - kind: "operation"
+    name: "identity.remove_passkey"
+    events: [identity.passkey_removed]
+  - kind: "operation"
+    name: "identity.admin_suspend_account"
+    events: [identity.account_suspended]
+  - kind: "operation"
+    name: "identity.admin_unsuspend_account"
+    events: [identity.account_unsuspended]
+  - kind: "operation"
+    name: "identity.register_client"
+    events: [identity.client_registered]
+  - kind: "operation"
+    name: "identity.rotate_client_secret"
+    events: [identity.client_secret_rotated]
+  - kind: "operation"
+    name: "identity.remove_client"
+    events: [identity.client_removed]
+  - kind: "operation"
+    name: "identity.register"
+    events: [identity.dynamic_client_registered]
+  - kind: "operation"
+    name: "identity.answer_consent"
+    events: [identity.consent_granted, identity.consent_denied]
+  - kind: "operation"
+    name: "identity.revoke_consent"
+    events: [identity.consent_revoked]
+  - kind: "operation"
+    name: "identity.discard_held_grant"
+    events: [identity.held_grant_discarded]
+  - kind: "operation"
+    name: "identity.adopt_held_grant"
+    events: [identity.held_grant_adopted]
+  - kind: "operation"
+    name: "identity.token"
+    events: [identity.tokens_issued, identity.refresh_reuse_detected]
+  - kind: "operation"
+    name: "identity.revoke"
+    events: [identity.refresh_token_revoked]
+  - kind: "operation"
+    name: "identity.start_sign_in"
+    exemption: "only starts a provider round trip; identity.finish_sign_in tracks its outcome"
+  - kind: "operation"
+    name: "identity.start_link"
+    exemption: "only issues a ticket for a signed-in round trip; identity.finish_sign_in tracks its outcome"
+  - kind: "operation"
+    name: "identity.start_passkey_registration"
+    exemption: "only starts a passkey ceremony; identity.register_passkey tracks its outcome"
+  - kind: "operation"
+    name: "identity.start_passkey_sign_in"
+    exemption: "only starts a passkey ceremony; identity.finish_passkey_sign_in tracks its outcome"
+  - kind: "operation"
+    name: "identity.start_passkey_sign_up"
+    exemption: "only starts a passkey ceremony; identity.finish_passkey_sign_up tracks its outcome"
+  - kind: "operation"
+    name: "identity.authorize"
+    exemption: "issues a short-lived code for a session that exists, or sends the browser to sign in; the code's redemption is tracked by identity.token"
+  - kind: "handler"
+    name: "identity.forget_connected_way_in"
+    events: [identity.connected_way_in_removed]
+  - kind: "handler"
+    name: "identity.revoke_departed_consents"
+    events: [identity.consents_revoked, identity.client_removed]
+  - kind: "handler"
+    name: "identity.name_connected_mailbox"
+    exemption: "bookkeeping: a way in's mailbox record named with the connection the connectors module confirms (tracked there); no action of anyone changes"
+  - kind: "handler"
+    name: "identity.notify_way_in_added"
+    exemption: "sends the notice of identity.way_in_added, which is tracked where the way in is added"
+  - kind: "handler"
+    name: "identity.remove_workspace_clients"
+    exemption: "consequence of workspaces.workspace_deleting (tracked by workspaces): the deleted workspace's apps and their access go with it"
+  - kind: "schedule"
+    name: "identity.prune"
+    events: [identity.way_in_removed]
