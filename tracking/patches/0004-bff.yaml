@@ -6,7 +6,7 @@ changelog:
   - date: "2026-10-24"
     plan_version: 4
     change: "The web BFF instrumented (campbooks-cloud#327): 3 events for web sessions started, ended one at a time (logging out, signing in again, a copied cookie, outdated scopes, a refused refresh, unreadable tokens, an expired access token) and ended at once (back-channel logout, signing out everywhere, a suspension); the enums of how they end; Coverage for every operation, handler and schedule of the BFF. bff is a platform module, generated into the kernel and tracked from the server."
-    pr: ""
+    pr: "#655"
 
 events:
   - name: "bff.web_session_started"
