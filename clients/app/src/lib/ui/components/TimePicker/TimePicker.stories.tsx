@@ -2,6 +2,9 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 
+import { Dialog } from "../Dialog/Dialog";
+import { TextField } from "../Field/Field";
+
 import { TimePicker, type TimePickerProps } from "./TimePicker";
 
 /** The picker with its own state, so picking shows. */
@@ -58,4 +61,32 @@ export const AfterStart: Story = {
 /** With an error under it. */
 export const WithError: Story = {
   args: { label: "Ends", value: "08:00", error: "It ends before it starts." },
+};
+
+/**
+ * Near the bottom of a dialog: the list opens over the dialog (in the top
+ * layer), whole, and typing replaces the time shown ("930", Enter).
+ */
+export const InADialog: Story = {
+  args: { label: "Starts", value: "09:00" },
+  render: (args) => (
+    <Dialog open onClose={fn()} title="New event" visor={null}>
+      <div className="flex flex-col gap-3">
+        <TextField label="Title" defaultValue="Walkthrough at Rua das Flores" />
+        <TextField label="Place" defaultValue="Rua das Flores 12, Lisboa" />
+        <TextField label="Notes" defaultValue="Bring the signed lease" />
+        <Demo {...args} />
+      </div>
+    </Dialog>
+  ),
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement.ownerDocument.body);
+    const field = page.getByRole("combobox", { name: "Starts" });
+    await userEvent.click(field);
+    await expect(page.getByRole("listbox", { name: "Starts" })).toBeVisible();
+    await userEvent.keyboard("930{Enter}");
+    await expect((field as HTMLInputElement).value).toMatch(/^9:30\sAM$/u);
+    await userEvent.keyboard("{Escape}");
+    await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
+  },
 };

@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 
+import { useTopLayer } from "../../internal/use-top-layer";
+
 import styles from "./Popover.module.css";
 
 export interface PopoverTriggerProps {
@@ -22,6 +24,12 @@ export interface PopoverProps {
   /** Controlled open state (optional). */
   open?: boolean | undefined;
   onOpenChange?: ((open: boolean) => void) | undefined;
+  /**
+   * `top`: the panel opens in the top layer at fixed coordinates, so no
+   * ancestor's overflow clips it (a picker in a dialog). `inline` (default):
+   * it hangs from the trigger in the flow.
+   */
+  layer?: "inline" | "top" | undefined;
 }
 
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled])";
@@ -38,6 +46,7 @@ export function Popover({
   placement = "bottom-end",
   open: controlledOpen,
   onOpenChange,
+  layer = "inline",
 }: PopoverProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
@@ -54,6 +63,16 @@ export function Popover({
   useEffect(() => {
     change.current = setOpen;
   });
+  const onTop =
+    useTopLayer({
+      open: open && layer === "top",
+      anchor: triggerRef,
+      panel,
+      align: placement === "bottom-end" ? "end" : "start",
+      onAway: () => {
+        change.current(false);
+      },
+    }) && layer === "top";
 
   useEffect(() => {
     if (!open) {
@@ -61,10 +80,11 @@ export function Popover({
     }
     // A control marked `data-autofocus` (a date grid's chosen day) takes the
     // focus; otherwise the first one.
+    // In the top layer, focusing scrolls nothing under it (a dialog's body).
     (
       panel.current?.querySelector<HTMLElement>("[data-autofocus]") ??
       panel.current?.querySelector<HTMLElement>(FOCUSABLE)
-    )?.focus();
+    )?.focus({ preventScroll: onTop });
     const onPointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && anchor.current?.contains(event.target) !== true) {
         change.current(false);
@@ -85,7 +105,7 @@ export function Popover({
       document.removeEventListener("pointerdown", onPointerDown);
       anchorElement?.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, onTop]);
 
   const close = () => {
     setOpen(false);
@@ -109,6 +129,8 @@ export function Popover({
         role="dialog"
         aria-label={label}
         data-placement={placement}
+        data-layer={onTop ? "top" : undefined}
+        popover={onTop ? "manual" : undefined}
         hidden={!open}
       >
         {open ? (typeof children === "function" ? children(close) : children) : null}

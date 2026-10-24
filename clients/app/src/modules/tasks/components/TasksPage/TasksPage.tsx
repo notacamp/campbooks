@@ -368,7 +368,7 @@ export function TasksPage({
             {t("empty.body")}
           </EmptyState>
         ) : null}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 pt-6">
           {GROUPS.map((group) => {
             const tasks = groups.get(group) ?? [];
             if (tasks.length === 0) {

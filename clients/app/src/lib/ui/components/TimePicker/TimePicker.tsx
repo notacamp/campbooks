@@ -1,6 +1,7 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useTopLayer } from "../../internal/use-top-layer";
 import { describedBy, FieldFrame, useFieldIds } from "../Field/Field";
 import { Icon } from "../Icon/Icon";
 
@@ -57,6 +58,7 @@ export function TimePicker({
   const ids = useFieldIds(id);
   const listId = useId();
   const list = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null);
   const locale = i18n.language;
   const current = value !== undefined && isTime(value) ? value : undefined;
   const shown = current === undefined ? "" : formatTime(current, locale);
@@ -82,12 +84,32 @@ export function TimePicker({
     setOpen(false);
     setActive(-1);
   };
-  // The active time scrolls into view as it moves.
+  // In the top layer the list hangs under the field where no dialog clips it.
+  const onTop = useTopLayer({
+    open,
+    anchor: box,
+    panel: list,
+    matchWidth: true,
+    onAway: () => {
+      setOpen(false);
+      setActive(-1);
+    },
+  });
+  // The active time scrolls into view as it moves, inside the list only:
+  // nothing around it (a dialog's body) scrolls.
   useEffect(() => {
-    if (open && active >= 0) {
-      const option: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
-        list.current?.querySelector(`[data-index="${CSS.escape(String(active))}"]`) ?? null;
-      option?.scrollIntoView?.({ block: "nearest" });
+    const listbox = list.current;
+    const option =
+      open && active >= 0
+        ? listbox?.querySelector<HTMLElement>(`[data-index="${CSS.escape(String(active))}"]`)
+        : null;
+    if (listbox === null || option === null || option === undefined) {
+      return;
+    }
+    if (option.offsetTop < listbox.scrollTop) {
+      listbox.scrollTop = option.offsetTop;
+    } else if (option.offsetTop + option.offsetHeight > listbox.scrollTop + listbox.clientHeight) {
+      listbox.scrollTop = option.offsetTop + option.offsetHeight - listbox.clientHeight;
     }
   }, [open, active]);
 
@@ -113,7 +135,9 @@ export function TimePicker({
     }
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+  // The field's keys. Heard on its own box, natively: a dialog around it
+  // stops plain keys (and so React's handlers) before they reach the page.
+  const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       if (!open) {
@@ -134,18 +158,36 @@ export function TimePicker({
       event.preventDefault();
       settle();
     } else if (event.key === "Escape" && (open || editing)) {
-      // Closes the list only, not the dialog or page around it.
+      // Closes the list (or drops what was typed) and nothing else: not the
+      // dialog or page around it.
       event.preventDefault();
       event.stopPropagation();
       setEditing(false);
       close();
     }
   };
+  const keys = useRef(onKeyDown);
+  useEffect(() => {
+    keys.current = onKeyDown;
+  });
+  useEffect(() => {
+    const element = box.current;
+    if (element === null) {
+      return;
+    }
+    const listener = (event: KeyboardEvent) => {
+      keys.current(event);
+    };
+    element.addEventListener("keydown", listener);
+    return () => {
+      element.removeEventListener("keydown", listener);
+    };
+  }, []);
 
   const activeId = open && active >= 0 ? `${listId}-${String(active)}` : undefined;
   return (
     <FieldFrame label={label} hideLabel={hideLabel} hint={hint} error={error} ids={ids}>
-      <div className={styles["box"]}>
+      <div ref={box} className={styles["box"]}>
         <Icon name="clock" className={styles["icon"]} />
         <input
           id={ids.controlId}
@@ -162,10 +204,15 @@ export function TimePicker({
           aria-activedescendant={activeId}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={describedBy(hint, error, ids)}
-          onFocus={() => {
+          onFocus={(event) => {
+            // Typing replaces the time shown, never adds to it.
+            event.currentTarget.select();
             show();
           }}
-          onClick={() => {
+          onClick={(event) => {
+            if (!editing) {
+              event.currentTarget.select();
+            }
             if (!open) {
               show();
             }
@@ -180,7 +227,6 @@ export function TimePicker({
             setActive(time === undefined ? -1 : nearest(time));
           }}
           onBlur={settle}
-          onKeyDown={onKeyDown}
         />
         <div
           ref={list}
@@ -188,6 +234,8 @@ export function TimePicker({
           role="listbox"
           aria-label={label}
           className={styles["list"]}
+          data-layer={onTop ? "top" : undefined}
+          popover={onTop ? "manual" : undefined}
           hidden={!open}
         >
           {slots.map((slot, index) => (

@@ -2,6 +2,9 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 
+import { Dialog } from "../Dialog/Dialog";
+import { TextField } from "../Field/Field";
+
 import { DatePicker, type DatePickerProps } from "./DatePicker";
 
 const NOW = new Date(2026, 9, 13, 10);
@@ -81,5 +84,31 @@ export const Inline: Story = {
     await expect(
       canvas.getByRole("button", { name: /October 20, 2026/u }).closest("[role='gridcell']"),
     ).toHaveAttribute("aria-selected", "true");
+  },
+};
+
+/**
+ * Near the bottom of a dialog: the month grid opens over the dialog (in the
+ * top layer), whole, with Today, and the dialog does not scroll.
+ */
+export const InADialog: Story = {
+  args: { label: "Date", value: "2026-10-26" },
+  render: (args) => (
+    <Dialog open onClose={fn()} title="New event" visor={null}>
+      <div className="flex flex-col gap-3">
+        <TextField label="Title" defaultValue="Walkthrough at Rua das Flores" />
+        <TextField label="Place" defaultValue="Rua das Flores 12, Lisboa" />
+        <TextField label="Notes" defaultValue="Bring the signed lease" />
+        <Demo {...args} />
+      </div>
+    </Dialog>
+  ),
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement.ownerDocument.body);
+    await userEvent.click(page.getByRole("button", { name: /^Date/u }));
+    await expect(page.getByRole("grid", { name: "October 2026" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Today" })).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();
   },
 };

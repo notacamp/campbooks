@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../Button/Button";
@@ -114,6 +114,7 @@ export function DatePicker({
       <Popover
         label={t("datePicker.choose")}
         placement="bottom-start"
+        layer="top"
         renderTrigger={(trigger) => (
           <button
             {...trigger}
@@ -214,7 +215,7 @@ function MonthCalendar({ value, today, min, max, clearable, locale, onPick }: Mo
   const long = new Intl.DateTimeFormat(locale, { weekday: "long", timeZone: "UTC" });
   const heads = weeks[0] ?? [];
 
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+  const onKeyDown = (event: KeyboardEvent) => {
     const moves: Record<string, () => Day> = {
       ArrowLeft: () => addDays(cursor, -1),
       ArrowRight: () => addDays(cursor, 1),
@@ -233,6 +234,26 @@ function MonthCalendar({ value, today, min, max, clearable, locale, onPick }: Mo
     event.stopPropagation();
     go(move(), true);
   };
+
+  // Heard on the grid natively: a dialog around it stops plain keys (and so
+  // React's handlers) before they reach the page.
+  const keys = useRef(onKeyDown);
+  useEffect(() => {
+    keys.current = onKeyDown;
+  });
+  useEffect(() => {
+    const element = grid.current;
+    if (element === null) {
+      return;
+    }
+    const listener = (event: KeyboardEvent) => {
+      keys.current(event);
+    };
+    element.addEventListener("keydown", listener);
+    return () => {
+      element.removeEventListener("keydown", listener);
+    };
+  }, []);
 
   const title = monthName.charAt(0).toLocaleUpperCase(locale) + monthName.slice(1);
   return (
@@ -288,7 +309,6 @@ function MonthCalendar({ value, today, min, max, clearable, locale, onPick }: Mo
                     disabled={!inRange(day, min, max)}
                     aria-current={day === today ? "date" : undefined}
                     aria-label={fullDay.format(at(day))}
-                    onKeyDown={onKeyDown}
                     onClick={() => {
                       onPick(day);
                     }}

@@ -65,6 +65,16 @@
     inset 0 0 0 var(--border-width) var(--border-strong);
 }
 
+/* In the top layer: fixed, at the coordinates the field gives; none of the
+   browser's popover box. */
+.list[data-layer="top"] {
+  position: fixed;
+  inset: auto;
+  width: auto;
+  margin: 0;
+  border: 0;
+}
+
 .list[hidden] {
   display: none;
 }

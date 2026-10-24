@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
 
+import { Dialog } from "../Dialog/Dialog";
+
 import { TimePicker } from "./TimePicker";
 import { formatTime } from "./times";
 
@@ -69,18 +71,39 @@ describe("TimePicker", () => {
     expect(field).toHaveValue(en("09:30"));
   });
 
-  it("closes the list on Escape, and the Escape stops there", () => {
-    // What the app's shortcuts listen on: Escape there would close the dialog around.
-    const onEscape = vi.fn();
-    document.addEventListener("keydown", onEscape);
-    renderUi(<TimePicker label="Starts" value="09:30" onChange={vi.fn()} />);
+  it("closes the list on Escape, and the dialog around it stays open", () => {
+    const onClose = vi.fn();
+    renderUi(
+      <Dialog open onClose={onClose} title="New event">
+        <TimePicker label="Starts" value="09:30" onChange={vi.fn()} />
+      </Dialog>,
+    );
     const field = screen.getByRole("combobox", { name: "Starts" });
     fireEvent.focus(field);
+    expect(field).toHaveAttribute("aria-expanded", "true");
+
     fireEvent.keyDown(field, { key: "Escape" });
-    document.removeEventListener("keydown", onEscape);
 
     expect(field).toHaveAttribute("aria-expanded", "false");
-    expect(onEscape).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    // With the list closed, Escape is the dialog's again.
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("selects the time shown on focus, so typing replaces it", () => {
+    const onChange = vi.fn();
+    renderUi(<TimePicker label="Starts" value="09:00" onChange={onChange} />);
+    const field = screen.getByRole<HTMLInputElement>("combobox", { name: "Starts" });
+
+    fireEvent.focus(field);
+
+    expect(field.selectionStart).toBe(0);
+    expect(field.selectionEnd).toBe(field.value.length);
+    // What typing "930" over the selection leaves in the field.
+    fireEvent.change(field, { target: { value: "930" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("09:30");
   });
 
   it("lists nothing before min, and refuses an earlier typed time", () => {

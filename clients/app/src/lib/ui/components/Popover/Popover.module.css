@@ -60,3 +60,14 @@
   font-weight: var(--weight-semibold);
   color: var(--text-tertiary);
 }
+
+/* In the top layer (`layer="top"`): fixed, at the coordinates the trigger
+   gives; none of the browser's popover box. After the placements, so their
+   offsets are reset. */
+.panel[data-layer="top"] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
