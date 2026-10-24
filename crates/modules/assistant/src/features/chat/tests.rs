@@ -1887,8 +1887,8 @@ const RUI: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b0002";
 fn errand() -> Value {
     json!({
         "id": ERRAND, "title": "Renew the van insurance", "verb": "do", "origin": "manual",
-        "due_on": "2026-11-02", "due_at": null, "overdue": false,
-        "plan": "date", "plan_on": "2026-10-27", "later_until": null,
+        "due_on": "2030-07-01", "due_at": null, "overdue": false,
+        "plan": "date", "plan_on": "2030-06-14", "later_until": null,
         "state": "open", "closed_at": null, "assignee": SAM, "created_by": SAM,
         "handed_by": null, "source": null, "revision": 7,
         "created_at": "2026-10-20T09:00:00Z", "updated_at": "2026-10-21T09:00:00Z",
@@ -1973,7 +1973,7 @@ async fn each_task_action_is_stored_with_its_request_and_undo(db: PgPool) {
                    "body": {"revision": 7, "plan": "date", "plan_on": day}}),
             // Restoring: the plan it had.
             json!({"operation": "tasks.plan", "method": "POST", "path": path("/plan"),
-                   "body": {"plan": "date", "plan_on": "2026-10-27"},
+                   "body": {"plan": "date", "plan_on": "2030-06-14"},
                    "from_response": revision}),
             json!({"day": day}),
         ),
@@ -1986,7 +1986,7 @@ async fn each_task_action_is_stored_with_its_request_and_undo(db: PgPool) {
             // Restoring: the title, verb and due day it had.
             json!({"operation": "tasks.update", "method": "PATCH", "path": path(""),
                    "body": {"title": "Renew the van insurance", "verb": "do",
-                            "due_on": "2026-11-02", "due_at": null},
+                            "due_on": "2030-07-01", "due_at": null},
                    "from_response": revision}),
             json!({"day": day}),
         ),
@@ -2026,7 +2026,7 @@ async fn each_task_action_is_stored_with_its_request_and_undo(db: PgPool) {
         // The card's facts are the record's, never the model's words.
         assert_eq!(
             proposal["task"],
-            json!({"title": "Renew the van insurance", "verb": "do", "due_on": "2026-11-02"})
+            json!({"title": "Renew the van insurance", "verb": "do", "due_on": "2030-07-01"})
         );
         assert!(proposal.get("facts").is_none(), "{what}");
         assert_eq!(proposal["request"], request, "{what}");
@@ -2054,7 +2054,7 @@ async fn each_task_action_is_stored_with_its_request_and_undo(db: PgPool) {
     assert!(later["detail"]["until"].is_string());
     assert_eq!(
         later["undo"]["body"],
-        json!({"plan": "date", "plan_on": "2026-10-27"})
+        json!({"plan": "date", "plan_on": "2030-06-14"})
     );
     assert_eq!(later["undo"]["from_response"], revision);
     only_reads(&kit);
