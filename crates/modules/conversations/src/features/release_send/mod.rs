@@ -32,11 +32,12 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    domain::{binding, drafts, format, redact},
+    domain::{binding, drafts, format, redact, tracked},
     events::{DRAFT_RECORD, SendRequested},
     features::check_send::{CHECK_AFTER, CheckSend, CheckSendPayload},
     model::{DraftId, DraftState, SendId},
     outgoing::{OUTGOING_CONTENT_TYPE, OUTGOING_VERSION, OutgoingAttachment, OutgoingMessage},
+    tracking,
 };
 
 /// The job's payload: ids only.
@@ -109,6 +110,10 @@ impl JobHandler for ReleaseSend {
         if !mark_sending(tx, &payload, &marked).await? {
             return Ok(()); // Cancelled while the document was written.
         }
+        tracked::track_draft(&state.tracker, tx, payload.draft, |draft| {
+            tracking::DraftReleased { workspace, draft }
+        })
+        .await?;
         state
             .blobs
             .attach(tx, &ws, &blob, &BlobOwner::new(DRAFT_RECORD, payload.draft))
@@ -236,7 +241,7 @@ async fn still_may_send(
     if author_may_send(state, tx, workspace, author, payload.draft).await? {
         return Ok(true);
     }
-    sqlx::query!(
+    let unscheduled = sqlx::query!(
         r#"UPDATE conversations.drafts
               SET state = 'draft', send_at = NULL, updated_at = now()
             WHERE id = $1 AND state = 'scheduled' AND send_generation = $2"#,
@@ -244,7 +249,18 @@ async fn still_may_send(
         payload.generation,
     )
     .execute(&mut **tx)
-    .await?;
+    .await?
+    .rows_affected();
+    if unscheduled > 0 {
+        tracked::track_draft(&state.tracker, tx, payload.draft, |draft| {
+            tracking::DraftUnscheduled {
+                workspace,
+                draft,
+                reason: tracking::UnscheduleReason::SenderMayNotSend,
+            }
+        })
+        .await?;
+    }
     tracing::info!(draft = %payload.draft, "scheduled send not released: the author may no longer send it");
     Ok(false)
 }

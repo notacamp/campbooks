@@ -368,6 +368,90 @@ async fn a_flagged_booking_is_read_when_a_member_opens_it(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn opening_a_flagged_message_tracks_the_request_and_the_read_by_counts(db: PgPool) {
+    let (iso, written) = in_a_month();
+    let quote = format!("A sua consulta é a {written} às 15:00");
+    let answer = json!({
+        "en": "", "pt-PT": "", "es-ES": "", "fr": "", "lapses_at": null, "due_on": null,
+        "items": [{
+            "kind": "appointment", "title": "Consulta na Clínica Sol",
+            "starts": format!("{iso}T15:00:00+00:00"), "ends": format!("{iso}T15:30:00+00:00"),
+            "all_day": false, "time_zone": "Europe/Lisbon", "place": "Rua do Sol 12",
+            "quote": quote, "updates": null, "cancels": null
+        }],
+        "asks": []
+    });
+    let server = complete(&answer).await;
+    let kit = kit_with(db, &server, clinic_deps()).await.tracking();
+    let workspace = WorkspaceId::new();
+    let (sam, sam_id) = kit.member("sam", workspace);
+    let inbox = kit
+        .inbox(
+            workspace,
+            "sam@example.com",
+            &[(sam_id, InboxRole::Manager)],
+        )
+        .await;
+    kit.ingest_value(
+        workspace,
+        inbox,
+        &clinic(&format!("Bom dia. {quote}. Até breve.")),
+    )
+    .await;
+    let path = read_path(&kit, workspace, "clinic-1").await;
+    let message = kit.message_of("clinic-1").await;
+    let conversation = kit.conversation_of("clinic-1").await;
+
+    assert_eq!(kit.post(&sam, &path, None).await.json["outcome"], "queued");
+    // Queued already: nothing more is tracked.
+    assert_eq!(
+        kit.post(&sam, &path, None).await.json["outcome"],
+        "already_queued"
+    );
+    let requested =
+        campbooks_kernel::testing::tracked_events(&kit.db, "conversations.message_read_requested")
+            .await;
+    assert_eq!(requested.len(), 1);
+    assert_eq!(requested[0].version, 1);
+    assert_eq!(
+        requested[0].envelope["actor"],
+        json!({"type": "user", "id": "sam"})
+    );
+    assert_eq!(
+        requested[0].envelope["operation"],
+        "conversations.request_message_read"
+    );
+    assert_eq!(requested[0].body["message_id"], message.as_str());
+    assert_eq!(requested[0].body["conversation_id"], conversation.as_str());
+
+    kit.run_jobs().await;
+    let reads =
+        campbooks_kernel::testing::tracked_events(&kit.db, "conversations.message_read_completed")
+            .await;
+    let read: Vec<_> = reads
+        .iter()
+        .filter(|event| event.body["layer"] == "model")
+        .collect();
+    assert_eq!(read.len(), 1, "{reads:?}");
+    let event = read[0];
+    assert_eq!(event.envelope["actor"]["type"], "system");
+    assert_eq!(
+        event.envelope["on_behalf_of"],
+        json!({"type": "user", "id": "sam"})
+    );
+    assert_eq!(event.body["message_id"], message.as_str());
+    assert_eq!(event.body["outcome"], "read");
+    assert_eq!(event.body["trigger"], "open");
+    assert_eq!(event.body["item_count"], 1);
+    assert_eq!(event.body["ask_count"], 0);
+    assert_eq!(event.body["summary_ready"], false);
+    let text = event.body.to_string();
+    for word in ["Consulta", "Rua do Sol", "Clínica", "15:00"] {
+        assert!(!text.contains(word), "{word} in {text}");
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_phishing_warning_gets_no_read(db: PgPool) {
     let server = complete(&good()).await;
     let kit = kit(db, &server).await;

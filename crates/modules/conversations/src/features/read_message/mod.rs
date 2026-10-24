@@ -68,10 +68,11 @@ use crate::{
         needs::{self, NeedSettings},
         plain_text::{self, Quotes},
         read::{ReadAsk, ReadItem},
-        redact,
+        redact, tracked,
     },
     events::{MESSAGE_RECORD, MessageRead, NeedSummarised, ReadAskFacts, ReadItemFacts},
     model::{Address, ConversationId, InboxId, MessageId},
+    tracking,
 };
 
 /// The feature name its model calls are counted under.
@@ -254,8 +255,9 @@ impl JobHandler for ReadMessage {
         };
         let events = ctx.state().events.clone();
         let blobs = ctx.state().blobs.clone();
+        let tracker = ctx.state().tracker.clone();
         let tx = ctx.tx().await?;
-        keep(tx, &events, &blobs, &self.needs, &read, answer).await?;
+        keep(tx, (&events, &tracker), &blobs, &self.needs, &read, answer).await?;
         Ok(())
     }
 }
@@ -525,9 +527,10 @@ pub(crate) fn covers(structured: Option<&(Value, Value)>, flag: Option<&Flagged>
 /// Keep what the call gave for `read` in `tx`: the read or a failure, with the
 /// dates, items and asks; then work its need out again (the dates may change
 /// it) and say what was written.
+#[allow(clippy::too_many_lines)]
 async fn keep(
     tx: &mut Transaction<'_, Postgres>,
-    events: &EventBus,
+    (events, tracker): (&EventBus, &campbooks_kernel::tracking::Tracker),
     blobs: &BlobStore,
     settings: &NeedSettings,
     read: &Read,
@@ -599,6 +602,30 @@ async fn keep(
     // Its dates may change the need (a lapse time, a due date).
     if stored + marked > 0 {
         needs::refresh(tx, events, &workspace, read.conversation, settings).await?;
+        // Counts only, never what it read (campbooks-cloud#325).
+        tracker
+            .track(
+                tx,
+                &tracking::MessageReadCompleted {
+                    workspace: read.workspace,
+                    message_id: *read.message.as_uuid(),
+                    conversation_id: *read.conversation.as_uuid(),
+                    layer: tracking::ReadLayer::Model,
+                    outcome: if usable {
+                        tracking::ReadOutcome::Read
+                    } else {
+                        tracking::ReadOutcome::Failed
+                    },
+                    trigger: Some(match read.trigger {
+                        Trigger::Need => tracking::ReadTrigger::Need,
+                        Trigger::Open => tracking::ReadTrigger::Open,
+                    }),
+                    item_count: tracked::count(items.len()),
+                    ask_count: tracked::count(asks.len()),
+                    summary_ready,
+                },
+            )
+            .await?;
     }
     if usable && stored == 1 {
         if !items.is_empty() || !asks.is_empty() || summary_ready {

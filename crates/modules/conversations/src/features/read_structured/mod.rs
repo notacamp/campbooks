@@ -310,6 +310,24 @@ async fn keep(
         .await?;
     // A payment due may be the date of the conversation's Pay need.
     needs::refresh(tx, &state.events, &ws, loaded.conversation_id, settings).await?;
+    // Counts only, never what it read (campbooks-cloud#325).
+    state
+        .tracker
+        .track(
+            tx,
+            &crate::tracking::MessageReadCompleted {
+                workspace,
+                message_id: *message.as_uuid(),
+                conversation_id: *loaded.conversation_id.as_uuid(),
+                layer: crate::tracking::ReadLayer::Structured,
+                outcome: crate::tracking::ReadOutcome::Read,
+                trigger: None,
+                item_count: crate::domain::tracked::count(items.len()),
+                ask_count: crate::domain::tracked::count(asks.len()),
+                summary_ready: false,
+            },
+        )
+        .await?;
     Ok(())
 }
 

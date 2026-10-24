@@ -1,0 +1,1896 @@
+# The conversations module's tracked events (campbooks-cloud#325, OpenSpec
+# change track-conversations-events): every operation, job, schedule and event handler of the
+# module gets a Coverage row. Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0002-conversations.yaml`.
+changelog:
+  - date: "2026-10-24"
+    plan_version: 2
+    change: "The conversations module instrumented (campbooks-cloud#325): 40 events for flags, streams, labels, needs, drafts and sends, taught rules and their runs, suggestions, person notes, provider batches, the model pass, Scout's reads and inboxes; records draft, need, rule and rule_run; Coverage for every operation, job, schedule and handler of the module."
+    pr: "#650"
+
+events:
+  - name: "conversations.conversation_read"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "read"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A conversation was marked read."
+    fires_when: "Marking it read changes at least one of its messages (conversations.mark_read), in the transaction of that change. A conversation already read tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_unread_marked"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "unread_marked"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A conversation was marked unread."
+    fires_when: "Marking it unread changes its newest message (conversations.mark_unread). One already unread tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_starred"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "starred"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A conversation was starred."
+    fires_when: "Starring it stars its newest message (conversations.star). One already starred tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_unstarred"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "unstarred"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A conversation was unstarred."
+    fires_when: "Unstarring it changes at least one of its messages (conversations.unstar). One with no star tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_trashed"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "trashed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A conversation went to the trash."
+    fires_when: "Trashing it changes at least one of its messages (conversations.trash). One already in the trash tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_untrashed"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "untrashed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A conversation came out of the trash, back where it was."
+    fires_when: "Taking it out of the trash changes at least one of its messages (conversations.untrash)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_spammed"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "spammed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A conversation was reported as spam: out of the inbox, into spam."
+    fires_when: "Reporting it changes at least one of its messages (conversations.report_spam). One already in spam tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_unspammed"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "unspammed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A conversation was taken out of spam (Not spam): received mail back in the inbox."
+    fires_when: "Taking it out of spam changes at least one of its messages (conversations.not_spam)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_moved"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "moved"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A member moved a conversation to another stream."
+    fires_when: "Moving it changes its stream (conversations.move_to_stream); the move is recorded as a correction. A move to the stream it is in tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_labelled"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "labelled"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A label was put on a conversation."
+    fires_when: "Adding the label links it to the conversation (conversations.add_label). A label already on it tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.conversation_unlabelled"
+    version: 1
+    module: "conversations"
+    object: "conversation"
+    action: "unlabelled"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A label was taken off a conversation."
+    fires_when: "Removing the label unlinks it (conversations.remove_label)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.need_resolved"
+    version: 1
+    module: "conversations"
+    object: "need"
+    action: "resolved"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A member gave a verdict on what a conversation needs: done, not needed, already paid or still to pay."
+    fires_when: "The verdict is stored (conversations.resolve_need), in the transaction that works the need out again. Still to pay on a need that was no question changes nothing and tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.need_confirmed"
+    version: 1
+    module: "conversations"
+    object: "need"
+    action: "confirmed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A member answered yes to the question a conversation's need asked."
+    fires_when: "The yes is stored (conversations.confirm_need)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.need_reopened"
+    version: 1
+    module: "conversations"
+    object: "need"
+    action: "reopened"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A member took back their verdict on a conversation's need (Undo)."
+    fires_when: "The verdict is taken back (conversations.reopen_need)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.draft_created"
+    version: 1
+    module: "conversations"
+    object: "draft"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A draft was started: new, a reply, a reply all, a forward or a nudge."
+    fires_when: "The draft is stored (conversations.create_draft)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.draft_updated"
+    version: 1
+    module: "conversations"
+    object: "draft"
+    action: "updated"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A draft was saved with a change."
+    fires_when: "A save changes its recipients, subject, text, quoted history, attachments, or makes a failed draft a draft again (conversations.update_draft). A save that changes nothing tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.draft_discarded"
+    version: 1
+    module: "conversations"
+    object: "draft"
+    action: "discarded"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A draft was discarded."
+    fires_when: "The draft is deleted (conversations.delete_draft)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.draft_scheduled"
+    version: 1
+    module: "conversations"
+    object: "draft"
+    action: "scheduled"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client]
+    description: "A member sent a draft: it waits out its undo window."
+    fires_when: "The send is scheduled (conversations.send_draft)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.draft_unscheduled"
+    version: 1
+    module: "conversations"
+    object: "draft"
+    action: "unscheduled"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, system]
+    description: "A scheduled send was taken back: a draft again."
+    fires_when: "A member cancels it during its undo window (conversations.cancel_send), or the release finds its author may no longer send from the inbox (conversations.release_send). A draft not scheduled tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.draft_released"
+    version: 1
+    module: "conversations"
+    object: "draft"
+    action: "released"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A scheduled send was handed to the connector."
+    fires_when: "Its undo window passed and the release marks it sending (conversations.release_send)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.draft_sent"
+    version: 1
+    module: "conversations"
+    object: "draft"
+    action: "sent"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "The provider sent a draft."
+    fires_when: "The connector reports it sent (conversations.record_send, on connectors.send_completed), before the draft is deleted."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.draft_send_failed"
+    version: 1
+    module: "conversations"
+    object: "draft"
+    action: "send_failed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A send failed: the draft is editable and sendable again."
+    fires_when: "The connector reports it failed (conversations.record_send), or no report came back in time (conversations.check_send, unknown_outcome)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_created"
+    version: 1
+    module: "conversations"
+    object: "rule"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "A taught rule was stored: acting, or proposed for a member's yes."
+    fires_when: "The rule is stored (conversations.create_rule)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_confirmed"
+    version: 1
+    module: "conversations"
+    object: "rule"
+    action: "confirmed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client]
+    description: "A member said yes to a rule: it acts with their rights."
+    fires_when: "A proposal is kept, or a kept rule is bound again (conversations.confirm_rule)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_declined"
+    version: 1
+    module: "conversations"
+    object: "rule"
+    action: "declined"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A member turned a proposed rule down."
+    fires_when: "The proposal is removed (conversations.decline_rule)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_updated"
+    version: 1
+    module: "conversations"
+    object: "rule"
+    action: "updated"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A rule was changed: reshaped, paused, resumed or adopted."
+    fires_when: "A save changes its conditions, actions, state or author (conversations.update_rule). A save that changes none of them tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_removed"
+    version: 1
+    module: "conversations"
+    object: "rule"
+    action: "removed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A rule was removed."
+    fires_when: "A member removes it (conversations.remove_rule), or a rule created, confirmed, updated or restored replaces it (cause replaced), in that transaction."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_restored"
+    version: 1
+    module: "conversations"
+    object: "rule"
+    action: "restored"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant]
+    description: "A removed rule was brought back (Undo)."
+    fires_when: "The rule is restored (conversations.restore_rule)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_run_finished"
+    version: 1
+    module: "conversations"
+    object: "rule_run"
+    action: "finished"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A run applying a rule to an inbox's mail, or putting it back, ended."
+    fires_when: "The run ends, done or cancelled (conversations.apply_rule), in the transaction of its last batch. One event per run, with its counts: a run touches a whole inbox."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_notice_answered"
+    version: 1
+    module: "conversations"
+    object: "rule_notice"
+    action: "answered"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client]
+    description: "A member answered a Scout-noticed suggestion: not now, or never."
+    fires_when: "The answer is stored (conversations.answer_rule_notice)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_notice_answer_cleared"
+    version: 1
+    module: "conversations"
+    object: "rule_notice"
+    action: "answer_cleared"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client]
+    description: "A member took back their answer to a suggestion (Undo): it is offered again."
+    fires_when: "An answer is deleted (conversations.clear_rule_notice_answer). No answer to take back tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.rule_suggestion_dismissed"
+    version: 1
+    module: "conversations"
+    object: "rule_suggestion"
+    action: "dismissed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client]
+    description: "A member turned down the rules suggested after acting on a conversation."
+    fires_when: "The dismissal is stored (conversations.dismiss_rule_suggestion). Only a member's own dismissal is stored."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.person_note_saved"
+    version: 1
+    module: "conversations"
+    object: "person_note"
+    action: "saved"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member saved what they told Scout about a person."
+    fires_when: "A note is created or its text changed (conversations.set_person_note). The same text again tracks nothing. Never the note, nor whom it is about."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.person_note_deleted"
+    version: 1
+    module: "conversations"
+    object: "person_note"
+    action: "deleted"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member deleted a note about a person."
+    fires_when: "The note is deleted (conversations.delete_person_note)."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.message_batch_applied"
+    version: 1
+    module: "conversations"
+    object: "message_batch"
+    action: "applied"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A batch of the provider's message changes was applied to an inbox."
+    fires_when: "Applying it adds, changes or removes at least one message (conversations.apply_changes). A batch that changes nothing tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.message_decided"
+    version: 1
+    module: "conversations"
+    object: "message"
+    action: "decided"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "The model pass answered the triage questions about an inbound message."
+    fires_when: "Its answers are stored (conversations.decide_message as mail arrives, conversations.decide_backlog for stored mail). A pass that stores nothing (no model, over the daily limit, already answered) tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.message_read_requested"
+    version: 1
+    module: "conversations"
+    object: "message_read"
+    action: "requested"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client]
+    description: "A member opened a message and Scout's read of it was queued."
+    fires_when: "The read is queued (conversations.request_message_read). Anything else it answers (already read, queued, not flagged, unavailable) tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.message_read_completed"
+    version: 1
+    module: "conversations"
+    object: "message_read"
+    action: "completed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A read of a message was stored: the sender's own structured data, or Scout's read."
+    fires_when: "The read is stored (conversations.read_structured, conversations.read_message). Never what it read: counts only."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.inbox_created"
+    version: 1
+    module: "conversations"
+    object: "inbox"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "An inbox was created for a connection that gained the messages capability."
+    fires_when: "The inbox is created (conversations.create_inbox, on connectors.capability_granted). A replay or an inbox already there tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+  - name: "conversations.inbox_closed"
+    version: 1
+    module: "conversations"
+    object: "inbox"
+    action: "closed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A removed connection's inbox was deleted with its mail, or kept read-only."
+    fires_when: "The inbox is deleted or frozen (conversations.forget_connection, on connectors.connection_removed). An inbox already gone or frozen tracks nothing."
+    added_in: 2
+    openspec_change: "track-conversations-events"
+
+properties:
+  - event: "conversations.conversation_read"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_unread_marked"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_starred"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_unstarred"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_trashed"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_untrashed"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_spammed"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_unspammed"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_moved"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_moved"
+    version: 1
+    property: "before"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation before the move: the stream it left and who had placed it there."
+  - event: "conversations.conversation_labelled"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_labelled"
+    version: 1
+    property: "label_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The label (its name is never tracked)."
+  - event: "conversations.conversation_labelled"
+    version: 1
+    property: "label_created"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether the inbox's label was created by this request."
+  - event: "conversations.conversation_unlabelled"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.conversation_unlabelled"
+    version: 1
+    property: "label_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The label."
+  - event: "conversations.need_resolved"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.need_resolved"
+    version: 1
+    property: "need"
+    type: "record"
+    of: "conversations.need"
+    required: false
+    classification: "operational"
+    description: "Its need afterwards; absent when it has none."
+  - event: "conversations.need_confirmed"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.need_confirmed"
+    version: 1
+    property: "need"
+    type: "record"
+    of: "conversations.need"
+    required: false
+    classification: "operational"
+    description: "Its need afterwards; absent when it has none."
+  - event: "conversations.need_reopened"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "The conversation afterwards."
+  - event: "conversations.need_reopened"
+    version: 1
+    property: "need"
+    type: "record"
+    of: "conversations.need"
+    required: false
+    classification: "operational"
+    description: "Its need afterwards; absent when it has none."
+  - event: "conversations.draft_created"
+    version: 1
+    property: "draft"
+    type: "record"
+    of: "conversations.draft"
+    required: true
+    classification: "operational"
+    description: "The draft afterwards."
+  - event: "conversations.draft_updated"
+    version: 1
+    property: "draft"
+    type: "record"
+    of: "conversations.draft"
+    required: true
+    classification: "operational"
+    description: "The draft afterwards."
+  - event: "conversations.draft_discarded"
+    version: 1
+    property: "draft"
+    type: "record"
+    of: "conversations.draft"
+    required: true
+    classification: "operational"
+    description: "The draft as it was when it was discarded."
+  - event: "conversations.draft_scheduled"
+    version: 1
+    property: "draft"
+    type: "record"
+    of: "conversations.draft"
+    required: true
+    classification: "operational"
+    description: "The draft afterwards."
+  - event: "conversations.draft_unscheduled"
+    version: 1
+    property: "draft"
+    type: "record"
+    of: "conversations.draft"
+    required: true
+    classification: "operational"
+    description: "The draft afterwards."
+  - event: "conversations.draft_unscheduled"
+    version: 1
+    property: "reason"
+    type: "enum"
+    of: "conversations.unschedule_reason"
+    required: true
+    classification: "operational"
+    description: "Why it was taken back."
+  - event: "conversations.draft_released"
+    version: 1
+    property: "draft"
+    type: "record"
+    of: "conversations.draft"
+    required: true
+    classification: "operational"
+    description: "The draft afterwards."
+  - event: "conversations.draft_sent"
+    version: 1
+    property: "draft"
+    type: "record"
+    of: "conversations.draft"
+    required: true
+    classification: "operational"
+    description: "The draft as it left (state sent)."
+  - event: "conversations.draft_send_failed"
+    version: 1
+    property: "draft"
+    type: "record"
+    of: "conversations.draft"
+    required: true
+    classification: "operational"
+    description: "The draft afterwards."
+  - event: "conversations.draft_send_failed"
+    version: 1
+    property: "error"
+    type: "enum"
+    of: "conversations.send_error"
+    required: true
+    classification: "operational"
+    description: "The kind of failure."
+  - event: "conversations.rule_created"
+    version: 1
+    property: "rule"
+    type: "record"
+    of: "conversations.rule"
+    required: true
+    classification: "operational"
+    description: "The rule afterwards."
+  - event: "conversations.rule_created"
+    version: 1
+    property: "acted_without_asking"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether it acts at once because the member lets Campbooks act without asking."
+  - event: "conversations.rule_confirmed"
+    version: 1
+    property: "rule"
+    type: "record"
+    of: "conversations.rule"
+    required: true
+    classification: "operational"
+    description: "The rule afterwards."
+  - event: "conversations.rule_declined"
+    version: 1
+    property: "rule"
+    type: "record"
+    of: "conversations.rule"
+    required: true
+    classification: "operational"
+    description: "The rule afterwards."
+  - event: "conversations.rule_updated"
+    version: 1
+    property: "rule"
+    type: "record"
+    of: "conversations.rule"
+    required: true
+    classification: "operational"
+    description: "The rule afterwards."
+  - event: "conversations.rule_removed"
+    version: 1
+    property: "rule"
+    type: "record"
+    of: "conversations.rule"
+    required: true
+    classification: "operational"
+    description: "The rule afterwards."
+  - event: "conversations.rule_removed"
+    version: 1
+    property: "cause"
+    type: "enum"
+    of: "conversations.rule_removal_cause"
+    required: true
+    classification: "operational"
+    description: "Why it was removed."
+  - event: "conversations.rule_removed"
+    version: 1
+    property: "put_back"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether what it changed is being put back."
+  - event: "conversations.rule_restored"
+    version: 1
+    property: "rule"
+    type: "record"
+    of: "conversations.rule"
+    required: true
+    classification: "operational"
+    description: "The rule afterwards."
+  - event: "conversations.rule_run_finished"
+    version: 1
+    property: "run"
+    type: "record"
+    of: "conversations.rule_run"
+    required: true
+    classification: "operational"
+    description: "The run as it ended."
+  - event: "conversations.rule_notice_answered"
+    version: 1
+    property: "notice_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The suggestion."
+  - event: "conversations.rule_notice_answered"
+    version: 1
+    property: "inbox_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "Its inbox."
+  - event: "conversations.rule_notice_answered"
+    version: 1
+    property: "kind"
+    type: "enum"
+    of: "conversations.notice_kind"
+    required: true
+    classification: "operational"
+    description: "What it suggested."
+  - event: "conversations.rule_notice_answered"
+    version: 1
+    property: "answer"
+    type: "enum"
+    of: "conversations.notice_answer"
+    required: true
+    classification: "operational"
+    description: "The answer."
+  - event: "conversations.rule_notice_answer_cleared"
+    version: 1
+    property: "notice_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The suggestion."
+  - event: "conversations.rule_notice_answer_cleared"
+    version: 1
+    property: "inbox_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "Its inbox."
+  - event: "conversations.rule_notice_answer_cleared"
+    version: 1
+    property: "kind"
+    type: "enum"
+    of: "conversations.notice_kind"
+    required: true
+    classification: "operational"
+    description: "What it suggested."
+  - event: "conversations.rule_suggestion_dismissed"
+    version: 1
+    property: "conversation_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The conversation the suggestion came from."
+  - event: "conversations.rule_suggestion_dismissed"
+    version: 1
+    property: "inbox_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "Its inbox."
+  - event: "conversations.rule_suggestion_dismissed"
+    version: 1
+    property: "times"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many times the member has turned it down."
+  - event: "conversations.person_note_saved"
+    version: 1
+    property: "note_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The note."
+  - event: "conversations.person_note_saved"
+    version: 1
+    property: "created"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether it is a new note."
+  - event: "conversations.person_note_deleted"
+    version: 1
+    property: "note_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The note."
+  - event: "conversations.message_batch_applied"
+    version: 1
+    property: "inbox_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The inbox."
+  - event: "conversations.message_batch_applied"
+    version: 1
+    property: "backfill"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether it is part of the first import."
+  - event: "conversations.message_batch_applied"
+    version: 1
+    property: "messages_added"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Messages stored."
+  - event: "conversations.message_batch_applied"
+    version: 1
+    property: "messages_updated"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Known messages whose flags, labels or stream changed."
+  - event: "conversations.message_batch_applied"
+    version: 1
+    property: "messages_removed"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Messages the provider deleted."
+  - event: "conversations.message_batch_applied"
+    version: 1
+    property: "conversations_changed"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Conversations the batch created or changed."
+  - event: "conversations.message_batch_applied"
+    version: 1
+    property: "rules_acted"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Arriving messages a taught rule acted on."
+  - event: "conversations.message_decided"
+    version: 1
+    property: "message_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The message."
+  - event: "conversations.message_decided"
+    version: 1
+    property: "conversation"
+    type: "record"
+    of: "conversations.conversation"
+    required: true
+    classification: "operational"
+    description: "Its conversation afterwards."
+  - event: "conversations.message_decided"
+    version: 1
+    property: "pass"
+    type: "enum"
+    of: "conversations.decide_pass"
+    required: true
+    classification: "operational"
+    description: "Which pass."
+  - event: "conversations.message_decided"
+    version: 1
+    property: "answer_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many answers it stored."
+  - event: "conversations.message_decided"
+    version: 1
+    property: "placed"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether its answer placed the conversation in a stream."
+  - event: "conversations.message_decided"
+    version: 1
+    property: "moves_only"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether only whose move it is was asked."
+  - event: "conversations.message_read_requested"
+    version: 1
+    property: "message_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The message."
+  - event: "conversations.message_read_requested"
+    version: 1
+    property: "conversation_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "Its conversation."
+  - event: "conversations.message_read_completed"
+    version: 1
+    property: "message_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The message."
+  - event: "conversations.message_read_completed"
+    version: 1
+    property: "conversation_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "Its conversation."
+  - event: "conversations.message_read_completed"
+    version: 1
+    property: "layer"
+    type: "enum"
+    of: "conversations.read_layer"
+    required: true
+    classification: "operational"
+    description: "Which read."
+  - event: "conversations.message_read_completed"
+    version: 1
+    property: "outcome"
+    type: "enum"
+    of: "conversations.read_outcome"
+    required: true
+    classification: "operational"
+    description: "Whether the read was usable."
+  - event: "conversations.message_read_completed"
+    version: 1
+    property: "trigger"
+    type: "enum"
+    of: "conversations.read_trigger"
+    required: false
+    classification: "operational"
+    description: "What asked for Scout's read; absent for structured data."
+  - event: "conversations.message_read_completed"
+    version: 1
+    property: "item_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Things that happen at a time it found."
+  - event: "conversations.message_read_completed"
+    version: 1
+    property: "ask_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Obligations it found."
+  - event: "conversations.message_read_completed"
+    version: 1
+    property: "summary_ready"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether it wrote a summary of the need."
+  - event: "conversations.inbox_created"
+    version: 1
+    property: "inbox_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The inbox."
+  - event: "conversations.inbox_created"
+    version: 1
+    property: "connection_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The connection that feeds it."
+  - event: "conversations.inbox_created"
+    version: 1
+    property: "member_added"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether the granting member was added as its manager."
+  - event: "conversations.inbox_closed"
+    version: 1
+    property: "inbox_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The inbox."
+  - event: "conversations.inbox_closed"
+    version: 1
+    property: "mail"
+    type: "enum"
+    of: "conversations.closed_mail"
+    required: true
+    classification: "operational"
+    description: "What happened to its mail."
+  - event: "conversations.inbox_closed"
+    version: 1
+    property: "message_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Messages it held."
+  - event: "conversations.inbox_closed"
+    version: 1
+    property: "draft_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Drafts it held."
+
+records:
+  - record: "conversations.need"
+    field: "conversation_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The conversation it belongs to."
+  - record: "conversations.need"
+    field: "message_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The inbound message it comes from."
+  - record: "conversations.need"
+    field: "reason"
+    type: "enum"
+    enum: "conversations.need_reason"
+    required: true
+    classification: "operational"
+    description: "Why the conversation needs its members."
+  - record: "conversations.need"
+    field: "question"
+    type: "enum"
+    enum: "conversations.need_question"
+    required: true
+    classification: "operational"
+    description: "The question that raised it."
+  - record: "conversations.need"
+    field: "trust"
+    type: "enum"
+    enum: "conversations.need_trust"
+    required: true
+    classification: "operational"
+    description: "How much Campbooks stands behind it."
+  - record: "conversations.need"
+    field: "basis"
+    type: "enum"
+    enum: "conversations.need_basis"
+    required: true
+    classification: "operational"
+    description: "Whose answer raised it."
+  - record: "conversations.need"
+    field: "state"
+    type: "enum"
+    enum: "conversations.need_state"
+    required: true
+    classification: "operational"
+    description: "Open, or cleared."
+  - record: "conversations.need"
+    field: "cleared_because"
+    type: "enum"
+    enum: "conversations.clear_cause"
+    required: false
+    classification: "operational"
+    description: "Why it was cleared, once cleared."
+  - record: "conversations.need"
+    field: "verdict"
+    type: "enum"
+    enum: "conversations.need_verdict"
+    required: false
+    classification: "operational"
+    description: "A member's verdict on it, if any."
+  - record: "conversations.need"
+    field: "urgent"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether it is urgent."
+  - record: "conversations.need"
+    field: "has_due_date"
+    type: "bool"
+    required: true
+    classification: "operational"
+    description: "Whether it has a date to act by (the date itself is not tracked)."
+  - record: "conversations.draft"
+    field: "id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The draft."
+  - record: "conversations.draft"
+    field: "inbox_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The inbox it is sent from."
+  - record: "conversations.draft"
+    field: "conversation_id"
+    type: "id"
+    required: false
+    classification: "id"
+    description: "The conversation it answers, if any."
+  - record: "conversations.draft"
+    field: "message_id"
+    type: "id"
+    required: false
+    classification: "id"
+    description: "The message it replies to or forwards, if any."
+  - record: "conversations.draft"
+    field: "kind"
+    type: "enum"
+    enum: "conversations.draft_kind"
+    required: true
+    classification: "operational"
+    description: "What it answers."
+  - record: "conversations.draft"
+    field: "state"
+    type: "enum"
+    enum: "conversations.draft_state"
+    required: true
+    classification: "operational"
+    description: "Where it is in its life."
+  - record: "conversations.draft"
+    field: "version"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Its save count."
+  - record: "conversations.draft"
+    field: "to_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many recipients (never who)."
+  - record: "conversations.draft"
+    field: "cc_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many copied recipients."
+  - record: "conversations.draft"
+    field: "bcc_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many blind-copied recipients."
+  - record: "conversations.draft"
+    field: "attachment_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many forwarded attachments."
+  - record: "conversations.draft"
+    field: "send_at"
+    type: "timestamp"
+    required: false
+    classification: "operational"
+    description: "When a scheduled send leaves."
+  - record: "conversations.draft"
+    field: "failure"
+    type: "enum"
+    enum: "conversations.send_error"
+    required: false
+    classification: "operational"
+    description: "Why its last send failed, while it is failed."
+  - record: "conversations.rule"
+    field: "id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The rule."
+  - record: "conversations.rule"
+    field: "inbox_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The inbox it acts in."
+  - record: "conversations.rule"
+    field: "state"
+    type: "enum"
+    enum: "conversations.rule_state"
+    required: true
+    classification: "operational"
+    description: "Its state as readers see it (paused while its author may not act)."
+  - record: "conversations.rule"
+    field: "paused_reason"
+    type: "enum"
+    enum: "conversations.paused_reason"
+    required: false
+    classification: "operational"
+    description: "Why it is paused, when it is."
+  - record: "conversations.rule"
+    field: "origin"
+    type: "enum"
+    enum: "conversations.rule_origin"
+    required: true
+    classification: "operational"
+    description: "How it was taught."
+  - record: "conversations.rule"
+    field: "condition_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many conditions it has (never what they match)."
+  - record: "conversations.rule"
+    field: "actions"
+    type: "enum"
+    enum: "conversations.rule_action"
+    list: true
+    required: true
+    classification: "operational"
+    description: "The kinds of its actions (never their values)."
+  - record: "conversations.rule"
+    field: "applied_count"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How often it acted on arriving mail."
+  - record: "conversations.rule_run"
+    field: "id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The run."
+  - record: "conversations.rule_run"
+    field: "rule_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "Its rule."
+  - record: "conversations.rule_run"
+    field: "kind"
+    type: "enum"
+    enum: "conversations.run_kind"
+    required: true
+    classification: "operational"
+    description: "Applying, or putting back."
+  - record: "conversations.rule_run"
+    field: "state"
+    type: "enum"
+    enum: "conversations.run_state"
+    required: true
+    classification: "operational"
+    description: "How it ended."
+  - record: "conversations.rule_run"
+    field: "total"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Conversations it matched."
+  - record: "conversations.rule_run"
+    field: "done"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Conversations it went through."
+  - record: "conversations.rule_run"
+    field: "changed"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Conversations it changed."
+  - record: "conversations.rule_run"
+    field: "skipped_suspicious"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Suspicious mail it left alone."
+  - record: "conversations.rule_run"
+    field: "skipped_member"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "Conversations a member had changed, left alone."
+
+enums:
+  - enum: "conversations.need_reason"
+    value: "reply"
+    description: "Someone is waiting for an answer."
+  - enum: "conversations.need_reason"
+    value: "do"
+    description: "Someone asked for something to be done."
+  - enum: "conversations.need_reason"
+    value: "pay"
+    description: "Money is owed."
+  - enum: "conversations.need_reason"
+    value: "review"
+    description: "Look before acting: a warning, or a question to the member."
+  - enum: "conversations.need_reason"
+    value: "worth_a_look"
+    description: "A taught rule keeps it in front of the member until opened."
+  - enum: "conversations.need_reason"
+    value: "waiting"
+    description: "Someone else has the next move."
+  - enum: "conversations.need_reason"
+    value: "nudge"
+    description: "The wait passed its nudge time."
+  - enum: "conversations.need_question"
+    value: "needs_reply"
+    description: "Does it need a reply?"
+  - enum: "conversations.need_question"
+    value: "asks_action"
+    description: "Does it ask for an action?"
+  - enum: "conversations.need_question"
+    value: "suspicious"
+    description: "Is it suspicious?"
+  - enum: "conversations.need_question"
+    value: "money"
+    description: "Is money owed?"
+  - enum: "conversations.need_question"
+    value: "worth_a_look"
+    description: "A taught highlight."
+  - enum: "conversations.need_question"
+    value: "still_to_do"
+    description: "Still to do?"
+  - enum: "conversations.need_question"
+    value: "still_needs_reply"
+    description: "Still needs a reply?"
+  - enum: "conversations.need_question"
+    value: "next_move"
+    description: "Whose move is it?"
+  - enum: "conversations.need_trust"
+    value: "sure"
+    description: "An answer the policy lets act, or a member confirmed."
+  - enum: "conversations.need_trust"
+    value: "check"
+    description: "A suggestion put to the member as a question."
+  - enum: "conversations.need_basis"
+    value: "rules"
+    description: "The facts."
+  - enum: "conversations.need_basis"
+    value: "model"
+    description: "The model's answer."
+  - enum: "conversations.need_basis"
+    value: "taught"
+    description: "A rule a member taught."
+  - enum: "conversations.need_basis"
+    value: "member"
+    description: "A member."
+  - enum: "conversations.need_state"
+    value: "open"
+    description: "It needs the members."
+  - enum: "conversations.need_state"
+    value: "cleared"
+    description: "It no longer does."
+  - enum: "conversations.clear_cause"
+    value: "replied"
+    description: "The inbox replied."
+  - enum: "conversations.clear_cause"
+    value: "archived"
+    description: "It was archived."
+  - enum: "conversations.clear_cause"
+    value: "trashed"
+    description: "It was binned."
+  - enum: "conversations.clear_cause"
+    value: "done"
+    description: "A member said it is done."
+  - enum: "conversations.clear_cause"
+    value: "not_needed"
+    description: "A member said it is not needed."
+  - enum: "conversations.clear_cause"
+    value: "superseded"
+    description: "A newer message replaced it."
+  - enum: "conversations.clear_cause"
+    value: "rule"
+    description: "A taught rule cleared it."
+  - enum: "conversations.clear_cause"
+    value: "opened"
+    description: "It was opened (worth a look)."
+  - enum: "conversations.clear_cause"
+    value: "lapsed"
+    description: "What it asked lapsed."
+  - enum: "conversations.clear_cause"
+    value: "heard_back"
+    description: "The person waited on wrote back."
+  - enum: "conversations.need_verdict"
+    value: "done"
+    description: "Done."
+  - enum: "conversations.need_verdict"
+    value: "not_needed"
+    description: "Not needed."
+  - enum: "conversations.need_verdict"
+    value: "confirmed"
+    description: "A question answered yes."
+  - enum: "conversations.need_verdict"
+    value: "already_paid"
+    description: "Already paid."
+  - enum: "conversations.need_verdict"
+    value: "still_to_pay"
+    description: "Still to pay."
+  - enum: "conversations.draft_kind"
+    value: "new"
+    description: "A new message."
+  - enum: "conversations.draft_kind"
+    value: "reply"
+    description: "A reply to the sender."
+  - enum: "conversations.draft_kind"
+    value: "reply_all"
+    description: "A reply to everyone."
+  - enum: "conversations.draft_kind"
+    value: "forward"
+    description: "A forward."
+  - enum: "conversations.draft_kind"
+    value: "nudge"
+    description: "A nudge to someone the member waits on."
+  - enum: "conversations.draft_state"
+    value: "draft"
+    description: "Being written."
+  - enum: "conversations.draft_state"
+    value: "scheduled"
+    description: "Sent, waiting out its undo window."
+  - enum: "conversations.draft_state"
+    value: "sending"
+    description: "Handed to the connector."
+  - enum: "conversations.draft_state"
+    value: "failed"
+    description: "The provider did not send it."
+  - enum: "conversations.draft_state"
+    value: "sent"
+    description: "The provider sent it (the draft is gone)."
+  - enum: "conversations.send_error"
+    value: "not_connected"
+    description: "The inbox's connection is gone."
+  - enum: "conversations.send_error"
+    value: "needs_reauth"
+    description: "The connection needs signing in again."
+  - enum: "conversations.send_error"
+    value: "rejected"
+    description: "The provider refused it."
+  - enum: "conversations.send_error"
+    value: "too_large"
+    description: "Too large for the provider."
+  - enum: "conversations.send_error"
+    value: "unavailable"
+    description: "The provider could not be reached; nothing was sent."
+  - enum: "conversations.send_error"
+    value: "unknown_outcome"
+    description: "It may have been sent: no answer came back."
+  - enum: "conversations.send_error"
+    value: "other"
+    description: "A reason this plan does not know yet."
+  - enum: "conversations.unschedule_reason"
+    value: "cancelled"
+    description: "The member took it back (Undo)."
+  - enum: "conversations.unschedule_reason"
+    value: "sender_may_not_send"
+    description: "Its author may no longer send from the inbox."
+  - enum: "conversations.rule_state"
+    value: "proposed"
+    description: "Waiting for a member's yes."
+  - enum: "conversations.rule_state"
+    value: "active"
+    description: "Acting."
+  - enum: "conversations.rule_state"
+    value: "paused"
+    description: "Not acting for now."
+  - enum: "conversations.rule_state"
+    value: "removed"
+    description: "Removed."
+  - enum: "conversations.paused_reason"
+    value: "inbox_read_only"
+    description: "Its inbox is kept read-only."
+  - enum: "conversations.paused_reason"
+    value: "domain_too_broad"
+    description: "Its domain is too broad to trust."
+  - enum: "conversations.paused_reason"
+    value: "author_cannot_write"
+    description: "Its author may not change the inbox."
+  - enum: "conversations.paused_reason"
+    value: "paused_by_member"
+    description: "A member paused it."
+  - enum: "conversations.paused_reason"
+    value: "author_unavailable"
+    description: "Its author is away."
+  - enum: "conversations.rule_origin"
+    value: "action"
+    description: "From something the member did."
+  - enum: "conversations.rule_origin"
+    value: "onboarding"
+    description: "From onboarding."
+  - enum: "conversations.rule_origin"
+    value: "instruction"
+    description: "From what the member told Scout."
+  - enum: "conversations.rule_origin"
+    value: "correction"
+    description: "From a member's correction."
+  - enum: "conversations.rule_origin"
+    value: "suggestion"
+    description: "From a suggestion."
+  - enum: "conversations.rule_action"
+    value: "move_to_stream"
+    description: "Put it in a stream."
+  - enum: "conversations.rule_action"
+    value: "archive"
+    description: "Take it out of the inbox."
+  - enum: "conversations.rule_action"
+    value: "add_label"
+    description: "Put a label on it."
+  - enum: "conversations.rule_action"
+    value: "mark_read"
+    description: "Mark it read."
+  - enum: "conversations.rule_action"
+    value: "needs_reply"
+    description: "Whether it needs a reply."
+  - enum: "conversations.rule_action"
+    value: "asks_action"
+    description: "Whether it asks for an action."
+  - enum: "conversations.rule_action"
+    value: "surface"
+    description: "Always or never show it."
+  - enum: "conversations.rule_action"
+    value: "trash"
+    description: "Put it in the trash."
+  - enum: "conversations.rule_action"
+    value: "spam"
+    description: "Report it as spam."
+  - enum: "conversations.rule_action"
+    value: "mark_paid"
+    description: "Its bills are paid."
+  - enum: "conversations.rule_action"
+    value: "show_images"
+    description: "Show its remote images."
+  - enum: "conversations.rule_action"
+    value: "worth_a_look"
+    description: "Keep it in front of the member until opened."
+  - enum: "conversations.rule_removal_cause"
+    value: "member"
+    description: "A member removed it."
+  - enum: "conversations.rule_removal_cause"
+    value: "replaced"
+    description: "Another rule replaced it."
+  - enum: "conversations.run_kind"
+    value: "apply"
+    description: "Applying it to the mail already there."
+  - enum: "conversations.run_kind"
+    value: "revert"
+    description: "Putting back what it changed."
+  - enum: "conversations.run_state"
+    value: "running"
+    description: "Running."
+  - enum: "conversations.run_state"
+    value: "done"
+    description: "Done."
+  - enum: "conversations.run_state"
+    value: "cancelled"
+    description: "Stopped before the end."
+  - enum: "conversations.notice_kind"
+    value: "keep_off_home"
+    description: "Keep this sender's mail off Home."
+  - enum: "conversations.notice_kind"
+    value: "archive_on_arrival"
+    description: "Archive this sender's mail as it arrives."
+  - enum: "conversations.notice_answer"
+    value: "not_now"
+    description: "Not now: offered again later."
+  - enum: "conversations.notice_answer"
+    value: "never"
+    description: "Never for this sender and kind."
+  - enum: "conversations.decide_pass"
+    value: "arrival"
+    description: "As the message arrived."
+  - enum: "conversations.decide_pass"
+    value: "backlog"
+    description: "For mail stored before."
+  - enum: "conversations.read_layer"
+    value: "structured"
+    description: "The sender's machine-readable data."
+  - enum: "conversations.read_layer"
+    value: "model"
+    description: "Scout's read."
+  - enum: "conversations.read_outcome"
+    value: "read"
+    description: "Stored a usable read."
+  - enum: "conversations.read_outcome"
+    value: "failed"
+    description: "Nothing usable came back."
+  - enum: "conversations.read_trigger"
+    value: "need"
+    description: "A need opened on it."
+  - enum: "conversations.read_trigger"
+    value: "open"
+    description: "A member opened it."
+  - enum: "conversations.closed_mail"
+    value: "deleted"
+    description: "Deleted with the inbox."
+  - enum: "conversations.closed_mail"
+    value: "kept"
+    description: "Kept read-only."
+
+coverage:
+  - kind: "operation"
+    name: "conversations.mark_read"
+    events: [conversations.conversation_read]
+  - kind: "operation"
+    name: "conversations.mark_unread"
+    events: [conversations.conversation_unread_marked]
+  - kind: "operation"
+    name: "conversations.star"
+    events: [conversations.conversation_starred]
+  - kind: "operation"
+    name: "conversations.unstar"
+    events: [conversations.conversation_unstarred]
+  - kind: "operation"
+    name: "conversations.trash"
+    events: [conversations.conversation_trashed]
+  - kind: "operation"
+    name: "conversations.untrash"
+    events: [conversations.conversation_untrashed]
+  - kind: "operation"
+    name: "conversations.report_spam"
+    events: [conversations.conversation_spammed]
+  - kind: "operation"
+    name: "conversations.not_spam"
+    events: [conversations.conversation_unspammed]
+  - kind: "operation"
+    name: "conversations.move_to_stream"
+    events: [conversations.conversation_moved]
+  - kind: "operation"
+    name: "conversations.add_label"
+    events: [conversations.conversation_labelled]
+  - kind: "operation"
+    name: "conversations.remove_label"
+    events: [conversations.conversation_unlabelled]
+  - kind: "operation"
+    name: "conversations.resolve_need"
+    events: [conversations.need_resolved]
+  - kind: "operation"
+    name: "conversations.confirm_need"
+    events: [conversations.need_confirmed]
+  - kind: "operation"
+    name: "conversations.reopen_need"
+    events: [conversations.need_reopened]
+  - kind: "operation"
+    name: "conversations.create_draft"
+    events: [conversations.draft_created]
+  - kind: "operation"
+    name: "conversations.update_draft"
+    events: [conversations.draft_updated]
+  - kind: "operation"
+    name: "conversations.delete_draft"
+    events: [conversations.draft_discarded]
+  - kind: "operation"
+    name: "conversations.send_draft"
+    events: [conversations.draft_scheduled]
+  - kind: "operation"
+    name: "conversations.cancel_send"
+    events: [conversations.draft_unscheduled]
+  - kind: "job"
+    name: "conversations.release_send"
+    events: [conversations.draft_released, conversations.draft_unscheduled]
+  - kind: "job"
+    name: "conversations.check_send"
+    events: [conversations.draft_send_failed]
+  - kind: "handler"
+    name: "conversations.record_send"
+    events: [conversations.draft_sent, conversations.draft_send_failed]
+  - kind: "operation"
+    name: "conversations.create_rule"
+    events: [conversations.rule_created, conversations.rule_removed]
+  - kind: "operation"
+    name: "conversations.confirm_rule"
+    events: [conversations.rule_confirmed, conversations.rule_removed]
+  - kind: "operation"
+    name: "conversations.update_rule"
+    events: [conversations.rule_updated, conversations.rule_removed]
+  - kind: "operation"
+    name: "conversations.restore_rule"
+    events: [conversations.rule_restored, conversations.rule_removed]
+  - kind: "operation"
+    name: "conversations.decline_rule"
+    events: [conversations.rule_declined]
+  - kind: "operation"
+    name: "conversations.remove_rule"
+    events: [conversations.rule_removed]
+  - kind: "operation"
+    name: "conversations.preview_rule"
+    exemption: "read: a preview changes nothing"
+  - kind: "job"
+    name: "conversations.apply_rule"
+    events: [conversations.rule_run_finished]
+  - kind: "operation"
+    name: "conversations.answer_rule_notice"
+    events: [conversations.rule_notice_answered]
+  - kind: "operation"
+    name: "conversations.clear_rule_notice_answer"
+    events: [conversations.rule_notice_answer_cleared]
+  - kind: "operation"
+    name: "conversations.dismiss_rule_suggestion"
+    events: [conversations.rule_suggestion_dismissed]
+  - kind: "operation"
+    name: "conversations.set_person_note"
+    events: [conversations.person_note_saved]
+  - kind: "operation"
+    name: "conversations.delete_person_note"
+    events: [conversations.person_note_deleted]
+  - kind: "job"
+    name: "conversations.apply_changes"
+    events: [conversations.message_batch_applied]
+  - kind: "handler"
+    name: "conversations.decide_message"
+    events: [conversations.message_decided]
+  - kind: "job"
+    name: "conversations.decide_backlog"
+    events: [conversations.message_decided]
+  - kind: "operation"
+    name: "conversations.request_message_read"
+    events: [conversations.message_read_requested]
+  - kind: "job"
+    name: "conversations.read_message"
+    events: [conversations.message_read_completed]
+  - kind: "job"
+    name: "conversations.read_structured"
+    events: [conversations.message_read_completed]
+  - kind: "handler"
+    name: "conversations.create_inbox"
+    events: [conversations.inbox_created]
+  - kind: "handler"
+    name: "conversations.forget_connection"
+    events: [conversations.inbox_closed]
+  - kind: "operation"
+    name: "conversations.write_reply"
+    exemption: "stores nothing: Scout proposes text, and a draft made from it is tracked by conversations.create_draft"
+  - kind: "operation"
+    name: "conversations.stream_reply"
+    exemption: "stores nothing: Scout proposes text, and a draft made from it is tracked by conversations.create_draft"
+  - kind: "operation"
+    name: "conversations.suggest_replies"
+    exemption: "stores nothing: Scout proposes text, and a draft made from it is tracked by conversations.create_draft"
+  - kind: "operation"
+    name: "conversations.write_nudge"
+    exemption: "stores nothing: Scout proposes text, and a draft made from it is tracked by conversations.create_draft"
+  - kind: "job"
+    name: "conversations.refresh_need"
+    exemption: "derived state: a need worked out again from stored messages and answers (conversations.need_changed); no action of anyone"
+  - kind: "job"
+    name: "conversations.wake_needs"
+    exemption: "derived state: a need worked out again from stored messages and answers (conversations.need_changed); no action of anyone"
+  - kind: "job"
+    name: "conversations.backfill_needs"
+    exemption: "derived state: a need worked out again from stored messages and answers (conversations.need_changed); no action of anyone"
+  - kind: "job"
+    name: "conversations.notice_rules"
+    exemption: "derived state: suggestions recounted from recent mail; answering one is tracked"
+  - kind: "job"
+    name: "conversations.fill_templates"
+    exemption: "maintenance, no action of anyone: subject templates filled in for older mail"
+  - kind: "job"
+    name: "conversations.resign_rules"
+    exemption: "maintenance, no action of anyone: rules that predate bindings signed once"
+  - kind: "job"
+    name: "conversations.retag_bindings"
+    exemption: "maintenance, no action of anyone: MACs re-tagged after a key rotation"
+  - kind: "job"
+    name: "conversations.purge_workspace"
+    exemption: "maintenance: a deleted workspace's rows deleted; the deletion is tracked by workspaces"
+  - kind: "schedule"
+    name: "conversations.dispatch_need_clocks"
+    exemption: "maintenance, no action of anyone: only enqueues the jobs that do the work"
+  - kind: "schedule"
+    name: "conversations.dispatch_needs_backfills"
+    exemption: "maintenance, no action of anyone: only enqueues the jobs that do the work"
+  - kind: "schedule"
+    name: "conversations.dispatch_rule_resigns"
+    exemption: "maintenance, no action of anyone: only enqueues the jobs that do the work"
+  - kind: "handler"
+    name: "conversations.ingest_messages"
+    exemption: "only enqueues conversations.apply_changes, which tracks"
+  - kind: "handler"
+    name: "conversations.forget_member"
+    exemption: "consequence of workspaces.member_left, tracked there: the departed member's own rows go"
+  - kind: "handler"
+    name: "conversations.pause_suspended_author"
+    exemption: "projection of workspaces.member_suspended: nothing on the rules changes"
+  - kind: "handler"
+    name: "conversations.resume_unsuspended_author"
+    exemption: "projection of workspaces.member_unsuspended: nothing on the rules changes"
+  - kind: "handler"
+    name: "conversations.schedule_workspace_purge"
+    exemption: "projection of workspaces.workspace_deleting: it only schedules the purge"

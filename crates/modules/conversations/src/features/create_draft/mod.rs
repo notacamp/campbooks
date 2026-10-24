@@ -26,10 +26,12 @@ use crate::{
     domain::{
         access::visible_inboxes,
         drafts::{self, DraftView, MAX_REFERENCES, StoredAttachment, check_limits, decode, tidy},
+        tracked,
     },
     events::DRAFT_RECORD,
     model::{Address, AttachmentId, ConversationId, DraftId, DraftKind, InboxId, MessageId},
     scopes::ConversationsSend,
+    tracking,
 };
 use campbooks_kernel::authz::Action;
 
@@ -186,6 +188,11 @@ pub async fn handler(
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
         .shown(&state.binding, access)?;
+    let workspace = access.workspace;
+    tracked::track_draft(&state.tracker, &mut tx, id, |draft| {
+        tracking::DraftCreated { workspace, draft }
+    })
+    .await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(draft)))
 }

@@ -204,6 +204,60 @@ async fn an_authenticated_airline_confirmation_is_read_with_no_model(db: PgPool)
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_structured_read_is_tracked_by_counts_once(db: PgPool) {
+    let (_server, gateway) = model_on_a_mock().await;
+    let kit = Kit::with_deps(
+        db,
+        ConversationsDeps {
+            ai: Some(gateway),
+            ..sorting_deps()
+        },
+    )
+    .await
+    .tracking();
+    let workspace = WorkspaceId::new();
+    let (_, sam) = kit.member("sam", workspace);
+    let inbox = kit
+        .inbox(workspace, "sam@example.com", &[(sam, InboxRole::Manager)])
+        .await;
+    let booking = mail(
+        "air-1",
+        "thr-air",
+        AIRLINE,
+        Some(PASSED),
+        Some(&flight(30)),
+        &[],
+    );
+    kit.ingest_value(workspace, inbox, &booking).await;
+    // A replayed delivery reads nothing new.
+    kit.ingest_value(workspace, inbox, &booking).await;
+
+    let reads =
+        campbooks_kernel::testing::tracked_events(&kit.db, "conversations.message_read_completed")
+            .await;
+    let structured: Vec<_> = reads
+        .iter()
+        .filter(|event| event.body["layer"] == "structured")
+        .collect();
+    assert_eq!(structured.len(), 1, "{reads:?}");
+    let event = structured[0];
+    assert_eq!(event.version, 1);
+    assert_eq!(event.workspace_id, Some(*workspace.as_uuid()));
+    assert_eq!(event.envelope["actor"]["type"], "system");
+    assert_eq!(
+        event.body["message_id"],
+        kit.message_of("air-1").await.as_str()
+    );
+    assert_eq!(event.body["outcome"], "read");
+    assert!(event.body.get("trigger").is_none());
+    assert_eq!(event.body["item_count"], 1);
+    assert_eq!(event.body["ask_count"], 0);
+    assert_eq!(event.body["summary_ready"], false);
+    let text = event.body.to_string();
+    assert!(!text.contains("LIS") && !text.contains("AE1234") && !text.contains('@'));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn markup_from_a_sender_that_failed_its_checks_is_not_believed(db: PgPool) {
     let (kit, server, workspace, inbox, _) = kit_for(db, sorting_deps()).await;
     let html = flight(30);

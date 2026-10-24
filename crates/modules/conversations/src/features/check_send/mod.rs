@@ -5,13 +5,18 @@
 //! send it recorded well before this; this covers an intent it never got.
 //! A late outcome still wins (`conversations.record_send`).
 
-use campbooks_kernel::{JobContext, JobError, JobHandler, tenancy::UserId};
+use campbooks_kernel::{
+    JobContext, JobError, JobHandler,
+    tenancy::{UserId, WorkspaceId},
+};
 use chrono::TimeDelta;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    domain::tracked,
     events::SendFailed,
     model::{DraftId, DraftState, InboxId, SendId},
+    tracking,
 };
 
 /// How long a released send may stay without an outcome.
@@ -40,7 +45,11 @@ impl JobHandler for CheckSend {
             .workspace()
             .ok_or_else(|| JobError::fatal("check_send enqueued outside a workspace"))?
             .to_owned();
+        let workspace_id: WorkspaceId = workspace
+            .parse()
+            .map_err(|_| JobError::fatal("check_send enqueued in an invalid workspace"))?;
         let events = ctx.state().events.clone();
+        let tracker = ctx.state().tracker.clone();
         let tx = ctx.tx().await?;
         let reason = "unknown_outcome";
         let stuck = sqlx::query!(
@@ -57,6 +66,14 @@ impl JobHandler for CheckSend {
         .fetch_optional(&mut **tx)
         .await?;
         if let Some(stuck) = stuck {
+            tracked::track_draft(&tracker, tx, payload.draft, |draft| {
+                tracking::DraftSendFailed {
+                    workspace: workspace_id,
+                    draft,
+                    error: tracking::SendError::UnknownOutcome,
+                }
+            })
+            .await?;
             events
                 .publish(
                     tx,

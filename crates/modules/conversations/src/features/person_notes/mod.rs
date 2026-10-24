@@ -39,6 +39,7 @@ use crate::{
     },
     model::{InboxId, PersonNoteId},
     scopes::{ConversationsRead, ConversationsWrite},
+    tracking,
 };
 
 /// Longest note kept, in characters.
@@ -277,6 +278,17 @@ pub async fn set(
                 .arg("max", MAX_NOTES),
         ));
     }
+    // What it said before, to track a change only (never the text itself).
+    let before: Option<String> = if known {
+        sqlx::query_scalar(ABOUT)
+            .bind(access.workspace.as_uuid())
+            .bind(user.as_uuid())
+            .bind(&address)
+            .fetch_optional(&mut *tx)
+            .await?
+    } else {
+        None
+    };
     let (id, address, note, updated_at): NoteRow = sqlx::query_as(UPSERT)
         .bind(PersonNoteId::new())
         .bind(access.workspace.as_uuid())
@@ -286,6 +298,19 @@ pub async fn set(
         .fetch_one(&mut *tx)
         .await?;
     let mut names = names_of(&mut tx, access, std::slice::from_ref(&address)).await?;
+    if before.as_deref() != Some(note.as_str()) {
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::PersonNoteSaved {
+                    workspace: access.workspace,
+                    note_id: *id.as_uuid(),
+                    created: !known,
+                },
+            )
+            .await?;
+    }
     tx.commit().await?;
     tracing::info!(new = !known, "a person note kept");
     Ok(Json(PersonNote {
@@ -351,6 +376,16 @@ pub async fn delete(
     if deleted == 0 {
         return Err(Error::NotFound);
     }
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::PersonNoteDeleted {
+                workspace: access.workspace,
+                note_id: *path.note_id.as_uuid(),
+            },
+        )
+        .await?;
     tx.commit().await?;
     tracing::info!("a person note forgotten");
     Ok(StatusCode::NO_CONTENT)

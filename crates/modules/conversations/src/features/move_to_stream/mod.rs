@@ -23,11 +23,12 @@ use crate::{
     domain::{
         access::lock_conversation,
         conversation::{Changed, ConversationSummary, provider_message_ids, request, summary},
-        rules,
+        rules, tracked,
     },
     events::{Change, Origin, RequestedChange},
     model::{ConversationId, CorrectionId, DecisionId, MessageId, Stream},
     scopes::ConversationsWrite,
+    tracking,
 };
 
 /// Where to move the conversation.
@@ -83,7 +84,9 @@ pub async fn handler(
     .fetch_one(&mut *tx)
     .await?;
     let mut exception = None;
+    let mut before = None;
     if current.stream != body.stream.as_str() {
+        before = tracked::conversation_now(&mut tx, id).await?;
         if current.stream_source == "taught" {
             exception = rules::except(&mut tx, id, rules::Undone::Stream, access.user).await?;
         }
@@ -149,6 +152,21 @@ pub async fn handler(
     }
     let mut summary = summary(&mut tx, access.user, id).await?;
     summary.rule_exception = exception;
+    // The move, tracked with the conversation before and after it
+    // (campbooks-cloud#325); the same stream again tracks nothing.
+    if let Some(before) = before {
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::ConversationMoved {
+                    workspace: access.workspace,
+                    conversation: tracked::conversation(&summary),
+                    before,
+                },
+            )
+            .await?;
+    }
     tx.commit().await?;
     Ok(Json(summary))
 }

@@ -31,6 +31,7 @@ use crate::{
         resources,
         rule_runs::{self, RunView, SCAN},
         rules::{self, NewRule, RuleAction, RuleCondition, Stored, binding as rule_binding},
+        tracked,
     },
     events::RULE_RECORD,
     features::rule_notices,
@@ -39,6 +40,7 @@ use crate::{
         RunKind, TeachingId,
     },
     scopes::{ConversationsRead, ConversationsWrite},
+    tracking,
 };
 
 /// Longest instruction kept with a rule, in characters.
@@ -919,6 +921,13 @@ pub async fn create_in(
         )
         .await?;
     }
+    let workspace = access.workspace;
+    tracked::track_rule(&state.tracker, tx, id, |rule| tracking::RuleCreated {
+        workspace,
+        rule,
+        acted_without_asking,
+    })
+    .await?;
     Ok(CreatedRule {
         rule: view(tx, &state.binding, access, &rule).await?,
         acted_without_asking,
@@ -988,6 +997,15 @@ async fn retire(
     if bound {
         rule_binding::sign(tx, &state.binding, rule).await?;
     }
+    // Replaced by the rule being kept (campbooks-cloud#325).
+    let workspace = access.workspace;
+    tracked::track_rule(&state.tracker, tx, rule, |rule| tracking::RuleRemoved {
+        workspace,
+        rule,
+        cause: tracking::RuleRemovalCause::Replaced,
+        put_back: false,
+    })
+    .await?;
     rule_runs::announce(
         tx,
         &state.events,
@@ -1130,6 +1148,11 @@ pub async fn confirm(
         )
         .await?;
     }
+    let workspace = access.workspace;
+    tracked::track_rule(&state.tracker, &mut tx, rule.id, |rule| {
+        tracking::RuleConfirmed { workspace, rule }
+    })
+    .await?;
     let view = view(&mut tx, &state.binding, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))
@@ -1180,6 +1203,11 @@ async fn confirm_again(
         )
         .await?;
     }
+    let workspace = access.workspace;
+    tracked::track_rule(&state.tracker, &mut tx, rule.id, |rule| {
+        tracking::RuleConfirmed { workspace, rule }
+    })
+    .await?;
     let view = view(&mut tx, &state.binding, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))
@@ -1250,6 +1278,11 @@ pub async fn decline(
     .await?;
     let mut declined = rule;
     declined.state = RuleState::Removed;
+    let workspace = access.workspace;
+    tracked::track_rule(&state.tracker, &mut tx, declined.id, |rule| {
+        tracking::RuleDeclined { workspace, rule }
+    })
+    .await?;
     let view = view(&mut tx, &state.binding, access, &declined).await?;
     tx.commit().await?;
     Ok(Json(view))
@@ -1309,6 +1342,7 @@ pub struct UpdateRule {
             body = Problem, content_type = "application/problem+json"),
     )
 )]
+#[allow(clippy::too_many_lines)]
 pub async fn update(
     State(state): State<AppState>,
     workspace: Workspace<ConversationsWrite>,
@@ -1331,6 +1365,14 @@ pub async fn update(
     let rule = rules::find(&mut tx, rule.id)
         .await?
         .ok_or(Error::NotFound)?;
+    // What a save may change, as it is before it (campbooks-cloud#325): a
+    // save that changes none of it tracks nothing.
+    let before = (
+        rule.conditions.clone(),
+        rule.actions.clone(),
+        rule.state,
+        rule.taught_by,
+    );
     // Adopting, letting it act again and changing what a kept rule does all
     // sign it as the member's: their own request only. Pausing it, or
     // reshaping a proposal (which still waits for a yes), signs nothing new.
@@ -1421,6 +1463,18 @@ pub async fn update(
         None,
     )
     .await?;
+    let (conditions, actions, state_before, author) = &before;
+    let edited = *conditions != rule.conditions
+        || *actions != rule.actions
+        || *state_before != rule.state
+        || *author != rule.taught_by;
+    if edited {
+        let workspace = access.workspace;
+        tracked::track_rule(&state.tracker, &mut tx, rule.id, |rule| {
+            tracking::RuleUpdated { workspace, rule }
+        })
+        .await?;
+    }
     let view = view(&mut tx, &state.binding, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))
@@ -1546,6 +1600,16 @@ pub async fn remove(
         )
         .await?;
     }
+    let workspace = access.workspace;
+    tracked::track_rule(&state.tracker, &mut tx, rule.id, |rule| {
+        tracking::RuleRemoved {
+            workspace,
+            rule,
+            cause: tracking::RuleRemovalCause::Member,
+            put_back,
+        }
+    })
+    .await?;
     let view = view(&mut tx, &state.binding, access, &removed).await?;
     tx.commit().await?;
     Ok(Json(view))
@@ -1595,6 +1659,7 @@ pub struct RestoreRule {
             body = Problem, content_type = "application/problem+json"),
     )
 )]
+#[allow(clippy::too_many_lines)]
 pub async fn restore(
     State(state): State<AppState>,
     workspace: Workspace<ConversationsWrite>,
@@ -1705,6 +1770,11 @@ pub async fn restore(
         )
         .await?;
     }
+    let workspace = access.workspace;
+    tracked::track_rule(&state.tracker, &mut tx, rule.id, |rule| {
+        tracking::RuleRestored { workspace, rule }
+    })
+    .await?;
     let view = view(&mut tx, &state.binding, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))

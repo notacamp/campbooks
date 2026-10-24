@@ -39,11 +39,13 @@ use crate::{
         access::lock_conversation,
         conversation::{ConversationSummary, summary},
         needs::{self, NeedSettings},
+        tracked,
     },
     model::{
         ConversationId, CorrectionId, DecisionId, MessageId, NeedQuestion, NeedReason, NeedVerdict,
     },
     scopes::ConversationsWrite,
+    tracking,
 };
 
 #[cfg(test)]
@@ -260,6 +262,7 @@ pub async fn reopen(
         )
         .await?;
         let summary = summary(&mut tx, access.user, id).await?;
+        track(&state, &mut tx, access, Judged::Reopened, &summary).await?;
         tx.commit().await?;
         return Ok(Json(summary));
     }
@@ -291,8 +294,74 @@ pub async fn reopen(
     )
     .await?;
     let summary = summary(&mut tx, access.user, id).await?;
+    track(&state, &mut tx, access, Judged::Reopened, &summary).await?;
     tx.commit().await?;
     Ok(Json(summary))
+}
+
+/// What a member did to a conversation's need, as it is tracked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Judged {
+    Resolved,
+    Confirmed,
+    Reopened,
+}
+
+/// Track what the member did to the conversation's need (ADR 0020,
+/// campbooks-cloud#325), with the conversation and its need afterwards,
+/// read in the transaction of the change.
+async fn track(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    access: &Access,
+    judged: Judged,
+    after: &ConversationSummary,
+) -> Result<()> {
+    let workspace = access.workspace;
+    let conversation = tracked::conversation(after);
+    let need = tracked::need(tx, after.id).await?;
+    match judged {
+        Judged::Resolved => {
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::NeedResolved {
+                        workspace,
+                        conversation,
+                        need,
+                    },
+                )
+                .await?;
+        }
+        Judged::Confirmed => {
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::NeedConfirmed {
+                        workspace,
+                        conversation,
+                        need,
+                    },
+                )
+                .await?;
+        }
+        Judged::Reopened => {
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::NeedReopened {
+                        workspace,
+                        conversation,
+                        need,
+                    },
+                )
+                .await?;
+        }
+    }
+    Ok(())
 }
 
 /// Withdraw `correction`: it no longer says what the member thinks.
@@ -444,6 +513,12 @@ async fn judge(
     )
     .await?;
     let summary = summary(&mut tx, access.user, id).await?;
+    let judged = if verdict == NeedVerdict::Confirmed {
+        Judged::Confirmed
+    } else {
+        Judged::Resolved
+    };
+    track(state, &mut tx, access, judged, &summary).await?;
     tx.commit().await?;
     Ok(summary)
 }
