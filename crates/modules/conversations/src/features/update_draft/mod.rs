@@ -174,13 +174,13 @@ pub async fn update(
         .shown(&state.binding, access)?;
     // Tracked when the save changed something (campbooks-cloud#325): an
     // autosave of what is there already tracks nothing.
-    let changed = was != (to, cc, bcc)
+    let edited = was != (to, cc, bcc)
         || subject != row.subject
         || body != row.body
         || quoted != row.quoted
         || attachments != attachments_before
         || row.state()? != DraftState::Draft;
-    if changed {
+    if edited {
         let workspace = access.workspace;
         tracked::track_draft(&state.tracker, &mut tx, id, |draft| {
             tracking::DraftUpdated { workspace, draft }
