@@ -6,7 +6,7 @@ changelog:
   - date: "2026-10-24"
     plan_version: 3
     change: "The identity module instrumented (campbooks-cloud#326): 27 events for sign-ins succeeded and refused, accounts created, sessions ended, ways in and passkeys added and removed, suspensions, workspace and registered apps, consents, held mailbox grants, and token exchanges, reuse and revocation; records account, session, way_in, passkey, client and consent; Coverage for every operation, handler and schedule of the module."
-    pr: ""
+    pr: "#654"
 
 events:
   - name: "identity.sign_in_succeeded"
