@@ -85,7 +85,7 @@ const EVENT_COLUMNS: &[Column] = &[
         9.0,
         "From 1. A published version never changes meaning.",
     ),
-    column("Module", 16.0, "The owning module (or kernel, server)."),
+    column("Module", 16.0, "The owning module (or kernel, server, bff)."),
     column("Object", 18.0, "What the event is about."),
     column("Action", 14.0, "What happened to it, in the past tense."),
     dropdown("Scope", 12.0, SCOPES, "workspace or instance"),

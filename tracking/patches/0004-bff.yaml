@@ -1,0 +1,175 @@
+# The web BFF's tracked events (campbooks-cloud#327, OpenSpec change track-bff-events):
+# every web session started and ended, and a Coverage row for every mutating operation,
+# state-changing read, event handler and schedule of the BFF (`crates/server/src/bff`).
+# Applied with `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0004-bff.yaml`.
+changelog:
+  - date: "2026-10-24"
+    plan_version: 4
+    change: "The web BFF instrumented (campbooks-cloud#327): 3 events for web sessions started, ended one at a time (logging out, signing in again, a copied cookie, outdated scopes, a refused refresh, unreadable tokens, an expired access token) and ended at once (back-channel logout, signing out everywhere, a suspension); the enums of how they end; Coverage for every operation, handler and schedule of the BFF. bff is a platform module, generated into the kernel and tracked from the server."
+    pr: ""
+
+events:
+  - name: "bff.web_session_started"
+    version: 1
+    module: "bff"
+    object: "web_session"
+    action: "started"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "A person signed in on the web: the BFF stored a new web session for the browser."
+    fires_when: "bff.callback finishes a sign-in (code exchanged, ID token verified), in the transaction that stores the session."
+    added_in: 4
+    openspec_change: "track-bff-events"
+  - name: "bff.web_session_ended"
+    version: 1
+    module: "bff"
+    object: "web_session"
+    action: "ended"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous]
+    description: "One web session ended; the cause says why. A session already gone tracks nothing."
+    fires_when: "bff.logout ends it (logout); bff.callback ends the browser's previous one (replaced); a lookup (bff.session, a proxy, bff.logout) finds its cookie copied (copied_cookie) or its scopes outdated (scopes_outdated); a proxy's refresh is refused (refresh_refused), its tokens do not decrypt (tokens_unreadable), or its access token expired with no refresh token (access_expired); in the transaction that deletes the session."
+    added_in: 4
+    openspec_change: "track-bff-events"
+  - name: "bff.web_sessions_ended"
+    version: 1
+    module: "bff"
+    object: "web_sessions"
+    action: "ended"
+    scope: "instance"
+    status: "live"
+    actor_types: [anonymous, system]
+    description: "The web sessions of an account, or of one identity provider session, ended at once; the cause says why. None ended tracks nothing."
+    fires_when: "bff.backchannel_logout ends the sessions a logout token names (backchannel); bff.end_signed_out_sessions on identity.signed_out_everywhere (signed_out_everywhere) or bff.end_suspended_sessions on identity.account_suspended (account_suspended) ends the account's; in the transaction that deletes them."
+    added_in: 4
+    openspec_change: "track-bff-events"
+
+properties:
+  - event: "bff.web_session_started"
+    version: 1
+    property: "session_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The web session's id."
+  - event: "bff.web_session_started"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: false
+    classification: "pseudonymous"
+    description: "The account signed in: the ID token's subject when it is a Campbooks account id (left out for another identity provider's subject)."
+  - event: "bff.web_session_ended"
+    version: 1
+    property: "session_id"
+    type: "id"
+    required: true
+    classification: "id"
+    description: "The web session's id."
+  - event: "bff.web_session_ended"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: false
+    classification: "pseudonymous"
+    description: "The account it was signed in to, when known and a Campbooks account id (a retired cookie names only the session)."
+  - event: "bff.web_session_ended"
+    version: 1
+    property: "cause"
+    type: "enum"
+    of: "bff.web_session_end_cause"
+    required: true
+    classification: "operational"
+    description: "Why it ended."
+  - event: "bff.web_sessions_ended"
+    version: 1
+    property: "account_id"
+    type: "id"
+    required: false
+    classification: "pseudonymous"
+    description: "The account whose sessions ended, when named and a Campbooks account id (a logout token may name only an identity provider session)."
+  - event: "bff.web_sessions_ended"
+    version: 1
+    property: "cause"
+    type: "enum"
+    of: "bff.web_sessions_end_cause"
+    required: true
+    classification: "operational"
+    description: "Why they ended."
+  - event: "bff.web_sessions_ended"
+    version: 1
+    property: "sessions_ended"
+    type: "int"
+    required: true
+    classification: "operational"
+    description: "How many web sessions ended (at least 1)."
+
+enums:
+  - { enum: "bff.web_session_end_cause", value: "logout", description: "The person signed out (bff.logout)." }
+  - { enum: "bff.web_session_end_cause", value: "replaced", description: "The browser signed in again; its previous session ended (bff.callback)." }
+  - { enum: "bff.web_session_end_cause", value: "copied_cookie", description: "A token rotated away was presented again after its successor was used, or a retired one at all: the cookie was copied." }
+  - { enum: "bff.web_session_end_cause", value: "scopes_outdated", description: "It signed in before the BFF asked for scopes it asks for now." }
+  - { enum: "bff.web_session_end_cause", value: "refresh_refused", description: "The identity provider refused to refresh its tokens." }
+  - { enum: "bff.web_session_end_cause", value: "tokens_unreadable", description: "Its stored tokens no longer decrypt (the instance's secret key changed)." }
+  - { enum: "bff.web_session_end_cause", value: "access_expired", description: "Its access token expired and it holds no refresh token." }
+  - { enum: "bff.web_sessions_end_cause", value: "backchannel", description: "The identity provider's back-channel logout named them (bff.backchannel_logout)." }
+  - { enum: "bff.web_sessions_end_cause", value: "signed_out_everywhere", description: "The person signed out everywhere (identity.signed_out_everywhere)." }
+  - { enum: "bff.web_sessions_end_cause", value: "account_suspended", description: "An administrator suspended the account (identity.account_suspended)." }
+
+coverage:
+  - kind: "operation"
+    name: "bff.callback"
+    events: [bff.web_session_started, bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.logout"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.backchannel_logout"
+    events: [bff.web_sessions_ended]
+  - kind: "operation"
+    name: "bff.session"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.api_get"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.api_post"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.api_put"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.api_patch"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.api_delete"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.admin_get"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.admin_post"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.admin_put"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.admin_patch"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.admin_delete"
+    events: [bff.web_session_ended]
+  - kind: "operation"
+    name: "bff.login"
+    exemption: "only starts a sign-in round trip (a short-lived sign-in transaction); bff.callback tracks its outcome"
+  - kind: "handler"
+    name: "bff.end_signed_out_sessions"
+    events: [bff.web_sessions_ended]
+  - kind: "handler"
+    name: "bff.end_suspended_sessions"
+    events: [bff.web_sessions_ended]
+  - kind: "schedule"
+    name: "bff.prune_sessions"
+    exemption: "maintenance: deletes web sessions already past their idle or absolute end and sign-ins never finished; no action of anyone"
