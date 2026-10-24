@@ -29,7 +29,8 @@ use super::Ctx;
 use crate::{
     MESSAGES,
     deps::Issuer,
-    domain::sessions,
+    domain::{sessions, tracked},
+    tracking,
     web::{self, SESSION_COOKIE, SameSite, see_other, with_cookie},
 };
 
@@ -133,7 +134,13 @@ async fn end(ctx: &Ctx, ip: ClientIp, request: EndSession) -> Result<Response> {
     let now = issuer.now();
     if let Some(session) = hint.session {
         let mut tx = ctx.state.db.begin().await?;
-        sessions::end_for(&mut tx, session, hint.account, now).await?;
+        if sessions::end_for(&mut tx, session, hint.account, now).await? {
+            let session = tracked::session(&mut tx, session).await?;
+            ctx.state
+                .tracker
+                .track(&mut tx, &tracking::SessionEnded { session })
+                .await?;
+        }
         tx.commit().await?;
     }
     let client = issuer.clients.first_party_client(&hint.client);

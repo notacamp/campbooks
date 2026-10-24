@@ -12,9 +12,10 @@ use uuid::Uuid;
 
 use crate::{
     deps::Deps,
-    domain::{accounts, consents},
+    domain::{accounts, consents, tracked},
     events::ConsentRevoked,
     scopes::IdentityWrite,
+    tracking,
 };
 
 /// The consent a path names (by field, so routes nested under the web BFF's
@@ -63,6 +64,11 @@ pub async fn handler(
     let revoked = consents::revoke(&mut tx, path.id, account, now)
         .await?
         .ok_or(Error::NotFound)?;
+    let consent = tracked::consent(&mut tx, path.id).await?;
+    state
+        .tracker
+        .track(&mut tx, &tracking::ConsentRevoked { consent })
+        .await?;
     accounts::audit(
         &mut tx,
         Some(account),

@@ -7,7 +7,13 @@ use chrono::Utc;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
-use crate::{domain::mailbox_links, events::ConnectionRemoved, testkit::Kit, upstream::Provider};
+use crate::{
+    domain::mailbox_links,
+    events::ConnectionRemoved,
+    testkit::Kit,
+    tracking_tests::{account_of, no_address, tracked},
+    upstream::Provider,
+};
 
 const BACK: &str = "/w/ws";
 
@@ -155,6 +161,22 @@ async fn the_way_in_a_connect_brought_goes_with_its_last_mailbox(db: PgPool) {
             .len(),
         1
     );
+    // Tracked once, in the workspace of the last connection, by the handler
+    // (ADR 0020): ids, the provider and a count, no address.
+    let tracked = tracked(&kit, "identity.connected_way_in_removed").await;
+    assert_eq!(tracked.len(), 1);
+    let event = &tracked[0];
+    assert_eq!(event.version, 1);
+    assert_eq!(event.workspace_id, Some(*two.as_uuid()));
+    assert_eq!(
+        event.envelope["actor"],
+        json!({"type": "system", "id": "identity.forget_connected_way_in"})
+    );
+    assert_eq!(event.body["account_id"], account_of(&access));
+    assert_eq!(event.body["provider"], "google");
+    assert_eq!(event.body["sessions_ended"], 0);
+    assert!(event.body["way_in_id"].is_string());
+    no_address(event);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

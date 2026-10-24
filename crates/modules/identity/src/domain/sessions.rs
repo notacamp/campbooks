@@ -167,32 +167,37 @@ pub async fn current(db: &PgPool, token: &str, now: DateTime<Utc>) -> Result<Opt
 }
 
 /// End session `id` of `account` (nothing when it is someone else's) and
-/// revoke the refresh tokens issued in it.
+/// revoke the refresh tokens issued in it; whether it was live and ended
+/// now.
 pub async fn end_for(
     conn: &mut PgConnection,
     id: Uuid,
     account: Uuid,
     now: DateTime<Utc>,
-) -> Result<()> {
+) -> Result<bool> {
     let owned: Option<Uuid> =
         sqlx::query_scalar("SELECT id FROM identity.sessions WHERE id = $1 AND account_id = $2")
             .bind(id)
             .bind(account)
             .fetch_optional(&mut *conn)
             .await?;
-    if owned.is_some() {
-        end(conn, id, now).await?;
+    if owned.is_none() {
+        return Ok(false);
     }
-    Ok(())
+    end(conn, id, now).await
 }
 
-/// End session `id` and revoke the refresh tokens issued in it.
-pub async fn end(conn: &mut PgConnection, id: Uuid, now: DateTime<Utc>) -> Result<()> {
-    sqlx::query("UPDATE identity.sessions SET ended_at = $2 WHERE id = $1 AND ended_at IS NULL")
-        .bind(id)
-        .bind(now)
-        .execute(&mut *conn)
-        .await?;
+/// End session `id` and revoke the refresh tokens issued in it; whether it
+/// was live and ended now.
+pub async fn end(conn: &mut PgConnection, id: Uuid, now: DateTime<Utc>) -> Result<bool> {
+    let ended = sqlx::query(
+        "UPDATE identity.sessions SET ended_at = $2 WHERE id = $1 AND ended_at IS NULL",
+    )
+    .bind(id)
+    .bind(now)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
     sqlx::query(
         "UPDATE identity.refresh_families SET revoked_at = $2, revoke_reason = 'signed_out'
           WHERE session_id = $1 AND revoked_at IS NULL",
@@ -201,7 +206,7 @@ pub async fn end(conn: &mut PgConnection, id: Uuid, now: DateTime<Utc>) -> Resul
     .bind(now)
     .execute(conn)
     .await?;
-    Ok(())
+    Ok(ended == 1)
 }
 
 /// End every live session of `account` and revoke every refresh token it

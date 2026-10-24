@@ -86,7 +86,16 @@ impl AdminKit {
         let state = idp
             .state(testing::app_role_pool(&db).await)
             .with_admin(Arc::new(Profiles(profiles)), trail.clone());
-        let app = testing::admin_app(crate::module(crate::Deps::default()), state);
+        let state = testing::tracking_outbox(state);
+        let (_, spec) = crate::module(crate::Deps::default())
+            .admin_router
+            .unwrap()
+            .split_for_parts();
+        // As the server mounts them: in the request's tracking context.
+        let app = campbooks_kernel::tracking::http::around(
+            testing::admin_app(crate::module(crate::Deps::default()), state),
+            campbooks_kernel::tracking::http::HttpTracking::from_spec(&spec),
+        );
         Self {
             db,
             trail,

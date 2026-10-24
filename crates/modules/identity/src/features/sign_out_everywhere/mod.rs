@@ -14,6 +14,7 @@ use crate::{
     domain::{accounts, sessions},
     events::SignedOutEverywhere,
     scopes::IdentityWrite,
+    tracking,
 };
 
 /// Sign out everywhere.
@@ -68,6 +69,17 @@ pub async fn handler(
     state
         .events
         .publish(&mut tx, &SignedOutEverywhere { account })
+        .await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::SessionsEnded {
+                account_id: account,
+                sessions_ended: i64::try_from(sessions).unwrap_or(i64::MAX),
+                refresh_families_revoked: i64::try_from(families).unwrap_or(i64::MAX),
+            },
+        )
         .await?;
     tx.commit().await?;
     tracing::info!(sessions, families, "signed out everywhere");

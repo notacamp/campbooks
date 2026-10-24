@@ -621,6 +621,8 @@ pub struct Kit {
     /// The runtime role in the kernel scope, to inspect the event log and
     /// the queue across workspaces.
     pub kernel: PgPool,
+    /// The test database's owner, which may read the tracked-event outbox.
+    pub owner: PgPool,
     /// What the grant-intake port was handed.
     pub intake: Arc<FakeIntake>,
     /// The module's dependencies.
@@ -749,8 +751,15 @@ impl Kit {
                 // everywhere stop a person's tokens at once.
                 .with_revocation(pool, crate::token_revocation()),
             );
+        // Tracked events go to the outbox, for the tests to read back.
+        let state = testing::tracking_outbox(state);
         let api = testing::app(crate::module(deps.clone()), state.clone());
-        let app = crate::protocol::router(state.clone(), deps.clone()).merge(api);
+        // As the server mounts them: in the request's tracking context.
+        let protocol = campbooks_kernel::tracking::http::around(
+            crate::protocol::router(state.clone(), deps.clone()),
+            campbooks_kernel::tracking::http::HttpTracking::from_spec(&crate::protocol::openapi()),
+        );
+        let app = protocol.merge(api);
         Self {
             app,
             google,
@@ -759,6 +768,7 @@ impl Kit {
             zoho_eu,
             state,
             kernel,
+            owner: db.clone(),
             intake,
             deps,
             documents,

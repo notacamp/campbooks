@@ -37,10 +37,11 @@ use crate::{
         accounts::{self, LinkOutcome, ProviderIdentity},
         links,
         mailbox_links::{self, Recorded},
-        sessions,
+        sessions, tracked,
     },
     events::WayInAdded,
-    features::forget_connected_way_in::announce as announce_removed,
+    features::forget_connected_way_in::{announce as announce_removed, track_removed},
+    tracking::{self, WayInRemoval},
     upstream::{
         Flow, Provider, Purpose,
         client::{SignedIn, Tokens, Upstream},
@@ -262,6 +263,11 @@ async fn announce_added(
             },
         )
         .await?;
+    let way_in = tracked::way_in(tx, id).await?;
+    ctx.state
+        .tracker
+        .track(tx, &tracking::WayInAdded { way_in })
+        .await?;
     Ok(())
 }
 
@@ -351,11 +357,17 @@ async fn hand_over_detached(
 ) -> Result<Response> {
     let ctx = ctx.clone();
     let return_to = flow.return_to.clone();
-    detached(&return_to, async move {
-        let issuer = ctx.issuer()?.clone();
-        let upstream = super::sign_in::configured(&issuer, flow.provider)?;
-        Ok(hand_over(&ctx, upstream, flow, identity, tokens, way_in).await)
-    })
+    // The spawned task keeps the request's tracking context (ADR 0020):
+    // what the hand-over tracks is still this request's.
+    let context = campbooks_kernel::tracking::current_or_outside();
+    detached(
+        &return_to,
+        campbooks_kernel::tracking::scope(context, async move {
+            let issuer = ctx.issuer()?.clone();
+            let upstream = super::sign_in::configured(&issuer, flow.provider)?;
+            Ok(hand_over(&ctx, upstream, flow, identity, tokens, way_in).await)
+        }),
+    )
     .await
 }
 
@@ -458,6 +470,7 @@ async fn take_back(ctx: &Ctx, way_in: Option<WayInLink>, workspace: Uuid) {
             mailbox_links::take_back(&mut tx, way_in.id, workspace, way_in.created, now).await?;
         if let Some(gone) = &gone {
             announce_removed(&ctx.state, &mut tx, gone, "connect_failed", now).await?;
+            track_removed(&ctx.state, &mut tx, gone, WayInRemoval::ConnectFailed).await?;
         }
         tx.commit().await?;
         Ok::<(), campbooks_kernel::Error>(())

@@ -34,7 +34,7 @@ use axum::{
 };
 use campbooks_kernel::{
     Error, Operation, Result, Risk,
-    config::SignupPolicy,
+    config::{SignupPolicy, TrackingSink},
     crypto::{pkce_challenge, random_token},
     rate_limit::{ClientIp, Limit, RateKey},
 };
@@ -51,8 +51,10 @@ use crate::{
         accounts::{self, Linked, ProviderIdentity},
         held_grants::{self, NewHeldGrant, ProviderTokens},
         sessions::{self, Session},
+        tracked,
     },
     events::{AccountCreated, SignedIn},
+    tracking::{self, SignInFailure, SignInMethod},
     upstream::{
         self, FLOW_LIFETIME, Flow, PendingSignUp, Provider, Purpose, SIGN_UP_LIFETIME,
         client::{AuthorizeRequest, SignedIn as Upstreamed, Tokens, Upstream, UpstreamError},
@@ -365,6 +367,10 @@ pub struct CallbackQuery {
             provider serves this instance."),
     ),
 )]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one flow, read top to bottom; its tracked events sit next to the changes they record"
+)]
 pub async fn callback(
     State(ctx): State<Ctx>,
     ip: ClientIp,
@@ -397,17 +403,17 @@ pub async fn callback(
         None => None,
     };
     let Some(flow) = flow else {
+        refused(
+            &ctx,
+            SignInMethod::Provider,
+            Some(provider),
+            "invalid_state",
+        )
+        .await?;
         return Ok(with_cookie(
             sign_in_error("invalid_state", None),
             clear_flow,
         ));
-    };
-    let fail = |code: &str| {
-        if flow.purpose == Purpose::SignIn {
-            sign_in_error(code, flow.request_id.as_deref())
-        } else {
-            link::back(&flow.return_to, "link_error", code)
-        }
     };
     if let Some(error) = &query.error {
         let code = if error == "access_denied" {
@@ -415,17 +421,25 @@ pub async fn callback(
         } else {
             "login_failed"
         };
-        return Ok(with_cookie(fail(code), clear_flow));
+        return Ok(with_cookie(fail(&ctx, &flow, code).await?, clear_flow));
     }
     let Some(code) = &query.code else {
-        return Ok(with_cookie(fail("login_failed"), clear_flow));
+        return Ok(with_cookie(
+            fail(&ctx, &flow, "login_failed").await?,
+            clear_flow,
+        ));
     };
     let signed_in = match identify(upstream, code, &query, &flow).await {
         Ok(found) => found,
-        Err(code) => return Ok(with_cookie(fail(code), clear_flow)),
+        Err(code) => return Ok(with_cookie(fail(&ctx, &flow, code).await?, clear_flow)),
     };
     if flow.purpose != Purpose::SignIn {
-        let response = link::finish(&ctx, issuer, upstream, &headers, flow, signed_in, now).await?;
+        // Boxed: the round trip's hand-over (and its tracking) makes a large
+        // future.
+        let response = Box::pin(link::finish(
+            &ctx, issuer, upstream, &headers, flow, signed_in, now,
+        ))
+        .await?;
         return Ok(with_cookie(response, clear_flow));
     }
     let Upstreamed { identity, tokens } = signed_in;
@@ -438,13 +452,29 @@ pub async fn callback(
             provider = provider.as_str(),
             "refused a sign-in the allow-list does not let in"
         );
+        refused(
+            &ctx,
+            SignInMethod::Provider,
+            Some(provider),
+            "sign_in_not_allowed",
+        )
+        .await?;
         return Ok(with_cookie(
             sign_in_error("sign_in_not_allowed", request),
             clear_flow,
         ));
     }
     let response = match accounts::find(&ctx.state.db, &identity).await? {
-        Some(Linked { disabled: true, .. }) => sign_in_error("account_suspended", request),
+        Some(Linked { disabled: true, .. }) => {
+            refused(
+                &ctx,
+                SignInMethod::Provider,
+                Some(provider),
+                "account_suspended",
+            )
+            .await?;
+            sign_in_error("account_suspended", request)
+        }
         // A sign-in never changes a workspace's mailbox: a refresh token
         // the provider sent along is dropped, not stored.
         Some(linked) => {
@@ -454,6 +484,13 @@ pub async fn callback(
         None if !may_create_account(&ctx, &identity).await? => {
             // Nothing is kept: no pending sign-up, no tokens.
             drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
+            refused(
+                &ctx,
+                SignInMethod::Provider,
+                Some(provider),
+                "signup_invite_only",
+            )
+            .await?;
             sign_in_error("signup_invite_only", request)
         }
         None => {
@@ -471,6 +508,64 @@ pub async fn callback(
         }
     };
     Ok(with_cookie(response, clear_flow))
+}
+
+/// Where a refused round trip goes: back to the sign-in screen (the refusal
+/// tracked) for a sign-in, back to `return_to` for a signed-in round trip.
+async fn fail(ctx: &Ctx, flow: &Flow, code: &'static str) -> Result<Response> {
+    if flow.purpose == Purpose::SignIn {
+        refused(ctx, SignInMethod::Provider, Some(flow.provider), code).await?;
+        Ok(sign_in_error(code, flow.request_id.as_deref()))
+    } else {
+        Ok(link::back(&flow.return_to, "link_error", code))
+    }
+}
+
+/// The plan's kind of a refused sign-in's error `code`; `None` for what is
+/// no sign-in attempt (a CSRF check, a rate limit, a malformed request).
+pub(super) fn failure_of(code: &str) -> Option<SignInFailure> {
+    Some(match code {
+        "invalid_state" => SignInFailure::InvalidState,
+        "cancelled_at_provider" => SignInFailure::CancelledAtProvider,
+        "provider_unavailable" => SignInFailure::ProviderUnavailable,
+        "login_failed" => SignInFailure::LoginFailed,
+        "account_suspended" => SignInFailure::AccountSuspended,
+        "signup_invite_only" => SignInFailure::SignupInviteOnly,
+        "sign_in_not_allowed" => SignInFailure::SignInNotAllowed,
+        "passkey_not_accepted" => SignInFailure::PasskeyNotAccepted,
+        "passkey_expired" => SignInFailure::PasskeyExpired,
+        _ => return None,
+    })
+}
+
+/// Track a refused sign-in (error `code`, when it is one) in a transaction
+/// of its own: the refusal changed nothing, and names no account.
+pub(super) async fn refused(
+    ctx: &Ctx,
+    method: SignInMethod,
+    provider: Option<Provider>,
+    code: &str,
+) -> Result<()> {
+    let Some(failure) = failure_of(code) else {
+        return Ok(());
+    };
+    if ctx.state.tracker.sink() == TrackingSink::None {
+        return Ok(());
+    }
+    let mut tx = ctx.state.db.begin().await?;
+    ctx.state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::SignInFailed {
+                method,
+                provider: provider.map(tracked::provider_of),
+                failure,
+            },
+        )
+        .await?;
+    tx.commit().await?;
+    Ok(())
 }
 
 /// A round trip that ended with a provider identity Campbooks does not know.
@@ -600,7 +695,16 @@ async fn sign_in_known(
         now,
     )
     .await?;
-    signed_in(ctx, &mut tx, linked.account_id, provider, now).await?;
+    signed_in(
+        ctx,
+        &mut tx,
+        linked.account_id,
+        provider,
+        started.session.id,
+        false,
+        now,
+    )
+    .await?;
     tx.commit().await?;
     let location = continue_after_sign_in(
         ctx,
@@ -714,12 +818,15 @@ pub(super) fn session_cookie(issuer: &Issuer, token: &str) -> axum::http::Header
     )
 }
 
-/// Record a sign-in in the audit trail and announce it.
+/// Record a sign-in in the audit trail, announce it, and track it with
+/// the session it started (`session`).
 async fn signed_in(
     ctx: &Ctx,
     tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
     account: Uuid,
     provider: Provider,
+    session: Uuid,
+    new_account: bool,
     now: DateTime<Utc>,
 ) -> Result<()> {
     accounts::audit(
@@ -738,6 +845,17 @@ async fn signed_in(
                 account,
                 method: "provider".to_owned(),
                 provider: Some(provider.as_str().to_owned()),
+            },
+        )
+        .await?;
+    let session = tracked::session(tx, session).await?;
+    ctx.state
+        .tracker
+        .track(
+            tx,
+            &tracking::SignInSucceeded {
+                session,
+                new_account,
             },
         )
         .await?;
@@ -846,6 +964,10 @@ pub struct Created {
             content_type = "application/problem+json"),
     ),
 )]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one flow, read top to bottom; its tracked events sit next to the changes they record"
+)]
 pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Result<Response> {
     let issuer = ctx.issuer()?;
     if !web::csrf_passes(&headers, &issuer.url) {
@@ -860,13 +982,28 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     let pending = upstream::take_sign_up(&mut tx, &issuer.cipher, &token, now)
         .await?
         .ok_or_else(|| Error::Conflict(MESSAGES.reason("sign_up_expired")))?;
+    let pending_provider = tracked::provider(&pending.identity.provider);
     if !ctx.permits_identity(&pending.identity)? {
         // The allow-list may have been tightened since the round trip.
+        track_refusal(
+            &ctx,
+            &mut tx,
+            pending_provider,
+            SignInFailure::SignInNotAllowed,
+        )
+        .await?;
         tx.commit().await?;
         return Err(Error::Denied(MESSAGES.reason("sign_in_not_allowed")));
     }
     if !may_create_account(&ctx, &pending.identity).await? {
         // The pending sign-up (and its tokens) is gone with this commit.
+        track_refusal(
+            &ctx,
+            &mut tx,
+            pending_provider,
+            SignInFailure::SignupInviteOnly,
+        )
+        .await?;
         tx.commit().await?;
         return Err(Error::Denied(MESSAGES.reason("signup_invite_only")));
     }
@@ -877,6 +1014,7 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     };
     let provider = Provider::parse(&pending.identity.provider)
         .ok_or_else(|| Error::internal("a pending sign-up names an unknown provider"))?;
+    let mailbox_held = pending.tokens.is_some() && pending.identity.email.is_some();
     if let (Some(tokens), Some(address)) = (&pending.tokens, &pending.identity.email) {
         held_grants::hold(
             &mut tx,
@@ -923,7 +1061,29 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
             },
         )
         .await?;
-    signed_in(&ctx, &mut tx, linked.account_id, provider, now).await?;
+    let account = tracked::account(&mut tx, linked.account_id).await?;
+    ctx.state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::AccountCreated {
+                account,
+                method: SignInMethod::Provider,
+                provider: Some(tracked::provider_of(provider)),
+                mailbox_held,
+            },
+        )
+        .await?;
+    signed_in(
+        &ctx,
+        &mut tx,
+        linked.account_id,
+        provider,
+        started.session.id,
+        true,
+        now,
+    )
+    .await?;
     tx.commit().await?;
     let redirect = continue_after_sign_in(
         &ctx,
@@ -944,6 +1104,28 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
         response,
         issuer.cookies.clear(SIGN_UP_COOKIE, SameSite::Strict),
     ))
+}
+
+/// Track a refused sign-up in `tx`, which commits what the refusal took
+/// (the pending sign-up).
+async fn track_refusal(
+    ctx: &Ctx,
+    tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    provider: Option<tracking::Provider>,
+    failure: SignInFailure,
+) -> Result<()> {
+    ctx.state
+        .tracker
+        .track(
+            tx,
+            &tracking::SignInFailed {
+                method: SignInMethod::Provider,
+                provider,
+                failure,
+            },
+        )
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]

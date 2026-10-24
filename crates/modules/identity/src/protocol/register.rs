@@ -32,8 +32,10 @@ use crate::{
     domain::{
         accounts,
         clients::{begin_as_server, redirect_host},
+        tracked,
     },
     metadata::{Invalid, Registration},
+    tracking,
     web::no_store,
 };
 
@@ -110,6 +112,10 @@ fn refuse(error: &'static str, description: &'static str) -> Response {
         (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
     ),
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one flow, read top to bottom; its tracked events sit next to the changes they record"
 )]
 pub async fn register(
     State(ctx): State<Ctx>,
@@ -200,6 +206,11 @@ pub async fn register(
         now,
     )
     .await?;
+    let client = tracked::client(&mut tx, &client_id).await?;
+    ctx.state
+        .tracker
+        .track(&mut tx, &tracking::DynamicClientRegistered { client })
+        .await?;
     tx.commit().await?;
     tracing::info!(client = %client_id, "a client registered itself");
     let body = Registered {

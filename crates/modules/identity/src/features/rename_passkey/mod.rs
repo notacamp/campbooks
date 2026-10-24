@@ -12,7 +12,13 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use super::{PasskeyPath, list_passkeys::PasskeyView};
-use crate::{MESSAGES, deps::Deps, domain::passkeys, scopes::IdentityWrite};
+use crate::{
+    MESSAGES,
+    deps::Deps,
+    domain::{passkeys, tracked},
+    scopes::IdentityWrite,
+    tracking,
+};
 
 /// The new name.
 #[derive(Debug, Deserialize, ToSchema)]
@@ -60,8 +66,21 @@ pub async fn handler(
     let (_, account) = super::account(&deps, &principal)?;
     let name = passkeys::clean_name(&input.name)
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("passkey_name_required")))?;
-    let renamed = passkeys::rename(&state.db, path.id, account, &name)
+    let mut tx = state.db.begin().await?;
+    let before = passkeys::name_of(&mut tx, path.id, account)
         .await?
         .ok_or(Error::NotFound)?;
+    let renamed = passkeys::rename(&mut tx, path.id, account, &name)
+        .await?
+        .ok_or(Error::NotFound)?;
+    // The same name again changes nothing, and tracks nothing.
+    if before != name {
+        let passkey = tracked::existing_passkey(&mut tx, path.id).await?;
+        state
+            .tracker
+            .track(&mut tx, &tracking::PasskeyRenamed { passkey })
+            .await?;
+    }
+    tx.commit().await?;
     Ok(Json(PasskeyView::from(renamed)))
 }

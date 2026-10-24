@@ -20,6 +20,7 @@ use crate::{
     domain::{accounts, workspace_clients},
     events::{ClientRemoved, ConsentRevoked},
     scopes::IdentityClients,
+    tracking,
 };
 
 /// Remove one of the workspace's apps.
@@ -73,6 +74,18 @@ pub async fn handler(
         now,
     )
     .await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::ClientRemoved {
+                workspace: workspace.id,
+                client_id: path.client_id.clone(),
+                cause: tracking::ClientRemoval::Removed,
+                consents_revoked: i64::try_from(ended.len()).unwrap_or(i64::MAX),
+            },
+        )
+        .await?;
     for (person, bound) in ended {
         state
             .events

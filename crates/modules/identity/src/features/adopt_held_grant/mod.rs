@@ -16,7 +16,12 @@ use secrecy::SecretString;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use crate::{deps::Deps, domain::held_grants, scopes::IdentityWrite};
+use crate::{
+    deps::Deps,
+    domain::{held_grants, tracked},
+    scopes::IdentityWrite,
+    tracking,
+};
 
 /// The connectors module's write scope (`connectors:write`), required as
 /// well: this makes a connection.
@@ -79,6 +84,8 @@ pub async fn handler(
     let taken = held_grants::take(&mut tx, &issuer.cipher, id, account, now)
         .await?
         .ok_or(Error::NotFound)?;
+    let provider = tracked::provider(&taken.grant.provider)
+        .ok_or_else(|| Error::internal("a held grant names an unknown provider"))?;
     let grant = ProviderGrant {
         workspace: workspace.id,
         subject: workspace.principal.subject.clone(),
@@ -98,6 +105,18 @@ pub async fn handler(
     // refuses, the row stays (rolled back) and the person can retry.
     let connection = state.grants.adopt(&state, grant).await?;
     held_grants::delete(&mut tx, id, account).await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::HeldGrantAdopted {
+                held_grant_id: id,
+                account_id: account,
+                provider,
+                in_workspace_id: *workspace.id.as_uuid(),
+            },
+        )
+        .await?;
     tx.commit().await?;
     Ok(Json(Adopted { connection }))
 }

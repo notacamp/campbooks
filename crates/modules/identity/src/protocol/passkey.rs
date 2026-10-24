@@ -42,7 +42,7 @@ use uuid::Uuid;
 
 use super::{
     Ctx, authorize,
-    sign_in::{continue_after_sign_in, session_cookie},
+    sign_in::{continue_after_sign_in, refused, session_cookie},
 };
 use crate::{
     MESSAGES,
@@ -51,8 +51,10 @@ use crate::{
         accounts,
         passkeys::{self, Binding, Ceremony, Purpose},
         sessions::{self, Started},
+        tracked,
     },
     events::{AccountCreated, SignedIn, WayInAdded},
+    tracking::{self, SignInMethod},
     web::{self, SameSite, with_cookie},
     webauthn::{
         AuthenticationCredential, CEREMONY_TIMEOUT, CreationOptions, Refusal,
@@ -373,6 +375,28 @@ pub async fn sign_in(
     headers: HeaderMap,
     JsonBody(credential): JsonBody<AuthenticationCredential>,
 ) -> Result<Response> {
+    let signed_in = sign_in_with(&ctx, ip, &headers, &credential).await;
+    // A refusal of the passkey (not of the request: CSRF, rate limits) is
+    // tracked, in a transaction of its own.
+    if let Err(error) = &signed_in {
+        refused(&ctx, SignInMethod::Passkey, None, error.code()).await?;
+    }
+    signed_in
+}
+
+/// [`sign_in`], refusals as errors.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one flow, read top to bottom; its tracked events sit next to the changes they record"
+)]
+async fn sign_in_with(
+    ctx: &Ctx,
+    ip: ClientIp,
+    headers: &HeaderMap,
+    credential: &AuthenticationCredential,
+) -> Result<Response> {
+    let ctx = ctx.clone();
+    let headers = headers.clone();
     let issuer = guard(&ctx, &headers, ip).await?;
     let rp = rp(issuer)?;
     let now = issuer.now();
@@ -398,7 +422,7 @@ pub async fn sign_in(
     let verified = rp
         .verify_assertion(
             &challenge,
-            &credential,
+            credential,
             &Stored {
                 credential_id: &passkey.credential_id,
                 public_key: &passkey.public_key,
@@ -419,7 +443,8 @@ pub async fn sign_in(
         return Err(Error::Denied(MESSAGES.reason("sign_in_not_allowed")));
     }
     let reported = i64::from(verified.sign_count);
-    if (reported != 0 || passkey.sign_count != 0) && reported <= passkey.sign_count {
+    let regressed = (reported != 0 || passkey.sign_count != 0) && reported <= passkey.sign_count;
+    if regressed {
         // A counter that does not move forward may mean a cloned
         // authenticator. Synced passkeys report 0, and a refusal would lock
         // out the person, so it is recorded instead (§7.2 step 21).
@@ -441,6 +466,16 @@ pub async fn sign_in(
         now,
     )
     .await?;
+    if regressed {
+        let snapshot = tracked::existing_passkey(&mut tx, passkey.id).await?;
+        ctx.state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::PasskeyCounterRegressed { passkey: snapshot },
+            )
+            .await?;
+    }
     let started = sessions::start_with_passkey(
         &mut tx,
         passkey.account_id,
@@ -450,7 +485,16 @@ pub async fn sign_in(
         now,
     )
     .await?;
-    announce_sign_in(&ctx, &mut tx, passkey.account_id, passkey.id, now).await?;
+    announce_sign_in(
+        &ctx,
+        &mut tx,
+        passkey.account_id,
+        passkey.id,
+        started.session.id,
+        false,
+        now,
+    )
+    .await?;
     tx.commit().await?;
     let redirect = continue_after_sign_in(
         &ctx,
@@ -470,12 +514,15 @@ pub async fn sign_in(
     ))
 }
 
-/// Record a passkey sign-in in the audit trail and announce it.
+/// Record a passkey sign-in in the audit trail, announce it, and track it
+/// with the session it started (`session`).
 async fn announce_sign_in(
     ctx: &Ctx,
     tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
     account: Uuid,
     passkey: Uuid,
+    session: Uuid,
+    new_account: bool,
     now: DateTime<Utc>,
 ) -> Result<()> {
     accounts::audit(
@@ -494,6 +541,17 @@ async fn announce_sign_in(
                 account,
                 method: "passkey".to_owned(),
                 provider: None,
+            },
+        )
+        .await?;
+    let session = tracked::session(tx, session).await?;
+    ctx.state
+        .tracker
+        .track(
+            tx,
+            &tracking::SignInSucceeded {
+                session,
+                new_account,
             },
         )
         .await?;
@@ -613,6 +671,10 @@ pub async fn sign_up_options(
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
     ),
 )]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one flow, read top to bottom; its tracked events sit next to the changes they record"
+)]
 pub async fn sign_up(
     State(ctx): State<Ctx>,
     ip: ClientIp,
@@ -703,7 +765,29 @@ pub async fn sign_up(
             },
         )
         .await?;
-    announce_sign_in(&ctx, &mut tx, account, passkey, now).await?;
+    let snapshot = tracked::account(&mut tx, account).await?;
+    ctx.state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::AccountCreated {
+                account: snapshot,
+                method: SignInMethod::Passkey,
+                provider: None,
+                mailbox_held: false,
+            },
+        )
+        .await?;
+    announce_sign_in(
+        &ctx,
+        &mut tx,
+        account,
+        passkey,
+        started.session.id,
+        true,
+        now,
+    )
+    .await?;
     tx.commit().await?;
     let redirect = continue_after_sign_in(
         &ctx,

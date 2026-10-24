@@ -29,9 +29,41 @@ use crate::{
     domain::{
         accounts,
         mailbox_links::{self, Removed},
+        tracked,
     },
     events::{ConnectionRemoved, WayInRemoved},
+    tracking::{self, WayInRemoval},
 };
+
+/// The plan's provider of a removed way in.
+fn provider_of(gone: &Removed) -> Result<tracking::Provider> {
+    tracked::provider(&gone.provider)
+        .ok_or_else(|| campbooks_kernel::Error::internal("a way in names an unknown provider"))
+}
+
+/// Track that `gone` went, for `cause`, in `conn` (an instance
+/// transaction: the prune's, or a round trip's take-back).
+pub(crate) async fn track_removed(
+    state: &AppState,
+    conn: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    gone: &Removed,
+    cause: WayInRemoval,
+) -> Result<()> {
+    state
+        .tracker
+        .track(
+            conn,
+            &tracking::WayInRemoved {
+                way_in_id: gone.way_in,
+                account_id: gone.account,
+                provider: provider_of(gone)?,
+                cause,
+                sessions_ended: i64::try_from(gone.sessions_ended).unwrap_or(i64::MAX),
+            },
+        )
+        .await?;
+    Ok(())
+}
 
 /// Audit way in `gone`'s removal (`reason`) and publish
 /// `identity.way_in_removed`, in the transaction that removed it.
@@ -136,6 +168,15 @@ impl EventConsumer for ForgetConnectedWayIn {
         announce(&state, tx, &gone, "connection_removed", now)
             .await
             .map_err(retry)?;
+        // The delivery works in the connection's workspace.
+        let removed = tracking::ConnectedWayInRemoved {
+            workspace: WorkspaceId::from_uuid(workspace),
+            way_in_id: gone.way_in,
+            account_id: gone.account,
+            provider: provider_of(&gone).map_err(retry)?,
+            sessions_ended: i64::try_from(gone.sessions_ended).unwrap_or(i64::MAX),
+        };
+        state.tracker.track(tx, &removed).await?;
         tracing::info!(
             sessions_ended = gone.sessions_ended,
             "a way in went with its last mailbox"
