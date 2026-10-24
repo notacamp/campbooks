@@ -28,7 +28,8 @@ use campbooks_kernel::{
     crypto::{Cipher, SecretKey},
     jobs::{Registry, Worker},
     outbound::{
-        Destination, OutboundRequests, Resolved, StandingFuture, StoredSend, StoredSendFuture,
+        CalendarRequests, Destination, OutboundRequests, Resolved, StandingFuture,
+        StoredCalendarChange, StoredCalendarChangeFuture, StoredSend, StoredSendFuture,
     },
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
@@ -313,6 +314,41 @@ impl OutboundRequests for FakeOutbound {
     }
 }
 
+/// What the schedule module stored, faked: the calendar changes it confirms
+/// through the kernel's calendar-requests port.
+#[derive(Debug, Default)]
+pub struct FakeCalendar {
+    stored: Mutex<HashMap<uuid::Uuid, StoredCalendarChange>>,
+}
+
+impl FakeCalendar {
+    /// Request `request` stands as `change`.
+    pub fn release(&self, request: uuid::Uuid, change: StoredCalendarChange) {
+        self.stored
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(request, change);
+    }
+}
+
+impl CalendarRequests for FakeCalendar {
+    fn stored_change<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _conn: &'a mut sqlx::PgConnection,
+        _workspace: WorkspaceId,
+        request: uuid::Uuid,
+    ) -> StoredCalendarChangeFuture<'a> {
+        let stored = self
+            .stored
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&request)
+            .cloned();
+        Box::pin(async move { Ok(stored) })
+    }
+}
+
 /// The module over a fresh database, with a fake Google.
 pub struct Kit {
     /// The test database as its owner (no row-level security), for
@@ -332,6 +368,8 @@ pub struct Kit {
     pub door: Arc<FakeDoor>,
     /// What the conversations module stored, faked.
     pub outbound: Arc<FakeOutbound>,
+    /// What the schedule module stored, faked.
+    pub calendar: Arc<FakeCalendar>,
     app: Router,
     idp: TestIdp,
     membership: Arc<FakeMembership>,
@@ -431,12 +469,14 @@ impl Kit {
         let membership = Arc::new(FakeMembership::default());
         let door = Arc::new(FakeDoor::default());
         let outbound = Arc::new(FakeOutbound::default());
+        let calendar = Arc::new(FakeCalendar::default());
         let state = idp
             .state(pool)
             .with_blobs(blobs)
             .with_membership(membership.clone())
             .with_consent_door(door.clone())
             .with_outbound(outbound.clone())
+            .with_calendar_requests(calendar.clone())
             .with_registry(Registry::build(&[crate::module(deps.clone())]).unwrap());
         let app = testing::app(crate::module(deps.clone()), state.clone());
         Self {
@@ -448,6 +488,7 @@ impl Kit {
             deps,
             door,
             outbound,
+            calendar,
             app,
             idp,
             membership,
@@ -619,6 +660,43 @@ impl Kit {
                     refresh_token: Some(SecretString::from(refresh)),
                     expires_in: Some(3599),
                     extending,
+                },
+            )
+            .await
+    }
+
+    /// A Google consent that also grants calendar access, handed to the
+    /// grant-intake port for `caller` in `workspace`: the connection id.
+    pub async fn adopt_calendar(
+        &self,
+        caller: &Caller,
+        workspace: WorkspaceId,
+        account_subject: &str,
+    ) -> Result<String, Error> {
+        let (access, refresh) = self.google.grant();
+        grant_intake(self.deps.clone())
+            .adopt(
+                &self.state,
+                ProviderGrant {
+                    workspace,
+                    subject: caller.subject.clone(),
+                    provider: "google".to_owned(),
+                    account_subject: account_subject.to_owned(),
+                    issuer: "https://accounts.google.com".to_owned(),
+                    address: "Sam@Example.com".to_owned(),
+                    address_verified: self.google.email_verified(),
+                    display_name: Some("Sam Rivera".to_owned()),
+                    scopes: vec![
+                        "openid".to_owned(),
+                        "email".to_owned(),
+                        GMAIL_SCOPE.to_owned(),
+                        crate::google::CALENDAR_EVENTS_SCOPE.to_owned(),
+                        crate::google::CALENDAR_LIST_SCOPE.to_owned(),
+                    ],
+                    access_token: SecretString::from(access),
+                    refresh_token: Some(SecretString::from(refresh)),
+                    expires_in: Some(3599),
+                    extending: None,
                 },
             )
             .await
@@ -962,6 +1040,23 @@ impl FakeGoogle {
 
     fn base(&self) -> Url {
         Url::parse(&format!("{}/", self.server.uri())).unwrap()
+    }
+
+    /// Answer as `mock` says, before the fake's own answers (a test of the
+    /// Calendar API, which the fake mailbox does not serve).
+    pub async fn mount_first(&self, mock: Mock) {
+        mock.with_priority(1).mount(&self.server).await;
+    }
+
+    /// The requests the fake server received, as `METHOD path`.
+    pub async fn received(&self) -> Vec<String> {
+        self.server
+            .received_requests()
+            .await
+            .unwrap_or_default()
+            .iter()
+            .map(|request| format!("{} {}", request.method, request.url.path()))
+            .collect()
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Mailbox> {

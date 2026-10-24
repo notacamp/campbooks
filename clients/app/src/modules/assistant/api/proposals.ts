@@ -7,6 +7,7 @@ export type Settlement = Schema<"Settlement">;
 const CONVERSATION = "conversations.conversation";
 const ITEM = "attention.item";
 const TASK = "tasks.task";
+const EVENT = "schedule.event";
 
 /**
  * A request this client runs for one of Scout's proposals: its method, its
@@ -37,10 +38,16 @@ const task = (tail: string, method: Runnable["method"] = "POST"): Runnable => ({
   records: [TASK, ITEM],
 });
 
+const event = (tail: string, method: Runnable["method"] = "POST"): Runnable => ({
+  method,
+  path: `schedule/events${tail}`,
+  records: [EVENT],
+});
+
 /**
  * The client's own list of the actions Scout may propose, and their undos
  * (the same operations as the server's action table): a proposal naming
- * anything else is never sent. Calendar events add theirs here.
+ * anything else is never sent.
  */
 export const RUNNABLE: Readonly<Record<string, Runnable>> = {
   "conversations.archive": conversation("archive"),
@@ -69,10 +76,35 @@ export const RUNNABLE: Readonly<Record<string, Runnable>> = {
   "tasks.update": task("", "PATCH"),
   "tasks.hand_off": task("/hand_off"),
   "tasks.take_back": task("/take_back"),
+  "schedule.create_event": event(""),
+  // An event's edit is the other PATCH Scout's cards run.
+  "schedule.update_event": event("/{event_id}", "PATCH"),
+  "schedule.delete_event": event("/{event_id}", "DELETE"),
+  "schedule.restore_event": event("/{event_id}/restore"),
+  "schedule.respond_event": event("/{event_id}/response"),
+  "schedule.push_event": event("/{event_id}/push"),
+  "schedule.unpush_event": event("/{event_id}/push", "DELETE"),
 };
 
 /** One plain id in a path. */
 const ID = /^[\w-]{1,64}$/u;
+
+/**
+ * The path ids an undo takes from the change's answer: its `from_response`
+ * entries `@<path parameter>:<field>` (a new event's undo deletes the event
+ * the answer names). The request's path holds `{<path parameter>}` until
+ * then.
+ */
+function lateParams(request: ProposalRequest): Map<string, string> {
+  const late = new Map<string, string>();
+  for (const entry of request.from_response ?? []) {
+    const found = /^@(\w+):(\w+)$/u.exec(entry);
+    if (found?.[1] !== undefined && found[2] !== undefined) {
+      late.set(found[1], found[2]);
+    }
+  }
+  return late;
+}
 
 /** A proposal's request this client may send: its entry and its path's ids. */
 export interface Ready {
@@ -82,7 +114,7 @@ export interface Ready {
 
 /**
  * `request` when this client runs it: its operation is in `list`, its
- * method POST or DELETE (PATCH for a task's edit alone) and the one its
+ * method POST or DELETE (PATCH for a task's or an event's edit alone) and the one its
  * entry says, and its path is the
  * entry's, under the workspace's root, each id one plain segment. Anything
  * else is `undefined`: the card says Scout can't do it here.
@@ -98,7 +130,8 @@ export function runnable(
   const allowed =
     method === "POST" ||
     method === "DELETE" ||
-    (method === "PATCH" && request.operation === "tasks.update");
+    (method === "PATCH" &&
+      (request.operation === "tasks.update" || request.operation === "schedule.update_event"));
   if (entry === undefined || !allowed || method !== entry.method) {
     return undefined;
   }
@@ -108,6 +141,7 @@ export function runnable(
     return undefined;
   }
   const params: Record<string, string> = {};
+  const late = lateParams(request);
   for (const [index, segment] of want.entries()) {
     const value = got[index] ?? "";
     const name = /^\{(\w+)\}$/u.exec(segment)?.[1];
@@ -115,6 +149,9 @@ export function runnable(
       if (value !== segment) {
         return undefined;
       }
+    } else if (late.has(name) && value === segment) {
+      // Waits for the change's answer (`withAnswer` fills it in).
+      params[name] = value;
     } else if (ID.test(value)) {
       params[name] = value;
     } else {
@@ -133,7 +170,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * `from_response` names copied from the change's answer, and nothing else.
  */
 export function undoBody(undo: ProposalRequest, answer: unknown): unknown {
-  const fields = undo.from_response ?? [];
+  // The `@` entries fill the path (`withAnswer`), not the body.
+  const fields = (undo.from_response ?? []).filter((field) => !field.startsWith("@"));
   if (fields.length === 0) {
     return undo.body ?? null;
   }
@@ -146,6 +184,33 @@ export function undoBody(undo: ProposalRequest, answer: unknown): unknown {
     }
   }
   return body;
+}
+
+/**
+ * `undo` with the path ids the change's answer gives (a new event's `id`),
+ * each one plain id; `undefined` when the answer does not give one, so the
+ * undo is never sent to a path the answer did not name.
+ */
+export function withAnswer(undo: ProposalRequest, answer: unknown): ProposalRequest | undefined {
+  const late = lateParams(undo);
+  if (late.size === 0) {
+    return undo;
+  }
+  if (!isRecord(answer)) {
+    return undefined;
+  }
+  let path = undo.path;
+  for (const [name, field] of late) {
+    const value = Object.hasOwn(answer, field) ? answer[field] : undefined;
+    if (typeof value !== "string" || !ID.test(value)) {
+      return undefined;
+    }
+    path = path
+      .split("/")
+      .map((segment) => (segment === `{${name}}` ? value : segment))
+      .join("/");
+  }
+  return { ...undo, path };
 }
 
 /** A request this client may not send. */

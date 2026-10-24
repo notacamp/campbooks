@@ -7,6 +7,7 @@
     "invalid_hours": "O horário de trabalho precisa de um dia da semana conhecido (mon a sun), horas no formato HH:MM e um fim depois do início.",
     "invalid_kind": "Esse não é um tipo de evento que o Scout possa adicionar. Escolha entre charge, appointment, meeting, travel, stay, show, reservation, delivery ou expiry.",
     "invalid_minutes": "Peça um intervalo de 5 a 1440 minutos.",
+    "invalid_source": "Esse email não pode ser a origem: indique um email que possa ler como conversations.message, com a sua conversa.",
     "invalid_text": "É preciso um título, e o título, o local e as notas não podem ser demasiado longos.",
     "invalid_time_zone": "Use o nome de um fuso horário IANA, como Europe/Lisbon.",
     "invalid_undo": "Este desfazer não corresponde a este evento eliminado.",

@@ -1,0 +1,1 @@
+- **Zoho Calendar adapter, off by default** (self-hosting). `CAMPBOOKS_CONNECTORS__ZOHO_CALENDAR=true` lets members add Zoho calendar access. It has not been verified against a live Zoho account yet, so it stays off until a hand test passes; while it is off, asking for it answers that it is not available.

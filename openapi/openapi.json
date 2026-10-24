@@ -3460,7 +3460,7 @@
             }
           },
           "409": {
-            "description": "The provider is not configured on this instance (`provider_not_configured`), or this instance has no front door for consents (`mailbox_unsupported`).",
+            "description": "The provider is not configured on this instance (`provider_not_configured`), this instance has no front door for consents (`mailbox_unsupported`), or the capability is switched off on it (`capability_not_offered`, Zoho Calendar).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11215,7 +11215,7 @@
             }
           },
           "400": {
-            "description": "Times that do not read or do not follow each other (`invalid_when`), a title that is empty or too long (`invalid_text`), a time zone that is not an IANA name (`invalid_time_zone`), or a calendar that cannot be written (`calendar_read_only`).",
+            "description": "Times that do not read or do not follow each other (`invalid_when`), a title that is empty or too long (`invalid_text`), a time zone that is not an IANA name (`invalid_time_zone`), or a calendar that cannot be written (`calendar_read_only`), or a source that is not an email (`invalid_source`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11245,7 +11245,7 @@
             }
           },
           "404": {
-            "description": "No such calendar, or it is not yours.",
+            "description": "No such calendar, or it is not yours, or the source email is not one you can read.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17522,6 +17522,13 @@
             "type": "boolean",
             "description": "Whether it is the account's primary calendar."
           },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Whose calendar it is, `google` or `zoho`, when known (none for your\nCampbooks calendar)."
+          },
           "source": {
             "$ref": "#/components/schemas/CalendarSource",
             "description": "Their Campbooks calendar, or one of a connected provider account."
@@ -17732,6 +17739,17 @@
               {
                 "$ref": "#/components/schemas/ProposalDetail",
                 "description": "What the change takes (a change only)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "event": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProposalEvent",
+                "description": "The event's own facts (an event change, except a new one); its\n`record` is the event."
               },
               {
                 "type": "null"
@@ -20024,7 +20042,8 @@
           "origin",
           "pending",
           "on_provider",
-          "busy"
+          "busy",
+          "item_keys"
         ],
         "properties": {
           "all_day": {
@@ -20054,6 +20073,13 @@
           "id": {
             "$ref": "#/components/schemas/EventId",
             "description": "The event (a series and its occurrences share it)."
+          },
+          "item_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The keys of the things Scout read that this event stands for (a read\nitem's `key`), so a reader can tell which event an item became."
           },
           "kind": {
             "$ref": "#/components/schemas/EventKind",
@@ -21965,6 +21991,24 @@
             ],
             "description": "Where it is."
           },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The email it is made from: a `conversations.message` you can read.\nOpening the event then leads back to that email."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_conversation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The conversation of that email (needed to open it)."
+          },
           "starts": {
             "type": "string",
             "description": "When it starts: an RFC 3339 time with an offset, or a `YYYY-MM-DD`\ndate for an all-day event.",
@@ -22575,13 +22619,26 @@
           "plan_day",
           "task_later",
           "due",
-          "hand_off"
+          "hand_off",
+          "create_event",
+          "update_event",
+          "delete_event",
+          "respond_event",
+          "push_event",
+          "unpush_event"
         ]
       },
       "ProposalDetail": {
         "type": "object",
         "description": "What a change takes besides its conversation.",
         "properties": {
+          "calendar_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The calendar an event is added to (`push_event`), as the calendars\nlist names it: read by the server, never the model's words."
+          },
           "day": {
             "type": [
               "string",
@@ -22589,6 +22646,13 @@
             ],
             "format": "date",
             "description": "The day (`plan_day`, `due`), `YYYY-MM-DD`."
+          },
+          "ends": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new end (`create_event`, `update_event`), as Scout wrote it."
           },
           "label": {
             "type": [
@@ -22611,12 +22675,40 @@
             ],
             "description": "The teammate's name, as the workspace's members list has it\n(`hand_off`): read by the server, never the model's words."
           },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new place (`create_event`, `update_event`), Scout's words."
+          },
+          "response": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The answer to an invitation (`respond_event`): `accepted`,\n`tentative` or `declined`."
+          },
+          "starts": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new start (`create_event`, `update_event`), as Scout wrote it."
+          },
           "stream": {
             "type": [
               "string",
               "null"
             ],
             "description": "The stream it moves to (`move_to_stream`)."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The title in Scout's words (`create_event`, `update_event`): show it\nquoted."
           },
           "until": {
             "type": [
@@ -22625,6 +22717,36 @@
             ],
             "format": "date-time",
             "description": "Until when (`later`), RFC 3339, UTC."
+          }
+        }
+      },
+      "ProposalEvent": {
+        "type": "object",
+        "description": "A calendar event's own facts, read from its record when the proposal was\nmade: what a card names, never the model's words.",
+        "required": [
+          "title",
+          "starts",
+          "all_day"
+        ],
+        "properties": {
+          "all_day": {
+            "type": "boolean",
+            "description": "Whether it lasts whole days."
+          },
+          "calendar": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the calendar it is on."
+          },
+          "starts": {
+            "type": "string",
+            "description": "When it starts: an RFC 3339 time with an offset, or a `YYYY-MM-DD`\ndate when it is all-day."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title, as the calendar has it."
           }
         }
       },
@@ -25499,7 +25621,7 @@
             "items": {
               "$ref": "#/components/schemas/Capability"
             },
-            "description": "The capabilities to ask for (`messages` is offered today)."
+            "description": "The capabilities to ask for (`messages`, and `calendar` for Google,\nand for Zoho while its flag is on)."
           },
           "connection": {
             "oneOf": [
@@ -25738,6 +25860,13 @@
           "capability": {
             "$ref": "#/components/schemas/Capability",
             "description": "The capability it reads."
+          },
+          "health_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why this stream does not work, when its connection is otherwise fine\n(`calendar_api_not_enabled`: the calendar API is not enabled for this\nserver's Google project; `provider_errors`)."
           },
           "inbox_id": {
             "oneOf": [

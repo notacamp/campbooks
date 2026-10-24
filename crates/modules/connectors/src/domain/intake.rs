@@ -47,6 +47,29 @@ impl GrantIntake for Intake {
         }
     }
 
+    fn capability_scopes(&self, provider: &str, capabilities: &[String]) -> Vec<String> {
+        let wanted: Vec<Capability> = capabilities
+            .iter()
+            .filter_map(|name| Capability::parse(name).ok())
+            .filter(|capability| *capability != Capability::Messages)
+            .collect();
+        match provider {
+            "google" if self.deps.google.is_some() => wanted
+                .into_iter()
+                .flat_map(|capability| google::capability_scopes(capability).iter().copied())
+                .map(ToOwned::to_owned)
+                .collect(),
+            "zoho"
+                if self.deps.zoho.is_some()
+                    && self.deps.config.zoho_calendar
+                    && wanted.contains(&Capability::Calendar) =>
+            {
+                zoho::CALENDAR_SCOPES.map(ToOwned::to_owned).to_vec()
+            }
+            _ => Vec::new(),
+        }
+    }
+
     fn adopt<'a>(&'a self, state: &'a AppState, grant: Grant) -> AdoptFuture<'a> {
         Box::pin(async move {
             let access = member(state, &grant.subject, grant.workspace).await?;
@@ -57,7 +80,7 @@ impl GrantIntake for Intake {
                 "google" if self.deps.google.is_some() => {
                     let capabilities: Vec<Capability> = google::granted_capabilities(&grant.scopes)
                         .into_iter()
-                        .filter(|c| google::capability_scope(*c).is_some())
+                        .filter(|c| !google::capability_scopes(*c).is_empty())
                         .collect();
                     let mailbox = Mailbox {
                         key: String::new(),
@@ -75,12 +98,15 @@ impl GrantIntake for Intake {
                         return Err(Error::Denied(MESSAGES.reason("consent_incomplete")));
                     }
                     let (server, mailboxes) = self.zoho_mailboxes(&grant, &address).await?;
-                    (
-                        Provider::Zoho,
-                        vec![Capability::Messages],
-                        Some(server),
-                        mailboxes,
-                    )
+                    let mut capabilities = vec![Capability::Messages];
+                    if self.deps.config.zoho_calendar
+                        && zoho::CALENDAR_SCOPES
+                            .iter()
+                            .all(|s| grant.scopes.iter().any(|g| g == s))
+                    {
+                        capabilities.push(Capability::Calendar);
+                    }
+                    (Provider::Zoho, capabilities, Some(server), mailboxes)
                 }
                 _ => return Err(Error::Conflict(MESSAGES.reason("provider_not_configured"))),
             };
@@ -146,6 +172,15 @@ impl GrantIntake for Intake {
             )
             .fetch_optional(&mut *tx)
             .await?;
+            // What it lets Campbooks do: the new grant asks for each again.
+            let held: Vec<String> = sqlx::query_scalar(
+                "SELECT unnest(capabilities) FROM connectors.connections
+                  WHERE id = $1 AND granted_by = $2",
+            )
+            .bind(id)
+            .bind(user)
+            .fetch_all(&mut *tx)
+            .await?;
             tx.commit().await?;
             // Only the grantor consents to their grant again.
             let found = found.ok_or(Error::NotFound)?;
@@ -154,6 +189,7 @@ impl GrantIntake for Intake {
                 address: found.address,
                 account_subject: found.account_subject,
                 needs_reauth: found.health == Health::NeedsReauth.as_str(),
+                capabilities: held,
             })
         })
     }

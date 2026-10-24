@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://campbooks.example.com/contracts/schedule.calendar_sync_changed.v1.schema.json",
   "title": "schedule.calendar_sync_changed v1 (event payload)",
-  "description": "Published by the schedule module, in the transaction in which a member turns one of their provider calendars on or off. The connectors module reads a calendar turned on again from the start (the calendar's cursor is dropped), and stops reading one turned off. Ids and a flag only: the provider's calendar id is in the connectors module's own records. Workspace-scoped.",
+  "description": "Published by the schedule module, in the transaction in which a member turns one of their provider calendars on or off. The connectors module reads a calendar turned on again from the start (the calendar's cursor is dropped), and stops reading one turned off. Ids, a flag and a blob reference only: which calendar of the provider it is travels in the `provider_calendar` blob (a `calendar-ref` v1 document), since the provider's calendar id can be an address. Workspace-scoped.",
   "type": "object",
   "required": ["workspace", "calendar", "connection", "syncing"],
   "additionalProperties": false,
@@ -10,12 +10,26 @@
     "workspace": { "type": "string" },
     "calendar": { "$ref": "#/$defs/uuid", "description": "The calendar (an id of the schedule module)." },
     "connection": { "$ref": "#/$defs/uuid", "description": "The connection whose calendar it is (an id of the connectors module)." },
-    "syncing": { "type": "boolean", "description": "Whether it syncs now." }
+    "syncing": { "type": "boolean", "description": "Whether it syncs now." },
+    "provider_calendar": {
+      "description": "Which calendar of the provider it is: a `calendar-ref` v1 document, a blob of the workspace. Optional: an event published without it names a calendar the connectors module cannot place, and is ignored.",
+      "$ref": "#/$defs/blob"
+    }
   },
   "$defs": {
     "uuid": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "blob": {
+      "type": "object",
+      "required": ["hash", "size", "content_type"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 },
+        "content_type": { "type": "string" }
+      }
     }
   }
 }

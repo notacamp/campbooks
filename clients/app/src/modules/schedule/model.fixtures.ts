@@ -15,6 +15,7 @@ export function event(fields: Partial<EventView> = {}): EventView {
     busy: true,
     calendar_id: "own",
     on_provider: false,
+    item_keys: [],
     origin: "member",
     pending: false,
     recurring: false,

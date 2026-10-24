@@ -7,6 +7,7 @@ import {
   runnable,
   runRequest,
   undoBody,
+  withAnswer,
   type ProposalRequest,
   type Runnable,
 } from "./proposals";
@@ -21,10 +22,10 @@ const archive: ProposalRequest = {
   body: null,
 };
 
-/** A row a later module adds (an event deleted, undone with its token): not one of ours. */
+/** A row a later module adds (a note deleted, undone with its token): not one of ours. */
 const FAKE: Readonly<Record<string, Runnable>> = {
-  "schedule.delete_event": { method: "DELETE", path: "events/{event_id}", records: [] },
-  "schedule.restore_event": { method: "POST", path: "events/{event_id}/restore", records: [] },
+  "notes.delete": { method: "DELETE", path: "events/{event_id}", records: [] },
+  "notes.restore": { method: "POST", path: "events/{event_id}/restore", records: [] },
 };
 
 describe("the client's own actions", () => {
@@ -49,6 +50,13 @@ describe("the client's own actions", () => {
         "conversations.unarchive",
         "conversations.unstar",
         "conversations.untrash",
+        "schedule.create_event",
+        "schedule.delete_event",
+        "schedule.push_event",
+        "schedule.respond_event",
+        "schedule.restore_event",
+        "schedule.unpush_event",
+        "schedule.update_event",
         "tasks.done",
         "tasks.hand_off",
         "tasks.not_needed",
@@ -105,7 +113,7 @@ describe("the client's own actions", () => {
 
 describe("an undo that takes fields of the change's answer", () => {
   const undo: ProposalRequest = {
-    operation: "schedule.restore_event",
+    operation: "notes.restore",
     method: "POST",
     path: "events/e-1/restore",
     body: { note: "kept" },
@@ -130,7 +138,7 @@ describe("an undo that takes fields of the change's answer", () => {
       },
     });
     const change: ProposalRequest = {
-      operation: "schedule.delete_event",
+      operation: "notes.delete",
       method: "DELETE",
       path: "events/e-1",
       body: null,
@@ -173,11 +181,11 @@ describe("a task's cards", () => {
       expect(runnable(odd)).toBeUndefined();
     }
     const patchOnly: Readonly<Record<string, Runnable>> = {
-      "schedule.edit": { method: "PATCH", path: "events/{event_id}", records: [] },
+      "notes.edit": { method: "PATCH", path: "events/{event_id}", records: [] },
     };
     expect(
       runnable(
-        { operation: "schedule.edit", method: "PATCH", path: "events/e-1", body: null },
+        { operation: "notes.edit", method: "PATCH", path: "events/e-1", body: null },
         patchOnly,
       ),
     ).toBeUndefined();
@@ -217,5 +225,116 @@ describe("a task's cards", () => {
       due_at: null,
       revision: 8,
     });
+  });
+});
+
+describe("an event's cards", () => {
+  const E = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2c0001";
+  const edit: ProposalRequest = {
+    operation: "schedule.update_event",
+    method: "PATCH",
+    path: `schedule/events/${E}`,
+    body: { place: "Clinic" },
+  };
+  /** The undo of a new event: it deletes the event the answer names. */
+  const deleteNew: ProposalRequest = {
+    operation: "schedule.delete_event",
+    method: "DELETE",
+    path: "schedule/events/{event_id}",
+    body: null,
+    from_response: ["@event_id:id"],
+  };
+  const putBack: ProposalRequest = {
+    operation: "schedule.push_event",
+    method: "POST",
+    path: "schedule/events/{event_id}/push",
+    body: null,
+    from_response: ["@event_id:id", "calendar_id"],
+  };
+
+  it("run their exact paths, PATCH for the edit", () => {
+    expect(runnable(edit)?.params).toEqual({ event_id: E });
+    expect(
+      runnable({
+        operation: "schedule.create_event",
+        method: "POST",
+        path: "schedule/events",
+        body: { title: "Dentist", starts: "2026-11-20T10:00:00+00:00" },
+      })?.params,
+    ).toEqual({});
+    expect(
+      runnable({
+        operation: "schedule.restore_event",
+        method: "POST",
+        path: `schedule/events/${E}/restore`,
+        body: null,
+        from_response: ["undo_token"],
+      })?.params,
+    ).toEqual({ event_id: E });
+    for (const odd of [
+      { ...edit, method: "POST" as const },
+      { ...edit, path: `schedule/events/${E}/push` },
+      { ...edit, path: "schedule/events/../x" },
+      // PATCH is for a task's edit and an event's alone.
+      { ...edit, operation: "schedule.respond_event", path: `schedule/events/${E}/response` },
+      // A placeholder is only for a path the answer fills in.
+      { ...edit, path: "schedule/events/{event_id}" },
+      { ...deleteNew, from_response: [] },
+      { ...deleteNew, from_response: ["@other_id:id"] },
+    ]) {
+      expect(runnable(odd)).toBeUndefined();
+    }
+  });
+
+  it("wait for the id the change's answer gives, and run nowhere else", () => {
+    expect(runnable(deleteNew)?.entry.method).toBe("DELETE");
+    expect(withAnswer(deleteNew, { id: E, title: "Dentist" })?.path).toBe(`schedule/events/${E}`);
+    expect(withAnswer(putBack, { id: E, calendar_id: "c-1" })?.path).toBe(
+      `schedule/events/${E}/push`,
+    );
+    // The body takes only the named fields; the `@` entry is the path's.
+    expect(undoBody(putBack, { id: E, calendar_id: "c-1", title: "x" })).toEqual({
+      calendar_id: "c-1",
+    });
+    expect(undoBody(deleteNew, { id: E })).toBeNull();
+    for (const answer of [
+      undefined,
+      "not an object",
+      {},
+      { id: 7 },
+      { id: "../../x" },
+      { id: "a/b" },
+      { id: `${E}%2F..` },
+    ]) {
+      expect(withAnswer(deleteNew, answer)).toBeUndefined();
+    }
+    // A request with nothing to wait for is as it was.
+    expect(withAnswer(edit, null)).toBe(edit);
+  });
+
+  it("send a new event's undo to the event the answer names", async () => {
+    const sent: { key: string | null }[] = [];
+    mockApi({
+      [`POST ${W}/schedule/events`]: { body: { id: E } },
+      [`DELETE ${W}/schedule/events/${E}`]: (request) => {
+        sent.push({ key: request.headers.get("Idempotency-Key") });
+        return { body: { id: E, undo_token: "t-1" } };
+      },
+    });
+    const create: ProposalRequest = {
+      operation: "schedule.create_event",
+      method: "POST",
+      path: "schedule/events",
+      body: { title: "Dentist", starts: "2026-11-20T10:00:00+00:00" },
+    };
+
+    const answer = await runRequest("ws-1", create, "p-4", create.body);
+    const target = withAnswer(deleteNew, answer);
+    if (target === undefined) {
+      throw new Error("the answer names the event the undo deletes");
+    }
+    await runRequest("ws-1", target, "p-4:undo", undoBody(deleteNew, answer));
+
+    expect(sent).toEqual([{ key: "p-4:undo" }]);
   });
 });

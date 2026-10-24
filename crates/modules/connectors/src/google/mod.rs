@@ -5,6 +5,7 @@
 //! passes Google's, tests a wiremock server's. Errors never carry a token,
 //! a code or a response body (which may echo either).
 
+mod calendar;
 mod gmail;
 
 use secrecy::ExposeSecret as _;
@@ -19,15 +20,22 @@ use crate::{
 use serde::Deserialize;
 use url::Url;
 
+pub use calendar::{Calendar, CalendarError, EventTime, EventsQuery, GoogleEvent, Person};
 pub use gmail::{Gmail, LabelInfo, MessageMeta, MessageRaw, RawFetch};
 
 /// The scope the `messages` capability needs: read mail and change labels,
 /// no permanent deletion.
 pub const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.modify";
 
-/// The Google scope a capability needs, when the capability is offered.
-/// Only `messages` is offered today; calendar and files come with their
-/// adapters.
+/// The scope of the `calendar` capability that reads and writes events.
+pub const CALENDAR_EVENTS_SCOPE: &str = "https://www.googleapis.com/auth/calendar.events";
+
+/// The scope of the `calendar` capability that lists the account's
+/// calendars.
+pub const CALENDAR_LIST_SCOPE: &str =
+    "https://www.googleapis.com/auth/calendar.calendarlist.readonly";
+
+/// The Google scope the mail capability needs (`None` for the others).
 pub const fn capability_scope(capability: Capability) -> Option<&'static str> {
     match capability {
         Capability::Messages => Some(GMAIL_SCOPE),
@@ -35,7 +43,18 @@ pub const fn capability_scope(capability: Capability) -> Option<&'static str> {
     }
 }
 
-/// The offered capabilities `scopes` grant.
+/// The Google scopes a capability needs, when the capability is offered:
+/// `messages` and `calendar` today. Files come with their adapter.
+pub const fn capability_scopes(capability: Capability) -> &'static [&'static str] {
+    match capability {
+        Capability::Messages => &[GMAIL_SCOPE],
+        Capability::Calendar => &[CALENDAR_EVENTS_SCOPE, CALENDAR_LIST_SCOPE],
+        Capability::Files | Capability::Bank => &[],
+    }
+}
+
+/// The offered capabilities `scopes` grant: every scope of a capability
+/// must be granted (Google lets a person leave a scope out).
 pub fn granted_capabilities(scopes: &[String]) -> Vec<Capability> {
     [
         Capability::Messages,
@@ -45,7 +64,8 @@ pub fn granted_capabilities(scopes: &[String]) -> Vec<Capability> {
     ]
     .into_iter()
     .filter(|&capability| {
-        capability_scope(capability).is_some_and(|scope| scopes.iter().any(|s| s == scope))
+        let needed = capability_scopes(capability);
+        !needed.is_empty() && needed.iter().all(|n| scopes.iter().any(|s| s == n))
     })
     .collect()
 }
@@ -61,6 +81,8 @@ pub struct Endpoints {
     pub gmail: Url,
     /// The Gmail upload base, up to `/upload/gmail/v1/` (sending).
     pub gmail_upload: Url,
+    /// The Calendar API base, up to `/calendar/v3/`.
+    pub calendar: Url,
 }
 
 impl Endpoints {
@@ -72,6 +94,7 @@ impl Endpoints {
             revoke: parse("https://oauth2.googleapis.com/revoke"),
             gmail: parse("https://gmail.googleapis.com/gmail/v1/"),
             gmail_upload: parse("https://gmail.googleapis.com/upload/gmail/v1/"),
+            calendar: parse("https://www.googleapis.com/calendar/v3/"),
         }
     }
 
@@ -86,6 +109,7 @@ impl Endpoints {
             revoke: join("revoke"),
             gmail: join("gmail/v1/"),
             gmail_upload: join("upload/gmail/v1/"),
+            calendar: join("calendar/v3/"),
         }
     }
 }
@@ -124,6 +148,11 @@ impl Google {
             &self.endpoints.gmail_upload,
             access_token,
         )
+    }
+
+    /// The Calendar API with `access_token`.
+    pub fn calendar<'a>(&'a self, access_token: &'a str) -> Calendar<'a> {
+        Calendar::new(&self.http, &self.endpoints.calendar, access_token)
     }
 
     /// A fresh access token for `refresh_token`.

@@ -33,6 +33,9 @@ pub struct CalendarView {
     pub writable: bool,
     /// Whether it is the account's primary calendar.
     pub primary: bool,
+    /// Whose calendar it is, `google` or `zoho`, when known (none for your
+    /// Campbooks calendar).
+    pub provider: Option<String>,
 }
 
 impl From<&CalendarRow> for CalendarView {
@@ -50,6 +53,7 @@ impl From<&CalendarRow> for CalendarView {
             syncing: row.syncing,
             writable: row.writable,
             primary: row.is_primary,
+            provider: row.provider.clone(),
         }
     }
 }
@@ -109,6 +113,9 @@ pub struct EventView {
     pub on_provider: bool,
     /// Whether it counts when free time is worked out.
     pub busy: bool,
+    /// The keys of the things Scout read that this event stands for (a read
+    /// item's `key`), so a reader can tell which event an item became.
+    pub item_keys: Vec<String>,
 }
 
 /// `row`, shown in `zone`; `occurrence` is the one occurrence of a series it
@@ -141,5 +148,6 @@ pub fn event_view(row: &EventRow, zone: Tz, occurrence: Option<&Occurrence>) -> 
         notice: row.notice.as_deref().and_then(|n| n.parse().ok()),
         on_provider: row.provider_event_id.is_some(),
         busy: row.busy,
+        item_keys: row.item_keys.clone(),
     })
 }

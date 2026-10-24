@@ -7,6 +7,7 @@
     "invalid_hours": "Les horaires de travail demandent un jour de la semaine connu (mon à sun), des heures au format HH:MM et une fin postérieure au début.",
     "invalid_kind": "Ce n’est pas un type d’événement que Scout peut ajouter. Choisissez parmi charge, appointment, meeting, travel, stay, show, reservation, delivery ou expiry.",
     "invalid_minutes": "Demandez un créneau de 5 à 1 440 minutes.",
+    "invalid_source": "Cet e-mail ne peut pas être la source : indiquez un e-mail que vous pouvez lire comme conversations.message, avec sa conversation.",
     "invalid_text": "Un titre est nécessaire, et le titre, le lieu et les notes ne doivent pas être trop longs.",
     "invalid_time_zone": "Utilisez le nom d’un fuseau horaire IANA, comme Europe/Lisbon.",
     "invalid_undo": "Cette annulation ne correspond pas à cet événement supprimé.",

@@ -110,6 +110,12 @@ pub struct CapabilityGranted {
     /// The account's address and name: an [`AccountDocument`] blob.
     #[schema(value_type = BlobSchema)]
     pub account: BlobRef,
+    /// The account's calendars: a `calendar-list` v1 blob (`calendar` only).
+    /// The provider's calendar ids can be addresses, so they travel in the
+    /// blob and never in the event.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<BlobSchema>)]
+    pub calendars: Option<BlobRef>,
 }
 
 impl DomainEvent for CapabilityGranted {
@@ -404,6 +410,67 @@ pub struct SendRequested {
 
 impl DomainEvent for SendRequested {
     const NAME: &'static str = "conversations.send_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `schedule.outbound_requested` v1, as this module reads it
+/// (`contracts/schedule.outbound_requested.v1.schema.json`): a member's
+/// change to an event on a provider calendar. Not proof that anyone asked
+/// (campbooks-cloud#227): the schedule module is asked through the kernel's
+/// calendar-requests port before anything is recorded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutboundRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The request: recorded once.
+    pub request: uuid::Uuid,
+    /// The calendar (an id of the schedule module).
+    pub calendar: uuid::Uuid,
+    /// The event (an id of the schedule module).
+    pub event: uuid::Uuid,
+    /// The connection whose grant makes the change.
+    pub connection: ConnectionId,
+    /// The kind of change.
+    pub change: String,
+    /// The `calendar-change` v1 document. Not trusted: the connector writes
+    /// the document the schedule module stored for the request.
+    pub body: BlobRef,
+}
+
+impl DomainEvent for OutboundRequested {
+    const NAME: &'static str = "schedule.outbound_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `schedule.calendar_sync_changed` v1, as this module reads it
+/// (`contracts/schedule.calendar_sync_changed.v1.schema.json`): a member
+/// turned a provider calendar on or off.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalendarSyncChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The calendar (an id of the schedule module).
+    pub calendar: uuid::Uuid,
+    /// The connection whose calendar it is.
+    pub connection: ConnectionId,
+    /// Whether it syncs now.
+    pub syncing: bool,
+    /// Which calendar of the provider it is: a `calendar-ref` v1 document
+    /// (a blob), since the provider's id can be an address.
+    #[serde(default)]
+    pub provider_calendar: Option<BlobRef>,
+}
+
+impl DomainEvent for CalendarSyncChanged {
+    const NAME: &'static str = "schedule.calendar_sync_changed";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {
