@@ -83,17 +83,18 @@ export function TimePicker({
     setActive(-1);
   };
   // In the top layer the list hangs under the field where no dialog clips it.
-  const layered = useTopLayer<HTMLDivElement, HTMLDivElement>({
+  const boxRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const onTop = useTopLayer({
     open,
+    anchorRef: boxRef,
+    panelRef: listRef,
     matchWidth: true,
     onAway: () => {
       setOpen(false);
       setActive(-1);
     },
   });
-  const boxRef = layered.anchor;
-  const listRef = layered.panel;
-  const onTop = layered.onTop;
   // The active time scrolls into view as it moves, inside the list only:
   // nothing around it (a dialog's body) scrolls.
   useEffect(() => {

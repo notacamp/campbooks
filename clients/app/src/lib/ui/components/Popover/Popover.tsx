@@ -61,17 +61,19 @@ export function Popover({
   useEffect(() => {
     change.current = setOpen;
   });
-  // The trigger and the panel; in the top layer when asked and possible.
-  const layered = useTopLayer<HTMLButtonElement, HTMLDivElement>({
-    open: open && layer === "top",
-    align: placement === "bottom-end" ? "end" : "start",
-    onAway: () => {
-      change.current(false);
-    },
-  });
-  const triggerRef = layered.anchor;
-  const panelRef = layered.panel;
-  const onTop = layered.onTop && layer === "top";
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // In the top layer when asked and possible.
+  const onTop =
+    useTopLayer({
+      open: open && layer === "top",
+      anchorRef: triggerRef,
+      panelRef,
+      align: placement === "bottom-end" ? "end" : "start",
+      onAway: () => {
+        change.current(false);
+      },
+    }) && layer === "top";
 
   useEffect(() => {
     if (!open) {
