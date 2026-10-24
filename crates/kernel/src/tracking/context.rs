@@ -77,9 +77,15 @@ impl Actor {
         Self::with_id(ActorType::User, account)
     }
 
-    /// An app on its own behalf, by client id.
+    /// An app on its own behalf, by client id when Campbooks minted it
+    /// ([`minted_client_id`]); any other client (one known by its metadata
+    /// document, whose id is a URL) is an app with no id.
     pub fn client(client: impl Into<String>) -> Self {
-        Self::with_id(ActorType::Client, client)
+        let client = client.into();
+        Self {
+            kind: ActorType::Client,
+            id: minted_client_id(&client).map(str::to_owned),
+        }
     }
 
     /// The assistant.
@@ -120,6 +126,28 @@ impl Actor {
             ),
         }
     }
+}
+
+/// The client ids of Campbooks' own apps: the web app and the desktop and
+/// mobile app.
+pub const FIRST_PARTY_CLIENT_IDS: [&str; 2] = ["campbooks-web", "campbooks-native"];
+
+/// `id`, when it is a client id Campbooks minted and so may be recorded: one
+/// of its own apps ([`FIRST_PARTY_CLIENT_IDS`]), a workspace's app (`cb_`)
+/// or a registered one (`dcr_`), each followed by 16 random bytes in
+/// unpadded base64url. `None` for any other: a client known by its metadata
+/// document has a URL for an id, and another identity provider's ids are
+/// its own, so neither goes into a tracked event.
+pub fn minted_client_id(id: &str) -> Option<&str> {
+    let random = |prefix: &str| {
+        id.strip_prefix(prefix).is_some_and(|rest| {
+            rest.len() == 22
+                && rest
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        })
+    };
+    (FIRST_PARTY_CLIENT_IDS.contains(&id) || random("cb_") || random("dcr_")).then_some(id)
 }
 
 /// What caused a job's events: the job, or the event a delivery delivers.

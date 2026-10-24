@@ -25,6 +25,19 @@ workspace's app, `dcr_…` for a registered one), as a `code` with that
 pattern. A client known by its metadata document has a URL for an id: the
 property is left out and only its kind (`metadata_document`) is kept.
 
+**The `client` actor follows the same rule.** The envelope's actor (and
+`on_behalf_of`) of type `client` carries its id only when Campbooks minted
+it. `Actor::client`, which the HTTP layer, `Scoped` and `Workspace` all go
+through, asks the kernel's `tracking::minted_client_id`; any other client
+(a metadata-document URL, or another identity provider's id) is recorded
+as `{"type": "client"}` with no id, which the envelope schema allows (`id`
+is optional). A kind such as `metadata_document` was not used as a
+stand-in: the id field would then hold either an id or a kind. The
+snapshots' `client_id` uses the same helper (`domain::tracked::client_ref`),
+so the rule lives in one place. The plan's Actors row for `client` says so
+(patches may now reword an actor type's id and description; the types stay
+fixed).
+
 **Scopes.** Instance-wide events (accounts, sessions, ways in, passkeys,
 consents, tokens) are written from the module's instance transactions.
 Workspace apps live in their workspace (`begin_for`), so their events are

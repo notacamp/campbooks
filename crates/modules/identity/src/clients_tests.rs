@@ -1201,6 +1201,27 @@ async fn a_client_known_by_its_metadata_document(db: PgPool) {
     let (url, _) = Kit::authorize_url("http://agent.example.com/c.json", AGENT_CALLBACK, "openid");
     assert_eq!(kit.get(&url).await.status, StatusCode::BAD_REQUEST);
     assert_eq!(kit.documents.fetched().len(), 33);
+    // Its id is a URL: tracked by its kind only, and the URL reaches no
+    // tracked event, in the body or the envelope (ADR 0020).
+    let consent = &tracked(&kit, "identity.consent_granted").await[0].body["consent"];
+    assert_eq!(consent["client_kind"], "metadata_document");
+    assert!(consent.get("client_id").is_none(), "{consent}");
+    let issued = tracked(&kit, "identity.tokens_issued").await;
+    assert_eq!(issued.len(), 1);
+    assert_eq!(issued[0].body["client_kind"], "metadata_document");
+    assert!(issued[0].body.get("client_id").is_none());
+    let everything: Vec<String> =
+        sqlx::query_scalar("SELECT envelope::text || body::text FROM kernel.tracked_events")
+            .fetch_all(&kit.owner)
+            .await
+            .unwrap_or_else(|e| panic!("{e}"));
+    assert!(!everything.is_empty());
+    assert!(
+        everything
+            .iter()
+            .all(|row| !row.contains("agent.example.com")),
+        "{everything:?}"
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

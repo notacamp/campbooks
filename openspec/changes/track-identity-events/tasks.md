@@ -15,6 +15,7 @@
 - [ ] 2.6 Admin: suspend and unsuspend (a retry tracks nothing)
 - [ ] 2.7 Apps: workspace clients registered, rotated, removed; dynamic registration; consents granted, denied, revoked; a departed member's consents and apps; held grants discarded and adopted
 - [ ] 2.8 Tokens: code exchange, reuse, revocation
+- [ ] 2.9 The envelope's `client` actor carries a client id only when Campbooks minted it (`tracking::minted_client_id`, shared with the snapshots)
 
 ## 3. Tests
 

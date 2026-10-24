@@ -29,6 +29,10 @@ have a Coverage row.
 - **WHEN** a person signs out everywhere with two live sessions
 - **THEN** one `identity.sessions_ended` event is written with actor `user` and `sessions_ended` 2
 
+#### Scenario: An app whose id is a URL
+- **WHEN** an app known by its metadata document (its client id is a URL) is let in and exchanges its code, or a request runs as a `client` whose id Campbooks did not mint
+- **THEN** its events name it by kind (`metadata_document`) and, as an actor, as `{"type": "client"}` with no id; the URL reaches no tracked event
+
 #### Scenario: Refreshing tokens
 - **WHEN** a client rotates its refresh token
 - **THEN** nothing is tracked; presenting the rotated token again tracks `identity.refresh_reuse_detected`

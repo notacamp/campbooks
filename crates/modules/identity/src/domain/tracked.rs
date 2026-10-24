@@ -7,13 +7,16 @@
 //! client is named by its id only when Campbooks minted it; a client known
 //! by its metadata document has a URL for an id, which is never kept.
 
-use campbooks_kernel::{Error, Result};
+use campbooks_kernel::{
+    Error, Result,
+    tracking::{FIRST_PARTY_CLIENT_IDS, minted_client_id},
+};
 use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::{
-    domain::clients::{Kind, NATIVE_CLIENT_ID, WEB_CLIENT_ID},
+    domain::clients::Kind,
     tracking::{
         AccountSnapshot, ClientKind, ClientSnapshot, ConsentSnapshot, LinkedVia, PasskeyAddedVia,
         PasskeySnapshot, Provider, SessionSnapshot, SignInMethod, WayInSnapshot,
@@ -56,36 +59,22 @@ pub fn client_kind(kind: Kind) -> ClientKind {
 }
 
 /// The kind of the client `id` names, from the shape of the ids Campbooks
-/// mints; anything else is a metadata-document client (a URL).
+/// mints ([`minted_client_id`]); anything else is a metadata-document client
+/// (a URL).
 pub fn client_kind_of(id: &str) -> ClientKind {
-    if id == WEB_CLIENT_ID || id == NATIVE_CLIENT_ID {
-        ClientKind::FirstParty
-    } else if minted(id, "cb_") {
-        ClientKind::Workspace
-    } else if minted(id, "dcr_") {
-        ClientKind::Dynamic
-    } else {
-        ClientKind::MetadataDocument
+    match minted_client_id(id) {
+        Some(id) if FIRST_PARTY_CLIENT_IDS.contains(&id) => ClientKind::FirstParty,
+        Some(id) if id.starts_with("cb_") => ClientKind::Workspace,
+        Some(_) => ClientKind::Dynamic,
+        None => ClientKind::MetadataDocument,
     }
 }
 
-/// Client `id`, when it is one Campbooks minted (the plan's pattern), else
+/// Client `id`, when Campbooks minted it (the plan's pattern, and the rule
+/// the envelope's `client` actor follows: [`minted_client_id`]), else
 /// `None`: a metadata-document client's id is a URL and is never kept.
 pub fn client_ref(id: &str) -> Option<String> {
-    let ours =
-        id == WEB_CLIENT_ID || id == NATIVE_CLIENT_ID || minted(id, "cb_") || minted(id, "dcr_");
-    ours.then(|| id.to_owned())
-}
-
-/// Whether `id` is `prefix` followed by 16 random bytes in unpadded
-/// base64url (22 characters).
-fn minted(id: &str, prefix: &str) -> bool {
-    id.strip_prefix(prefix).is_some_and(|rest| {
-        rest.len() == 22
-            && rest
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-    })
+    minted_client_id(id).map(str::to_owned)
 }
 
 /// Account `id` as it is now.
@@ -331,6 +320,14 @@ pub async fn consent(conn: &mut PgConnection, id: Uuid) -> Result<ConsentSnapsho
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_kernels_first_party_ids_are_the_issuers() {
+        use crate::domain::clients::{NATIVE_CLIENT_ID, WEB_CLIENT_ID};
+        assert_eq!(FIRST_PARTY_CLIENT_IDS, [WEB_CLIENT_ID, NATIVE_CLIENT_ID]);
+        assert_eq!(client_kind_of(WEB_CLIENT_ID), ClientKind::FirstParty);
+        assert_eq!(client_kind_of(NATIVE_CLIENT_ID), ClientKind::FirstParty);
+    }
 
     #[test]
     fn only_ids_campbooks_minted_are_kept() {

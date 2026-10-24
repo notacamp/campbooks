@@ -1112,6 +1112,11 @@ enums:
   - { enum: "identity.client_removal", value: "removed", description: "A workspace admin removed it." }
   - { enum: "identity.client_removal", value: "member_left", description: "The member who registered it left the workspace." }
 
+actors:
+  - type: "client"
+    id_is: "the OAuth client id when Campbooks minted it (campbooks-web, campbooks-native, cb_…, dcr_…); none for any other client (one known by its metadata document has a URL for an id)"
+    description: "An app acting on its own behalf (client credentials)."
+
 coverage:
   - kind: "operation"
     name: "identity.finish_sign_in"

@@ -46,8 +46,9 @@ mod tests;
 mod generated;
 
 pub use context::{
-    Actor, ActorType, Causation, CausationKind, JobOrigin, MAX_ORIGIN_BYTES, TrackingContext,
-    current, current_or_outside, new_correlation, scope, set_command,
+    Actor, ActorType, Causation, CausationKind, FIRST_PARTY_CLIENT_IDS, JobOrigin,
+    MAX_ORIGIN_BYTES, TrackingContext, current, current_or_outside, minted_client_id,
+    new_correlation, scope, set_command,
 };
 pub(crate) use context::{administrator, authenticated, for_job, origin};
 #[allow(

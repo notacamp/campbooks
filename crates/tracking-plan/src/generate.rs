@@ -96,7 +96,8 @@ fn envelope_schema() -> Value {
         "properties": {
             "type": {"enum": crate::model::ACTOR_TYPES},
             "id": {"type": "string", "description": "See the Actors sheet: an account id, a \
-                client id, a job kind or a command's name; never a name or an address."},
+                client id Campbooks minted (none for any other client), a job kind or a \
+                command's name; never a name, an address or a URL."},
         },
     });
     json!({

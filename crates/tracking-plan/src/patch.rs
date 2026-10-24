@@ -15,13 +15,16 @@
 //! records: []
 //! enums: []
 //! coverage: []
+//! actors: []   # rewords an actor type's id and description
 //! remove:
 //!   coverage: [{ kind: operation, name: things.old }]
 //! ```
 
 use serde::Deserialize;
 
-use crate::model::{ChangelogRow, CoverageRow, EnumRow, EventRow, Plan, PropertyRow, RecordRow};
+use crate::model::{
+    ActorRow, ChangelogRow, CoverageRow, EnumRow, EventRow, Plan, PropertyRow, RecordRow,
+};
 
 /// A patch file.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -37,6 +40,9 @@ pub struct Patch {
     pub enums: Vec<EnumRow>,
     /// Coverage rows, keyed by kind and name.
     pub coverage: Vec<CoverageRow>,
+    /// Actors rows, keyed by type: what an actor type's id is and its
+    /// description (the types themselves are fixed).
+    pub actors: Vec<ActorRow>,
     /// Changelog rows, keyed by plan version.
     pub changelog: Vec<ChangelogRow>,
     /// Rows to remove, by key (other columns are ignored).
@@ -142,6 +148,9 @@ pub fn apply(plan: &mut Plan, patch: Patch) -> anyhow::Result<()> {
             (r.kind.clone(), r.name.clone())
         });
     }
+    for row in patch.actors {
+        upsert(&mut plan.actors, row, |r| r.kind.clone());
+    }
     for row in patch.changelog {
         upsert(&mut plan.changelog, row, |r| r.plan_version);
     }
@@ -187,6 +196,19 @@ coverage:
         apply(&mut plan, parse(&again).unwrap()).unwrap();
         assert_eq!(plan.events.len(), 1);
         assert_eq!(plan.events[0].status, "live");
+    }
+
+    #[test]
+    fn a_patch_rewords_an_actor_type() {
+        let mut plan = Plan::empty();
+        let before = plan.actors.len();
+        let patch =
+            parse("actors:\n  - { type: client, id_is: \"its id\", description: \"An app.\" }\n")
+                .unwrap();
+        apply(&mut plan, patch).unwrap();
+        assert_eq!(plan.actors.len(), before);
+        let client = plan.actors.iter().find(|a| a.kind == "client").unwrap();
+        assert_eq!(client.id_is, "its id");
     }
 
     #[test]

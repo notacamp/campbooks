@@ -7,7 +7,7 @@
     },
     {
       "description": "An app acting on its own behalf (client credentials).",
-      "id_is": "the OAuth client id",
+      "id_is": "the OAuth client id when Campbooks minted it (campbooks-web, campbooks-native, cb_…, dcr_…); none for any other client (one known by its metadata document has a URL for an id)",
       "type": "client"
     },
     {
@@ -1551,7 +1551,7 @@
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "See the Actors sheet: an account id, a client id, a job kind or a command's name; never a name or an address.",
+            "description": "See the Actors sheet: an account id, a client id Campbooks minted (none for any other client), a job kind or a command's name; never a name, an address or a URL.",
             "type": "string"
           },
           "type": {
@@ -1623,7 +1623,7 @@
             "additionalProperties": false,
             "properties": {
               "id": {
-                "description": "See the Actors sheet: an account id, a client id, a job kind or a command's name; never a name or an address.",
+                "description": "See the Actors sheet: an account id, a client id Campbooks minted (none for any other client), a job kind or a command's name; never a name, an address or a URL.",
                 "type": "string"
               },
               "type": {
