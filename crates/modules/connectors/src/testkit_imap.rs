@@ -779,7 +779,7 @@ async fn append<S: AsyncRead + AsyncWrite + Unpin>(
     read(conn).await?;
     shared.see(|seen| seen.appended.push((folder.clone(), raw.clone())));
     if offers.append_hang {
-        tokio::time::sleep(Duration::from_secs(3600)).await;
+        tokio::time::sleep(Duration::from_hours(1)).await;
         return None;
     }
     if offers.append_refused {

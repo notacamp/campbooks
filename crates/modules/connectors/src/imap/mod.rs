@@ -296,7 +296,7 @@ impl Imap {
     /// mailbox's Sent folder ([`SENT_KEEPERS`]): Campbooks then appends none.
     pub fn keeps_sent_copy(&self, host: &str) -> bool {
         let host = host.trim_end_matches('.').to_ascii_lowercase();
-        SENT_KEEPERS.contains(&host.as_str()) || self.sent_keepers.iter().any(|h| *h == host)
+        SENT_KEEPERS.contains(&host.as_str()) || self.sent_keepers.contains(&host)
     }
 }
 

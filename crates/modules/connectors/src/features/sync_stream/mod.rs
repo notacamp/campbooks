@@ -1352,6 +1352,10 @@ async fn pending_copies(
     Ok(copies)
 }
 
+/// How one copy ended (its send, end and attempts so far), and where an
+/// appended copy went.
+type CopyEnd = ((SendId, End, i32), Option<(Place, Location)>);
+
 /// A pending copy's row: send, index key, bytes, attempts, `Message-ID`.
 type CopyRow = (
     uuid::Uuid,
@@ -1524,8 +1528,7 @@ async fn record_copies(run: &ImapRun<'_>, ends: Vec<(Pending, End)>) -> Result<u
             ((copy.send, end, copy.attempts), at)
         })
         .collect::<Vec<_>>();
-    let mut all: Vec<((SendId, End, i32), Option<(Place, Location)>)> =
-        broken.map(|end| (end, None)).collect();
+    let mut all: Vec<CopyEnd> = broken.map(|end| (end, None)).collect();
     all.extend(ends);
     for ((send, end, attempts), at) in all {
         let (state, reason) = match end {

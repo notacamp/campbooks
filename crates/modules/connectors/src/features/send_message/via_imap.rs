@@ -55,7 +55,7 @@ use crate::{
 const SESSION_WAIT: Duration = Duration::from_secs(10);
 
 /// How long a send the server did not take now waits before trying again.
-const RETRY_WAIT: Duration = Duration::from_secs(60);
+const RETRY_WAIT: Duration = Duration::from_mins(1);
 
 /// Seconds a login's SMTP session slot takes to come back if a process died
 /// holding it.
