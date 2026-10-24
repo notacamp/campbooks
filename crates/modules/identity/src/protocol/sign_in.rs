@@ -434,7 +434,12 @@ pub async fn callback(
         Err(code) => return Ok(with_cookie(fail(&ctx, &flow, code).await?, clear_flow)),
     };
     if flow.purpose != Purpose::SignIn {
-        let response = link::finish(&ctx, issuer, upstream, &headers, flow, signed_in, now).await?;
+        // Boxed: the round trip's hand-over (and its tracking) makes a large
+        // future.
+        let response = Box::pin(link::finish(
+            &ctx, issuer, upstream, &headers, flow, signed_in, now,
+        ))
+        .await?;
         return Ok(with_cookie(response, clear_flow));
     }
     let Upstreamed { identity, tokens } = signed_in;
