@@ -47,7 +47,7 @@
       "change": "The conversations module instrumented (campbooks-cloud#325): 40 events for flags, streams, labels, needs, drafts and sends, taught rules and their runs, suggestions, person notes, provider batches, the model pass, Scout's reads and inboxes; records draft, need, rule and rule_run; Coverage for every operation, job, schedule and handler of the module.",
       "date": "2026-10-24",
       "plan_version": 2,
-      "pr": ""
+      "pr": "#650"
     }
   ],
   "coverage": [
