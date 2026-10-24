@@ -28,3 +28,4 @@ pub mod search_words;
 pub mod streams;
 pub mod structured;
 pub mod suggestions;
+pub mod tracked;

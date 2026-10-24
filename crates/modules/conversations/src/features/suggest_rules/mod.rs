@@ -38,6 +38,7 @@ use crate::{
     features::rules::{PREVIEW_DEADLINE, RulePreview, compute_preview, may_teach},
     model::{ConversationId, InboxId, LabelId, Stream},
     scopes::{ConversationsRead, ConversationsWrite},
+    tracking,
 };
 
 /// How long a turned-down suggestion stays hidden, in days.
@@ -563,6 +564,14 @@ pub struct DismissSuggestion {
     pub key: String,
 }
 
+/// Store a member's no to a suggestion, counting how many times they said
+/// it; returns the count.
+const DISMISS: &str = "INSERT INTO conversations.rule_dismissals \
+         (workspace_id, inbox_id, user_id, suggestion_key) VALUES ($1, $2, $3, $4) \
+     ON CONFLICT (inbox_id, user_id, suggestion_key) DO UPDATE \
+        SET times = conversations.rule_dismissals.times + 1, dismissed_at = now() \
+     RETURNING times";
+
 /// Turn a suggestion down ("Just this one"): it is not offered again for 30
 /// days, and never after the second time.
 #[utoipa::path(
@@ -598,19 +607,27 @@ pub async fn dismiss(
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inbox = teachable_inbox(&state, &mut tx, access, path.conversation_id).await?;
     if let Some(user) = access.user {
-        sqlx::query!(
-            r#"INSERT INTO conversations.rule_dismissals
-                   (workspace_id, inbox_id, user_id, suggestion_key)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT (inbox_id, user_id, suggestion_key) DO UPDATE
-                  SET times = conversations.rule_dismissals.times + 1, dismissed_at = now()"#,
-            access.workspace.as_uuid(),
-            inbox as InboxId,
-            user.as_uuid(),
-            body.key.chars().take(2000).collect::<String>(),
-        )
-        .execute(&mut *tx)
-        .await?;
+        let times: i32 = sqlx::query_scalar(DISMISS)
+            .bind(access.workspace.as_uuid())
+            .bind(inbox)
+            .bind(user.as_uuid())
+            .bind(body.key.chars().take(2000).collect::<String>())
+            .fetch_one(&mut *tx)
+            .await?;
+        // Ids and a count: never the suggestion's key, which names a sender
+        // (campbooks-cloud#325).
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::RuleSuggestionDismissed {
+                    workspace: access.workspace,
+                    conversation_id: *path.conversation_id.as_uuid(),
+                    inbox_id: *inbox.as_uuid(),
+                    times: i64::from(times),
+                },
+            )
+            .await?;
     }
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)

@@ -38,6 +38,7 @@ use crate::{
     },
     model::{ConversationId, InboxId, MessageId},
     scopes::ConversationsRead,
+    tracking,
 };
 
 /// What asking for the read did.
@@ -122,6 +123,19 @@ pub async fn handler(
     .await?
     .ok_or(Error::NotFound)?;
     let outcome = request(&mut tx, access.workspace, message, &settings).await?;
+    if outcome == Outcome::Queued {
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::MessageReadRequested {
+                    workspace: access.workspace,
+                    message_id: *message.as_uuid(),
+                    conversation_id: *conversation.as_uuid(),
+                },
+            )
+            .await?;
+    }
     tx.commit().await?;
     Ok(Json(ReadRequested { outcome }))
 }

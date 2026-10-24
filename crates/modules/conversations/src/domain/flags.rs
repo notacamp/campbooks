@@ -7,11 +7,11 @@ use super::{
     access::lock_conversation,
     conversation::{Changed, ConversationSummary, request_each, summary},
     needs::{self, NeedSettings},
-    rules,
+    rules, tracked,
 };
 use crate::{
     events::{Change, Origin, RequestedChange},
-    model::{ConversationId, Stream, StreamSource},
+    model::ConversationId,
     tracking,
 };
 
@@ -137,9 +137,7 @@ pub async fn apply(
 
 /// Track what `flag` did to the conversation (ADR 0020), with a snapshot of
 /// it afterwards read from this module's rows in the transaction of the
-/// change. Archiving and putting back are tracked so far (the reference
-/// flow); the other flags follow with the module's instrumentation
-/// (campbooks-cloud#325).
+/// change (campbooks-cloud#325).
 async fn track(
     state: &AppState,
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -147,72 +145,36 @@ async fn track(
     flag: Flag,
     after: &ConversationSummary,
 ) -> Result<()> {
-    let workspace = access.workspace;
-    let conversation = snapshot(after);
+    // Every flag's event holds the same two fields: the workspace and the
+    // conversation afterwards. Only the function's parameters are named, so
+    // the macro reads nothing declared after it.
+    macro_rules! track {
+        ($event:ident) => {
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::$event {
+                        workspace: access.workspace,
+                        conversation: tracked::conversation(after),
+                    },
+                )
+                .await?
+        };
+    }
     match flag {
-        Flag::Archive => {
-            state
-                .tracker
-                .track(
-                    tx,
-                    &tracking::ConversationArchived {
-                        workspace,
-                        conversation,
-                    },
-                )
-                .await?;
-        }
-        Flag::Unarchive => {
-            state
-                .tracker
-                .track(
-                    tx,
-                    &tracking::ConversationUnarchived {
-                        workspace,
-                        conversation,
-                    },
-                )
-                .await?;
-        }
-        _ => {}
+        Flag::Read => track!(ConversationRead),
+        Flag::Unread => track!(ConversationUnreadMarked),
+        Flag::Star => track!(ConversationStarred),
+        Flag::Unstar => track!(ConversationUnstarred),
+        Flag::Archive => track!(ConversationArchived),
+        Flag::Unarchive => track!(ConversationUnarchived),
+        Flag::Trash => track!(ConversationTrashed),
+        Flag::Untrash => track!(ConversationUntrashed),
+        Flag::Spam => track!(ConversationSpammed),
+        Flag::Unspam => track!(ConversationUnspammed),
     }
     Ok(())
-}
-
-/// The tracked snapshot of a conversation: ids, its stream, where it is,
-/// counts and its last activity; never its subject or who wrote it.
-fn snapshot(summary: &ConversationSummary) -> tracking::ConversationSnapshot {
-    let status = if summary.spam {
-        tracking::ConversationStatus::Spam
-    } else if summary.trashed {
-        tracking::ConversationStatus::Trash
-    } else if summary.archived {
-        tracking::ConversationStatus::Archived
-    } else {
-        tracking::ConversationStatus::Inbox
-    };
-    tracking::ConversationSnapshot {
-        id: *summary.id.as_uuid(),
-        inbox_id: *summary.inbox_id.as_uuid(),
-        last_message_at: summary.last_message_at,
-        message_count: i64::from(summary.message_count),
-        starred: summary.starred,
-        status,
-        stream: match summary.stream {
-            Stream::Primary => tracking::Stream::Primary,
-            Stream::Updates => tracking::Stream::Updates,
-            Stream::Receipts => tracking::Stream::Receipts,
-            Stream::Newsletters => tracking::Stream::Newsletters,
-        },
-        stream_source: match summary.stream_source {
-            StreamSource::Default => tracking::StreamSource::Default,
-            StreamSource::Rules => tracking::StreamSource::Rules,
-            StreamSource::Model => tracking::StreamSource::Model,
-            StreamSource::Taught => tracking::StreamSource::Taught,
-            StreamSource::Member => tracking::StreamSource::Member,
-        },
-        unread_count: i64::from(summary.unread_count),
-    }
 }
 
 /// Set `flag` on conversation `id`'s messages in `conn`, returning each

@@ -34,6 +34,8 @@ export interface KbdHintProps {
   announce?: boolean | undefined;
   /** Only show while the parent row is hovered, focused or selected. */
   reveal?: boolean | undefined;
+  /** `sm`: smaller, quieter keycaps, for compact controls (the calendar's views). */
+  size?: "md" | "sm" | undefined;
   className?: string | undefined;
 }
 
@@ -62,6 +64,7 @@ export function KbdHint({
   withAlternates = false,
   announce = false,
   reveal = false,
+  size = "md",
   className,
 }: KbdHintProps) {
   const { t } = useTranslation("ui");
@@ -80,6 +83,7 @@ export function KbdHint({
       className={cx(styles["hint"], className)}
       data-reveal={reveal || undefined}
       data-announce={announce || undefined}
+      data-size={size === "sm" ? "sm" : undefined}
     >
       <span className={styles["keys"]} aria-hidden="true">
         {drawn.map((chords, alternative) => (

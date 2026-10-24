@@ -471,6 +471,73 @@ async fn not_now_and_dont_suggest_this_are_each_members_own(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn answers_are_tracked_by_kind_never_by_sender(db: PgPool) {
+    let kit = Kit::with_deps(db, ConversationsDeps::offline())
+        .await
+        .tracking();
+    let (workspace, inbox, sam) = sams_inbox(&kit).await;
+    kit.ingest_value(workspace, inbox, &daily("ci", BUILDS, 12))
+        .await;
+    let notices = noticed(&kit, &sam, workspace).await;
+    let id = notices[0]["id"].as_str().unwrap().to_owned();
+    let answer = format!("/api/v1/w/{workspace}/rule-notices/{id}/answer");
+
+    let not_now = kit
+        .post(&sam, &answer, Some(json!({"answer": "not_now"})))
+        .await;
+    assert_eq!(not_now.status, StatusCode::NO_CONTENT);
+    let answered =
+        campbooks_kernel::testing::tracked_events(&kit.db, "conversations.rule_notice_answered")
+            .await;
+    assert_eq!(answered.len(), 1);
+    let event = &answered[0];
+    assert_eq!(event.version, 1);
+    assert_eq!(
+        event.envelope["actor"],
+        json!({"type": "user", "id": "sam"})
+    );
+    assert_eq!(
+        event.envelope["operation"],
+        "conversations.answer_rule_notice"
+    );
+    assert_eq!(event.body["notice_id"], id.as_str());
+    assert_eq!(event.body["inbox_id"], json!(inbox));
+    assert_eq!(event.body["kind"], "keep_off_home");
+    assert_eq!(event.body["answer"], "not_now");
+    assert!(!event.body.to_string().contains(BUILDS));
+
+    // Undo, then Undo again (nothing left to take back).
+    assert_eq!(
+        kit.delete(&sam, &answer).await.status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        kit.delete(&sam, &answer).await.status,
+        StatusCode::NO_CONTENT
+    );
+    let cleared = campbooks_kernel::testing::tracked_events(
+        &kit.db,
+        "conversations.rule_notice_answer_cleared",
+    )
+    .await;
+    assert_eq!(cleared.len(), 1);
+    assert_eq!(
+        cleared[0].envelope["operation"],
+        "conversations.clear_rule_notice_answer"
+    );
+    assert_eq!(cleared[0].body["notice_id"], id.as_str());
+    assert_eq!(cleared[0].body["kind"], "keep_off_home");
+
+    kit.post(&sam, &answer, Some(json!({"answer": "never"})))
+        .await;
+    let answered =
+        campbooks_kernel::testing::tracked_events(&kit.db, "conversations.rule_notice_answered")
+            .await;
+    assert_eq!(answered.len(), 2);
+    assert_eq!(answered[1].body["answer"], "never");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn nobody_else_sees_or_answers_an_inboxs_notices(db: PgPool) {
     let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
     let workspace = WorkspaceId::new();

@@ -23,10 +23,12 @@ use crate::{
     domain::{
         drafts::{self, DraftView, check_limits, shown_to_author, tidy},
         paths::DraftPath,
+        tracked,
     },
     events::DRAFT_RECORD,
     model::{Address, AttachmentId, DraftId, DraftState},
     scopes::ConversationsSend,
+    tracking,
 };
 use campbooks_kernel::authz::Action;
 
@@ -118,6 +120,7 @@ pub async fn update(
     // over what the save leaves (campbooks-cloud#242).
     shown_to_author(&state, access, &row, changes.content_token.as_deref())?;
     let (to, cc, bcc) = row.recipients()?;
+    let was = (to.clone(), cc.clone(), bcc.clone());
     let [to, cc, bcc] = tidy([
         changes.to.unwrap_or(to),
         changes.cc.unwrap_or(cc),
@@ -129,6 +132,7 @@ pub async fn update(
     check_limits(to.len() + cc.len() + bcc.len(), &subject, &body, &quoted)?;
 
     let mut attachments = row.stored_attachments()?;
+    let attachments_before = attachments.clone();
     if let Some(keep) = changes.attachments {
         let keep: HashSet<AttachmentId> = keep.into_iter().collect();
         let (kept, dropped): (Vec<_>, Vec<_>) =
@@ -168,6 +172,21 @@ pub async fn update(
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
         .shown(&state.binding, access)?;
+    // Tracked when the save changed something (campbooks-cloud#325): an
+    // autosave of what is there already tracks nothing.
+    let edited = was != (to, cc, bcc)
+        || subject != row.subject
+        || body != row.body
+        || quoted != row.quoted
+        || attachments != attachments_before
+        || row.state()? != DraftState::Draft;
+    if edited {
+        let workspace = access.workspace;
+        tracked::track_draft(&state.tracker, &mut tx, id, |draft| {
+            tracking::DraftUpdated { workspace, draft }
+        })
+        .await?;
+    }
     tx.commit().await?;
     Ok(Json(draft))
 }
@@ -215,6 +234,12 @@ pub async fn delete(
             crate::MESSAGES.reason("draft_not_editable"),
         ));
     }
+    // Tracked as it was, before it goes (campbooks-cloud#325).
+    let workspace = access.workspace;
+    tracked::track_draft(&state.tracker, &mut tx, id, |draft| {
+        tracking::DraftDiscarded { workspace, draft }
+    })
+    .await?;
     discard(&state, &mut tx, &access.workspace.to_string(), id).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)

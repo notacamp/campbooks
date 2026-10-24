@@ -222,6 +222,14 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.noticedAsk",
   },
   {
+    // See the mail the suggestion counts: the search for it (campbooks-cloud#347).
+    id: "inbox.noticed.see",
+    keys: "shift+s",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.noticedSee",
+  },
+  {
     // Focus moves through the open messages' attachments; Enter opens one.
     id: "inbox.next_attachment",
     keys: "v",

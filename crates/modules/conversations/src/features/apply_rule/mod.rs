@@ -23,15 +23,17 @@ mod binding_tests;
 #[cfg(test)]
 mod tests;
 
-use campbooks_kernel::{JobContext, JobError, JobHandler, tenancy::WorkspaceId};
+use campbooks_kernel::{JobContext, JobError, JobHandler, tenancy::WorkspaceId, tracking::Tracker};
 
 use crate::{
     domain::{
         needs::NeedSettings,
         rule_runs::{self, BATCH, COUNT_WINDOW, Newest, RunBatch, SCAN},
         rules::{self, Applied, Context},
+        tracked,
     },
     model::{ConversationId, RuleId, RuleRunId, RuleState, RunKind, RunState},
+    tracking,
 };
 
 /// Works through runs of taught rules.
@@ -59,6 +61,7 @@ impl JobHandler for ApplyRules {
         let ws = workspace.to_string();
         let events = ctx.state().events.clone();
         let binding = ctx.state().binding.clone();
+        let tracker = ctx.state().tracker.clone();
         let tx = ctx.tx().await?;
         let run = sqlx::query!(
             r#"SELECT rule_id AS "rule: RuleId", kind, state, counted,
@@ -81,7 +84,7 @@ impl JobHandler for ApplyRules {
         // Gone, or a row that does not decode (`find_any` WARNs with its id):
         // the run ends, never retried.
         let Some(rule) = rules::find_any(tx, run.rule).await? else {
-            return end(tx, batch.run, RunState::Cancelled).await;
+            return end(tx, (&tracker, workspace), batch.run, RunState::Cancelled).await;
         };
         // Nothing changes in an inbox kept read-only. A rule applies only
         // while active and its author may change the inbox; putting mail back
@@ -89,11 +92,11 @@ impl JobHandler for ApplyRules {
         if rule.inbox_detached
             || (kind == RunKind::Apply && rule.effective_state() != RuleState::Active)
         {
-            return end(tx, batch.run, RunState::Cancelled).await;
+            return end(tx, (&tracker, workspace), batch.run, RunState::Cancelled).await;
         }
         // Planted or changed with SQL: it changes nothing (campbooks-cloud#242).
         if !bound(tx, &binding, workspace, (batch.run, kind), &rule).await? {
-            return end(tx, batch.run, RunState::Cancelled).await;
+            return end(tx, (&tracker, workspace), batch.run, RunState::Cancelled).await;
         }
         let context = Context {
             binding: &binding,
@@ -123,7 +126,7 @@ impl JobHandler for ApplyRules {
             Some(next) => {
                 campbooks_kernel::jobs::enqueue_to::<Self>(tx, &next, next.options(&ws)).await?;
             }
-            None => end(tx, batch.run, RunState::Done).await?,
+            None => end(tx, (&tracker, workspace), batch.run, RunState::Done).await?,
         }
         let view = rule_runs::latest(tx, rule.id).await?;
         let state = if kind == RunKind::Revert {
@@ -321,6 +324,7 @@ async fn progress(
 
 async fn end(
     tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    (tracker, workspace): (&Tracker, WorkspaceId),
     run: RuleRunId,
     state: RunState,
 ) -> Result<(), JobError> {
@@ -331,6 +335,13 @@ async fn end(
     )
     .execute(&mut **tx)
     .await?;
+    // One summary per run, with its counts: a run touches a whole inbox
+    // (campbooks-cloud#325).
+    if let Some(run) = tracked::rule_run(tx, run).await? {
+        tracker
+            .track(tx, &tracking::RuleRunFinished { workspace, run })
+            .await?;
+    }
     Ok(())
 }
 

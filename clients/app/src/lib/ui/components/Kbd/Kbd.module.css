@@ -26,6 +26,16 @@
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 
+/* Small and quiet: keycaps that sit inside a compact control. */
+.hint[data-size="sm"] .kbd {
+  min-width: var(--kbd-size-sm);
+  height: var(--kbd-size-sm);
+  padding: 0 var(--space-0-5);
+  background: transparent;
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
+  font-weight: var(--weight-medium);
+}
+
 .then {
   padding: 0 var(--space-0-5);
   font-size: var(--text-xs);

@@ -17,8 +17,6 @@
     "later": "Later"
   },
   "add": {
-    "label": "Add a task",
-    "placeholder": "Add a task…",
     "due": "Due",
     "today": "Today",
     "tomorrow": "Tomorrow",
@@ -27,9 +25,15 @@
     "kind": "Kind",
     "do": "Do",
     "pay": "Pay",
-    "submit": "Add",
     "added": "Task added",
     "failed": "Couldn’t add {{title}}. Nothing was saved."
+  },
+  "form": {
+    "new": "New task",
+    "label": "New task",
+    "placeholder": "What needs doing?",
+    "due": "Due",
+    "close": "Close"
   },
   "row": {
     "own": "You wrote this",

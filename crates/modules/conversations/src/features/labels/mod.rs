@@ -19,11 +19,12 @@ use crate::{
     domain::{
         access::lock_conversation,
         conversation::{Changed, LabelView, provider_message_ids, request},
-        rules,
+        rules, tracked,
     },
     events::{Change, Origin, RequestedChange},
     model::{ConversationId, InboxId, LabelId},
     scopes::ConversationsWrite,
+    tracking,
 };
 
 /// Longest label name, in characters.
@@ -85,6 +86,14 @@ pub async fn add(
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inbox = lock_conversation(&state, &mut tx, access, id).await?;
+    // Whether the inbox has the label yet, for its tracked event.
+    let existed: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM conversations.labels WHERE inbox_id = $1 AND name = $2)",
+    )
+    .bind(inbox)
+    .bind(name)
+    .fetch_one(&mut *tx)
+    .await?;
     let label = sqlx::query!(
         r#"
         WITH created AS (
@@ -121,6 +130,20 @@ pub async fn add(
             provider_key: label.provider_key,
         };
         announce(&state, &mut tx, access, inbox, id, &change).await?;
+        if let Some(conversation) = tracked::conversation_now(&mut tx, id).await? {
+            state
+                .tracker
+                .track(
+                    &mut tx,
+                    &tracking::ConversationLabelled {
+                        workspace: access.workspace,
+                        conversation,
+                        label_id: *label.id.as_uuid(),
+                        label_created: !existed,
+                    },
+                )
+                .await?;
+        }
     }
     tx.commit().await?;
     Ok(Json(LabelView {
@@ -184,6 +207,19 @@ pub async fn remove(
         provider_key: removed,
     };
     announce(&state, &mut tx, access, inbox, id, &change).await?;
+    if let Some(conversation) = tracked::conversation_now(&mut tx, id).await? {
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::ConversationUnlabelled {
+                    workspace: access.workspace,
+                    conversation,
+                    label_id: *label.as_uuid(),
+                },
+            )
+            .await?;
+    }
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }

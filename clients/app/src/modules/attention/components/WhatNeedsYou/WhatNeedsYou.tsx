@@ -1319,7 +1319,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       />
       {offer}
       {loading ? <SkeletonList rows={4} /> : null}
-      <div ref={list} className="flex flex-col">
+      {/* Groups, Scout noticed and an opened item each keep a section's room. */}
+      <div ref={list} className="flex flex-col gap-6">
         {groups.map((group, position) => {
           const live = group.rows.filter((row) => row.confirmation === undefined);
           const bills = live.filter(

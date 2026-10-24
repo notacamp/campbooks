@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, Checkbox, Dialog, Select, TextField, type SelectOption } from "~/lib/ui";
+import {
+  Button,
+  Checkbox,
+  DatePicker,
+  Dialog,
+  Select,
+  TextField,
+  TimePicker,
+  type SelectOption,
+} from "~/lib/ui";
 
 import type { EventKind, EventPatch, EventView, NewEvent } from "../../api/types";
 import { MEMBER_KINDS } from "../../api/types";
@@ -29,7 +38,16 @@ export interface EventDialogProps {
   onClose: () => void;
 }
 
-/** New event, and Edit: title, kind, day, times, place. */
+const LAST_MINUTE = 23 * 60 + 59;
+const minutesOf = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+const timeOf = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+/**
+ * New event, and Edit: title, kind, day, times, place. The day and times come
+ * from the date and time pickers; the end is never before the start, and
+ * moving the start moves an end it would pass, keeping the event's length.
+ */
 export function EventDialog({
   draft,
   zone,
@@ -59,6 +77,13 @@ export function EventDialog({
     ...(kind === "hold" ? (["hold"] as const) : []),
   ].map((each) => ({ value: each, label: tKinds(each) }));
   const valid = title.trim() !== "" && day !== "" && (allDay || (start !== "" && end !== ""));
+  const changeStart = (next: string) => {
+    setStart(next);
+    if (end !== "" && end <= next) {
+      const length = start === "" ? 0 : minutesOf(end) - minutesOf(start);
+      setEnd(timeOf(Math.min(LAST_MINUTE, minutesOf(next) + (length > 0 ? length : 60))));
+    }
+  };
   const save = () => {
     if (!valid) {
       return;
@@ -122,12 +147,13 @@ export function EventDialog({
           }}
         />
         <Select label={t("form.kind")} value={kind} options={kindOptions} onChange={setKind} />
-        <TextField
+        <DatePicker
           label={t("form.day")}
-          type="date"
-          value={day}
-          onChange={(event) => {
-            setDay(event.target.value);
+          value={day === "" ? undefined : day}
+          onChange={(next) => {
+            if (next !== undefined) {
+              setDay(next);
+            }
           }}
         />
         <Checkbox
@@ -140,23 +166,18 @@ export function EventDialog({
         {allDay ? null : (
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex-1">
-              <TextField
+              <TimePicker
                 label={t("form.starts")}
-                type="time"
-                value={start}
-                onChange={(event) => {
-                  setStart(event.target.value);
-                }}
+                value={start === "" ? undefined : start}
+                onChange={changeStart}
               />
             </div>
             <div className="flex-1">
-              <TextField
+              <TimePicker
                 label={t("form.ends")}
-                type="time"
-                value={end}
-                onChange={(event) => {
-                  setEnd(event.target.value);
-                }}
+                value={end === "" ? undefined : end}
+                min={start === "" ? undefined : start}
+                onChange={setEnd}
               />
             </div>
           </div>

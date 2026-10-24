@@ -121,3 +121,33 @@ export const Suggestion: Story = {
 
 /** Phones: smaller text and visor. */
 export const Compact: Story = { args: { compact: true } };
+
+/**
+ * A titled note (Scout noticed): the title and "1 of 5" on a line of their
+ * own, the longer sentence in the body font, and a link under it.
+ */
+export const Titled: Story = {
+  args: {
+    visor: "happy",
+    label: "Scout noticed",
+    title: "Scout noticed",
+    meta: "1 of 5",
+    children:
+      "You got 34 emails from CI (builds@ci.example.com) in the last 60 days and opened 2. They come most days. Keep them off Home and file them under Updates?",
+    after: (
+      <Button variant="link" icon="arrow-right">
+        See the 34 emails
+      </Button>
+    ),
+    quote: undefined,
+    chips: undefined,
+    how: undefined,
+    links: [],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Scout noticed", { selector: "span" })).toBeVisible();
+    await expect(canvas.getByText("1 of 5")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "See the 34 emails" })).toBeVisible();
+  },
+};

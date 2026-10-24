@@ -122,5 +122,15 @@
     "clear": "Effacer la recherche",
     "filters": "Filtres de recherche",
     "remove": "Retirer le filtre : {{filter}}"
+  },
+  "datePicker": {
+    "choose": "Choisir une date",
+    "previous": "Mois précédent",
+    "next": "Mois suivant",
+    "today": "Aujourd’hui",
+    "clear": "Effacer"
+  },
+  "timePicker": {
+    "choose": "Choisir une heure"
   }
 }

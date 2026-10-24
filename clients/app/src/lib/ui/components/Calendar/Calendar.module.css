@@ -275,21 +275,26 @@ button.kindChip:hover {
   box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
 }
 
+/* Sized like Segmented: a quiet switch, lighter than the title beside it. */
 .view {
   display: inline-flex;
   flex: 1 1 0;
-  gap: var(--space-1-5);
+  gap: var(--space-1);
   align-items: center;
   justify-content: center;
-  height: var(--size-control-md);
+  height: var(--size-control-sm);
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
-  font: var(--weight-medium) var(--text-sm) / var(--leading-none) var(--font-sans);
+  color: var(--text-tertiary);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-none) var(--font-sans);
   white-space: nowrap;
   cursor: pointer;
+}
+
+.view:hover {
+  color: var(--text-primary);
 }
 
 .view[aria-pressed="true"] {

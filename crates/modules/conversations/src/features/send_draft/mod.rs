@@ -30,10 +30,12 @@ use crate::{
         binding,
         drafts::{self, DraftView, MAX_ATTACHMENT_BYTES, attachment_bytes, valid_address},
         paths::DraftPath,
+        tracked,
     },
     features::release_send::{ReleaseSend, ReleaseSendPayload},
     model::{DraftId, DraftState},
     scopes::ConversationsSend,
+    tracking,
 };
 use campbooks_kernel::authz::Action;
 
@@ -176,6 +178,11 @@ pub async fn send(
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
         .shown(&state.binding, access)?;
+    let workspace = access.workspace;
+    tracked::track_draft(&state.tracker, &mut tx, id, |draft| {
+        tracking::DraftScheduled { workspace, draft }
+    })
+    .await?;
     tx.commit().await?;
     Ok((StatusCode::ACCEPTED, Json(draft)))
 }
@@ -302,6 +309,15 @@ pub async fn cancel(
                 .bind(id)
                 .execute(&mut *tx)
                 .await?;
+            let workspace = access.workspace;
+            tracked::track_draft(&state.tracker, &mut tx, id, |draft| {
+                tracking::DraftUnscheduled {
+                    workspace,
+                    draft,
+                    reason: tracking::UnscheduleReason::Cancelled,
+                }
+            })
+            .await?;
         }
         DraftState::Sending => return Err(Error::Conflict(crate::MESSAGES.reason("too_late"))),
         // Not sending: nothing to take back.

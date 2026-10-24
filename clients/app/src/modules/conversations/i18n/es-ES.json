@@ -266,7 +266,8 @@
     "trash": "Ir a Papelera",
     "delete": "Eliminar, o restaurar de la Papelera",
     "reportSpam": "Marcar como spam, o no es spam",
-    "noticedAsk": "Preguntar a Scout sobre la sugerencia"
+    "noticedAsk": "Preguntar a Scout sobre la sugerencia",
+    "noticedSee": "Scout se ha fijado: ver los correos"
   },
   "compose": {
     "title": {
@@ -807,7 +808,10 @@
     "verbArchive": "Archivarlos…",
     "verbFile": "Guardar en {{stream}}…",
     "other": "Otra cosa…",
-    "ask": "Preguntar a Scout"
+    "ask": "Preguntar a Scout",
+    "see_one": "Ver el correo",
+    "see_other": "Ver los {{count}} correos",
+    "more": "Más"
   },
   "forward": {
     "title": "Reenviar el correo de {{name}} a…",

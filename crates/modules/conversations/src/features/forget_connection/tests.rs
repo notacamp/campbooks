@@ -184,6 +184,38 @@ async fn deleting_a_connections_mail_leaves_nothing_behind(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn closing_an_inbox_is_tracked_once_with_its_counts(db: PgPool) {
+    let kit = Kit::new(db).await.tracking();
+    for mail in [MailChoice::Delete, MailChoice::Keep] {
+        let s = setup(&kit).await;
+        let ws = s.workspace;
+        publish(&kit, ws, &removed(ws, s.inbox, mail)).await;
+        // A replay finds nothing left to do.
+        publish(&kit, ws, &removed(ws, s.inbox, mail)).await;
+        let closed: Vec<_> =
+            campbooks_kernel::testing::tracked_events(&kit.db, "conversations.inbox_closed")
+                .await
+                .into_iter()
+                .filter(|event| event.workspace_id == Some(*ws.as_uuid()))
+                .collect();
+        assert_eq!(closed.len(), 1, "{mail:?}");
+        let event = &closed[0];
+        assert_eq!(event.version, 1);
+        assert_eq!(event.envelope["actor"]["type"], "system");
+        assert_eq!(event.body["inbox_id"], s.inbox.to_string());
+        let expected = if mail == MailChoice::Delete {
+            "deleted"
+        } else {
+            "kept"
+        };
+        assert_eq!(event.body["mail"], expected);
+        assert_eq!(event.body["message_count"], 4);
+        assert_eq!(event.body["draft_count"], 1);
+        assert!(!event.body.to_string().contains('@'));
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn kept_mail_is_read_only_history(db: PgPool) {
     let kit = Kit::new(db).await;
     let s = setup(&kit).await;
