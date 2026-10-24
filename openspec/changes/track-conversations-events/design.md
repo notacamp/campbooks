@@ -45,7 +45,7 @@ this change (the first two exist since plan version 1 and are unchanged).
 | `conversation_archived` (exists) | `archive` changes a message | |
 | `conversation_unarchived` (exists) | `unarchive` changes a message | |
 | `conversation_read` | `mark_read` marks a message read | |
-| `conversation_marked_unread` | `mark_unread` marks the newest message unread | |
+| `conversation_unread_marked` | `mark_unread` marks the newest message unread | |
 | `conversation_starred` | `star` stars the newest message | |
 | `conversation_unstarred` | `unstar` unstars a message | |
 | `conversation_trashed` | `trash` moves a message to the trash | |
@@ -131,7 +131,7 @@ Operations (`openapi/openapi.json`, tag `conversations`):
 | Operation | Events / exemption |
 | --- | --- |
 | `archive` / `unarchive` | `conversation_archived` / `conversation_unarchived` (exist) |
-| `mark_read` / `mark_unread` | `conversation_read` / `conversation_marked_unread` |
+| `mark_read` / `mark_unread` | `conversation_read` / `conversation_unread_marked` |
 | `star` / `unstar` | `conversation_starred` / `conversation_unstarred` |
 | `trash` / `untrash` | `conversation_trashed` / `conversation_untrashed` |
 | `report_spam` / `not_spam` | `conversation_spammed` / `conversation_unspammed` |
