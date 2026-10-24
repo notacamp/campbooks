@@ -347,6 +347,27 @@ fn catalogue_reads_ids_metadata_and_routes() {
     assert!(catalogue.route(&method, "/api/v1/test/notes").is_none());
 }
 
+/// A wildcard route (axum's `{*path}`) is found by its documented template
+/// (`{path}`): the BFF's proxies are named in their requests' tracking
+/// context.
+#[test]
+fn a_wildcard_route_is_found_by_its_documented_template() {
+    let catalogue = Catalogue::from_json(&json!({
+        "paths": {"/bff/api/{path}": {"get": {"operationId": "bff.api_get"}}}
+    }));
+    assert_eq!(
+        catalogue
+            .route(&axum::http::Method::GET, "/bff/api/{*path}")
+            .map(|op| op.id.as_str()),
+        Some("bff.api_get")
+    );
+    assert!(
+        catalogue
+            .route(&axum::http::Method::POST, "/bff/api/{*path}")
+            .is_none()
+    );
+}
+
 #[test]
 fn metadata_serializes_as_the_extension() {
     let meta = Operation::command(Risk::High)

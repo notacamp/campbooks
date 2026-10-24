@@ -121,12 +121,21 @@ impl Catalogue {
     /// The operation served at `method` + `path` (a template, as axum's
     /// `MatchedPath` reports it). A router nested under a prefix (the web
     /// client's `/bff`) reports the prefixed template; the operation is then
-    /// found by the part from `/api/` on.
+    /// found by the part from `/api/` on. A wildcard segment, which axum
+    /// reports as `{*name}`, is `{name}` in the document (the BFF's
+    /// `/bff/api/{*path}`).
     pub fn route(&self, method: &Method, path: &str) -> Option<&OperationInfo> {
         let find = |path: &str| {
             self.by_route
                 .get(&(method.to_string(), path.to_owned()))
                 .and_then(|id| self.by_id.get(id))
+        };
+        let documented;
+        let path = if path.contains("{*") {
+            documented = path.replace("{*", "{");
+            documented.as_str()
+        } else {
+            path
         };
         find(path).or_else(|| path.find("/api/").and_then(|at| find(&path[at..])))
     }

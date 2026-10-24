@@ -14,6 +14,7 @@ use campbooks_kernel::{
     i18n,
     operations::{Operation, Risk},
     rate_limit::{ClientIp, RateKey},
+    tracking::WebSessionEndCause,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -353,7 +354,7 @@ impl Inner {
         // (campbooks-cloud#214), the identity provider's session left as it
         // is (this sign-in may have gone straight through it).
         if let Some(previous) = self.cookies.session(headers)
-            && let Err(err) = self.retire(&crypto::hash(&previous)).await
+            && let Err(err) = self.replace(&crypto::hash(&previous)).await
         {
             return Error::from(err).into_response();
         }
@@ -389,7 +390,7 @@ impl Inner {
             // come in between): its tokens carry those, not today's.
             scopes: login.scopes.as_deref(),
         };
-        if let Err(err) = store::insert_session(&self.db, &session).await {
+        if let Err(err) = self.start(&session).await {
             return Error::from(err).into_response();
         }
         tracing::info!("web sign-in completed");
@@ -402,6 +403,16 @@ impl Inner {
 }
 
 impl Inner {
+    /// End the session this browser had before signing in again (tracked as
+    /// `replaced`), naming its account when it is still live.
+    async fn replace(&self, previous: &[u8]) -> sqlx::Result<()> {
+        let subject = store::find_session(&self.db, previous)
+            .await?
+            .map(|session| session.subject);
+        self.retire(previous, WebSessionEndCause::Replaced, subject.as_deref())
+            .await
+    }
+
     /// A sign-in's sealed PKCE verifier and nonce, opened; `None` when either
     /// does not open (another key, or another row's value).
     fn open_login(&self, login: &store::LoginTransaction) -> Option<(String, String)> {
@@ -567,7 +578,13 @@ pub async fn logout(State(bff): State<Bff>, headers: HeaderMap) -> Result<Respon
     // full here (the identity provider's session too), rather than being
     // retired by the lookup and leaving that session behind.
     if let Some(current) = inner.current_any_scopes(&headers).await? {
-        ended_here = inner.terminate(&current.session.presented).await?;
+        ended_here = inner
+            .terminate(
+                &current.session.presented,
+                WebSessionEndCause::Logout,
+                Some(&current.session.subject),
+            )
+            .await?;
         tracing::info!("web sign-out");
     }
     let logout_url = if ended_here || inner.oidc.in_process() {
@@ -634,12 +651,9 @@ pub async fn backchannel_logout(
             )));
         }
     };
-    let ended = store::delete_for_logout(
-        &inner.db,
-        token.subject.as_deref(),
-        token.session_id.as_deref(),
-    )
-    .await?;
+    let ended = inner
+        .end_for_logout(token.subject.as_deref(), token.session_id.as_deref())
+        .await?;
     tracing::info!(sessions = ended, "back-channel logout");
     Ok(no_store(StatusCode::OK.into_response()))
 }
