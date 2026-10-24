@@ -14,7 +14,7 @@
 //! the record's values read when the proposal is checked (the catalogue
 //! forbids an operation naming itself as its undo). Tasks add their rows
 //! (campbooks-cloud#43, `propose_task_change`); calendar events add theirs
-//! in their own change. The three-per-answer cap and the dedupe are shared
+//! (campbooks-cloud#42, `propose_event_change`). The three-per-answer cap and the dedupe are shared
 //! by every proposing tool.
 
 use campbooks_ai::{ToolCall, ToolDefinition};
@@ -25,8 +25,8 @@ use serde_json::{Map, Value, json};
 use super::{
     member::{Member, Unread},
     types::{
-        ChatProposal, ProposalAction, ProposalDetail, ProposalFacts, ProposalId, ProposalKind,
-        ProposalMethod, ProposalRequest, ProposalState, ProposalTask,
+        ChatProposal, ProposalAction, ProposalDetail, ProposalEvent, ProposalFacts, ProposalId,
+        ProposalKind, ProposalMethod, ProposalRequest, ProposalState, ProposalTask,
     },
     words::{clean, cut_bytes},
 };
@@ -51,8 +51,17 @@ const TASK: &str = "tasks.task";
 const YEAR: i64 = 365;
 /// The workspace's API root, as the catalogue's paths start.
 const WORKSPACE_ROOT: &str = "/api/v1/w/{workspace_id}/";
+/// Record type of a calendar event (the schedule module's).
+const EVENT: &str = "schedule.event";
+/// Longest event title Scout may propose, in characters.
+const EVENT_TITLE_CHARS: usize = 200;
+/// Longest place Scout may propose, in characters.
+const EVENT_PLACE_CHARS: usize = 300;
 /// The streams a conversation may be moved to.
 const STREAMS: [&str; 4] = ["primary", "updates", "receipts", "newsletters"];
+
+/// The answers to an invitation a member may give.
+const RESPONSES: [&str; 3] = ["accepted", "tentative", "declined"];
 
 /// A proposing tool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,11 +74,19 @@ pub enum Proposing {
     Reply,
     /// One change to one task.
     Task,
+    /// One change to one calendar event.
+    Event,
 }
 
 impl Proposing {
     /// Every proposing tool, in the order they are offered.
-    pub const ALL: [Self; 4] = [Self::Change, Self::Rule, Self::Reply, Self::Task];
+    pub const ALL: [Self; 5] = [
+        Self::Change,
+        Self::Rule,
+        Self::Reply,
+        Self::Task,
+        Self::Event,
+    ];
 
     /// The name the model calls it by.
     pub const fn name(self) -> &'static str {
@@ -78,6 +95,7 @@ impl Proposing {
             Self::Rule => "propose_rule",
             Self::Reply => "propose_reply",
             Self::Task => "propose_task_change",
+            Self::Event => "propose_event_change",
         }
     }
 
@@ -120,6 +138,35 @@ impl ProposalAction {
         Self::Due,
         Self::HandOff,
     ];
+
+    /// The event actions, in the order the model is offered them.
+    pub const EVENTS: [Self; 6] = [
+        Self::CreateEvent,
+        Self::UpdateEvent,
+        Self::DeleteEvent,
+        Self::RespondEvent,
+        Self::PushEvent,
+        Self::UnpushEvent,
+    ];
+
+    /// The event action the model names `name` (`create`, `update`,
+    /// `delete`, `respond`, `push`, `unpush`), if there is one.
+    pub fn event_named(name: &str) -> Option<Self> {
+        Self::EVENTS.into_iter().find(|a| a.event_name() == name)
+    }
+
+    /// An event action's name for the model.
+    pub const fn event_name(self) -> &'static str {
+        match self {
+            Self::CreateEvent => "create",
+            Self::UpdateEvent => "update",
+            Self::DeleteEvent => "delete",
+            Self::RespondEvent => "respond",
+            Self::PushEvent => "push",
+            Self::UnpushEvent => "unpush",
+            _ => self.name(),
+        }
+    }
 
     /// The task action the model names `name` (`done`, `not_needed`,
     /// `plan_day`, `later`, `due`, `hand_off`), if there is one.
@@ -168,6 +215,12 @@ impl ProposalAction {
             Self::TaskLater => "task_later",
             Self::Due => "due",
             Self::HandOff => "hand_off",
+            Self::CreateEvent => "create_event",
+            Self::UpdateEvent => "update_event",
+            Self::DeleteEvent => "delete_event",
+            Self::RespondEvent => "respond_event",
+            Self::PushEvent => "push_event",
+            Self::UnpushEvent => "unpush_event",
         }
     }
 
@@ -255,6 +308,32 @@ const fn restoring(action: ProposalAction, operation: &'static str) -> Row {
 
 /// The one field of a task's answer an undo takes.
 const REVISION: &[&str] = &["revision"];
+/// The event a change made is the one its undo deletes or takes off: its
+/// `id`, in the path (`@<path parameter>:<field>`).
+const NEW_EVENT: &[&str] = &["@event_id:id"];
+/// The token a delete gives, which brings the event back.
+const UNDO_TOKEN: &[&str] = &["undo_token"];
+/// An unpush gives the Campbooks event (`id`, the path) and the calendar it
+/// was taken off (`calendar_id`, the body), which push it back.
+const PUT_BACK: &[&str] = &["@event_id:id", "calendar_id"];
+
+/// An event row whose undo is its catalogue undo, taking `from_response`
+/// from the change's answer.
+const fn event_row(
+    action: ProposalAction,
+    operation: &'static str,
+    undo: &'static str,
+    from_response: &'static [&'static str],
+) -> Row {
+    Row {
+        action,
+        operation,
+        undo: Undo::Catalogue {
+            operation: undo,
+            from_response,
+        },
+    }
+}
 
 /// The action table: each action's operation and undo.
 pub const ROWS: &[Row] = &[
@@ -363,6 +442,42 @@ pub const ROWS: &[Row] = &[
     restoring(ProposalAction::TaskLater, "tasks.plan"),
     restoring(ProposalAction::Due, "tasks.update"),
     task_row(ProposalAction::HandOff, "tasks.hand_off", "tasks.take_back"),
+    event_row(
+        ProposalAction::CreateEvent,
+        "schedule.create_event",
+        "schedule.delete_event",
+        NEW_EVENT,
+    ),
+    // The event's own values before, read when the proposal is checked.
+    Row {
+        action: ProposalAction::UpdateEvent,
+        operation: "schedule.update_event",
+        undo: Undo::Restoring { from_response: &[] },
+    },
+    event_row(
+        ProposalAction::DeleteEvent,
+        "schedule.delete_event",
+        "schedule.restore_event",
+        UNDO_TOKEN,
+    ),
+    // The answer it had, read when the proposal is checked.
+    Row {
+        action: ProposalAction::RespondEvent,
+        operation: "schedule.respond_event",
+        undo: Undo::Restoring { from_response: &[] },
+    },
+    event_row(
+        ProposalAction::PushEvent,
+        "schedule.push_event",
+        "schedule.unpush_event",
+        NEW_EVENT,
+    ),
+    event_row(
+        ProposalAction::UnpushEvent,
+        "schedule.unpush_event",
+        "schedule.push_event",
+        PUT_BACK,
+    ),
 ];
 
 /// Why a proposal was not stored: a fixed code the model reads, and the log.
@@ -388,6 +503,19 @@ pub enum Refusal {
     DayOutOfRange,
     /// The teammate is the member, or not a member of the workspace.
     NotATeammate,
+    /// The event waits for its provider, is a series, or sits on a calendar
+    /// that cannot be written.
+    EventNotChangeable,
+    /// The event is not an invitation the member answers.
+    NotAnInvitation,
+    /// A new event's start is before now, or a year or more away.
+    StartOutOfRange,
+    /// The times cannot be written: a time on an all-day event, a day on a
+    /// timed one, or an end before the start.
+    InvalidWhen,
+    /// No calendar of theirs by that id or name that an event can be added
+    /// to.
+    NoSuchCalendar,
     /// The answer holds [`MAX_PROPOSALS`] already.
     TooMany,
     /// A read failed, or the operation is not here.
@@ -408,6 +536,11 @@ impl Refusal {
             Self::TaskClosed => "task_closed",
             Self::DayOutOfRange => "day_out_of_range",
             Self::NotATeammate => "not_a_teammate",
+            Self::EventNotChangeable => "event_not_changeable",
+            Self::NotAnInvitation => "not_an_invitation",
+            Self::StartOutOfRange => "start_out_of_range",
+            Self::InvalidWhen => "invalid_when",
+            Self::NoSuchCalendar => "no_such_calendar",
             Self::TooMany => "too_many",
             Self::Unavailable => "unavailable",
         }
@@ -452,6 +585,28 @@ impl Refusal {
                 "No teammate by that id or name, or it is the member themself: hand_off takes \
                  another member of the workspace. Nothing was proposed."
             }
+            Self::EventNotChangeable => {
+                "The event is a series, is still waiting to reach its calendar, or is on a \
+                 calendar that cannot be written: it cannot be changed from here. Nothing was \
+                 proposed."
+            }
+            Self::NotAnInvitation => {
+                "The event is not an invitation the member can answer. Nothing was proposed."
+            }
+            Self::StartOutOfRange => {
+                "`starts` must be later than now and less than a year away (RFC 3339 with an \
+                 offset, or YYYY-MM-DD for a day in the member's days). Nothing was proposed."
+            }
+            Self::InvalidWhen => {
+                "The times do not fit the event: an all-day event takes days (YYYY-MM-DD), a \
+                 timed one RFC 3339 times with an offset, and it cannot end before it starts. \
+                 Nothing was proposed."
+            }
+            Self::NoSuchCalendar => {
+                "No calendar of the member's by that id or name that an event can be added to \
+                 (one that is not their Campbooks calendar, can be written and is shown). \
+                 Nothing was proposed."
+            }
             Self::TooMany => {
                 "This answer holds three proposals already: propose no more in it. Nothing was \
                  proposed."
@@ -477,11 +632,19 @@ fn object(properties: &Value, required: &[&str]) -> Value {
 }
 
 /// Every proposing tool's definition, for the model.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one schema per proposing tool, read top to bottom"
+)]
 pub fn definitions() -> Vec<ToolDefinition> {
     let actions: Vec<&str> = ProposalAction::ALL.iter().map(|a| a.name()).collect();
     let task_actions: Vec<&str> = ProposalAction::TASKS
         .iter()
         .map(|a| a.task_name())
+        .collect();
+    let event_actions: Vec<&str> = ProposalAction::EVENTS
+        .iter()
+        .map(|a| a.event_name())
         .collect();
     let conversation_id = json!({
         "type": "string",
@@ -558,6 +721,35 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 &["action", "task_id"],
             ),
         ),
+        ToolDefinition::new(
+            Proposing::Event.name(),
+            "Propose one change to the member's calendar, for the member to confirm on a card. \
+             Nothing changes unless they confirm. create makes an event (`title` and `starts`, \
+             optionally `ends` and `place`) on their Campbooks calendar; update changes the \
+             event `event_id` (any of `title`, `starts`, `ends`, `place`; never a series); delete \
+             removes it; respond answers an invitation with `response`; push adds an event of \
+             their Campbooks calendar to the provider calendar `calendar` (its id or name); \
+             unpush takes such a copy off the provider calendar again. `starts` and `ends` are \
+             RFC 3339 with an offset, in the member's time zone, or YYYY-MM-DD for an all-day \
+             event (the end is then the day after the last). Nothing else is sent with an \
+             action.",
+            object(
+                &json!({
+                    "action": {"type": "string", "enum": event_actions},
+                    "event_id": {"type": "string", "minLength": 1, "maxLength": 64,
+                                 "description": "The event's id, as `my_calendar` gave it."},
+                    "title": {"type": "string", "minLength": 1,
+                              "maxLength": EVENT_TITLE_CHARS},
+                    "starts": {"type": "string", "minLength": 10, "maxLength": 40},
+                    "ends": {"type": "string", "minLength": 10, "maxLength": 40},
+                    "place": {"type": "string", "minLength": 1,
+                              "maxLength": EVENT_PLACE_CHARS},
+                    "response": {"type": "string", "enum": RESPONSES},
+                    "calendar": {"type": "string", "minLength": 1, "maxLength": MEMBER_CHARS},
+                }),
+                &["action"],
+            ),
+        ),
     ]
 }
 
@@ -587,11 +779,75 @@ pub enum Asked {
         until: Option<String>,
         member: Option<String>,
     },
+    /// `propose_event_change`.
+    Event {
+        action: ProposalAction,
+        event: Option<String>,
+        title: Option<String>,
+        starts: Option<String>,
+        ends: Option<String>,
+        place: Option<String>,
+        response: Option<String>,
+        calendar: Option<String>,
+    },
+}
+
+/// A start or an end: a day for an all-day event, else a moment.
+enum When {
+    Day(NaiveDate),
+    At(DateTime<Utc>),
+}
+
+impl When {
+    /// `text` as an RFC 3339 time with an offset, or as `YYYY-MM-DD`.
+    fn parse(text: &str) -> Option<Self> {
+        match DateTime::parse_from_rfc3339(text) {
+            Ok(at) => Some(Self::At(at.with_timezone(&Utc))),
+            Err(_) => NaiveDate::parse_from_str(text, "%Y-%m-%d")
+                .ok()
+                .map(Self::Day),
+        }
+    }
+
+    /// Whether `self` is before `other`, both of the same form.
+    fn before(&self, other: &Self) -> Option<bool> {
+        match (self, other) {
+            (Self::Day(a), Self::Day(b)) => Some(a < b),
+            (Self::At(a), Self::At(b)) => Some(a < b),
+            _ => None,
+        }
+    }
+}
+
+/// Whether the event arguments are the ones `action` takes, and no others.
+fn event_shape(action: ProposalAction, given: [bool; 8]) -> bool {
+    // event, title, starts, ends, place, response, calendar, (unused)
+    let [event, title, starts, ends, place, response, calendar, _] = given;
+    match action {
+        ProposalAction::CreateEvent => !event && title && starts && !response && !calendar,
+        ProposalAction::UpdateEvent => {
+            event && (title || starts || ends || place) && !response && !calendar
+        }
+        ProposalAction::DeleteEvent | ProposalAction::UnpushEvent => {
+            event && !(title || starts || ends || place || response || calendar)
+        }
+        ProposalAction::RespondEvent => {
+            event && response && !(title || starts || ends || place || calendar)
+        }
+        ProposalAction::PushEvent => {
+            event && calendar && !(title || starts || ends || place || response)
+        }
+        _ => false,
+    }
 }
 
 /// `raw`'s arguments when they fit `tool`'s schema: only its properties,
 /// each of the right type and length, and for a change only the detail its
 /// action takes.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one arm per proposing tool, read top to bottom"
+)]
 pub fn arguments(tool: Proposing, raw: &str) -> Option<Asked> {
     let raw = raw.trim();
     let object: Map<String, Value> = if raw.is_empty() {
@@ -619,6 +875,9 @@ pub fn arguments(tool: Proposing, raw: &str) -> Option<Asked> {
         Proposing::Rule => &["sentence"],
         Proposing::Reply => &["conversation_id", "intent"],
         Proposing::Task => &["action", "task_id", "day", "until", "member_id"],
+        Proposing::Event => &[
+            "action", "event_id", "title", "starts", "ends", "place", "response", "calendar",
+        ],
     };
     if !object.keys().all(|key| allowed.contains(&key.as_str())) {
         return None;
@@ -675,6 +934,59 @@ pub fn arguments(tool: Proposing, raw: &str) -> Option<Asked> {
                 day,
                 until,
                 member,
+            })
+        }
+        Proposing::Event => {
+            let action = ProposalAction::event_named(object.get("action")?.as_str()?)?;
+            let event = text("event_id", (1, 64))?;
+            let title = text("title", (1, EVENT_TITLE_CHARS))?;
+            let starts = text("starts", (10, 40))?;
+            let ends = text("ends", (10, 40))?;
+            let place = text("place", (1, EVENT_PLACE_CHARS))?;
+            let response = text("response", (1, 16))?;
+            let calendar = text("calendar", (1, MEMBER_CHARS))?;
+            if response.as_deref().is_some_and(|r| !RESPONSES.contains(&r)) {
+                return None;
+            }
+            let first = starts
+                .as_deref()
+                .map(When::parse)
+                .map(|w| w.ok_or(()))
+                .transpose()
+                .ok()?;
+            let last = ends
+                .as_deref()
+                .map(When::parse)
+                .map(|w| w.ok_or(()))
+                .transpose()
+                .ok()?;
+            if let (Some(first), Some(last)) = (&first, &last)
+                && !first.before(last)?
+            {
+                return None;
+            }
+            let given = [
+                event.is_some(),
+                title.is_some(),
+                starts.is_some(),
+                ends.is_some(),
+                place.is_some(),
+                response.is_some(),
+                calendar.is_some(),
+                false,
+            ];
+            if !event_shape(action, given) {
+                return None;
+            }
+            Some(Asked::Event {
+                action,
+                event,
+                title,
+                starts,
+                ends,
+                place,
+                response,
+                calendar,
             })
         }
         Proposing::Rule => Some(Asked::Rule {
@@ -782,6 +1094,7 @@ impl Proposer {
                         record: None,
                         facts: None,
                         task: None,
+                        event: None,
                         detail: None,
                         request: None,
                         undo: None,
@@ -808,6 +1121,7 @@ impl Proposer {
                         record: Some(RecordRef::new(CONVERSATION, &seen.id)),
                         facts: Some(seen.facts()),
                         task: None,
+                        event: None,
                         detail: None,
                         request: None,
                         undo: None,
@@ -841,6 +1155,7 @@ impl Proposer {
                         record: Some(RecordRef::new(CONVERSATION, &seen.id)),
                         facts: Some(seen.facts()),
                         task: None,
+                        event: None,
                         detail: Some(built.detail),
                         request: Some(built.request),
                         undo: Some(built.undo),
@@ -860,6 +1175,12 @@ impl Proposer {
                     }
                     self.task_proposal(*action, task, *day, until.as_deref(), member.as_deref())
                         .await?
+                }
+                Asked::Event { .. } => {
+                    if full && !self.holds(&asked) {
+                        return Err(Refusal::TooMany);
+                    }
+                    self.event_proposal(&asked).await?
                 }
             };
         if let Some(same) = self.proposals.iter().find(|p| same_card(p, &proposal)) {
@@ -915,6 +1236,21 @@ impl Proposer {
                     && p.detail
                         .as_ref()
                         .is_some_and(|d| d.day == *day && d.until == until)
+            }
+            Asked::Event {
+                action,
+                event,
+                title,
+                starts,
+                response,
+                ..
+            } => {
+                // Rough, like a task's: the exact check is `same_card`.
+                p.action == Some(*action)
+                    && p.record.as_ref().map(|r| r.id.as_str()) == event.as_deref()
+                    && p.detail.as_ref().is_some_and(|d| {
+                        d.title == *title && d.starts == *starts && d.response == *response
+                    })
             }
         })
     }
@@ -1102,6 +1438,13 @@ impl Proposer {
             A::TaskDone | A::TaskNotNeeded | A::PlanDay | A::TaskLater | A::Due | A::HandOff => {
                 return Err(Refusal::InvalidArguments);
             }
+            // Event actions are built by `event_proposal`, never here.
+            A::CreateEvent
+            | A::UpdateEvent
+            | A::DeleteEvent
+            | A::RespondEvent
+            | A::PushEvent
+            | A::UnpushEvent => return Err(Refusal::InvalidArguments),
         };
         if already {
             return Err(Refusal::AlreadySo);
@@ -1270,12 +1613,256 @@ impl Proposer {
                 verb: seen.verb.clone(),
                 due_on: seen.due_on,
             }),
+            event: None,
             detail: Some(detail),
             request: Some(request),
             undo: Some(undo),
             sentence: None,
             intent: None,
         })
+    }
+
+    /// An event change's proposal, after reading the event and the member's
+    /// calendars as the member and checking it changes something, for
+    /// someone who may change it. The card's facts are the record's (and,
+    /// for a push, the calendar list's), never the model's words.
+    #[allow(clippy::too_many_lines)]
+    async fn event_proposal(&self, asked: &Asked) -> Result<ChatProposal, Refusal> {
+        use ProposalAction as A;
+        let Asked::Event {
+            action,
+            event,
+            title,
+            starts,
+            ends,
+            place,
+            response,
+            calendar,
+        } = asked
+        else {
+            return Err(Refusal::InvalidArguments);
+        };
+        let action = *action;
+        let row = action.row();
+        let mut detail = ProposalDetail {
+            title: title.clone(),
+            starts: starts.clone(),
+            ends: ends.clone(),
+            place: place.clone(),
+            response: response.clone(),
+            ..ProposalDetail::default()
+        };
+        if action == A::CreateEvent {
+            event_start_within(
+                starts.as_deref().ok_or(Refusal::InvalidArguments)?,
+                Utc::now(),
+                self.utc_offset,
+            )?;
+            let mut body = json!({
+                "title": title.as_deref().ok_or(Refusal::InvalidArguments)?,
+                "starts": starts.as_deref().ok_or(Refusal::InvalidArguments)?,
+            });
+            if let Some(ends) = ends {
+                body["ends"] = ends.clone().into();
+            }
+            if let Some(place) = place {
+                body["place"] = place.clone().into();
+            }
+            let request = self.request(row.operation, &[], Some(body), &[])?;
+            let undo = self.row_undo(row, &[], None)?;
+            return Ok(ChatProposal {
+                id: ProposalId::new(),
+                kind: ProposalKind::Change,
+                state: ProposalState::Pending,
+                action: Some(action),
+                record: None,
+                facts: None,
+                task: None,
+                event: None,
+                detail: Some(detail),
+                request: Some(request),
+                undo: Some(undo),
+                sentence: None,
+                intent: None,
+            });
+        }
+        let seen = self
+            .read_event(event.as_deref().ok_or(Refusal::InvalidArguments)?)
+            .await?;
+        let calendars = self.calendars().await?;
+        let here = calendars.iter().find(|c| c.id == seen.calendar_id);
+        // An answer that has not reached the provider yet is never stacked on.
+        if seen.pending {
+            return Err(Refusal::EventNotChangeable);
+        }
+        let params = [("event_id", seen.id.clone())];
+        let mut body: Option<Value> = None;
+        let mut undo_body: Option<Value> = None;
+        match action {
+            A::UpdateEvent => {
+                let here = here.ok_or(Refusal::Unavailable)?;
+                if seen.recurring || !here.writes() {
+                    return Err(Refusal::EventNotChangeable);
+                }
+                let (now, before) = event_changes(
+                    &seen,
+                    title.as_deref(),
+                    starts.as_deref(),
+                    ends.as_deref(),
+                    place.as_deref(),
+                )?;
+                // What the card says is what is sent, not what was asked.
+                detail.title = now.get("title").and_then(Value::as_str).map(fact);
+                detail.starts = now.get("starts").and_then(Value::as_str).map(str::to_owned);
+                detail.ends = now.get("ends").and_then(Value::as_str).map(str::to_owned);
+                detail.place = now.get("place").and_then(Value::as_str).map(fact);
+                body = Some(Value::Object(now));
+                undo_body = Some(Value::Object(before));
+            }
+            A::DeleteEvent => {
+                let here = here.ok_or(Refusal::Unavailable)?;
+                // A series is deleted whole: not from a card.
+                if seen.recurring || !here.writes() {
+                    return Err(Refusal::EventNotChangeable);
+                }
+            }
+            A::RespondEvent => {
+                // Only an invitation: the event carries the member's answer.
+                let current = seen.response.clone().ok_or(Refusal::NotAnInvitation)?;
+                let wanted = response.as_deref().ok_or(Refusal::InvalidArguments)?;
+                if current == wanted {
+                    return Err(Refusal::AlreadySo);
+                }
+                body = Some(json!({ "response": wanted }));
+                undo_body = Some(json!({ "response": current }));
+            }
+            A::PushEvent => {
+                let here = here.ok_or(Refusal::Unavailable)?;
+                if !here.campbooks || seen.recurring {
+                    return Err(Refusal::EventNotChangeable);
+                }
+                let asked = calendar.as_deref().ok_or(Refusal::InvalidArguments)?.trim();
+                let lowered = asked.to_lowercase();
+                let targets: Vec<&Cal> = calendars
+                    .iter()
+                    .filter(|c| !c.campbooks && c.writes())
+                    .collect();
+                let by_id = targets.iter().find(|c| c.id == asked);
+                let named: Vec<&&Cal> = targets
+                    .iter()
+                    .filter(|c| c.name.to_lowercase() == lowered)
+                    .collect();
+                let target: &Cal = by_id
+                    .copied()
+                    .or_else(|| (named.len() == 1).then(|| *named[0]))
+                    .ok_or(Refusal::NoSuchCalendar)?;
+                if !safe_segment(&target.id) {
+                    return Err(Refusal::Unavailable);
+                }
+                detail.calendar_name = Some(target.name.clone());
+                body = Some(json!({ "calendar_id": target.id }));
+            }
+            A::UnpushEvent => {
+                let here = here.ok_or(Refusal::Unavailable)?;
+                if here.campbooks || !seen.on_provider {
+                    return Err(Refusal::EventNotChangeable);
+                }
+            }
+            _ => return Err(Refusal::InvalidArguments),
+        }
+        let request = self.request(row.operation, &params, body, &[])?;
+        let undo = self.row_undo(row, &params, undo_body)?;
+        Ok(ChatProposal {
+            id: ProposalId::new(),
+            kind: ProposalKind::Change,
+            state: ProposalState::Pending,
+            action: Some(action),
+            record: Some(RecordRef::new(EVENT, &seen.id)),
+            facts: None,
+            task: None,
+            event: Some(ProposalEvent {
+                title: fact(&seen.title),
+                starts: seen.starts.clone(),
+                all_day: seen.all_day,
+                calendar: here.map(|c| c.name.clone()),
+            }),
+            detail: Some(detail),
+            request: Some(request),
+            undo: Some(undo),
+            sentence: None,
+            intent: None,
+        })
+    }
+
+    /// The undo of `row`'s change: its catalogue undo, or the same operation
+    /// with `undo_body`, the record's values before.
+    fn row_undo(
+        &self,
+        row: &Row,
+        params: &[(&str, String)],
+        undo_body: Option<Value>,
+    ) -> Result<ProposalRequest, Refusal> {
+        match row.undo {
+            Undo::Restoring { from_response } => {
+                self.request(row.operation, params, undo_body, from_response)
+            }
+            Undo::Catalogue {
+                operation,
+                from_response,
+            } => self.request(operation, params, None, from_response),
+        }
+    }
+
+    /// The event as the member sees it (`schedule.get_event` refuses what
+    /// they cannot see).
+    async fn read_event(&self, event: &str) -> Result<SeenEvent, Refusal> {
+        let view = self
+            .member
+            .read("schedule.get_event", json!({ "event_id": event }))
+            .await
+            .map_err(|unread| match unread {
+                Unread::NotVisible | Unread::Refused => Refusal::NotVisible,
+                Unread::Broken(_) => Refusal::Unavailable,
+            })?;
+        let text = |key: &str| view[key].as_str().map(ToOwned::to_owned);
+        Ok(SeenEvent {
+            id: text("id")
+                .filter(|id| safe_segment(id))
+                .ok_or(Refusal::Unavailable)?,
+            title: text("title").ok_or(Refusal::Unavailable)?,
+            starts: text("starts").ok_or(Refusal::Unavailable)?,
+            ends: text("ends").ok_or(Refusal::Unavailable)?,
+            all_day: view["all_day"] == true,
+            calendar_id: text("calendar_id").ok_or(Refusal::Unavailable)?,
+            place: text("place"),
+            recurring: view["recurring"] == true,
+            response: text("response"),
+            pending: view["pending"] == true,
+            on_provider: view["on_provider"] == true,
+        })
+    }
+
+    /// The member's calendars, named as the list names them.
+    async fn calendars(&self) -> Result<Vec<Cal>, Refusal> {
+        let list = self
+            .member
+            .read("schedule.list_calendars", Value::Null)
+            .await
+            .map_err(|_| Refusal::Unavailable)?;
+        Ok(list["calendars"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|c| {
+                Some(Cal {
+                    id: c["id"].as_str()?.to_owned(),
+                    name: c["name"].as_str().map(fact)?,
+                    campbooks: c["source"] == "campbooks",
+                    writable: c["writable"] == true,
+                    syncing: c["syncing"] == true,
+                })
+            })
+            .collect())
     }
 
     /// The task as the member sees it (`tasks.get` refuses what they
@@ -1397,12 +1984,39 @@ impl Proposer {
         let method = match info.method.as_str() {
             "POST" => ProposalMethod::Post,
             "DELETE" => ProposalMethod::Delete,
-            // Only a task's edit uses it (the client allows it for that
-            // entry alone).
-            "PATCH" if operation == "tasks.update" => ProposalMethod::Patch,
+            // Only a task's edit and an event's use it (the client allows it
+            // for those entries alone).
+            "PATCH" if operation == "tasks.update" || operation == "schedule.update_event" => {
+                ProposalMethod::Patch
+            }
             _ => return Err(Refusal::Unavailable),
         };
-        let path = fill(&info.path, params).ok_or(Refusal::Unavailable)?;
+        // A path id the change's answer will give (`@event_id:id`): a
+        // placeholder segment the client fills in from that answer.
+        let late: Vec<&str> = from_response
+            .iter()
+            .filter_map(|entry| entry.strip_prefix('@')?.split_once(':'))
+            .map(|(name, _)| name)
+            .collect();
+        let mut filled: Vec<(&str, String)> = params.to_vec();
+        for name in &late {
+            filled.retain(|(key, _)| key != name);
+            filled.push((*name, format!("late-{name}")));
+        }
+        let mut path = fill(&info.path, &filled).ok_or(Refusal::Unavailable)?;
+        for name in &late {
+            path = path
+                .split('/')
+                .map(|segment| {
+                    if segment == format!("late-{name}") {
+                        format!("{{{name}}}")
+                    } else {
+                        segment.to_owned()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("/");
+        }
         Ok(ProposalRequest {
             operation: operation.to_owned(),
             method,
@@ -1462,6 +2076,107 @@ fn day_within(day: NaiveDate, now: DateTime<Utc>, utc_offset: i32) -> Result<Nai
         return Err(Refusal::DayOutOfRange);
     }
     Ok(day)
+}
+
+/// A time of an event: a day (all-day) or a moment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
+enum EventTime {
+    Day(NaiveDate),
+    At(DateTime<Utc>),
+}
+
+impl EventTime {
+    fn parse(text: &str) -> Option<Self> {
+        NaiveDate::parse_from_str(text, "%Y-%m-%d")
+            .map(Self::Day)
+            .ok()
+            .or_else(|| {
+                DateTime::parse_from_rfc3339(text)
+                    .ok()
+                    .map(|at| Self::At(at.with_timezone(&Utc)))
+            })
+    }
+
+    const fn is_day(self) -> bool {
+        matches!(self, Self::Day(_))
+    }
+}
+
+/// A new event's `starts`: a day from today (in the member's days) to a year
+/// away, or a moment later than now and a year or more away.
+fn event_start_within(starts: &str, now: DateTime<Utc>, utc_offset: i32) -> Result<(), Refusal> {
+    match EventTime::parse(starts).ok_or(Refusal::InvalidArguments)? {
+        EventTime::Day(day) => day_within(day, now, utc_offset)
+            .map(|_| ())
+            .map_err(|_| Refusal::StartOutOfRange),
+        EventTime::At(at) => {
+            if at <= now || at >= now + Duration::days(YEAR) {
+                Err(Refusal::StartOutOfRange)
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+/// The fields of an event's edit that would really change it (`now`), and
+/// their values before (`before`, which puts them back), judged against the
+/// event as read. Refuses an edit that changes nothing, or that cannot be
+/// written: a day on a timed event, a time on an all-day one, an end before
+/// the start.
+fn event_changes(
+    seen: &SeenEvent,
+    title: Option<&str>,
+    starts: Option<&str>,
+    ends: Option<&str>,
+    place: Option<&str>,
+) -> Result<EventChanges, Refusal> {
+    let mut now = Map::new();
+    let mut before = Map::new();
+    if let Some(title) = title.filter(|t| *t != seen.title) {
+        now.insert("title".into(), title.into());
+        before.insert("title".into(), seen.title.clone().into());
+    }
+    let moved_start = starts.filter(|s| *s != seen.starts);
+    let moved_end = ends.filter(|e| *e != seen.ends);
+    // Every time given must be of the event's form.
+    for given in [moved_start, moved_end].into_iter().flatten() {
+        let when = EventTime::parse(given).ok_or(Refusal::InvalidWhen)?;
+        if when.is_day() != seen.all_day {
+            return Err(Refusal::InvalidWhen);
+        }
+    }
+    // The end, against the start the event will have.
+    if let Some(end) = moved_end {
+        let start = moved_start.unwrap_or(&seen.starts);
+        if let (Some(start), Some(end)) = (EventTime::parse(start), EventTime::parse(end))
+            && end < start
+        {
+            return Err(Refusal::InvalidWhen);
+        }
+    }
+    if let Some(starts) = moved_start {
+        now.insert("starts".into(), starts.into());
+    }
+    if let Some(ends) = moved_end {
+        now.insert("ends".into(), ends.into());
+    }
+    if moved_start.is_some() || moved_end.is_some() {
+        // The start moves the end with it unless it is given: put both back.
+        before.insert("starts".into(), seen.starts.clone().into());
+        before.insert("ends".into(), seen.ends.clone().into());
+    }
+    if let Some(place) = place.filter(|p| Some(*p) != seen.place.as_deref()) {
+        now.insert("place".into(), place.into());
+        before.insert(
+            "place".into(),
+            seen.place.clone().unwrap_or_default().into(),
+        );
+    }
+    if now.is_empty() {
+        return Err(Refusal::AlreadySo);
+    }
+    Ok((now, before))
 }
 
 /// A fact, cleaned and bounded.
@@ -1530,6 +2245,47 @@ struct Teammate {
     email: Option<String>,
 }
 
+/// The fields an edit sets, and their values before.
+type EventChanges = (Map<String, Value>, Map<String, Value>);
+
+/// An event, as read for a proposal.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the flags are the event as the provider reports it"
+)]
+struct SeenEvent {
+    id: String,
+    title: String,
+    starts: String,
+    ends: String,
+    all_day: bool,
+    calendar_id: String,
+    place: Option<String>,
+    recurring: bool,
+    /// The member's answer, when the event is an invitation.
+    response: Option<String>,
+    pending: bool,
+    on_provider: bool,
+}
+
+/// A calendar of the member's, as the list has it.
+struct Cal {
+    id: String,
+    /// Its name (bounded).
+    name: String,
+    /// Whether it is their Campbooks calendar.
+    campbooks: bool,
+    writable: bool,
+    syncing: bool,
+}
+
+impl Cal {
+    /// Whether events may be made and changed on it.
+    const fn writes(&self) -> bool {
+        self.writable && (self.campbooks || self.syncing)
+    }
+}
+
 /// A task, as read for a proposal.
 struct SeenTask {
     id: String,
@@ -1571,6 +2327,12 @@ struct Built {
 pub fn line(proposal: &ChatProposal) -> String {
     if let (Some(task), Some(action)) = (&proposal.task, proposal.action) {
         return task_line(proposal, action, task);
+    }
+    if let Some(action) = proposal
+        .action
+        .filter(|action| ProposalAction::EVENTS.contains(action))
+    {
+        return event_line(proposal, action);
     }
     let about = proposal.facts.as_ref().map_or_else(String::new, |facts| {
         let subject = if facts.subject.is_empty() {
@@ -1647,13 +2409,157 @@ fn task_line(proposal: &ChatProposal, action: ProposalAction, task: &ProposalTas
     )
 }
 
+/// The line for one of an event proposal.
+fn event_line(proposal: &ChatProposal, action: ProposalAction) -> String {
+    let detail = proposal.detail.as_ref();
+    let title = proposal
+        .event
+        .as_ref()
+        .map(|e| e.title.clone())
+        .or_else(|| detail.and_then(|d| d.title.clone()))
+        .unwrap_or_default();
+    let extra = detail.map_or_else(String::new, |d| {
+        if let Some(name) = &d.calendar_name {
+            format!(" to the calendar {name}")
+        } else if let Some(response) = &d.response {
+            format!(" ({response})")
+        } else if let Some(starts) = &d.starts {
+            format!(" starting {starts}")
+        } else {
+            String::new()
+        }
+    });
+    let state = match proposal.state {
+        ProposalState::Pending => "The member has not answered it.",
+        ProposalState::Done => "The member confirmed it.",
+        ProposalState::Declined => "The member said not now.",
+        ProposalState::Failed => "The member confirmed it, and it could not be done.",
+        ProposalState::Undone => "The member confirmed it, then undid it.",
+    };
+    format!(
+        "Proposed: {}{extra} for the event \"{title}\". {state}",
+        action.event_name()
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn event(all_day: bool) -> SeenEvent {
+        SeenEvent {
+            id: "e1".into(),
+            title: "Dentist".into(),
+            starts: if all_day {
+                "2026-11-05"
+            } else {
+                "2026-11-05T15:00:00+00:00"
+            }
+            .into(),
+            ends: if all_day {
+                "2026-11-06"
+            } else {
+                "2026-11-05T16:00:00+00:00"
+            }
+            .into(),
+            all_day,
+            calendar_id: "c1".into(),
+            place: None,
+            recurring: false,
+            response: None,
+            pending: false,
+            on_provider: true,
+        }
+    }
+
+    #[test]
+    fn a_new_events_start_is_bounded_like_a_tasks_day() {
+        let now = DateTime::parse_from_rfc3339("2026-10-23T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        assert!(event_start_within("2026-10-23T13:00:00+00:00", now, 0).is_ok());
+        assert!(event_start_within("2026-10-24", now, 0).is_ok());
+        for out in [
+            "2026-10-23T11:00:00+00:00",
+            "2027-10-23T13:00:00+00:00",
+            "2026-10-22",
+            "2027-10-23",
+        ] {
+            assert_eq!(
+                event_start_within(out, now, 0),
+                Err(Refusal::StartOutOfRange),
+                "{out}"
+            );
+        }
+        assert_eq!(
+            event_start_within("next Thursday", now, 0),
+            Err(Refusal::InvalidArguments)
+        );
+    }
+
+    #[test]
+    fn an_edit_is_what_it_really_changes() {
+        let seen = event(false);
+        // The same start with a new title renames; it does not move.
+        let (now, before) = event_changes(
+            &seen,
+            Some("Dentist, Dr Lopes"),
+            Some("2026-11-05T15:00:00+00:00"),
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(now.keys().collect::<Vec<_>>(), ["title"]);
+        assert_eq!(before["title"], "Dentist");
+        // An end alone changes the end, and puts both times back.
+        let (now, before) =
+            event_changes(&seen, None, None, Some("2026-11-05T17:00:00+00:00"), None).unwrap();
+        assert_eq!(now.keys().collect::<Vec<_>>(), ["ends"]);
+        assert_eq!(before["starts"], "2026-11-05T15:00:00+00:00");
+        assert_eq!(
+            event_changes(&seen, Some("Dentist"), None, None, None),
+            Err(Refusal::AlreadySo)
+        );
+    }
+
+    #[test]
+    fn an_edit_that_can_only_fail_is_refused_when_it_is_proposed() {
+        let timed = event(false);
+        let day = event(true);
+        // A day on a timed event, a moment on an all-day one.
+        assert_eq!(
+            event_changes(&timed, None, Some("2026-11-07"), None, None),
+            Err(Refusal::InvalidWhen)
+        );
+        assert_eq!(
+            event_changes(&day, None, Some("2026-11-07T10:00:00+00:00"), None, None),
+            Err(Refusal::InvalidWhen)
+        );
+        // An end alone before the current start, or before the new start.
+        assert_eq!(
+            event_changes(&timed, None, None, Some("2026-11-05T14:00:00+00:00"), None),
+            Err(Refusal::InvalidWhen)
+        );
+        assert_eq!(
+            event_changes(
+                &timed,
+                None,
+                Some("2026-11-06T10:00:00+00:00"),
+                Some("2026-11-05T17:00:00+00:00"),
+                None
+            ),
+            Err(Refusal::InvalidWhen)
+        );
+        assert!(event_changes(&day, None, Some("2026-11-07"), Some("2026-11-08"), None).is_ok());
+    }
+
     #[test]
     fn every_action_has_one_row_and_a_strict_schema() {
-        for action in ProposalAction::ALL.into_iter().chain(ProposalAction::TASKS) {
+        for action in ProposalAction::ALL
+            .into_iter()
+            .chain(ProposalAction::TASKS)
+            .chain(ProposalAction::EVENTS)
+        {
             assert_eq!(
                 ROWS.iter().filter(|row| row.action == action).count(),
                 1,
@@ -1679,9 +2585,18 @@ mod tests {
                 }
             ));
         }
+        for action in ProposalAction::EVENTS {
+            assert_eq!(
+                ProposalAction::event_named(action.event_name()),
+                Some(action)
+            );
+            // An event action is never one `propose_change` takes.
+            assert_eq!(ProposalAction::named(action.name()), None);
+            assert!(action.row().operation.starts_with("schedule."));
+        }
         assert_eq!(
             ROWS.len(),
-            ProposalAction::ALL.len() + ProposalAction::TASKS.len()
+            ProposalAction::ALL.len() + ProposalAction::TASKS.len() + ProposalAction::EVENTS.len()
         );
         for definition in definitions() {
             assert_eq!(definition.parameters["additionalProperties"], false);
@@ -1773,6 +2688,69 @@ mod tests {
         ] {
             assert!(!fits(&bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn event_arguments_take_only_what_their_action_takes() {
+        let id = "\"event_id\": \"e-1\"";
+        let fits = |raw: &str| arguments(Proposing::Event, raw).is_some();
+        assert!(fits(
+            "{\"action\": \"create\", \"title\": \"Dentist\", \"starts\": \"2026-11-12T15:00:00+00:00\"}"
+        ));
+        assert!(fits(
+            "{\"action\": \"create\", \"title\": \"Trip\", \"starts\": \"2026-11-12\", \"ends\": \"2026-11-14\"}"
+        ));
+        assert!(fits(&format!(
+            "{{\"action\": \"update\", {id}, \"place\": \"Clinic\"}}"
+        )));
+        assert!(fits(&format!("{{\"action\": \"delete\", {id}}}")));
+        assert!(fits(&format!("{{\"action\": \"unpush\", {id}}}")));
+        assert!(fits(&format!(
+            "{{\"action\": \"respond\", {id}, \"response\": \"declined\"}}"
+        )));
+        assert!(fits(&format!(
+            "{{\"action\": \"push\", {id}, \"calendar\": \"Work\"}}"
+        )));
+        for bad in [
+            // Not an action here.
+            format!("{{\"action\": \"restore\", {id}}}"),
+            format!("{{\"action\": \"archive\", {id}}}"),
+            // A new event needs a title and a start, and has no id yet.
+            "{\"action\": \"create\", \"title\": \"Dentist\"}".to_owned(),
+            format!(
+                "{{\"action\": \"create\", {id}, \"title\": \"Dentist\", \"starts\": \"2026-11-12\"}}"
+            ),
+            // A start that is not a moment or a day, an end before the start,
+            // and a day with a time.
+            "{\"action\": \"create\", \"title\": \"Dentist\", \"starts\": \"next Thursday\"}"
+                .to_owned(),
+            "{\"action\": \"create\", \"title\": \"Dentist\", \"starts\": \"2026-11-12T15:00:00+00:00\", \"ends\": \"2026-11-12T14:00:00+00:00\"}"
+                .to_owned(),
+            "{\"action\": \"create\", \"title\": \"Dentist\", \"starts\": \"2026-11-12\", \"ends\": \"2026-11-12T14:00:00+00:00\"}"
+                .to_owned(),
+            // Nothing to change; a change the action does not take.
+            format!("{{\"action\": \"update\", {id}}}"),
+            format!("{{\"action\": \"delete\", {id}, \"title\": \"x\"}}"),
+            format!("{{\"action\": \"respond\", {id}}}"),
+            format!("{{\"action\": \"respond\", {id}, \"response\": \"needs_action\"}}"),
+            format!("{{\"action\": \"push\", {id}}}"),
+            format!("{{\"action\": \"unpush\", {id}, \"calendar\": \"Work\"}}"),
+            "{\"action\": \"delete\"}".to_owned(),
+        ] {
+            assert!(!fits(&bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn an_undo_path_may_wait_for_the_id_the_change_gives() {
+        assert_eq!(
+            fill(
+                "/api/v1/w/{workspace_id}/schedule/events/{event_id}/push",
+                &[("event_id", "late-event_id".to_owned())]
+            )
+            .as_deref(),
+            Some("schedule/events/late-event_id/push")
+        );
     }
 
     #[test]

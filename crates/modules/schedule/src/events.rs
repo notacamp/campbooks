@@ -168,6 +168,12 @@ pub struct CalendarSyncChanged {
     pub connection: ConnectionId,
     /// Whether it syncs now.
     pub syncing: bool,
+    /// Which calendar of the provider it is: a `calendar-ref` v1 document, a
+    /// blob. The provider's id can be an address, so it never travels in the
+    /// event itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<BlobPointer>)]
+    pub provider_calendar: Option<BlobRef>,
 }
 
 impl DomainEvent for CalendarSyncChanged {

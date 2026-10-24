@@ -16,7 +16,7 @@
 use campbooks_kernel::{Job, JobContext, JobError, tenancy::WorkspaceId};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::outbound;
+use crate::{calendar::changes, domain::outbound};
 
 /// Re-tag, in the job's workspace, the pending outbound changes bound under
 /// the previous key.
@@ -38,6 +38,9 @@ impl Job for RetagBindings {
         }
         let tx = ctx.tx().await?;
         let (retagged, left) = outbound::retag(tx, &key, workspace).await?;
+        // The calendar changes members asked for are bound the same way.
+        let (cal_retagged, cal_left) = changes::retag(tx, &key, workspace).await?;
+        let (retagged, left) = (retagged + cal_retagged, left + cal_left);
         if left == 0 {
             tracing::info!(
                 %workspace,

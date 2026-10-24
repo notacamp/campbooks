@@ -59,6 +59,13 @@ impl ChangeRequest<'_> {
         binding.tag(&self.fields())
     }
 
+    /// The tag of this request under the current key when `mac` is its tag
+    /// under the previous key only (a rotation of the instance secret key):
+    /// what was bound stays bound. `None` otherwise.
+    pub fn retag(&self, binding: &Binding, mac: Option<&[u8]>) -> Option<Vec<u8>> {
+        binding.retag(&self.fields(), mac)
+    }
+
     /// Whether `mac` is the tag of this request.
     pub fn holds(&self, binding: &Binding, mac: Option<&[u8]>) -> bool {
         binding.verify(&self.fields(), mac)

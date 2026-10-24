@@ -25,8 +25,10 @@ use super::{
 };
 use crate::{
     MESSAGES,
+    calendar::{self, API_NOT_ENABLED, LIST_CONTENT_TYPE, ListDocument, ListedCalendar},
     deps::Deps,
     events::{ACCOUNT_CONTENT_TYPE, AccountDocument, CapabilityGranted, ConnectionAdded},
+    google::CalendarError,
     provider::TokenGrant,
 };
 
@@ -106,7 +108,20 @@ struct Pending<'a> {
     grant: &'a ProviderGrant,
     /// Each mailbox with its account document.
     mailboxes: Vec<(&'a Mailbox, BlobRef)>,
+    /// The account's calendars, when the grant brings the calendar
+    /// capability.
+    calendars: Option<CalendarGrant>,
     now: DateTime<Utc>,
+}
+
+/// The calendars a calendar grant listed.
+struct CalendarGrant {
+    /// What the provider listed (nothing when it could not be asked).
+    listed: Vec<ListedCalendar>,
+    /// The `calendar-list` v1 document of them, a blob.
+    blob: BlobRef,
+    /// Why the calendar stream cannot work yet, for the member to act on.
+    reason: Option<&'static str>,
 }
 
 /// Create the connection of `grant`, or refresh the existing one of the
@@ -140,10 +155,16 @@ pub async fn create_or_refresh_connection(
             .await?;
         mailboxes.push((mailbox, blob));
     }
+    let calendars = if grant.capabilities.contains(&Capability::Calendar) {
+        Some(list_calendars(state, deps, grant).await?)
+    } else {
+        None
+    };
     let mut tx = state.db.begin_for(grant.workspace).await?;
     let pending = Pending {
         grant,
         mailboxes,
+        calendars,
         now: deps.clock.now(),
     };
     let id = save(&mut tx, state, deps, &pending).await?;
@@ -155,8 +176,80 @@ pub async fn create_or_refresh_connection(
     Ok(view)
 }
 
+/// The calendars of the account `grant` reaches, listed with the grant's
+/// own access token, and their `calendar-list` document stored as a blob
+/// (before the transaction that references it). A provider that cannot be
+/// asked now (trouble, or its calendar API is not enabled for this
+/// instance) lists none, and the stream lists them again when it runs: mail
+/// is never held back by it.
+async fn list_calendars(
+    state: &AppState,
+    deps: &Deps,
+    grant: &ProviderGrant,
+) -> Result<CalendarGrant> {
+    let mut reason = None;
+    let mut listed = Vec::new();
+    if let Secret::Tokens(tokens) = &grant.secret {
+        let answer = match grant.provider {
+            Provider::Google => match &deps.google {
+                Some(google) => {
+                    let api = google.calendar(&tokens.access_token);
+                    Some(calendar::google::list(&api).await)
+                }
+                None => None,
+            },
+            Provider::Zoho => {
+                let centre = deps
+                    .zoho
+                    .as_ref()
+                    .zip(grant.provider_server.as_deref())
+                    .and_then(|(zoho, server)| zoho.centre(server).map(|c| (zoho, c)));
+                match centre {
+                    Some((zoho, centre)) if deps.config.zoho_calendar => {
+                        let api = zoho.calendar(&centre, &tokens.access_token);
+                        Some(calendar::zoho::list(&api).await)
+                    }
+                    _ => None,
+                }
+            }
+            Provider::Imap => None,
+        };
+        match answer {
+            Some(Ok(calendars)) => listed = calendars,
+            Some(Err(CalendarError::ApiNotEnabled)) => reason = Some(API_NOT_ENABLED),
+            Some(Err(_)) | None => {}
+        }
+    }
+    let document = ListDocument {
+        version: 1,
+        provider: match grant.provider {
+            Provider::Google => Some("google"),
+            Provider::Zoho => Some("zoho"),
+            Provider::Imap => None,
+        },
+        calendars: listed.clone(),
+    };
+    let blob = state
+        .blobs
+        .put(
+            &grant.workspace.to_string(),
+            serde_json::to_vec(&document).map_err(Error::internal)?,
+            LIST_CONTENT_TYPE,
+        )
+        .await?;
+    Ok(CalendarGrant {
+        listed,
+        blob,
+        reason,
+    })
+}
+
 /// Create or extend the connection, store its credentials, create the
 /// streams of new capabilities and start them. Returns the connection.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction read top to bottom: connection, credentials, streams, events"
+)]
 async fn save(
     tx: &mut Transaction<'static, Postgres>,
     state: &AppState,
@@ -241,6 +334,17 @@ async fn save(
             )
             .await?;
     }
+    if let Some(calendars) = &g.calendars {
+        state
+            .blobs
+            .attach(
+                tx,
+                &workspace_key,
+                &calendars.blob,
+                &BlobOwner::new(CONNECTION_OWNER, id),
+            )
+            .await?;
+    }
     state
         .events
         .publish(
@@ -303,6 +407,10 @@ async fn existing(
 /// Resume a reconnected connection's paused streams, and create, announce
 /// and start the streams it did not have: one per new capability, and for
 /// `messages` one per mailbox (a refreshed grant can reach a new one).
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction read top to bottom: resume, create, announce, start"
+)]
 async fn start_streams(
     tx: &mut Transaction<'static, Postgres>,
     state: &AppState,
@@ -325,6 +433,15 @@ async fn start_streams(
     for stream in resumed {
         schedule::run_now(tx, g.grant.workspace, stream, g.now).await?;
     }
+    // A reconnect gives a calendar stream another chance: whatever kept it
+    // from working (the calendar API not enabled) is tried again.
+    sqlx::query(
+        "UPDATE connectors.streams SET health_reason = NULL
+          WHERE connection_id = $1 AND capability = 'calendar'",
+    )
+    .bind(id)
+    .execute(&mut **tx)
+    .await?;
     let min_interval = i32::try_from(deps.config.poll.min_seconds).unwrap_or(i32::MAX);
     for &capability in &g.grant.capabilities {
         // `messages` reads each mailbox; other capabilities are one stream
@@ -366,9 +483,25 @@ async fn start_streams(
             )
             .fetch_optional(&mut **tx)
             .await?;
-            if created.is_none() {
+            let Some(created) = created else {
                 continue;
-            }
+            };
+            let calendars = match (&g.calendars, capability) {
+                (Some(grant), Capability::Calendar) => {
+                    calendar::remember(tx, g.grant.workspace, created, &grant.listed).await?;
+                    if let Some(reason) = grant.reason {
+                        sqlx::query(
+                            "UPDATE connectors.streams SET health_reason = $2 WHERE id = $1",
+                        )
+                        .bind(created)
+                        .bind(reason)
+                        .execute(&mut **tx)
+                        .await?;
+                    }
+                    Some(grant.blob.clone())
+                }
+                _ => None,
+            };
             // The inbox is announced before any batch can name it: the first
             // run cannot commit before this transaction does.
             state
@@ -382,6 +515,7 @@ async fn start_streams(
                         granted_by: g.grant.user,
                         inbox_id: inbox,
                         account: account.clone(),
+                        calendars,
                     },
                 )
                 .await?;

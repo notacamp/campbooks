@@ -7,6 +7,13 @@ use campbooks_kernel::{
 use futures_util::StreamExt as _;
 use serde::de::DeserializeOwned;
 
+/// The record type that holds a `calendar-ref` blob (a provider calendar).
+pub const CALENDAR_REF_OWNER: &str = "schedule.calendar_ref";
+
+/// The media type of a `calendar-ref` v1 document.
+pub const CALENDAR_REF_CONTENT_TYPE: &str =
+    "application/vnd.campbooks.calendar-ref+json; version=1";
+
 /// Most bytes of a document read.
 pub const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
 

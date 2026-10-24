@@ -117,3 +117,58 @@ applied.
 #### Scenario: After a write
 - **WHEN** a member's create has been written to Google and the stream runs again
 - **THEN** no `calendar_changed` batch carries that event unless Google changed it since
+
+### Requirement: The consent asks for what the connection has
+A consent that adds the `calendar` capability to a connection, or connects
+one with it, SHALL ask the provider for the calendar scopes besides the
+mailbox's, and a reconnect of a connection SHALL ask again for the scopes of
+every capability that connection has, so the new grant loses none. A member
+who leaves a calendar scope out at the provider's consent still connects their
+mailbox: the connection then gains only the capabilities whose scopes were
+granted.
+
+#### Scenario: Adding calendar to a Google connection
+- **WHEN** Inês asks for calendar access on her Google connection
+- **THEN** the consent asks for the mailbox scope and the two calendar scopes, and the connection gains `calendar` when all are granted
+
+#### Scenario: Reconnecting after the grant stopped working
+- **WHEN** Inês reconnects a Google connection that has `calendar`
+- **THEN** the consent asks for the calendar scopes again, so the connection keeps its calendar
+
+#### Scenario: A calendar scope left out
+- **WHEN** Inês grants the mailbox scope and one of the two calendar scopes
+- **THEN** the connection gains `messages` only
+
+### Requirement: Calendars are read when the member turns them on
+The module SHALL consume `schedule.calendar_sync_changed` v1 and read a
+provider calendar only while the member has it on. A calendar turned on again
+SHALL be read from the start (its sync token is dropped); one turned off SHALL
+not be read. Which calendar of the provider the event is about SHALL travel in
+a `calendar-ref` v1 blob, since the provider's id can be an address and never
+travels in an event. Deliveries can arrive in any order and more than once:
+the newest event a calendar heard SHALL win, and an older or repeated one
+SHALL change nothing.
+
+#### Scenario: Turning a calendar on
+- **WHEN** Inês turns on her "Holidays" calendar
+- **THEN** its next read is a full one, and a batch for it is announced
+
+#### Scenario: Turning a calendar off
+- **WHEN** Inês turns it off again
+- **THEN** the stream stops reading it
+
+#### Scenario: Off and on, delivered out of order
+- **WHEN** Inês turns "Holidays" off and straight back on, and the "on" is delivered first
+- **THEN** the late "off" changes nothing, and the calendar is read from the start
+
+### Requirement: A calendar stream says why it does not work
+A calendar stream that cannot work SHALL carry a stable reason a member or an
+operator can act on (`calendar_api_not_enabled`, `provider_errors`), shown on
+the connection's stream, and SHALL leave the connection's health and its mail
+streams as they are. Throttling and failures on the calendar stream SHALL slow
+that stream only; a refused token or grant, which the mailbox shares, SHALL
+follow the connection's rules. A reconnect clears the reason.
+
+#### Scenario: Failures in a row
+- **WHEN** the calendar stream fails as many times in a row as the connection's mail would take to be marked failing
+- **THEN** the stream's reason is `provider_errors` and the connection's health stays `ok`

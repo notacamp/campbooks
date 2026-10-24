@@ -35,7 +35,7 @@ impl ConsentDoor for FrontDoor {
             } else {
                 LinkPurpose::Connect
             };
-            let started = start_link::execute(
+            let started = start_link::execute_asking(
                 state,
                 &self.deps,
                 &request.principal,
@@ -49,6 +49,7 @@ impl ConsentDoor for FrontDoor {
                     // way in. The Mailboxes screen asks first.
                     sign_in: None,
                 },
+                &request.capabilities,
             )
             .await?;
             Ok(StartedConsent {

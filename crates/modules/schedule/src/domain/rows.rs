@@ -24,11 +24,12 @@ pub struct CalendarRow {
     pub syncing: bool,
     pub writable: bool,
     pub is_primary: bool,
+    pub provider: Option<String>,
 }
 
 /// The columns of [`CalendarRow`], for `SELECT`.
 pub const CALENDAR_COLUMNS: &str = "id, member_id, source, connection_id, provider_calendar_id, \
-     name, color, time_zone, syncing, writable, is_primary";
+     name, color, time_zone, syncing, writable, is_primary, provider";
 
 impl CalendarRow {
     /// Whether it is the member's Campbooks calendar.

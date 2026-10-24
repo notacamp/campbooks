@@ -1,0 +1,1 @@
+- **Reconnecting an account keeps what it could do** (Settings). When you reconnect a mailbox that also has calendar access, the new consent asks for the calendar permission again, so the connection does not quietly lose it.

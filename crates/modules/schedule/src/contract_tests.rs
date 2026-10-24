@@ -143,6 +143,7 @@ fn an_outbound_request_follows_its_contract_and_carries_no_provider_id() {
 fn the_calendar_list_of_a_grant() {
     let list = json!({
         "version": 1,
+        "provider": "google",
         "calendars": [
             {"provider_id": "ines@example.com", "name": "Inês", "color": "#0b8043",
              "time_zone": "Europe/Lisbon", "primary": true, "writable": true},
@@ -154,6 +155,10 @@ fn the_calendar_list_of_a_grant() {
     let mut bad = list;
     bad["calendars"][0]["color"] = json!("green");
     assert!(!accepts("calendar-list.v1.schema.json", &bad));
+    let mut other = json!({"version": 1, "provider": "icloud", "calendars": []});
+    assert!(!accepts("calendar-list.v1.schema.json", &other));
+    other["provider"] = json!("zoho");
+    assert!(accepts("calendar-list.v1.schema.json", &other));
 }
 
 #[test]
@@ -375,11 +380,32 @@ fn the_calendar_sync_event_follows_its_contract() {
         calendar: CalendarId::new(),
         connection: ConnectionId::new(),
         syncing: true,
+        provider_calendar: Some(BlobRef {
+            hash: BlobHash::of(b"a calendar reference"),
+            size: 20,
+            content_type: "application/vnd.campbooks.calendar-ref+json; version=1".into(),
+        }),
     };
     let value = serde_json::to_value(&event).unwrap();
     assert!(accepts(
         "schedule.calendar_sync_changed.v1.schema.json",
         &value
+    ));
+    // The reference is optional.
+    let mut bare = value.clone();
+    bare.as_object_mut().unwrap().remove("provider_calendar");
+    assert!(accepts(
+        "schedule.calendar_sync_changed.v1.schema.json",
+        &bare
+    ));
+    // The reference document names the calendar once, and nothing else.
+    assert!(accepts(
+        "calendar-ref.v1.schema.json",
+        &json!({"version": 1, "provider_calendar_id": "ines@example.com"})
+    ));
+    assert!(!accepts(
+        "calendar-ref.v1.schema.json",
+        &json!({"version": 1, "provider_calendar_id": "ines@example.com", "name": "Ines"})
     ));
     assert_eq!(CalendarSyncChanged::NAME, "schedule.calendar_sync_changed");
     let mut named = value;

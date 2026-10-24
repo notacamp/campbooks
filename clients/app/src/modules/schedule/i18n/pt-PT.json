@@ -63,6 +63,7 @@
     "inZone": "{{time}}, hora de {{city}}",
     "onlyYou": "Só você o vê até o adicionar a um calendário",
     "synced": "Sincronizado nos dois sentidos",
+    "syncedWith": "Sincronizado nos dois sentidos com {{provider}}",
     "source": {
       "label": "De um email",
       "meta": "{{sender}} · {{when}}",

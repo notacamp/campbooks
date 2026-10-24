@@ -7,6 +7,7 @@
     "invalid_hours": "Working hours need a known weekday (mon to sun), times as HH:MM, and an end after the start.",
     "invalid_kind": "That is not a kind of event Scout can add. Choose from charge, appointment, meeting, travel, stay, show, reservation, delivery or expiry.",
     "invalid_minutes": "Ask for a slot of 5 to 1,440 minutes.",
+    "invalid_source": "That email cannot be the source: name an email you can read as conversations.message, with its conversation.",
     "invalid_text": "A title is needed, and the title, place and notes must not be too long.",
     "invalid_time_zone": "Use an IANA time zone name, such as Europe/Lisbon.",
     "invalid_undo": "That undo does not match this deleted event.",

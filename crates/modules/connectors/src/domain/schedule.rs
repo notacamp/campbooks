@@ -184,6 +184,11 @@ pub fn connection_budget(connection: ConnectionId) -> String {
     format!("zoho:{connection}")
 }
 
+/// The budget key of one connection's calendar requests.
+pub fn calendar_budget(connection: ConnectionId) -> String {
+    format!("calendar:{connection}")
+}
+
 /// What a budget refills by and holds.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rate {

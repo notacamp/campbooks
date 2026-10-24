@@ -95,6 +95,7 @@ pub(super) async fn start(
         code_verifier: campbooks_kernel::crypto::random_token(),
         consent_retry: false,
         adds_way_in: ticket.adds_way_in,
+        capabilities: ticket.capabilities,
     };
     redirect_to_provider(
         ctx,

@@ -4,6 +4,7 @@
 import type { Schema } from "~/lib/api";
 
 import { MARTA, PEDRO } from "./attention";
+import { CALENDARS, DENTIST, HANDOVER, REVIEW } from "./schedule";
 import { BILL, LEASE, PROPOSAL } from "./tasks";
 import { RUI } from "./workspaces";
 import { BUILDS_NOTICE, LEDGER_RULE } from "./conversations";
@@ -408,6 +409,137 @@ export function chatWithTaskProposals(
         created_at: "2026-10-13T14:59:30Z",
       },
       { ...TASKS_ANSWER, proposals: [...proposals] },
+    ],
+  };
+}
+
+// Scout proposes calendar changes (campbooks-cloud#42): Sam asks to move the
+// dentist, answer an invitation and put the lease handover on the Google
+// calendar; Scout proposes each as a card that names the event from its
+// record, with the request and the undo the server writes for it.
+
+export const CALENDAR_SAID =
+  "Move the dentist to Thursday at 10:00, accept the design review and put the key handover on my Google calendar.";
+
+const MOVED_START = "2026-10-29T10:00:00+00:00";
+const MOVED_END = "2026-10-29T10:45:00+00:00";
+const PERSONAL = CALENDARS.find((calendar) => calendar.name === "Personal");
+const WORK = CALENDARS.find((calendar) => calendar.name === "Work");
+
+const eventPath = (event: { id: string }, tail = "") => `schedule/events/${event.id}${tail}`;
+
+const eventFacts = (
+  event: { title: string; starts: string; all_day: boolean },
+  calendar: string | undefined,
+) => ({
+  title: event.title,
+  starts: event.starts,
+  all_day: event.all_day,
+  ...(calendar === undefined ? {} : { calendar }),
+});
+
+/** Move the dentist: the undo is the same edit with the values it had. */
+const MOVE_PROPOSAL: Proposal = {
+  id: "0192f1a0-0000-7000-8000-000000004061",
+  kind: "change",
+  state: "pending",
+  action: "update_event",
+  record: { type: "schedule.event", id: DENTIST.id },
+  event: eventFacts(DENTIST, "Campbooks"),
+  detail: { starts: MOVED_START, ends: MOVED_END },
+  request: {
+    operation: "schedule.update_event",
+    method: "PATCH",
+    path: eventPath(DENTIST),
+    body: { starts: MOVED_START, ends: MOVED_END },
+  },
+  undo: {
+    operation: "schedule.update_event",
+    method: "PATCH",
+    path: eventPath(DENTIST),
+    body: { starts: DENTIST.starts, ends: DENTIST.ends },
+  },
+};
+
+/** Answer the invitation: the undo sends the answer it had. */
+const ACCEPT_PROPOSAL: Proposal = {
+  id: "0192f1a0-0000-7000-8000-000000004062",
+  kind: "change",
+  state: "pending",
+  action: "respond_event",
+  record: { type: "schedule.event", id: REVIEW.id },
+  event: eventFacts(REVIEW, WORK?.name),
+  detail: { response: "accepted" },
+  request: {
+    operation: "schedule.respond_event",
+    method: "POST",
+    path: eventPath(REVIEW, "/response"),
+    body: { response: "accepted" },
+  },
+  undo: {
+    operation: "schedule.respond_event",
+    method: "POST",
+    path: eventPath(REVIEW, "/response"),
+    body: { response: "needs_action" },
+  },
+};
+
+/** Add the handover to a Google calendar: the undo takes it off, by the id the answer names. */
+const PUSH_PROPOSAL: Proposal = {
+  id: "0192f1a0-0000-7000-8000-000000004063",
+  kind: "change",
+  state: "pending",
+  action: "push_event",
+  record: { type: "schedule.event", id: HANDOVER.id },
+  event: eventFacts(HANDOVER, "Campbooks"),
+  detail: { calendar_name: PERSONAL?.name ?? "Personal" },
+  request: {
+    operation: "schedule.push_event",
+    method: "POST",
+    path: eventPath(HANDOVER, "/push"),
+    body: { calendar_id: PERSONAL?.id ?? "" },
+  },
+  undo: {
+    operation: "schedule.unpush_event",
+    method: "DELETE",
+    path: "schedule/events/{event_id}/push",
+    body: null,
+    from_response: ["@event_id:id"],
+  },
+};
+
+/** Scout's answer to {@link CALENDAR_SAID}, with its three event cards. */
+export const CALENDAR_ANSWER: Message = {
+  id: "0192f1a0-0000-7000-8000-000000004052",
+  author: "scout",
+  text:
+    "I proposed moving the dentist to Thursday, accepting the design review and adding " +
+    "the key handover to your Google calendar. Nothing changes until you confirm each card.",
+  steps: [],
+  finish: "done",
+  proposals: [MOVE_PROPOSAL, ACCEPT_PROPOSAL, PUSH_PROPOSAL],
+  created_at: "2026-10-13T14:59:40Z",
+};
+
+/** The chat once {@link CALENDAR_SAID} was answered, its cards in `proposals`' states. */
+export function chatWithCalendarProposals(
+  proposals: readonly Proposal[] = CALENDAR_ANSWER.proposals,
+): Chat {
+  return {
+    ...MARTA_CHAT,
+    questions: 1,
+    last_message_at: CALENDAR_ANSWER.created_at,
+    messages: [
+      {
+        id: "0192f1a0-0000-7000-8000-000000004051",
+        author: "member",
+        text: CALENDAR_SAID,
+        steps: [],
+        finish: null,
+        proposals: [],
+        created_at: "2026-10-13T14:59:30Z",
+      },
+      { ...CALENDAR_ANSWER, proposals: [...proposals] },
     ],
   };
 }
