@@ -14,10 +14,7 @@ use sqlx::PgPool;
 
 use crate::{
     admin_testkit::AdminKit,
-    passkey_tests::{
-        add_passkey, device, redeem, screen, sign_in_with_passkey, sign_up_with_passkey,
-        waiting_request,
-    },
+    passkey_tests::{add_passkey, device, redeem, screen, sign_up_with_passkey, waiting_request},
     testkit::{Kit, MAIL_SCOPE, query},
     upstream::Provider,
     ways_in_tests::{link_to, user},
@@ -300,14 +297,15 @@ async fn passkeys_are_tracked_from_sign_up_to_removal(db: PgPool) {
     );
     assert!(!renamed[0].body.to_string().contains("laptop"));
 
-    // Signing in with it, and a counter that goes backwards.
+    // Signing in with it (this browser, no waiting request), and a counter
+    // that goes backwards.
     device.passkeys[0].count = 9;
-    let (request, _) = waiting_request(&kit).await;
-    let first = sign_in_with_passkey(&kit, &mut device, 0, &request).await;
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let first = screen(&kit, "/auth/passkey/sign-in", &device.get(&options.json, 0)).await;
     assert_eq!(first.status, StatusCode::OK, "{first:?}");
     device.passkeys[0].count = 9;
-    let (request, _) = waiting_request(&kit).await;
-    let clone = sign_in_with_passkey(&kit, &mut device, 0, &request).await;
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let clone = screen(&kit, "/auth/passkey/sign-in", &device.get(&options.json, 0)).await;
     assert_eq!(clone.status, StatusCode::OK, "{clone:?}");
     let signed_in = tracked(&kit, "identity.sign_in_succeeded").await;
     assert_eq!(signed_in.len(), 3);
