@@ -4,6 +4,8 @@
 //! twice, the limits, a server that is busy, refuses or never stops
 //! talking, and the copy in Sent appended (or not) without echo.
 
+use std::{sync::Arc, time::Duration};
+
 use axum::http::StatusCode;
 use campbooks_kernel::{
     clock::Clock as _,
@@ -33,7 +35,7 @@ struct Mailbox {
     ws: WorkspaceId,
     inbox: InboxId,
     _ana: Caller,
-    _fakes: Fakes,
+    fakes: Fakes,
 }
 
 /// Ana's mailbox: an IMAP server (TLS, a `\Sent` folder, `imap` its
@@ -47,14 +49,25 @@ async fn mailbox(
     imap: impl FnOnce(&mut Script),
     smtp: impl FnOnce(&mut Script),
 ) -> Mailbox {
+    signed_in_as(db, "ana@bakery.example", adapter, security, imap, smtp).await
+}
+
+/// [`mailbox`], signing in as `username` (its address stays
+/// `ana@bakery.example`).
+async fn signed_in_as(
+    db: PgPool,
+    username: &str,
+    adapter: impl FnOnce(&mut Imap),
+    security: Security,
+    imap: impl FnOnce(&mut Script),
+    smtp: impl FnOnce(&mut Script),
+) -> Mailbox {
     let (kit, fakes) = testkit_imap::kit_with_adapter(db, adapter).await;
     let ws = WorkspaceId::new();
     let ana = kit.user_signed_in("ana", 5);
     kit.join(&ana, ws, Role::Member);
-    let imap_server =
-        FakeServer::imap(Security::Tls, Script::accepting("ana@bakery.example", "pw")).await;
-    let smtp_server =
-        FakeServer::smtp(security, Script::accepting("ana@bakery.example", "pw")).await;
+    let imap_server = FakeServer::imap(Security::Tls, Script::accepting(username, "pw")).await;
+    let smtp_server = FakeServer::smtp(security, Script::accepting(username, "pw")).await;
     fakes.resolver.name(IMAP_HOST, &["127.0.0.1"]);
     fakes.resolver.name(SMTP_HOST, &["127.0.0.1"]);
     imap_server.mailbox(|store| store.add_folder("Sent", &["\\Sent"]));
@@ -67,7 +80,12 @@ async fn mailbox(
         .post(
             &ana,
             &format!("/api/v1/w/{ws}/connections/imap"),
-            json!({"address": "ana@bakery.example", "password": "pw", "servers": servers}),
+            json!({
+                "address": "ana@bakery.example",
+                "username": username,
+                "password": "pw",
+                "servers": servers,
+            }),
         )
         .await;
     assert_eq!(
@@ -88,7 +106,7 @@ async fn mailbox(
         ws,
         inbox,
         _ana: ana,
-        _fakes: fakes,
+        fakes,
     }
 }
 
@@ -871,4 +889,212 @@ async fn sent_copies_are_isolated_by_workspace(db: PgPool) {
         .unwrap();
     assert_eq!(none, 0);
     tx.rollback().await.unwrap();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_unverified_address_cannot_send(db: PgPool) {
+    // Signed in as `ana`: the login proves the username, not the address.
+    let m = signed_in_as(db, "ana", |_| {}, Security::Starttls, |_| {}, |_| {}).await;
+    let verified: bool = sqlx::query_scalar("SELECT address_verified FROM connectors.connections")
+        .fetch_one(&m.kit.db)
+        .await
+        .unwrap();
+    assert!(!verified);
+    let before = m.smtp.seen().connections;
+    m.send(|_| {}).await;
+    m.settle().await;
+
+    assert_eq!(
+        m.outcome().await,
+        ("failed".to_owned(), Some("rejected".to_owned()))
+    );
+    assert_eq!(
+        m.smtp.seen().connections,
+        before,
+        "nothing reached the SMTP server"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn one_workspace_takes_at_most_half_of_a_small_host(db: PgPool) {
+    let m = mailbox(
+        db,
+        |imap| imap.config.send_host_per_hour = 2,
+        Security::Starttls,
+        |_| {},
+        |_| {},
+    )
+    .await;
+    m.send(|_| {}).await;
+    m.send(|d| d.subject = "Re: Order, again".into()).await;
+    m.kit.run_jobs().await;
+
+    // The workspace's share of the host (1 an hour) went on the first.
+    let done = m.completed().await;
+    assert_eq!(done.len(), 1, "{done:?}");
+    let seen = m.smtp.seen();
+    assert_eq!((seen.datas, seen.delivered.len()), (1, 1));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_refused_recipient_still_costs_its_budget(db: PgPool) {
+    let m = mailbox(
+        db,
+        |imap| imap.config.send_per_hour = 1,
+        Security::Starttls,
+        |_| {},
+        |smtp| smtp.smtp.refuse_rcpt = Some("nobody@example.com".into()),
+    )
+    .await;
+    m.send(|d| d.to = vec![person(None, "nobody@example.com")])
+        .await;
+    m.kit.run_jobs().await;
+    m.send(|_| {}).await;
+    m.kit.run_jobs().await;
+
+    // The refused try spent the hour: the next send waits.
+    let done = m.completed().await;
+    assert_eq!(done.len(), 1, "{done:?}");
+    assert_eq!(done[0]["reason"], "rejected");
+    assert_eq!(m.smtp.seen().datas, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn losing_the_claim_after_data_ends_nothing_and_says_nothing(db: PgPool) {
+    let arrived = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let gate = (arrived.clone(), release.clone());
+    let m = usual(db, move |smtp| smtp.smtp.hold_data = Some(gate)).await;
+    let send = m.send(|_| {}).await;
+    let db = m.kit.db.clone();
+    tokio::join!(m.kit.run_jobs(), async {
+        arrived.notified().await;
+        // Another runner claims the attempt while this one waits for 354.
+        sqlx::query("UPDATE connectors.sends SET attempted_at = now() WHERE id = $1")
+            .bind(send)
+            .execute(&db)
+            .await
+            .unwrap();
+        release.notify_one();
+    });
+
+    // The connection was dropped mid-DATA: no end of data, no QUIT inside
+    // it, nothing delivered.
+    let mut seen = m.smtp.seen();
+    for _ in 0..100 {
+        if !seen.unfinished.is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        seen = m.smtp.seen();
+    }
+    assert_eq!(seen.datas, 1);
+    assert!(seen.received.is_empty() && seen.delivered.is_empty());
+    assert_eq!(seen.unfinished, [Vec::<u8>::new()]);
+    assert!(
+        m.completed().await.is_empty(),
+        "nothing settled by this runner"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_certificate_for_another_name_is_refused_before_auth(db: PgPool) {
+    let m = mailbox(db, |_| {}, Security::Tls, |_| {}, |_| {}).await;
+    // The server's certificate names smtp.example.com, not this host.
+    m.fakes.resolver.name("smtp.example.net", &["127.0.0.1"]);
+    sqlx::query("UPDATE connectors.imap_servers SET smtp_host = 'smtp.example.net'")
+        .execute(&m.kit.db)
+        .await
+        .unwrap();
+    let before = m.smtp.seen().sign_ins;
+    m.send(|_| {}).await;
+    m.settle().await;
+
+    assert_eq!(
+        m.outcome().await,
+        ("failed".to_owned(), Some("unavailable".to_owned()))
+    );
+    let seen = m.smtp.seen();
+    assert_eq!(seen.sign_ins, before, "no AUTH");
+    assert!(!seen.password_in_clear && seen.mail_froms.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_copy_that_will_not_go_never_holds_up_inbound_mail(db: PgPool) {
+    let m = mailbox(
+        db,
+        |_| {},
+        Security::Starttls,
+        |imap| imap.offers.append_drop = true,
+        |_| {},
+    )
+    .await;
+    let send = m.send(|_| {}).await;
+    m.settle().await;
+    // New mail arrives meanwhile.
+    m.imap.deliver(
+        "INBOX",
+        b"From: Bea <bea@example.com>\r\nTo: Ana <ana@bakery.example>\r\n\
+          Subject: Thanks\r\nDate: Mon, 5 Oct 2026 12:00:00 +0000\r\n\
+          Message-ID: <thanks@example.com>\r\n\r\nSee you Friday.\r\n",
+        m.kit.clock.now(),
+    );
+
+    m.run().await;
+    let read = m
+        .changes()
+        .await
+        .iter()
+        .any(|c| c["message"]["subject"] == "Thanks");
+    assert!(read, "the new mail was read");
+    let attempts: i32 =
+        sqlx::query_scalar("SELECT sent_copy_attempts FROM connectors.sends WHERE id = $1")
+            .bind(send)
+            .fetch_one(&m.kit.db)
+            .await
+            .unwrap();
+    assert_eq!(m.copy(send).await, (Some("pending".to_owned()), None));
+    assert_eq!(attempts, 1);
+    assert_eq!(m.health().await, "ok");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_sent_folder_that_will_not_open_gets_no_copy(db: PgPool) {
+    let m = usual(db, |_| {}).await;
+    let send = m.send(|_| {}).await;
+    m.settle().await;
+    m.imap
+        .mailbox(|store| store.refuse_open.push("Sent".to_owned()));
+
+    m.run().await;
+    // Whether a copy is there cannot be told: none is appended.
+    assert_eq!(m.imap.seen().count("APPEND"), 0);
+    assert_eq!(m.copy(send).await, (Some("pending".to_owned()), None));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_run_appends_within_its_byte_budget(db: PgPool) {
+    let m = mailbox(
+        db,
+        |imap| imap.config.run_budget_bytes = 1,
+        Security::Starttls,
+        |imap| imap.offers.uidplus = true,
+        |_| {},
+    )
+    .await;
+    let first = m.send(|_| {}).await;
+    let second = m.send(|d| d.subject = "Re: Order, again".into()).await;
+    m.settle().await;
+
+    m.run().await;
+    let ends = (m.copy(first).await.0, m.copy(second).await.0);
+    let appended = |end: &Option<String>| end.as_deref() == Some("appended");
+    assert!(
+        appended(&ends.0) ^ appended(&ends.1),
+        "one copy this run: {ends:?}"
+    );
+    m.run().await;
+    assert_eq!(m.copy(first).await.0.as_deref(), Some("appended"));
+    assert_eq!(m.copy(second).await.0.as_deref(), Some("appended"));
+    assert_eq!(m.imap.seen().count("APPEND"), 2);
 }

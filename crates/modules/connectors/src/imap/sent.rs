@@ -1,39 +1,52 @@
 //! The copies, in the mailbox's Sent folder, of messages Campbooks sent
 //! through its SMTP server (campbooks-cloud#313): made by the stream's run,
-//! over its session, after the write-backs and before the read, so the
-//! read finds each copy where it was recorded and announces nothing.
+//! over its session, once the read is done, so a copy that will not go never
+//! holds up inbound mail.
 //!
 //! For each copy still to be made (`connectors.sends.sent_copy = 'pending'`,
-//! the oldest first): the Sent folder (SPECIAL-USE `\Sent`, else the folder
-//! the reader found by name); the server's `APPENDLIMIT` and the adapter's
-//! largest message; a look in Sent for its `Message-ID` (a server that keeps
-//! a copy itself must not get a second); then `APPEND … (\Seen) {n}`, a
+//! the oldest first, within the run's byte budget): the Sent folder
+//! (SPECIAL-USE `\Sent`, else the folder the reader found by name); the
+//! server's `APPENDLIMIT` and the adapter's largest message; a look in Sent
+//! for its `Message-ID` (a server that keeps a copy itself, or an earlier
+//! `APPEND` cut short, must not leave a second; a Sent folder that cannot be
+//! looked in gets nothing appended); then `APPEND … (\Seen) {n}`, a
 //! synchronising literal through the session's bounded framer. With UIDPLUS,
-//! `APPENDUID` says where the copy went. Nothing here touches the send: it
-//! was sent. Logs carry ids, codes and counts only.
+//! `APPENDUID` says where the copy went. Each copy's end is recorded as it
+//! ends, in a transaction of its own, so a run cut short loses none. Nothing
+//! here touches the send: it was sent. Logs carry ids, codes and counts only.
 
 use std::time::Duration;
 
 use campbooks_kernel::{
-    blobs::{BlobRef, BlobStore},
+    blobs::{BlobOwner, BlobRef, BlobStore},
+    db::BeginFor as _,
     tenancy::WorkspaceId,
 };
 use futures_util::StreamExt as _;
+use sqlx::PgPool;
 
 use super::{
     folders::Role,
     session::{Limits, Session, logged_code, quoted},
-    state::{Cursor, Location, Place},
+    state::{self, Cursor, Location, LocationOp, Place},
     syntax::{Code, Untagged},
     write::Trouble,
 };
-use crate::{config::ImapConfig, domain::model::SendId};
+use crate::{
+    config::ImapConfig,
+    domain::{
+        health,
+        model::{ConnectionId, SendId, StreamId},
+        removal::SENT_COPY_OWNER,
+    },
+    mail::ReadError,
+};
 
 /// Most copies one run makes.
 pub const COPIES_PER_RUN: i64 = 10;
 
-/// Runs a copy may meet trouble in (busy, a cut session) before it is given
-/// up.
+/// Runs a copy may meet trouble in (busy, a cut session, a Sent folder that
+/// will not open) before it is given up.
 pub const MAX_ATTEMPTS: i32 = 3;
 
 /// Most UIDs a look for a copy reads.
@@ -63,7 +76,8 @@ pub enum End {
     /// Appended; where, when the server said (`APPENDUID`) and the place
     /// can be trusted.
     Appended(Option<(Place, Location)>),
-    /// Already in Sent: the server keeps its own copy.
+    /// Already in Sent: the server keeps its own copy, or an earlier
+    /// `APPEND` went through.
     Found,
     /// Not to be made (a stable code): no Sent folder, too large, a folder
     /// name no command can carry.
@@ -80,9 +94,9 @@ pub enum End {
 /// What a run did with its copies.
 #[derive(Debug, Default)]
 pub struct Copied {
-    /// How each ended, in order.
-    pub ends: Vec<(Pending, End)>,
-    /// What stopped it, if anything did: the run stops too.
+    /// Copies appended.
+    pub appended: usize,
+    /// What stopped it, if anything did (the read was already done).
     pub trouble: Option<Trouble>,
 }
 
@@ -90,14 +104,31 @@ pub struct Copied {
 pub struct Appender<'a> {
     /// The run's signed-in session.
     pub session: &'a mut Session,
+    /// The pool (runtime role), for recording each copy's end.
+    pub pool: &'a PgPool,
     /// The blob store (the bytes to append).
     pub blobs: &'a BlobStore,
     /// The workspace.
     pub workspace: WorkspaceId,
-    /// The stream's cursor (its folders).
+    /// The stream's connection (locked first, removal's order).
+    pub connection: ConnectionId,
+    /// The stream.
+    pub stream: StreamId,
+    /// The stream's cursor (its folders), as the read left it.
     pub cursor: &'a Cursor,
     /// The adapter's settings.
     pub config: &'a ImapConfig,
+}
+
+/// What looking in Sent found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Look {
+    /// A message with the `Message-ID` is there.
+    Found,
+    /// None is.
+    Absent,
+    /// Sent could not be looked in: nothing may be appended.
+    Unknown,
 }
 
 /// What the server offers that copying reads.
@@ -169,34 +200,49 @@ impl Appender<'_> {
         }
     }
 
-    /// Make `pending`'s copies. Errors never: what the server did, and its
-    /// trouble, is in the result.
-    pub async fn append(mut self, pending: Vec<Pending>) -> Copied {
+    /// Make `pending`'s copies, recording each as it ends, and fail the
+    /// copies in `broken` (whose bytes cannot be read back). Errors are the
+    /// database's only: what the server did, and its trouble, is recorded.
+    pub async fn append(
+        mut self,
+        pending: Vec<Pending>,
+        broken: &[SendId],
+    ) -> Result<Copied, ReadError> {
         let mut copied = Copied::default();
+        for send in broken {
+            self.record(*send, "", &End::Failed("copy_unreadable"), 0)
+                .await?;
+        }
         if pending.is_empty() {
-            return copied;
+            return Ok(copied);
         }
         let small = self.small();
         let caps = match self.session.capabilities(small).await {
             Ok(capabilities) => Caps::of(&capabilities),
-            Err(err) => return later(pending, Trouble::Wire(err)),
+            // A session the read left unusable: every copy waits, uncounted.
+            Err(err) => {
+                copied.trouble = Some(Trouble::Wire(err));
+                return Ok(copied);
+            }
         };
         let Some(sent) = self.cursor.folder_of(Role::Sent).cloned() else {
-            // Not listed yet (the first run): later. Listed, none: skipped.
-            let end = if self.cursor.folders.is_empty() {
-                End::Later { counted: false }
-            } else {
-                End::Skipped("no_sent_folder")
-            };
-            copied.ends = pending.into_iter().map(|p| (p, end.clone())).collect();
-            return copied;
+            // Not listed yet: later. Listed, none: skipped.
+            if !self.cursor.folders.is_empty() {
+                for copy in &pending {
+                    let end = End::Skipped("no_sent_folder");
+                    self.record(copy.send, &copy.key, &end, copy.attempts)
+                        .await?;
+                }
+            }
+            return Ok(copied);
         };
         let Some(name) = quoted(&sent.name) else {
-            copied.ends = pending
-                .into_iter()
-                .map(|p| (p, End::Skipped("folder_name_refused")))
-                .collect();
-            return copied;
+            for copy in &pending {
+                let end = End::Skipped("folder_name_refused");
+                self.record(copy.send, &copy.key, &end, copy.attempts)
+                    .await?;
+            }
+            return Ok(copied);
         };
         let largest = caps
             .append_limit
@@ -204,51 +250,30 @@ impl Appender<'_> {
             .min(self.config.max_message_bytes);
         // Whether Sent is open (read-only) for looking: `None` before trying.
         let mut examined: Option<bool> = None;
-        let mut rest = pending.into_iter();
-        for copy in rest.by_ref() {
-            if copy.raw.size > largest {
-                copied.ends.push((copy, End::Skipped("too_large")));
-                continue;
+        let mut sent_bytes: u64 = 0;
+        for copy in pending {
+            // Within the run's byte budget, after one copy at least.
+            if copied.appended > 0 && sent_bytes >= self.config.run_budget_bytes {
+                break;
             }
-            let Some(bytes) = self.bytes(&copy.raw, largest).await else {
-                copied.ends.push((copy, End::Failed("copy_unreadable")));
-                continue;
+            let end = self.copy(&copy, &sent, &name, largest, &mut examined).await;
+            let end = match end {
+                Ok(end) => end,
+                Err(trouble) => {
+                    copied.trouble = Some(trouble);
+                    End::Later { counted: true }
+                }
             };
-            match self
-                .look(&name, copy.rfc_message_id.as_deref(), &mut examined)
-                .await
-            {
-                Ok(true) => {
-                    copied.ends.push((copy, End::Found));
-                    continue;
-                }
-                Ok(false) => {}
-                Err(trouble) => {
-                    copied.ends.push((copy, End::Later { counted: true }));
-                    copied.trouble = Some(trouble);
-                    break;
-                }
+            if let End::Appended(_) = end {
+                copied.appended += 1;
+                sent_bytes = sent_bytes.saturating_add(copy.raw.size);
             }
-            match self.append_one(&name, &bytes).await {
-                Ok(Ok(code)) => {
-                    let at = appended_at(code.as_ref(), &sent.name, sent.uidvalidity, &copy.key);
-                    copied.ends.push((copy, End::Appended(at)));
-                }
-                Ok(Err(code)) => {
-                    tracing::info!(code, "the IMAP server refused a sent copy");
-                    copied.ends.push((copy, End::Failed("append_refused")));
-                }
-                Err(trouble) => {
-                    copied.ends.push((copy, End::Later { counted: true }));
-                    copied.trouble = Some(trouble);
-                    break;
-                }
+            self.record(copy.send, &copy.key, &end, copy.attempts)
+                .await?;
+            if copied.trouble.is_some() {
+                break;
             }
         }
-        // What a stop left unmade waits for the next run, uncounted.
-        copied
-            .ends
-            .extend(rest.map(|p| (p, End::Later { counted: false })));
         if copied.trouble.is_none() && examined == Some(true) && caps.unselect {
             // Leave no folder open (`EXAMINE` already expunges nothing).
             match self.session.command("UNSELECT", small, |_| {}).await {
@@ -257,7 +282,119 @@ impl Appender<'_> {
                 Err(err) => copied.trouble = Some(Trouble::Wire(err)),
             }
         }
-        copied
+        Ok(copied)
+    }
+
+    /// Make one copy in Sent (`sent`, its name quoted as `name`), within
+    /// `largest` bytes: how it ended, or the trouble that stopped it.
+    async fn copy(
+        &mut self,
+        copy: &Pending,
+        sent: &state::Folder,
+        name: &str,
+        largest: u64,
+        examined: &mut Option<bool>,
+    ) -> Result<End, Trouble> {
+        if copy.raw.size > largest {
+            return Ok(End::Skipped("too_large"));
+        }
+        let Some(bytes) = self.bytes(&copy.raw, largest).await else {
+            return Ok(End::Failed("copy_unreadable"));
+        };
+        match self
+            .look(name, copy.rfc_message_id.as_deref(), examined)
+            .await?
+        {
+            Look::Found => return Ok(End::Found),
+            // Whether it is there already cannot be told: no second copy.
+            Look::Unknown => return Ok(End::Later { counted: true }),
+            Look::Absent => {}
+        }
+        Ok(match self.append_one(name, &bytes).await? {
+            Ok(code) => End::Appended(appended_at(
+                code.as_ref(),
+                &sent.name,
+                sent.uidvalidity,
+                &copy.key,
+            )),
+            Err(code) => {
+                tracing::info!(code, "the IMAP server refused a sent copy");
+                End::Failed("append_refused")
+            }
+        })
+    }
+
+    /// Record, in a transaction of its own, how send `send`'s copy (of the
+    /// message with key `key`) ended: its state, the bytes it held released
+    /// once it is done, and where an appended copy went. A copy that met
+    /// trouble a [`MAX_ATTEMPTS`]th time is given up. Whether it was recorded
+    /// (the copy was still pending).
+    async fn record(
+        &self,
+        send: SendId,
+        key: &str,
+        end: &End,
+        attempts: i32,
+    ) -> Result<bool, ReadError> {
+        let (outcome, reason) = match end {
+            End::Appended(_) => ("appended", None),
+            End::Found => ("found", None),
+            End::Skipped(reason) => ("skipped", Some(*reason)),
+            End::Failed(reason) => ("failed", Some(*reason)),
+            End::Later { counted: false } => return Ok(false),
+            End::Later { counted: true } if attempts + 1 >= MAX_ATTEMPTS => {
+                ("failed", Some("append_gave_up"))
+            }
+            End::Later { counted: true } => ("pending", None),
+        };
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        // The connection before the stream (removal's order).
+        health::lock(&mut tx, self.connection).await?;
+        let recorded = sqlx::query(
+            "UPDATE connectors.sends
+                SET sent_copy = $3, sent_copy_reason = $4,
+                    sent_copy_raw = CASE WHEN $3 = 'pending' THEN sent_copy_raw END,
+                    sent_copy_attempts = sent_copy_attempts
+                        + CASE WHEN $5 THEN 1 ELSE 0 END
+              WHERE id = $1 AND stream_id = $2 AND sent_copy = 'pending'",
+        )
+        .bind(send)
+        .bind(self.stream)
+        .bind(outcome)
+        .bind(reason)
+        .bind(matches!(end, End::Later { counted: true }))
+        .execute(&mut *tx)
+        .await?
+        .rows_affected()
+            > 0;
+        if recorded && outcome != "pending" {
+            self.blobs
+                .detach_owner(
+                    &mut tx,
+                    &self.workspace.to_string(),
+                    &BlobOwner::new(SENT_COPY_OWNER, send),
+                )
+                .await?;
+        }
+        if let (true, End::Appended(Some((place, location)))) = (recorded, end) {
+            // A place recorded for another message keeps it: the read looks.
+            let other: Option<String> = sqlx::query_scalar(
+                "SELECT message_key FROM connectors.imap_locations
+                  WHERE stream_id = $1 AND folder = $2 AND uidvalidity = $3 AND uid = $4",
+            )
+            .bind(self.stream)
+            .bind(&place.folder)
+            .bind(i64::from(place.uidvalidity))
+            .bind(i64::from(place.uid))
+            .fetch_optional(&mut *tx)
+            .await?;
+            if other.is_none_or(|other| other == key) {
+                let put = LocationOp::Put(place.clone(), location.clone());
+                state::apply(&mut tx, self.workspace, self.stream, vec![put]).await?;
+            }
+        }
+        tx.commit().await?;
+        Ok(recorded)
     }
 
     /// The bytes of `blob`, at most `max`; `None` when larger or unreadable.
@@ -281,17 +418,17 @@ impl Appender<'_> {
     }
 
     /// Whether Sent (`name`, quoted) already holds a message with
-    /// `Message-ID` `id`, opening it read-only the first time. An id no
-    /// quoted string can carry, or a Sent folder that will not open, is not
-    /// looked for.
+    /// `Message-ID` `id`, opening it read-only the first time. A Sent folder
+    /// that will not open is [`Look::Unknown`]; an id no quoted string can
+    /// carry is not looked for ([`Look::Absent`]).
     async fn look(
         &mut self,
         name: &str,
         id: Option<&str>,
         examined: &mut Option<bool>,
-    ) -> Result<bool, Trouble> {
+    ) -> Result<Look, Trouble> {
         let Some(id) = id.and_then(quoted) else {
-            return Ok(false);
+            return Ok(Look::Absent);
         };
         if examined.is_none() {
             let small = self.small();
@@ -306,7 +443,7 @@ impl Appender<'_> {
             *examined = Some(done.is_ok());
         }
         if *examined != Some(true) {
-            return Ok(false);
+            return Ok(Look::Unknown);
         }
         let limits = Limits {
             response: 256 * 1024,
@@ -331,7 +468,11 @@ impl Appender<'_> {
         if done.is_busy() {
             return Err(Trouble::Busy);
         }
-        Ok(done.is_ok() && found > 0)
+        Ok(match (done.is_ok(), found > 0) {
+            (true, true) => Look::Found,
+            (true, false) => Look::Absent,
+            (false, _) => Look::Unknown,
+        })
     }
 
     /// `APPEND` `bytes` to Sent (`name`, quoted), `\Seen`: the `OK`'s
@@ -362,20 +503,6 @@ impl Appender<'_> {
         } else {
             Ok(Err(logged_code(done.code.as_ref())))
         }
-    }
-}
-
-/// Every copy left for a later run after `trouble` stopped the run before
-/// any was tried: the first counted, the rest not.
-fn later(pending: Vec<Pending>, trouble: Trouble) -> Copied {
-    let ends = pending
-        .into_iter()
-        .enumerate()
-        .map(|(n, p)| (p, End::Later { counted: n == 0 }))
-        .collect();
-    Copied {
-        ends,
-        trouble: Some(trouble),
     }
 }
 

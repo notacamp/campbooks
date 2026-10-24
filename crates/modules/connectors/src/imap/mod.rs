@@ -300,6 +300,36 @@ impl Imap {
     }
 }
 
+/// The SMTP submission hosts of the big mail providers, which limit sending
+/// per account themselves: no instance-wide hourly cap applies to them, as
+/// it does to a small or self-hosted server (which it protects). A short
+/// list kept by hand, matched exactly.
+pub const SMTP_PROVIDER_HOSTS: [&str; 17] = [
+    "mail.gmx.com",
+    "mail.gmx.net",
+    "smtp-mail.outlook.com",
+    "smtp.aol.com",
+    "smtp.fastmail.com",
+    "smtp.gmail.com",
+    "smtp.googlemail.com",
+    "smtp.mail.com",
+    "smtp.mail.me.com",
+    "smtp.mail.ru",
+    "smtp.mail.yahoo.com",
+    "smtp.office365.com",
+    "smtp.web.de",
+    "smtp.yandex.com",
+    "smtp.yandex.ru",
+    "smtp.zoho.com",
+    "smtp.zoho.eu",
+];
+
+/// Whether `host` is one of [`SMTP_PROVIDER_HOSTS`].
+pub fn is_smtp_provider_host(host: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    SMTP_PROVIDER_HOSTS.contains(&host.as_str())
+}
+
 /// The SMTP submission hosts of providers that file every message they send
 /// in the mailbox's Sent folder themselves: a copy Campbooks appended would
 /// be a second one. A short list kept by hand, matched exactly; every other
@@ -414,6 +444,20 @@ mod tests {
         assert!(!is_provider_host("imap.bakery-isp.example"));
         assert!(
             PROVIDER_HOSTS
+                .iter()
+                .all(|host| guard::is_host_name(host) && *host == host.to_ascii_lowercase())
+        );
+    }
+
+    #[test]
+    fn big_smtp_providers_are_a_short_list_matched_exactly() {
+        assert!(is_smtp_provider_host("smtp.mail.me.com"));
+        assert!(is_smtp_provider_host("SMTP.fastmail.com."));
+        assert!(!is_smtp_provider_host("imap.mail.me.com"));
+        assert!(!is_smtp_provider_host("smtp.fastmail.com.example.com"));
+        assert!(!is_smtp_provider_host("smtp.example.com"));
+        assert!(
+            SMTP_PROVIDER_HOSTS
                 .iter()
                 .all(|host| guard::is_host_name(host) && *host == host.to_ascii_lowercase())
         );

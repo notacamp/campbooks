@@ -377,6 +377,8 @@ pub struct Offers {
     pub append_refused: bool,
     /// `APPEND` takes the bytes and never answers.
     pub append_hang: bool,
+    /// `APPEND` makes it hang up at once.
+    pub append_drop: bool,
 }
 
 /// The answer to one signed-in command (`verb` and its `args`), on a

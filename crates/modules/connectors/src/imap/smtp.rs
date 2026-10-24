@@ -328,14 +328,19 @@ impl Submission {
     ) -> Result<Self, Failed> {
         let deadline = Instant::now() + total;
         let step = imap.timeout();
-        let address = imap.reach(server).await.map_err(|refused| {
-            match Refusal::of(refused, Refusal::SmtpUnreachable) {
-                Refusal::SmtpUnreachable => Failed::Retry(None),
-                _ => Failed::Unsafe("host_refused"),
-            }
-        })?;
+        // Every step within its own time and the whole submission's.
+        let within = |limit: Duration| deadline.min(Instant::now() + limit);
+        let address = timeout_at(within(step), imap.reach(server))
+            .await
+            .map_err(|_| Failed::Retry(None))?
+            .map_err(
+                |refused| match Refusal::of(refused, Refusal::SmtpUnreachable) {
+                    Refusal::SmtpUnreachable => Failed::Retry(None),
+                    _ => Failed::Unsafe("host_refused"),
+                },
+            )?;
         let name = tls::server_name(&server.host).ok_or(Failed::Unsafe("host_refused"))?;
-        let tcp = timeout(imap.connect_timeout(), TcpStream::connect(address))
+        let tcp = timeout_at(within(imap.connect_timeout()), TcpStream::connect(address))
             .await
             .map_err(|_| Failed::Retry(None))?
             .map_err(|_| Failed::Retry(None))?;
@@ -344,16 +349,13 @@ impl Submission {
             Security::Tls => {
                 let config = tls::client_config(&imap.trust)
                     .map_err(|_| Failed::Unsafe("smtp_tls_failed"))?;
-                let tls = timeout_at(
-                    deadline.min(Instant::now() + step),
-                    TlsConnector::from(config).connect(name, tcp),
-                )
-                .await
-                .map_err(|_| Failed::Retry(None))?
-                .map_err(|e| tls_failed(&e))?;
+                let tls = timeout_at(within(step), TlsConnector::from(config).connect(name, tcp))
+                    .await
+                    .map_err(|_| Failed::Retry(None))?
+                    .map_err(|e| tls_failed(&e))?;
                 let stream: Box<dyn AsyncTokioStream> = Box::new(Bounded::new(tls, address));
-                timeout(
-                    step,
+                timeout_at(
+                    within(step),
                     AsyncSmtpConnection::connect_with_transport(stream, &hello),
                 )
                 .await
@@ -362,8 +364,8 @@ impl Submission {
             }
             Security::Starttls => {
                 let stream: Box<dyn AsyncTokioStream> = Box::new(Bounded::new(tcp, address));
-                let mut connection = timeout(
-                    step,
+                let mut connection = timeout_at(
+                    within(step),
                     AsyncSmtpConnection::connect_with_transport(stream, &hello),
                 )
                 .await
@@ -376,7 +378,7 @@ impl Submission {
                 }
                 let parameters = tls::smtp_parameters(&imap.trust, &server.host)
                     .map_err(|_| Failed::Unsafe("smtp_tls_failed"))?;
-                match timeout(step, connection.starttls(parameters, &hello)).await {
+                match timeout_at(within(step), connection.starttls(parameters, &hello)).await {
                     Ok(Ok(())) => {}
                     Ok(Err(e)) if e.is_tls() || tls::is_tls_failure(&e) => {
                         return Err(Failed::Unsafe("smtp_tls_failed"));
@@ -553,5 +555,12 @@ impl Submission {
     /// Say goodbye, briefly; whatever the server answers.
     pub async fn quit(self) {
         close(self.connection).await;
+    }
+
+    /// Drop the connection without a word, in the middle of `DATA`: no
+    /// `QUIT` (it would be taken as part of the message) and no end of data,
+    /// so the server delivers nothing of it.
+    pub fn abandon(self) {
+        drop(self.connection);
     }
 }

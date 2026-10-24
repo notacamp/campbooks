@@ -177,7 +177,8 @@ pub struct ImapConfig {
     /// most 35 MiB).
     pub send_max_message_bytes: u64,
     /// How long one submission may take in all, connecting to the server's
-    /// last answer, in seconds (default 300).
+    /// last answer, in seconds (default 300, at most 600: within the login's
+    /// 15-minute SMTP session slot).
     pub send_timeout_seconds: u32,
 }
 
@@ -464,10 +465,12 @@ impl ConnectorsConfig {
                     .to_owned(),
             );
         }
-        if imap.send_timeout_seconds < imap.timeout_seconds || imap.send_timeout_seconds > 900 {
+        // A submission ends well within the 15 minutes its login's SMTP
+        // session slot takes to come back, so it never outlives the slot.
+        if imap.send_timeout_seconds < imap.timeout_seconds || imap.send_timeout_seconds > 600 {
             return Err(
                 "CAMPBOOKS_CONNECTORS__IMAP__SEND_TIMEOUT_SECONDS must be at least \
-                 …__TIMEOUT_SECONDS and at most 900"
+                 …__TIMEOUT_SECONDS and at most 600"
                     .to_owned(),
             );
         }
@@ -824,7 +827,7 @@ mod tests {
                 "SEND_TIMEOUT_SECONDS",
             ),
             (
-                serde_json::json!({"send_timeout_seconds": 901}),
+                serde_json::json!({"send_timeout_seconds": 601}),
                 "SEND_TIMEOUT_SECONDS",
             ),
         ] {

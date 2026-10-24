@@ -49,7 +49,7 @@ use crate::{
         model::{ConnectionId, Health, InboxId, Phase, Provider, SendId, StreamId},
         outbound::{self, Backlog},
         push::Push,
-        removal::{BATCH_OWNER, SENT_COPY_OWNER},
+        removal::BATCH_OWNER,
         schedule::{self, LEASE, Rate, SYNC_STREAM, SyncStreamPayload},
     },
     features::imap_idle::lease,
@@ -58,9 +58,9 @@ use crate::{
     imap::{
         self, Refusal,
         read::{Failure, Page},
-        sent::{self, End, Pending},
+        sent::{self, Pending},
         session::Session,
-        state::{Cursor, Location, LocationOp, Place},
+        state::{Cursor, LocationOp},
     },
     mail::{IndexOp, ReadError},
     metrics::{self, SyncOutcome},
@@ -1352,10 +1352,6 @@ async fn pending_copies(
     Ok(copies)
 }
 
-/// How one copy ended (its send, end and attempts so far), and where an
-/// appended copy went.
-type CopyEnd = ((SendId, End, i32), Option<(Place, Location)>);
-
 /// A pending copy's row: send, index key, bytes, attempts, `Message-ID`.
 type CopyRow = (
     uuid::Uuid,
@@ -1391,12 +1387,6 @@ async fn read_imap(run: ImapRun<'_>) -> Result<Page, ImapTrouble> {
             }
         }
     }
-    if (!run.copies.pending.is_empty() || !run.copies.broken.is_empty())
-        && let Err(trouble) = copy_imap(&run, &mut session, &cursor).await
-    {
-        session.logout().await;
-        return Err(trouble);
-    }
     let page = imap::read::Reader {
         session: &mut session,
         pool: run.pool,
@@ -1411,6 +1401,13 @@ async fn read_imap(run: ImapRun<'_>) -> Result<Page, ImapTrouble> {
     }
     .read()
     .await;
+    // Copies in Sent once the read is done: one that will not go never holds
+    // up inbound mail.
+    if let Ok(read) = &page
+        && (!run.copies.pending.is_empty() || !run.copies.broken.is_empty())
+    {
+        copy_imap(&run, &mut session, &read.cursor).await;
+    }
     session.logout().await;
     page.map_err(ImapTrouble::Failed)
 }
@@ -1472,129 +1469,35 @@ async fn record_imap_push(
     Ok(pushed.cursor)
 }
 
-/// Make `run`'s copies in Sent over `session` and record how they ended,
-/// with the locations they leave, before anything is read (so the read
-/// finds each copy where it was recorded); trouble that stopped them once
-/// recorded.
-async fn copy_imap(
-    run: &ImapRun<'_>,
-    session: &mut Session,
-    cursor: &Cursor,
-) -> Result<(), ImapTrouble> {
+/// Make `run`'s copies in Sent over `session`, each recorded as it ends
+/// (`imap::sent`), after the read. Trouble is logged, never the run's: the
+/// copies left wait for the next run.
+async fn copy_imap(run: &ImapRun<'_>, session: &mut Session, cursor: &Cursor) {
     let copied = sent::Appender {
         session,
+        pool: run.pool,
         blobs: run.blobs,
         workspace: run.workspace,
+        connection: run.connection,
+        stream: run.stream,
         cursor,
         config: &run.imap.config,
     }
-    .append(run.copies.pending.clone())
+    .append(run.copies.pending.clone(), &run.copies.broken)
     .await;
-    let trouble = copied.trouble;
-    let made = record_copies(run, copied.ends)
-        .await
-        .map_err(|err| ImapTrouble::Failed(Failure::Read(err)))?;
-    tracing::info!(stream = %run.stream, copies = made, "sent copies made in Sent");
-    match trouble {
-        None => Ok(()),
-        Some(imap::write::Trouble::Busy) => Err(ImapTrouble::Failed(Failure::Busy)),
-        Some(other) => Err(ImapTrouble::Failed(Failure::Server(other.code()))),
+    match copied {
+        Ok(copied) => tracing::info!(
+            stream = %run.stream,
+            appended = copied.appended,
+            trouble = copied.trouble.map_or("", imap::write::Trouble::code),
+            "copies made in Sent"
+        ),
+        Err(err) => tracing::warn!(
+            stream = %run.stream,
+            error = %redact::error(&err),
+            "the copies made in Sent could not be recorded"
+        ),
     }
-}
-
-/// Record, in one transaction of the stream's workspace, how `ends` (and
-/// the run's unreadable copies) ended: each send's copy state, the bytes
-/// it held released once it is done, and the locations appended copies
-/// have. How many were appended.
-async fn record_copies(run: &ImapRun<'_>, ends: Vec<(Pending, End)>) -> Result<usize, ReadError> {
-    let mut tx = run.pool.begin_for(run.workspace).await?;
-    // The connection before the stream (removal's order).
-    health::lock(&mut tx, run.connection).await?;
-    let workspace = run.workspace.to_string();
-    let mut locations = Vec::new();
-    let mut appended = 0;
-    let broken = run
-        .copies
-        .broken
-        .iter()
-        .map(|send| (*send, End::Failed("copy_unreadable"), 0));
-    let ends = ends
-        .into_iter()
-        .map(|(copy, end)| {
-            let at = match &end {
-                End::Appended(Some(at)) => Some(at.clone()),
-                _ => None,
-            };
-            ((copy.send, end, copy.attempts), at)
-        })
-        .collect::<Vec<_>>();
-    let mut all: Vec<CopyEnd> = broken.map(|end| (end, None)).collect();
-    all.extend(ends);
-    for ((send, end, attempts), at) in all {
-        let (state, reason) = match end {
-            End::Appended(_) => ("appended", None),
-            End::Found => ("found", None),
-            End::Skipped(reason) => ("skipped", Some(reason)),
-            End::Failed(reason) => ("failed", Some(reason)),
-            End::Later { counted: false } => continue,
-            End::Later { counted: true } if attempts + 1 >= sent::MAX_ATTEMPTS => {
-                ("failed", Some("append_gave_up"))
-            }
-            End::Later { counted: true } => {
-                sqlx::query(
-                    "UPDATE connectors.sends SET sent_copy_attempts = sent_copy_attempts + 1
-                      WHERE id = $1 AND stream_id = $2 AND sent_copy = 'pending'",
-                )
-                .bind(send)
-                .bind(run.stream)
-                .execute(&mut *tx)
-                .await?;
-                continue;
-            }
-        };
-        let ended = sqlx::query(
-            "UPDATE connectors.sends
-                SET sent_copy = $3, sent_copy_reason = $4, sent_copy_raw = NULL,
-                    sent_copy_attempts = sent_copy_attempts
-                        + CASE WHEN $3 = 'failed' AND $4 = 'append_gave_up' THEN 1 ELSE 0 END
-              WHERE id = $1 AND stream_id = $2 AND sent_copy = 'pending'",
-        )
-        .bind(send)
-        .bind(run.stream)
-        .bind(state)
-        .bind(reason)
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-        if ended == 0 {
-            continue;
-        }
-        run.blobs
-            .detach_owner(&mut tx, &workspace, &BlobOwner::new(SENT_COPY_OWNER, send))
-            .await?;
-        if state == "appended" {
-            appended += 1;
-        }
-        if let Some((place, location)) = at {
-            // A place recorded for another message keeps it: the read looks.
-            let other: Option<String> = sqlx::query_scalar(
-                "SELECT message_key FROM connectors.imap_locations
-                  WHERE stream_id = $1 AND folder = $2 AND uidvalidity = $3 AND uid = $4",
-            )
-            .bind(run.stream)
-            .bind(&place.folder)
-            .bind(i64::from(place.uidvalidity))
-            .bind(i64::from(place.uid))
-            .fetch_optional(&mut *tx)
-            .await?;
-            if other.is_none_or(|key| key == location.key) {
-                locations.push(LocationOp::Put(place, location));
-            }
-        }
-    }
-    imap::state::apply(&mut tx, run.workspace, run.stream, locations).await?;
-    tx.commit().await?;
-    Ok(appended)
 }
 
 /// An IMAP page as the run applies it.

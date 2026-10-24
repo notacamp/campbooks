@@ -121,6 +121,9 @@ pub struct SmtpScript {
     pub hang_up_after_message: bool,
     /// EHLO is answered with bytes and no line ending, without end.
     pub endless_ehlo: bool,
+    /// At `DATA`, before its go-ahead: say so on the first, then wait for
+    /// the second (a test acts in between).
+    pub hold_data: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
 }
 
 impl Script {
@@ -191,6 +194,9 @@ pub struct Seen {
     pub datas: usize,
     pub received: Vec<Vec<u8>>,
     pub delivered: Vec<Vec<u8>>,
+    /// SMTP: what arrived after `DATA` of a message that never ended (the
+    /// connection closed before its final dot).
+    pub unfinished: Vec<Vec<u8>>,
     /// SMTP: whether each `MAIL FROM` came after STARTTLS or over TLS.
     pub mail_in_clear: bool,
 }
@@ -765,6 +771,10 @@ async fn append<S: AsyncRead + AsyncWrite + Unpin>(
     if offers.append_busy {
         return Some(format!("{tag} NO [UNAVAILABLE] try again later\r\n"));
     }
+    if offers.append_drop {
+        // Hangs up on the command, as a server going away would.
+        return None;
+    }
     if offers
         .append_limit
         .is_some_and(|limit| u64::try_from(size).unwrap_or(u64::MAX) > limit)
@@ -970,11 +980,19 @@ async fn smtp_session<S: AsyncRead + AsyncWrite + Unpin>(
             }
             "DATA" => {
                 shared.see(|seen| seen.datas += 1);
+                if let Some((arrived, release)) = &script.smtp.hold_data {
+                    arrived.notify_one();
+                    release.notified().await;
+                }
                 if !write(conn.get_mut(), "354 end with a dot\r\n").await {
                     break;
                 }
-                let Some(message) = smtp_message(conn).await else {
-                    break;
+                let message = match smtp_message(conn).await {
+                    Ok(message) => message,
+                    Err(unfinished) => {
+                        shared.see(|seen| seen.unfinished.push(unfinished));
+                        break;
+                    }
                 };
                 let mut busy = false;
                 shared.see(|seen| {
@@ -1014,16 +1032,17 @@ fn envelope_address(args: &str) -> String {
         .map_or_else(String::new, |(address, _)| address.to_owned())
 }
 
-/// A message after `DATA`, up to its final dot, dot-stuffing undone.
-async fn smtp_message<S: AsyncRead + Unpin>(conn: &mut BufReader<S>) -> Option<Vec<u8>> {
+/// A message after `DATA`, up to its final dot, dot-stuffing undone; what
+/// came of it when the connection closed first.
+async fn smtp_message<S: AsyncRead + Unpin>(conn: &mut BufReader<S>) -> Result<Vec<u8>, Vec<u8>> {
     let mut message = Vec::new();
     loop {
         let mut line = Vec::new();
-        if conn.read_until(b'\n', &mut line).await.ok()? == 0 {
-            return None;
+        if conn.read_until(b'\n', &mut line).await.unwrap_or(0) == 0 {
+            return Err(message);
         }
         if line == b".\r\n" || line == b".\n" {
-            return Some(message);
+            return Ok(message);
         }
         let line = line.strip_prefix(b".").unwrap_or(&line);
         message.extend_from_slice(line);

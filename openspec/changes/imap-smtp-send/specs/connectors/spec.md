@@ -12,9 +12,11 @@ more (no `AUTH`, no password, no `MAIL`) and the send SHALL fail
 connection's sealed password, opened for that send only. A refused password
 (a 5xx answer to `AUTH`) SHALL count towards the stream's shared login
 refusals, the third in a row setting `needs_reauth` and failing the send
-`needs_reauth`; a busy answer (4xx) SHALL be retried and never counted. The
-envelope sender and the `From` header SHALL be the connection's own address:
-a document whose `From` address is any other SHALL not be sent (`rejected`).
+`needs_reauth`; a busy answer (4xx) SHALL be retried and never counted. A
+send SHALL be made only while the connection's address is verified; otherwise
+it SHALL fail `rejected` before any SMTP session. The envelope sender and the
+`From` header SHALL be the connection's own address, as stored: a document
+whose `From` address is any other SHALL not be sent (`rejected`).
 The envelope recipients SHALL be the document's To, Cc and Bcc; the message
 sent SHALL carry no `Bcc` header. A recipient the server refuses SHALL abort
 the whole send before `DATA` (`rejected`). The message SHALL be built by the
@@ -36,6 +38,14 @@ name adds a header. Logs SHALL carry ids, reply codes and counts only.
 #### Scenario: From another address
 - **WHEN** a send's document is from an address that is not the connection's
 - **THEN** no SMTP session is opened and the send fails `rejected`
+
+#### Scenario: An address the login does not prove
+- **WHEN** a connection signs in with a username that is not its address, and a member sends from it
+- **THEN** no SMTP session is opened and the send fails `rejected`
+
+#### Scenario: A certificate for another name
+- **WHEN** the SMTP server's certificate is not valid for its host name
+- **THEN** no `AUTH` and no `MAIL` reach it and the send fails `unavailable`
 
 #### Scenario: Bcc in the envelope only
 - **WHEN** a message has a Bcc recipient
@@ -59,8 +69,11 @@ retried later on a 4xx or no answer, `rejected` on a 5xx (`too_large` on
 started SHALL never be followed by another attempt: the send SHALL end
 `unknown_outcome`, once the attempt has surely ended (no IMAP attempt starts
 sooner than `CAMPBOOKS_CONNECTORS__IMAP__SEND_TIMEOUT_SECONDS` plus 30
-seconds after the previous one). Every step of a submission SHALL have a time
-limit, and at most 1 MiB SHALL be read from the server in one session.
+seconds after the previous one was claimed). A runner that cannot claim the
+attempt after 354 SHALL drop the connection without `QUIT` and without ending
+the data. Every step of a submission SHALL have a time limit and end by the
+submission's deadline, and at most 1 MiB SHALL be read from the server in one
+session.
 
 #### Scenario: Busy, then accepted
 - **WHEN** the SMTP server answers the first `RCPT TO` with 451, then accepts the message on the next attempt
@@ -69,6 +82,10 @@ limit, and at most 1 MiB SHALL be read from the server in one session.
 #### Scenario: Connection lost after the message
 - **WHEN** the connection is lost after the message was sent and before the server's final answer
 - **THEN** the server received one `DATA`, no second attempt is made, and the send fails `unknown_outcome`
+
+#### Scenario: The attempt claimed by another runner
+- **WHEN** another runner claims the attempt while this one waits for the server's 354
+- **THEN** this one drops the connection: the server sees no end of data, receives no `QUIT` inside the message, and delivers nothing
 
 #### Scenario: A server that never stops talking
 - **WHEN** the SMTP server answers EHLO with more than 1 MiB and no end
@@ -80,9 +97,12 @@ message of its mailbox login's hourly allowance
 (`CAMPBOOKS_CONNECTORS__IMAP__SEND_PER_HOUR`, default 50), its recipients
 from the login's daily allowance (`…__SEND_RECIPIENTS_PER_DAY`, 500), one
 message of its workspace's hourly allowance (`…__SEND_WORKSPACE_PER_HOUR`,
-200) and one of its SMTP host's (`…__SEND_HOST_PER_HOUR`, 1,000), the
-login's keyed by a digest of the login, never by the connection; an empty
-budget SHALL make the send wait. A message with more recipients than
+200) and, unless the SMTP host is one of a short list of big providers' that
+limit each account themselves, one of its SMTP host's
+(`…__SEND_HOST_PER_HOUR`, 1,000) of which one workspace SHALL take at most
+half, the login's keyed by a digest of the login, never by the connection;
+an empty budget SHALL make the send wait. What a send took SHALL be given
+back only when nothing was sent and the server refused nothing. A message with more recipients than
 `…__SEND_RECIPIENTS_PER_MESSAGE` (50) SHALL fail `rejected`; one larger than
 `…__SEND_MAX_MESSAGE_BYTES` (25 MiB), or than the `SIZE` the server announces
 in EHLO, SHALL fail `too_large` before `MAIL`. One SMTP session per mailbox
@@ -96,6 +116,14 @@ login SHALL be open at a time.
 - **WHEN** a mailbox login has used its messages for the hour
 - **THEN** its next send waits for the budget and the server receives nothing until then
 
+#### Scenario: One workspace on a small host
+- **WHEN** a workspace has used half of a small SMTP host's hourly allowance
+- **THEN** its next send through that host waits, and other workspaces still send through it
+
+#### Scenario: A refused recipient costs its budget
+- **WHEN** the server refuses a send's recipient and the mailbox login had one message left for the hour
+- **THEN** the send fails `rejected` and the login's next send waits for the budget
+
 #### Scenario: Too many recipients
 - **WHEN** a message names more recipients than `CAMPBOOKS_CONNECTORS__IMAP__SEND_RECIPIENTS_PER_MESSAGE`
 - **THEN** no SMTP session is opened and the send fails `rejected`
@@ -106,17 +134,20 @@ reader's key for its `Message-ID`, as a read copy in Sent that the mailbox
 sent, and announce it, in the transaction that marks the send `sent`. Unless
 its SMTP host is one of the providers known to keep a copy of what they send
 (a short list in the code, matched exactly), the stream's next run SHALL,
-after its write-backs and before it reads, look for the `Message-ID` in the
-Sent folder and, when it is not there, `APPEND` the message (Bcc kept) with
+once its read is done, look for the `Message-ID` in the Sent folder and, when
+it is not there, `APPEND` the message (Bcc kept) with
 `\Seen` to the SPECIAL-USE `\Sent` folder or the Sent folder the reader found
 by name, as a synchronising literal within the server's `APPENDLIMIT` and
 `CAMPBOOKS_CONNECTORS__IMAP__MAX_MESSAGE_BYTES`, through the session's
-bounded framer. With `APPENDUID` the copy's location SHALL be recorded in the
-run's transaction before the read, so neither the read nor IDLE announces the
-message again. A busy answer or a cut session SHALL leave the copy for the
-next run (three at most); any other refusal SHALL end it `failed`. Nothing
-about the copy SHALL fail or repeat the send. A sent message whose copy could
-not be made SHALL never be removed for having no location.
+bounded framer, within the run's byte budget. Each copy's end SHALL be
+recorded as it ends, in a transaction of its own, with the location
+`APPENDUID` names, so neither the next read nor IDLE announces the message
+again. A Sent folder that cannot be looked in SHALL get no copy. A busy
+answer, a cut session or a Sent folder that will not open SHALL leave the
+copy for the next run (three at most); any other refusal SHALL end it
+`failed`. Nothing about the copy SHALL fail or repeat the send, or stop the
+run's inbound mail. A sent message whose copy could not be made SHALL never
+be removed for having no location.
 
 #### Scenario: Appended with APPENDUID and no echo
 - **WHEN** a send is accepted by a server offering UIDPLUS, and the stream then runs twice
@@ -133,6 +164,18 @@ not be made SHALL never be removed for having no location.
 #### Scenario: An APPEND the server refuses
 - **WHEN** the server answers the `APPEND` with `NO [OVERQUOTA]`
 - **THEN** the send stays `sent`, the server receives no second message, the copy is `failed`, and the sent message stays in its conversation
+
+#### Scenario: A copy that will not go
+- **WHEN** the IMAP server hangs up on `APPEND` and new mail has arrived in the Inbox
+- **THEN** the run reads the new mail, the copy waits for the next run, and the connection stays healthy
+
+#### Scenario: A Sent folder that will not open
+- **WHEN** the IMAP server refuses to open Sent
+- **THEN** no `APPEND` is sent and the copy waits for the next run
+
+#### Scenario: Within the run's byte budget
+- **WHEN** two copies are pending and the first fills the run's byte budget
+- **THEN** the run appends one, and the next run the other
 
 #### Scenario: Larger than the server's APPENDLIMIT
 - **WHEN** the server's `APPENDLIMIT` is smaller than the message

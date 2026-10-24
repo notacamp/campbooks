@@ -36,8 +36,11 @@ dependency, no new endpoint, scope, event, job or schedule. One migration,
   and dropped after it. Reuses `lettre`, over a connection Campbooks opens
   and bounds itself.
 - **From the mailbox only.** The envelope sender and the `From` header are
-  the connection's own address; a document whose `From` is any other address
-  is not sent (`rejected`). Bcc recipients are in the envelope only: the
+  the connection's own address, and only once that address is verified (a
+  password login proves the username, not an address typed beside it; the
+  check for mailboxes whose username differs ships with the connect screen,
+  #314); a document whose `From` is any other address is not sent
+  (`rejected`). Bcc recipients are in the envelope only: the
   message on the wire has no `Bcc` header; the Sent copy keeps it.
 - **Never twice.** The attempt is recorded once the server has accepted
   `DATA` (354) and before the message goes out. A refusal before then, or a
@@ -46,7 +49,7 @@ dependency, no new endpoint, scope, event, job or schedule. One migration,
   answer, is never resent: the send ends `unknown_outcome` at once. A
   `Message-ID` minted per send (the document's) is kept with it.
 - **The Sent copy.** After a successful send, the stream's next run (due at
-  once) appends the message, `\Seen`, to the SPECIAL-USE `\Sent` folder (or
+  once), once its read is done, appends the message, `\Seen`, to the SPECIAL-USE `\Sent` folder (or
   the folder the reader found by name), through the session's bounded framer,
   within the server's `APPENDLIMIT` and Campbooks' own cap, unless the SMTP
   host is one of a short list known to keep a copy itself, or the message is

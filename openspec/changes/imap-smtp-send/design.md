@@ -58,10 +58,13 @@ the wrapper does:
   whole session (SMTP replies are a few lines), past which every read fails
   and the session ends, so a server that never sends a line ending cannot
   grow memory.
-- **Time.** Every step (connect, TLS, greeting and EHLO, STARTTLS, AUTH,
-  `MAIL`, each `RCPT`, `DATA`) has `CAMPBOOKS_CONNECTORS__IMAP__TIMEOUT_SECONDS`
-  (30); the message itself has what is left of the whole submission's
-  `…__SEND_TIMEOUT_SECONDS` (300). `QUIT` waits 5 seconds at most.
+- **Time.** Every step (resolving through the guard, the TCP connect, TLS,
+  greeting and EHLO, STARTTLS, AUTH, `MAIL`, each `RCPT`, `DATA`) has
+  `CAMPBOOKS_CONNECTORS__IMAP__TIMEOUT_SECONDS` (30, the connect
+  `…__CONNECT_TIMEOUT_SECONDS`) and never runs past the whole submission's
+  deadline, `…__SEND_TIMEOUT_SECONDS` (300, at most 600 so a submission always
+  ends within its login's 15-minute session slot); the message itself has
+  what is left of that deadline. `QUIT` waits 5 seconds at most.
 - **Words.** `lettre`'s errors carry the server's text; none is logged or
   stored. Logs carry the reply code (`535`, `451`) and stable codes only.
 - **No pipelining, no `CHUNKING`, no `BDAT`**: one command, one reply.
@@ -90,13 +93,22 @@ until its attempts run out and ends `unavailable` (nothing was sent).
 |---|---|
 | Whatever the document says | an IMAP server that does not check the sender (many small ones) would send as anyone |
 | The document's, when the server accepts it | the same, decided by the server |
-| **The connection's own address only** (chosen) | the envelope sender is the connection's address, taken from the stream, never from the document; a document whose `From` address is not it (case-insensitive, trimmed) is not sent: `rejected`, before connecting |
+| **The connection's own address only, once verified** (chosen) | the envelope sender is the connection's address as stored (its case kept; only the comparison ignores case), never the document's; a document whose `From` address is not it is not sent: `rejected`, before connecting |
 
 There is no alias model in the send path today (Gmail sends as the
 account, Zoho's `fromAddress` is checked by Zoho), so the connection's
-address is the only one. The address is the one the member typed at
-connect: the login proved the username, and the server's own sender rules
-still apply on top.
+address is the only one. That address is the one the member typed at
+connect, and a password login proves the username, not an address typed
+beside it: a member could connect `billing@victim-corp.example` with the
+login of a mailbox on a lax server that lets any sender through. So an IMAP
+send is made only while the connection's `address_verified` is true (#310
+sets it when the username is the address); otherwise it fails `rejected`,
+logged with the stable code `address_not_verified`, before any SMTP session
+(the send's reasons are a closed set in `connectors.send_completed` v1, so
+the code is not a new reason). Verifying the address of a mailbox whose
+username differs from it ships with the connect screen (#314): Campbooks
+sends a one-time code to the address through the mailbox's own SMTP server
+and finds it in that mailbox's Inbox over IMAP. It is not built here.
 
 ### 4. Recipients and Bcc
 
@@ -119,7 +131,7 @@ on where it happened:
 
 | Where it failed | Was it sent? | What happens |
 |---|---|---|
-| connecting, TLS, greeting, EHLO, AUTH, `MAIL`, `RCPT`, the `DATA` command | no | 4xx or no answer: retried with backoff; 5xx: `rejected`; the budget taken is given back |
+| connecting, TLS, greeting, EHLO, AUTH, `MAIL`, `RCPT`, the `DATA` command | no | 4xx or no answer: retried with backoff, the budget given back; 5xx: `rejected`, the budget kept (a refused recipient costs what it cost, so trying addresses at a server is never free) |
 | a 4xx or 5xx answer to the message (after the final dot) | no (RFC 5321: the server took no responsibility) | 4xx: retried; 5xx: `rejected` (552: `too_large`) |
 | a 250 answer to the message | yes | `sent` |
 | the connection lost, a timeout or an unreadable answer after the message started | unknown | **never resent**: `unknown_outcome` |
@@ -127,8 +139,13 @@ on where it happened:
 The attempt is committed (`attempts + 1`, `attempted_at`, `unclear = true`,
 the same compare-and-set as Gmail's, so of two runners of one send only one
 sends) **after** the server answered `DATA` with 354 and before the first byte
-of the message. A crash before then leaves the send provably unsent; a crash
-after leaves it unclear.
+of the message, timed at that moment (after the blobs were read and the
+session opened), so the quiet window below starts when the message can
+start to go. A crash before then leaves the send provably unsent; a crash
+after leaves it unclear. A runner that loses the compare-and-set there is in
+the middle of `DATA`: it drops the connection without a word (no `QUIT`,
+which the server would take as part of the message, and no end of data), so
+the server delivers nothing of it.
 
 What an unclear send becomes:
 
@@ -155,8 +172,14 @@ before connecting, each refilled continuously:
 | messages per mailbox login | `smtp:login:<keyed digest of username and SMTP host>` | 50 an hour | `…__SEND_PER_HOUR` |
 | recipients per mailbox login | `smtp:recipients:<same digest>` | 500 a day | `…__SEND_RECIPIENTS_PER_DAY` |
 | messages per workspace | `smtp:workspace:<workspace id>` | 200 an hour | `…__SEND_WORKSPACE_PER_HOUR` |
-| messages per SMTP host, every workspace | `smtp:host:<keyed digest of the host>` | 1,000 an hour | `…__SEND_HOST_PER_HOUR` |
+| messages per SMTP host, every workspace (not a big provider's) | `smtp:host:<keyed digest of the host>` | 1,000 an hour | `…__SEND_HOST_PER_HOUR` |
+| one workspace's share of that host (not a big provider's) | `smtp:host:<digest>:<workspace id>` | half of the host's | (derived) |
 | recipients per message | (a cap, no bucket) | 50 | `…__SEND_RECIPIENTS_PER_MESSAGE` |
+
+| | The SMTP host's own budget |
+|---|---|
+| One instance-wide cap for every host | one workspace can spend a host's hour for everyone, and a big provider's host (millions of accounts) is capped as a small one |
+| **No host cap for a short list of big providers' submission hosts (`imap::SMTP_PROVIDER_HOSTS`, matched exactly), which limit each account themselves; on every other host the cap, of which one workspace takes at most half** (chosen) | protects a small or self-hosted server and every workspace on it, as the IDLE and run caps do (#318) |
 
 The login's budgets are keyed by the login (the instance signer's HMAC,
 like the IDLE leases' keys), not by the connection: removing and adding the
@@ -186,19 +209,22 @@ Size, checked before anything is sent:
 
 A send that finds its login's session slot taken retries in 10 seconds.
 
-### 8. The Sent copy: made by the stream's run
+### 8. The Sent copy: made by the stream's run, after its read
 
 | | Where the APPEND to Sent is made |
 |---|---|
 | In the send job, right after the 250 | a third IMAP session per login (beside the run's and IDLE's, #318's "one login holds one IDLE and its stream's one run"), and a second writer of the stream's locations racing the run |
-| **The stream's next run, over its session, after the write-backs and before the read** (chosen) | one session, one writer of the locations (the run's ordering key), the read that follows sees the copy where it was recorded, like a write-back (#312); the run is due at once (the send made it due) |
+| The stream's next run, before the read | one session and one writer, but a copy that will not go (a server that hangs up on `APPEND`) would stop inbound mail with it |
+| **The stream's next run, over its session, once the read is done** (chosen) | one session, one writer of the locations (the run's ordering key); copy trouble is logged and never the run's, so inbound mail is always read; the next read finds the copy where it was recorded; the run is due at once (the send made it due) |
 
 So a successful IMAP send records, in the job's transaction, the message's
 Sent copy as `pending` with the bytes it will append (the message as built
 from the whole document, Bcc kept), held as a blob owned by the send's copy
 (`connectors.sent_copy`) until the copy ends. The stream's run, signed in:
 
-1. takes at most 10 pending copies of its stream (oldest first);
+1. takes at most 10 pending copies of its stream (oldest first), and stops
+   starting new ones once it appended `…__RUN_BUDGET_BYTES` (after one at
+   least);
 2. finds the Sent folder: the SPECIAL-USE `\Sent` folder, else the folder
    the reader found by name (#311's name table). None in the folder list:
    `skipped` (`no_sent_folder`). The folders not listed yet (the very first
@@ -206,7 +232,10 @@ from the whole document, Bcc kept), held as a blob owned by the send's copy
 3. checks the bytes against the server's `APPENDLIMIT=n` (RFC 7889, when
    the capability names a number) and `…__MAX_MESSAGE_BYTES` (what the reader
    would download): larger, `skipped` (`too_large`);
-4. looks in Sent first (below): already there, `found`, nothing appended;
+4. looks in Sent first (below): already there, `found`, nothing appended. A
+   Sent folder that will not open (`EXAMINE` or the search refused) cannot
+   say whether a copy is there (an earlier `APPEND` cut short may have gone
+   through): nothing is appended, and the copy waits, counted as trouble;
 5. `APPEND <Sent> (\Seen) {n}`: a synchronising literal, its size announced
    and the bytes sent only after the server's `+` (a server that refuses the
    size takes none of it), through the session's bounded framer (each answer
@@ -222,11 +251,14 @@ from the whole document, Bcc kept), held as a blob owned by the send's copy
 | any other `NO`/`BAD` (`[OVERQUOTA]`, `[TOOBIG]`, `[TRYCREATE]`…) | `failed` (`append_refused`), the response code logged when it is a known one |
 | the session cut short or timed out | stays `pending`, the run fails as for a cut read |
 
-A copy that stays `pending` through three runs (busy, cut) is `failed`
-(`append_gave_up`). An APPEND's outcome never touches the send: it stays
-`sent`, nothing is sent again, and nothing is retried but the APPEND itself.
-The ends are recorded in the run's own transaction (the send's copy state and
-reason, its blob released, the locations) before the read.
+A copy that stays `pending` through three runs (busy, cut, Sent not open)
+is `failed` (`append_gave_up`). An APPEND's outcome never touches the send:
+it stays `sent`, nothing is sent again, and nothing is retried but the APPEND
+itself (always after a look, so a retried copy is never a second one). Each
+copy's end is recorded **as it ends**, in a transaction of its own (the send's
+copy state and reason, its blob released, its location), so a run cut short
+by its time limit loses none of the copies it made. Trouble with copies (a
+busy server, a cut session) ends the copies, not the run.
 
 ### 9. A server that keeps a copy itself
 
@@ -254,9 +286,9 @@ the tokens the reader would derive for a copy in Sent that the mailbox sent
 (`SELF`, `SENT`, read), and announces it in a batch, in the same transaction
 that marks the send `sent` (as Gmail's and Zoho's are). Then:
 
-- the APPEND records the copy's location with `APPENDUID`; the read finds the
-  new UID in Sent, the same key at the same place, the same tokens: nothing
-  emitted;
+- the APPEND records the copy's location with `APPENDUID`; the next read
+  finds the new UID in Sent, the same key at the same place, the same tokens:
+  nothing emitted;
 - without `APPENDUID`, the read finds the new UID by its `Message-ID`: a
   known key, a new location, the same tokens: nothing emitted;
 - a server that keeps its own copy: the same, from the copy it made;
@@ -280,6 +312,12 @@ server would not take the copy.
 - Header injection: the wire message and the Sent copy come from the
   outgoing-document MIME builder; a line break in the subject or in a display
   name becomes a space, so no header can be added.
+
+### 12. Reading less before refusing
+
+The message's size is checked against `…__SEND_MAX_MESSAGE_BYTES` from the
+sizes its blobs declare before any attachment is read into memory, and again
+as each is read.
 
 ## Data ownership and events
 
@@ -328,18 +366,15 @@ IMAP), and none tied to the poll bounds:
 | `SEND_WORKSPACE_PER_HOUR` | 200 | 1 to 100,000 |
 | `SEND_HOST_PER_HOUR` | 1,000 | 1 to 1,000,000 |
 | `SEND_MAX_MESSAGE_BYTES` | 25 MiB | 64 KiB to 35 MiB |
-| `SEND_TIMEOUT_SECONDS` | 300 | `TIMEOUT_SECONDS` to 900 |
+| `SEND_TIMEOUT_SECONDS` | 300 | `TIMEOUT_SECONDS` to 600 (within the 15-minute session slot) |
 
 ## Risks
 
 - **A wrong curated list.** A listed provider that stops keeping copies
   leaves Sent empty; an unlisted one that keeps them late shows two. Both
   are visible to the member, neither loses or repeats mail.
-- **The typed address.** `From` is the address the member typed at connect,
-  which a password login does not prove; a server that does not check the
-  sender lets a member send as another address of the same server. The
-  member already holds that mailbox's password; most providers refuse a
-  foreign sender.
+- **Mailboxes whose username is not their address** cannot send until the
+  connect screen's address check (#314) lands.
 - **An SMTP password that differs from the IMAP one** is not caught by the
   shared refusal count while reads succeed (section 2).
 - **Unknown outcomes are final.** A connection cut after the message went

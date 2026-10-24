@@ -2,10 +2,12 @@
 //! (campbooks-cloud#313).
 //!
 //! The envelope sender and the `From` header are the connection's own
-//! address (a document from any other is not sent); the recipients are the
-//! document's To, Cc and Bcc, and the message on the wire carries no `Bcc`.
-//! Before connecting, the mailbox login's, the workspace's and the SMTP
-//! host's budgets are taken, and the login's one session slot.
+//! address, and only once that address is verified (a login proves the
+//! username, not an address typed beside it); a document from any other is
+//! not sent. The recipients are the document's To, Cc and Bcc, and the
+//! message on the wire carries no `Bcc`. Before connecting, the mailbox
+//! login's, the workspace's and (on a host that is not a big provider's)
+//! the SMTP host's budgets are taken, and the login's one session slot.
 //!
 //! SMTP has no idempotency key, so the attempt is committed once the server
 //! accepted `DATA`, before the first byte of the message: a failure before
@@ -122,16 +124,15 @@ impl SendMessage {
         };
         let mut tx = ctx.pool().begin_for(workspace).await?;
         let account = imap_servers::smtp_server(&mut tx, connection).await?;
-        let address: Option<String> = sqlx::query_scalar(
-            "SELECT coalesce(st.address, c.address)
+        let mailbox_address: Option<(Option<String>, bool)> = sqlx::query_as(
+            "SELECT c.address, c.address_verified
                FROM connectors.streams st
                JOIN connectors.connections c ON c.id = st.connection_id
               WHERE st.id = $1",
         )
         .bind(stream)
         .fetch_optional(&mut *tx)
-        .await?
-        .flatten();
+        .await?;
         let opened = credentials::password(&mut tx, &cipher, connection).await;
         tx.commit().await?;
         let password = match opened {
@@ -148,18 +149,31 @@ impl SendMessage {
             }
             Err(TokenError::Database(err)) => return Err(err.into()),
         };
-        let (Some((username, server)), Some(address)) = (account, address) else {
+        let (Some((username, server)), Some((Some(address), verified))) =
+            (account, mailbox_address)
+        else {
             return finish_failed(ctx, workspace, send, &target, "not_connected").await;
         };
         let config = &self.deps.imap.config;
 
-        // From the mailbox only, to recipients that are addresses.
-        let own = address.trim().to_lowercase();
-        if document.from.address.trim().to_lowercase() != own {
+        // From the mailbox's verified address only, to recipients that are
+        // addresses.
+        if !verified {
+            tracing::warn!(
+                %workspace,
+                %send,
+                code = "address_not_verified",
+                "the mailbox's address is not verified; not sent"
+            );
+            return finish_failed(ctx, workspace, send, &target, "rejected").await;
+        }
+        let address = address.trim();
+        if !document.from.address.trim().eq_ignore_ascii_case(address) {
             tracing::warn!(%workspace, %send, "a send from another address than the mailbox's is not sent");
             return finish_failed(ctx, workspace, send, &target, "rejected").await;
         }
-        let Some(from) = mailbox(&own) else {
+        // As stored, its case kept: only the comparison ignores it.
+        let Some(from) = mailbox(address) else {
             return finish_failed(ctx, workspace, send, &target, "rejected").await;
         };
         let Some(to) = envelope(document) else {
@@ -198,46 +212,30 @@ impl SendMessage {
             &server.host.to_ascii_lowercase(),
         );
         let recipients = u32::try_from(to.len()).unwrap_or(u32::MAX);
-        let budgets: [Budget; 5] = [
-            (
-                format!("smtp:login:{login}"),
-                Rate::per_hour(config.send_per_hour),
-                1,
-            ),
-            (
-                format!("smtp:recipients:{login}"),
-                Rate::per_day(config.send_recipients_per_day),
-                recipients,
-            ),
-            (
-                format!("smtp:workspace:{workspace}"),
-                Rate::per_hour(config.send_workspace_per_hour),
-                1,
-            ),
-            (
-                format!("smtp:host:{host}"),
-                Rate::per_hour(config.send_host_per_hour),
-                1,
-            ),
-            (
-                format!("smtp:session:{login}"),
-                Rate {
-                    per_second: 1.0 / SLOT_SECONDS,
-                    burst_seconds: SLOT_SECONDS,
-                },
-                1,
-            ),
-        ];
-        let (spend, session) = budgets.split_at(4);
-        if let Err(wait) = take_all(ctx.pool(), spend).await? {
+        let keys = Keys {
+            login: &login,
+            host: &host,
+            workspace,
+            provider: imap::is_smtp_provider_host(&server.host),
+        };
+        let spend = budgets(config, &keys, recipients);
+        let session = [(
+            format!("smtp:session:{login}"),
+            Rate {
+                per_second: 1.0 / SLOT_SECONDS,
+                burst_seconds: SLOT_SECONDS,
+            },
+            1,
+        )];
+        if let Err(wait) = take_all(ctx.pool(), &spend).await? {
             tracing::info!(%workspace, %send, "waiting for the mailbox's sending budget");
             return Err(JobError::retry_after(
                 "waiting for the mailbox's sending budget",
                 wait,
             ));
         }
-        if take_all(ctx.pool(), session).await?.is_err() {
-            give_back(ctx.pool(), spend).await;
+        if take_all(ctx.pool(), &session).await?.is_err() {
+            give_back(ctx.pool(), &spend).await;
             return Err(JobError::retry_after(
                 "another send of this mailbox is in progress",
                 SESSION_WAIT,
@@ -247,12 +245,12 @@ impl SendMessage {
         let submitted = Box::pin(self.submit(
             ctx,
             &mut target,
-            (workspace, send, now),
+            (workspace, send),
             (&server, &username, &password),
             (&from, &to, &wire),
         ))
         .await;
-        give_back(ctx.pool(), session).await;
+        give_back(ctx.pool(), &session).await;
         drop(password);
 
         match submitted {
@@ -263,7 +261,7 @@ impl SendMessage {
                     .await
             }
             Submitted::Claimed(err) => {
-                give_back(ctx.pool(), spend).await;
+                give_back(ctx.pool(), &spend).await;
                 Err(err)
             }
             Submitted::Failed(Failed::Unclear) => {
@@ -272,7 +270,11 @@ impl SendMessage {
                 finish_failed(ctx, workspace, send, &target, "unavailable").await
             }
             Submitted::Failed(failed) => {
-                give_back(ctx.pool(), spend).await;
+                // A refusal (a recipient refused, say) keeps what it cost:
+                // trying addresses at a server is never free.
+                if !matches!(failed, Failed::Refused(_)) {
+                    give_back(ctx.pool(), &spend).await;
+                }
                 self.not_taken(ctx, &target, (workspace, send, stream, connection), failed)
                     .await
             }
@@ -285,7 +287,7 @@ impl SendMessage {
         &self,
         ctx: &JobContext,
         target: &mut Target,
-        (workspace, send, now): (WorkspaceId, SendId, DateTime<Utc>),
+        (workspace, send): (WorkspaceId, SendId),
         (server, username, password): (&imap::Server, &str, &SecretString),
         (from, to, wire): (&lettre::Address, &[lettre::Address], &[u8]),
     ) -> Submitted {
@@ -302,15 +304,21 @@ impl SendMessage {
             submission.quit().await;
             return Submitted::Failed(failed);
         }
-        // From here until the server answers, the message may be out.
+        // From here until the server answers, the message may be out. The
+        // claim is timed now, so a second runner waits a whole submission
+        // from here before it settles anything.
+        let claimed = self.deps.clock.now();
         if let Err(err) =
-            record_attempt(ctx.pool(), workspace, send, target.attempted_at, now).await
+            record_attempt(ctx.pool(), workspace, send, target.attempted_at, claimed).await
         {
-            submission.quit().await;
+            // In the middle of `DATA`: no `QUIT` (it would be read as part of
+            // the message) and no end of data. The connection is dropped,
+            // and a server takes nothing from a message that never ended.
+            submission.abandon();
             return Submitted::Claimed(err);
         }
         target.unclear = true;
-        target.attempted_at = Some(now);
+        target.attempted_at = Some(claimed);
         match submission.message(wire).await {
             Ok(()) => {
                 submission.quit().await;
@@ -320,7 +328,7 @@ impl SendMessage {
             Err(failed) => {
                 submission.quit().await;
                 // A definite answer: this attempt did not send it.
-                if let Err(err) = clear_unclear(ctx.pool(), workspace, send, Some(now)).await {
+                if let Err(err) = clear_unclear(ctx.pool(), workspace, send, Some(claimed)).await {
                     return Submitted::Claimed(err);
                 }
                 target.unclear = false;
@@ -495,18 +503,30 @@ async fn messages(
     document: &OutgoingMessage,
     max: usize,
 ) -> Result<Option<(Vec<u8>, Vec<u8>)>, JobError> {
+    // What the blobs say they hold, before any is read: base64 grows
+    // attachments by a third.
+    let stated = document
+        .attachments
+        .iter()
+        .map(|a| usize::try_from(a.blob.size).unwrap_or(usize::MAX))
+        .fold(
+            document.text.len() + document.html.as_ref().map_or(0, String::len),
+            usize::saturating_add,
+        );
+    if stated.saturating_mul(4) / 3 > max {
+        return Ok(None);
+    }
     let mut attachments = Vec::with_capacity(document.attachments.len());
     let mut total = document.text.len() + document.html.as_ref().map_or(0, String::len);
     for attachment in &document.attachments {
         let Some(bytes) = read_blob(ctx, workspace, &attachment.blob, max).await? else {
             return Ok(None);
         };
-        total += bytes.len();
+        total = total.saturating_add(bytes.len());
+        if total.saturating_mul(4) / 3 > max {
+            return Ok(None);
+        }
         attachments.push(bytes);
-    }
-    // Base64 grows attachments by a third.
-    if total.saturating_mul(4) / 3 > max {
-        return Ok(None);
     }
     let wire = compose::rfc5322(
         &OutgoingMessage {
@@ -517,6 +537,55 @@ async fn messages(
     );
     let copy = compose::rfc5322(document, attachments);
     Ok((wire.len() <= max && copy.len() <= MAX_MESSAGE_BYTES).then_some((wire, copy)))
+}
+
+/// What a send's budgets are keyed by.
+struct Keys<'a> {
+    /// The keyed digest of the mailbox login.
+    login: &'a str,
+    /// The keyed digest of the SMTP host.
+    host: &'a str,
+    workspace: WorkspaceId,
+    /// The host is a big provider's ([`imap::SMTP_PROVIDER_HOSTS`]).
+    provider: bool,
+}
+
+/// The budgets one send of `recipients` recipients takes: the login's
+/// messages an hour and recipients a day, the workspace's messages an hour,
+/// and on a host that is not a big provider's (those keep their own limits
+/// per account) the host's messages an hour, of which one workspace takes
+/// at most half.
+fn budgets(config: &crate::config::ImapConfig, keys: &Keys<'_>, recipients: u32) -> Vec<Budget> {
+    let mut budgets = vec![
+        (
+            format!("smtp:login:{}", keys.login),
+            Rate::per_hour(config.send_per_hour),
+            1,
+        ),
+        (
+            format!("smtp:recipients:{}", keys.login),
+            Rate::per_day(config.send_recipients_per_day),
+            recipients,
+        ),
+        (
+            format!("smtp:workspace:{}", keys.workspace),
+            Rate::per_hour(config.send_workspace_per_hour),
+            1,
+        ),
+    ];
+    if !keys.provider {
+        budgets.push((
+            format!("smtp:host:{}:{}", keys.host, keys.workspace),
+            Rate::per_hour((config.send_host_per_hour / 2).max(1)),
+            1,
+        ));
+        budgets.push((
+            format!("smtp:host:{}", keys.host),
+            Rate::per_hour(config.send_host_per_hour),
+            1,
+        ));
+    }
+    budgets
 }
 
 /// Take `cost` of each of `budgets`, in order; none when one is short (those
@@ -616,6 +685,47 @@ mod tests {
             document.to[0].address = bad.to_owned();
             assert!(envelope(&document).is_none(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn a_big_provider_keeps_its_own_limits_and_a_small_host_is_shared() {
+        let config = crate::config::ImapConfig::default();
+        let workspace = WorkspaceId::new();
+        let keys = |provider| Keys {
+            login: "l1",
+            host: "h1",
+            workspace,
+            provider,
+        };
+        let named = |budgets: Vec<Budget>| -> Vec<(String, u32)> {
+            budgets
+                .into_iter()
+                .map(|(key, _, cost)| (key, cost))
+                .collect()
+        };
+        let small = named(budgets(&config, &keys(false), 3));
+        assert_eq!(
+            small,
+            [
+                ("smtp:login:l1".to_owned(), 1),
+                ("smtp:recipients:l1".to_owned(), 3),
+                (format!("smtp:workspace:{workspace}"), 1),
+                (format!("smtp:host:h1:{workspace}"), 1),
+                ("smtp:host:h1".to_owned(), 1),
+            ]
+        );
+        // One workspace takes at most half of a small host's hour.
+        let share = budgets(&config, &keys(false), 1)[3].1;
+        let host = budgets(&config, &keys(false), 1)[4].1;
+        assert!((share.per_second * 2.0 - host.per_second).abs() < 1e-9);
+        // A big provider's host has no instance-wide cap.
+        let provider = named(budgets(&config, &keys(true), 3));
+        assert_eq!(provider.len(), 3);
+        assert!(
+            provider
+                .iter()
+                .all(|(key, _)| !key.starts_with("smtp:host:"))
+        );
     }
 
     #[test]
