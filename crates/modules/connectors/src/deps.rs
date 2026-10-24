@@ -271,6 +271,37 @@ mod tests {
     }
 
     #[test]
+    fn the_module_starts_with_production_poll_bounds_and_imap_send_settings() {
+        // What the server loads at startup (the 2026-10-23 outage): IMAP off
+        // with stray send values, and IMAP on with the send defaults, both
+        // under production's narrowed poll bounds.
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let off = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {
+                "poll": {"min_seconds": 60, "max_seconds": 120},
+                "imap": {"send_per_hour": 0, "send_timeout_seconds": 1, "send_max_message_bytes": 1}
+            }
+        })));
+        let deps = Deps::from_figment(&off, &kernel_config(), None).unwrap();
+        assert!(!deps.imap_enabled());
+        let on = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {
+                "poll": {"min_seconds": 60, "max_seconds": 120},
+                "imap": {"enabled": true}
+            }
+        })));
+        let deps = Deps::from_figment(&on, &kernel_config(), key()).unwrap();
+        assert!(deps.imap_enabled());
+        assert_eq!(deps.imap.config.send_per_hour, 50);
+        // A broken send setting stops only an instance that reads IMAP.
+        let broken = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {"imap": {"enabled": true, "send_per_hour": 0}}
+        })));
+        let err = Deps::from_figment(&broken, &kernel_config(), key()).unwrap_err();
+        assert!(err.contains("SEND_PER_HOUR"), "{err}");
+    }
+
+    #[test]
     fn a_fake_google_is_for_development_only() {
         let figment = Figment::from(Serialized::defaults(serde_json::json!({
             "google": {"client_id": "client-1", "client_secret": "s3cret",

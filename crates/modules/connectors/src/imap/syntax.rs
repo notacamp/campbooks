@@ -107,7 +107,8 @@ pub const MAX_CODE_UIDS: u64 = 10_000;
 pub struct Code {
     pub name: String,
     pub number: Option<u64>,
-    /// The UID sets of `COPYUID` (source, then destination; RFC 4315) or
+    /// The UID sets of `COPYUID` (source, then destination; RFC 4315),
+    /// `APPENDUID` (the appended UIDs, after its UIDVALIDITY; RFC 4315) or
     /// `MODIFIED` (RFC 7162), each as the UIDs it names in order; empty for
     /// any other code, or a set that names more than [`MAX_CODE_UIDS`].
     pub sets: Vec<Vec<u32>>,
@@ -238,10 +239,11 @@ fn code(text: &[u8]) -> Option<Code> {
         .filter(|w| !w.is_empty())
         .take(3)
         .collect();
-    // Which words are UID sets: COPYUID's after its UIDVALIDITY, MODIFIED's
-    // first.
+    // Which words are UID sets: COPYUID's and APPENDUID's after their
+    // UIDVALIDITY, MODIFIED's first.
     let set_words: &[&[u8]] = match name.as_str() {
         "COPYUID" if words.len() == 3 => &words[1..],
+        "APPENDUID" if words.len() == 2 => &words[1..],
         "MODIFIED" if !words.is_empty() => &words[..1],
         _ => &[],
     };
@@ -832,6 +834,30 @@ mod tests {
             panic!()
         };
         assert!(code.unwrap().sets.is_empty());
+    }
+
+    #[test]
+    fn appenduid_keeps_its_uidvalidity_and_uid() {
+        let Response::Tagged { code, .. } =
+            parse(b"w4 OK [APPENDUID 38505 3955] APPEND completed\r\n").unwrap()
+        else {
+            panic!()
+        };
+        let code = code.unwrap();
+        assert_eq!(code.name, "APPENDUID");
+        assert_eq!(code.number, Some(38_505));
+        assert_eq!(code.sets, [vec![3955]]);
+        // A UID of zero, or words that are no UIDs, name none.
+        for broken in [
+            &b"w4 OK [APPENDUID 38505 0] x\r\n"[..],
+            b"w4 OK [APPENDUID 38505 x] x\r\n",
+            b"w4 OK [APPENDUID 38505] x\r\n",
+        ] {
+            let Response::Tagged { code, .. } = parse(broken).unwrap() else {
+                panic!()
+            };
+            assert!(code.unwrap().sets.is_empty());
+        }
     }
 
     #[test]
