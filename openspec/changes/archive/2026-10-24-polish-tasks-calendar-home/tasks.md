@@ -24,5 +24,5 @@
 
 - [x] 4.1 Changelog entry files
 - [x] 4.2 Gates green in CI
-- [ ] 4.3 Recording at 375px and desktop (the lead records it)
+- [x] 4.3 Recording at 375px and desktop (`pnpm --dir clients record ui-polish`, from Storybook)
 - [x] 4.4 `openspec archive polish-tasks-calendar-home --yes` before merge
