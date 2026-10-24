@@ -18,3 +18,7 @@ setuptools==84.0.0
 # (emSign roots with compromised intermediate keys): a critical CA-trust fix,
 # so it skips the two-week rule.
 certifi==2026.10.19
+# filelock arrives transitively (torch, huggingface_hub). Pinned here for
+# CVE-2026-112940 (arbitrary file overwrite through an insecure lock file):
+# a HIGH fix that blocks the image scan, so it skips the two-week rule.
+filelock==4.2.1

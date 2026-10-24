@@ -1,0 +1,1 @@
+- **Scout's sorting model runs on a patched filelock.** The image it runs in now ships filelock 4.2.1 (CVE-2026-112940), which fixes an arbitrary file overwrite through an insecure lock file.
