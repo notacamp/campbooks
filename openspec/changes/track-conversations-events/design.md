@@ -88,7 +88,7 @@ and who placed it).
 | `rule_created` | `create_rule` stores a rule | `acted_without_asking` |
 | `rule_confirmed` | `confirm_rule` says yes to a proposal, or binds a kept rule again | |
 | `rule_declined` | `decline_rule` turns a proposal down | |
-| `rule_updated` | `update_rule` saves it (reshaped, paused, resumed or adopted) | |
+| `rule_updated` | `update_rule` changes its conditions, actions, state or author (reshaped, paused, resumed or adopted); a save that changes nothing tracks nothing | |
 | `rule_removed` | `remove_rule` removes it, or a new or confirmed rule replaces it | `cause` (`member`, `replaced`), `put_back` |
 | `rule_restored` | `restore_rule` brings it back | |
 | `rule_run_finished` | `apply_rule` ends a run (done or cancelled) | `run` (`rule_run`), no `rule` |

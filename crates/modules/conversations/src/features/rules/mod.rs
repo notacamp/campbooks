@@ -1365,6 +1365,14 @@ pub async fn update(
     let rule = rules::find(&mut tx, rule.id)
         .await?
         .ok_or(Error::NotFound)?;
+    // What a save may change, as it is before it (campbooks-cloud#325): a
+    // save that changes none of it tracks nothing.
+    let before = (
+        rule.conditions.clone(),
+        rule.actions.clone(),
+        rule.state,
+        rule.taught_by,
+    );
     // Adopting, letting it act again and changing what a kept rule does all
     // sign it as the member's: their own request only. Pausing it, or
     // reshaping a proposal (which still waits for a yes), signs nothing new.
@@ -1455,11 +1463,18 @@ pub async fn update(
         None,
     )
     .await?;
-    let workspace = access.workspace;
-    tracked::track_rule(&state.tracker, &mut tx, rule.id, |rule| {
-        tracking::RuleUpdated { workspace, rule }
-    })
-    .await?;
+    let (conditions, actions, state_before, author) = &before;
+    let edited = *conditions != rule.conditions
+        || *actions != rule.actions
+        || *state_before != rule.state
+        || *author != rule.taught_by;
+    if edited {
+        let workspace = access.workspace;
+        tracked::track_rule(&state.tracker, &mut tx, rule.id, |rule| {
+            tracking::RuleUpdated { workspace, rule }
+        })
+        .await?;
+    }
     let view = view(&mut tx, &state.binding, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))

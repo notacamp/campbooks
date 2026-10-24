@@ -561,8 +561,15 @@ async fn a_taught_rule_is_tracked_through_its_life_and_its_run(db: PgPool) {
     assert_eq!(run.body["run"]["state"], "done");
     assert_eq!(run.body["run"]["changed"], 3);
 
+    // A save that changes nothing tracks nothing.
+    let unchanged = kit.patch(&sam, &one, json!({})).await;
+    assert_eq!(unchanged.status, StatusCode::OK, "{:?}", unchanged.json);
+    assert!(tracked(&kit, "conversations.rule_updated").await.is_empty());
     let paused = kit.patch(&sam, &one, json!({"paused": true})).await;
     assert_eq!(paused.status, StatusCode::OK, "{:?}", paused.json);
+    // Paused already: nothing more.
+    let again = kit.patch(&sam, &one, json!({"paused": true})).await;
+    assert_eq!(again.status, StatusCode::OK, "{:?}", again.json);
     let events = tracked(&kit, "conversations.rule_updated").await;
     assert_eq!(events.len(), 1);
     sams(

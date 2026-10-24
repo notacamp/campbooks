@@ -6360,7 +6360,7 @@
       ],
       "added_in": 2,
       "description": "A rule was changed: reshaped, paused, resumed or adopted.",
-      "fires_when": "The rule is saved (conversations.update_rule).",
+      "fires_when": "A save changes its conditions, actions, state or author (conversations.update_rule). A save that changes none of them tracks nothing.",
       "module": "conversations",
       "name": "conversations.rule_updated",
       "object": "rule",

@@ -1045,7 +1045,7 @@ impl types::TrackedEvent for RuleSuggestionDismissed {
 
 /// `conversations.rule_updated` v1: A rule was changed: reshaped, paused, resumed or adopted.
 ///
-/// Fires when: The rule is saved (conversations.update_rule).
+/// Fires when: A save changes its conditions, actions, state or author (conversations.update_rule). A save that changes none of them tracks nothing.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct RuleUpdated {
     /// The workspace it happened in (written in the envelope, not the body).
