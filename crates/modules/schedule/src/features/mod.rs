@@ -15,6 +15,7 @@ pub mod list_events;
 pub mod push_event;
 pub mod respond_event;
 pub mod restore_event;
+pub mod retag_bindings;
 pub mod settings;
 pub mod time_zones;
 pub mod update_event;

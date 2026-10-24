@@ -5,13 +5,14 @@
 
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk,
+    AppState, Error, Operation, Problem, RecordRef, Result, Risk,
     authz::Action,
     db::BeginFor as _,
     extract,
     tenancy::{Workspace, WorkspaceId},
 };
 use serde::{Deserialize, Serialize};
+use sqlx::types::Uuid;
 use utoipa::ToSchema;
 
 use crate::{
@@ -53,6 +54,41 @@ pub struct NewEvent {
     pub notes: Option<String>,
     /// Whether it counts when free time is worked out (default yes).
     pub busy: Option<bool>,
+    /// The email it is made from: a `conversations.message` you can read.
+    /// Opening the event then leads back to that email.
+    pub source: Option<RecordRef>,
+    /// The conversation of that email (needed to open it).
+    pub source_conversation: Option<String>,
+}
+
+/// The email a new event is made from, when the member can read it.
+async fn checked_source(
+    state: &AppState,
+    conn: &mut sqlx::PgConnection,
+    access: &campbooks_kernel::tenancy::Access,
+    body: &NewEvent,
+) -> Result<(Option<RecordRef>, Option<Uuid>)> {
+    let invalid = || Error::BadRequest(crate::MESSAGES.reason("invalid_source"));
+    let Some(source) = &body.source else {
+        return if body.source_conversation.is_some() {
+            Err(invalid())
+        } else {
+            Ok((None, None))
+        };
+    };
+    if source.record_type != "conversations.message" || source.id.parse::<Uuid>().is_err() {
+        return Err(invalid());
+    }
+    let conversation = match &body.source_conversation {
+        Some(id) => Some(id.parse::<Uuid>().map_err(|_| invalid())?),
+        None => None,
+    };
+    // 404 when the message is not one the caller may read.
+    campbooks_kernel::authz::require(state, conn, access, Action::Read, source, || {
+        Error::Forbidden
+    })
+    .await?;
+    Ok((Some(source.clone()), conversation))
 }
 
 /// Make an event.
@@ -74,13 +110,14 @@ pub struct NewEvent {
         (status = BAD_REQUEST, description = "Times that do not read or do not follow each other \
             (`invalid_when`), a title that is empty or too long (`invalid_text`), a time zone that \
             is not an IANA name (`invalid_time_zone`), or a calendar that cannot be written \
-            (`calendar_read_only`).",
+            (`calendar_read_only`), or a source that is not an email (`invalid_source`).",
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "Missing scope.", body = Problem,
             content_type = "application/problem+json"),
-        (status = NOT_FOUND, description = "No such calendar, or it is not yours.", body = Problem,
+        (status = NOT_FOUND, description = "No such calendar, or it is not yours, or the source \
+            email is not one you can read.", body = Problem,
             content_type = "application/problem+json"),
     )
 )]
@@ -113,6 +150,7 @@ pub async fn handler(
 
     let mut tx = state.db.begin_for(access.workspace).await?;
     let settings = settings::load(&mut tx, member).await?;
+    let (source, source_conversation) = checked_source(&state, &mut tx, access, &body).await?;
     let calendar = match body.calendar_id {
         Some(id) => {
             ops::require_calendar(&state, &mut tx, access, Action::Write, id).await?;
@@ -140,14 +178,14 @@ pub async fn handler(
             notes: notes.as_deref(),
             origin: EventOrigin::Member,
             found_by: None,
-            source: None,
+            source: source.as_ref(),
             item_key: None,
             ical_uid: None,
             busy: body.busy.unwrap_or(true),
             pushed_from: None,
             series_id: None,
             original_start: None,
-            source_conversation: None,
+            source_conversation,
             quote: None,
         },
     )

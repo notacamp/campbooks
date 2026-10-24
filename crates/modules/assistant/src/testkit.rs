@@ -35,7 +35,7 @@ use crate::AssistantDeps;
 
 /// Every scope a member's token carries here.
 pub const ALL_SCOPES: &str = "assistant:read assistant:write conversations:read search:read attention:read \
-     tasks:read workspaces:read";
+     tasks:read workspaces:read schedule:read";
 
 #[derive(Debug, Default)]
 struct TestMembership {
@@ -105,6 +105,10 @@ pub struct Mail {
     pub tasks: HashMap<String, Value>,
     /// `workspaces.list_members`'s `members`.
     pub members: Vec<Value>,
+    /// `schedule.get_event`'s answers, by event id; any other id is 404.
+    pub events: HashMap<String, Value>,
+    /// `schedule.list_calendars`'s `calendars`.
+    pub calendars: Vec<Value>,
     /// Every stand-in operation called, in order.
     pub called: Vec<String>,
     /// Every change a chat invoked: always empty (each panics).
@@ -139,6 +143,13 @@ impl ScopeName for TasksRead {
     const DESCRIPTION: &'static str = "Read tasks (stand-in).";
 }
 
+struct ScheduleRead;
+
+impl ScopeName for ScheduleRead {
+    const NAME: &'static str = "schedule:read";
+    const DESCRIPTION: &'static str = "Read the calendar (stand-in).";
+}
+
 struct WorkspacesRead;
 
 impl ScopeName for WorkspacesRead {
@@ -166,6 +177,40 @@ async fn get_task(
         .get(&path.1)
         .map(|task| Json(json!({ "task": task, "history": [] })))
         .ok_or(Error::NotFound)
+}
+
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/schedule/events/{event_id}",
+    operation_id = "schedule.get_event",
+    params(("workspace_id" = String, Path), ("event_id" = String, Path)),
+    security(("bearer" = ["schedule:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["schedule.event"])))),
+    responses((status = OK, body = Value)))]
+async fn get_event(
+    _: Workspace<ScheduleRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Path(path): extract::Path<(String, String)>,
+) -> Result<Json<Value>, Error> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("schedule.get_event".into());
+    mail.events
+        .get(&path.1)
+        .map(|event| Json(event.clone()))
+        .ok_or(Error::NotFound)
+}
+
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/schedule/calendars",
+    operation_id = "schedule.list_calendars",
+    params(("workspace_id" = String, Path)),
+    security(("bearer" = ["schedule:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["schedule.calendar"])))),
+    responses((status = OK, body = Value)))]
+async fn list_calendars(
+    _: Workspace<ScheduleRead>,
+    Extension(mail): Extension<Shared>,
+) -> Json<Value> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("schedule.list_calendars".into());
+    Json(json!({ "calendars": mail.calendars }))
 }
 
 #[utoipa::path(get, path = "/api/v1/w/{workspace_id}/members",
@@ -640,6 +685,74 @@ async fn never_task_take_back(Extension(mail): Extension<Shared>) -> Json<Value>
     never(&mail, "tasks.take_back")
 }
 
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/schedule/events",
+    operation_id = "schedule.create_event",
+    params(("workspace_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("schedule.delete_event").automation().assistant().records(["schedule.event"])))),
+    responses((status = OK, body = Value)))]
+async fn never_create_event(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "schedule.create_event")
+}
+
+#[utoipa::path(patch, path = "/api/v1/w/{workspace_id}/schedule/events/{event_id}",
+    operation_id = "schedule.update_event",
+    params(("workspace_id" = String, Path), ("event_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("schedule.update_event").automation().assistant().records(["schedule.event"])))),
+    responses((status = OK, body = Value)))]
+async fn never_update_event(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "schedule.update_event")
+}
+
+#[utoipa::path(delete, path = "/api/v1/w/{workspace_id}/schedule/events/{event_id}",
+    operation_id = "schedule.delete_event",
+    params(("workspace_id" = String, Path), ("event_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("schedule.restore_event").automation().assistant().records(["schedule.event"])))),
+    responses((status = OK, body = Value)))]
+async fn never_delete_event(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "schedule.delete_event")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/schedule/events/{event_id}/restore",
+    operation_id = "schedule.restore_event",
+    params(("workspace_id" = String, Path), ("event_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("schedule.delete_event").automation().assistant().records(["schedule.event"])))),
+    responses((status = OK, body = Value)))]
+async fn never_restore_event(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "schedule.restore_event")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/schedule/events/{event_id}/response",
+    operation_id = "schedule.respond_event",
+    params(("workspace_id" = String, Path), ("event_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("schedule.respond_event").automation().assistant().records(["schedule.event"])))),
+    responses((status = OK, body = Value)))]
+async fn never_respond_event(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "schedule.respond_event")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/schedule/events/{event_id}/push",
+    operation_id = "schedule.push_event",
+    params(("workspace_id" = String, Path), ("event_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("schedule.unpush_event").automation().assistant().records(["schedule.event", "schedule.calendar"])))),
+    responses((status = OK, body = Value)))]
+async fn never_push_event(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "schedule.push_event")
+}
+
+#[utoipa::path(delete, path = "/api/v1/w/{workspace_id}/schedule/events/{event_id}/push",
+    operation_id = "schedule.unpush_event",
+    params(("workspace_id" = String, Path), ("event_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("schedule.push_event").automation().assistant().records(["schedule.event", "schedule.calendar"])))),
+    responses((status = OK, body = Value)))]
+async fn never_unpush_event(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "schedule.unpush_event")
+}
+
 /// The module over a fresh database.
 pub struct Kit {
     /// The test database as its owner (no row-level security).
@@ -707,6 +820,15 @@ impl Kit {
             .routes(routes!(never_task_update))
             .routes(routes!(never_task_hand_off))
             .routes(routes!(never_task_take_back))
+            .routes(routes!(get_event))
+            .routes(routes!(list_calendars))
+            .routes(routes!(never_create_event))
+            .routes(routes!(never_update_event))
+            .routes(routes!(never_delete_event))
+            .routes(routes!(never_restore_event))
+            .routes(routes!(never_respond_event))
+            .routes(routes!(never_push_event))
+            .routes(routes!(never_unpush_event))
             .layer(Extension(mail.clone()));
         let state = idp
             .state(pool)

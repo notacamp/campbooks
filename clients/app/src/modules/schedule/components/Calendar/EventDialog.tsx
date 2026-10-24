@@ -23,6 +23,8 @@ export interface EventDraft {
   kind?: EventKind | undefined;
   /** The email it is made from: shown as a hint. */
   subject?: string | undefined;
+  /** The email it is made from: the new event keeps the link back to it. */
+  source?: { messageId: string; conversationId: string } | undefined;
 }
 
 export interface EventDialogProps {
@@ -97,6 +99,12 @@ export function EventDialog({
         starts,
         ends,
         ...(place.trim() === "" ? {} : { place: place.trim() }),
+        ...(draft.source === undefined
+          ? {}
+          : {
+              source: { type: "conversations.message", id: draft.source.messageId },
+              source_conversation: draft.source.conversationId,
+            }),
       });
     } else {
       onEdit(editing, { title: title.trim(), kind, starts, ends, place: place.trim() });

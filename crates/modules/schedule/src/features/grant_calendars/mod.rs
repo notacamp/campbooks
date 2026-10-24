@@ -47,6 +47,11 @@ impl EventHandler for GrantCalendars {
             read_json(&state.blobs, &granted.workspace, listed, MAX_DOCUMENT_BYTES).await?;
         let tx = ctx.tx().await?;
         ensure_campbooks_calendar(tx, workspace, granted.granted_by).await?;
+        // Only the providers the module names; anything else is left unnamed.
+        let provider = list
+            .provider
+            .as_deref()
+            .filter(|name| matches!(*name, "google" | "zoho"));
         let mut added = 0_u64;
         for calendar in list.calendars {
             let time_zone = calendar.time_zone.filter(|zone| parse_zone(zone).is_some());
@@ -57,8 +62,8 @@ impl EventHandler for GrantCalendars {
             added += sqlx::query(
                 "INSERT INTO schedule.calendars
                      (id, workspace_id, member_id, source, connection_id, provider_calendar_id,
-                      name, color, time_zone, syncing, writable, is_primary)
-                 VALUES ($1, $2, $3, 'provider', $4, $5, $6, $7, $8, $9, $10, $9)
+                      name, color, time_zone, syncing, writable, is_primary, provider)
+                 VALUES ($1, $2, $3, 'provider', $4, $5, $6, $7, $8, $9, $10, $9, $11)
                  ON CONFLICT (workspace_id, connection_id, provider_calendar_id)
                     WHERE source = 'provider' DO NOTHING",
             )
@@ -72,6 +77,7 @@ impl EventHandler for GrantCalendars {
             .bind(&time_zone)
             .bind(calendar.primary)
             .bind(calendar.writable)
+            .bind(provider)
             .execute(&mut **tx)
             .await?
             .rows_affected();

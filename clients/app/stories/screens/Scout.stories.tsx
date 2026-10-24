@@ -11,7 +11,10 @@ import {
   answered,
   answerFrames,
   chatWithProposals,
+  chatWithCalendarProposals,
   chatWithTaskProposals,
+  CALENDAR_ANSWER,
+  CALENDAR_SAID,
   TASK_CHAT,
   CLEAR,
   CLEAR_ANSWER,
@@ -58,10 +61,12 @@ import {
   STREAM_COUNTS,
   W,
 } from "../../test/demo/conversations";
+import { DENTIST, HANDOVER, REVIEW } from "../../test/demo/schedule";
 import { BILL, LEASE, OPEN_TASKS, PROPOSAL, TEAM } from "../../test/demo/tasks";
 import { ANA, DUARTE, SESSION, SOFIA as SOFIA_MEMBER } from "../../test/demo/workspaces";
 
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
+import { scheduleApi } from "./schedule-mock";
 
 // Scout's chat (campbooks-cloud#305, "Ask about this"): opened from a Home
 // need and from the reader, against fictional demo data, with the answer
@@ -601,6 +606,71 @@ export const TaskProposals: Story = {
 /** The same, without a play: say it, then Confirm each card and Undo one (recordings). */
 export const TaskProposalsLive: Story = {
   args: { path: HOME, api: taskProposalsApi() },
+};
+
+/**
+ * The API for Scout's calendar proposals (campbooks-cloud#42): the same
+ * flow as the task cards, over the stateful schedule API, so Confirm moves,
+ * answers or adds the event and Undo puts it back.
+ */
+function calendarProposalsApi(): Record<string, MockRoute> {
+  let asked = false;
+  const states = new Map<string, string>();
+  const proposals = () =>
+    CALENDAR_ANSWER.proposals.map(
+      (p) => ({ ...p, state: states.get(p.id) ?? p.state }) as typeof p,
+    );
+  return api({
+    ...scheduleApi([DENTIST, REVIEW, HANDOVER]).routes,
+    [`POST ${CHATS}`]: () => ({
+      body: asked ? chatWithCalendarProposals(proposals()) : MARTA_CHAT,
+      status: asked ? 200 : 201,
+    }),
+    [`POST ${CHATS}/${MARTA_CHAT.id}/questions/stream`]: () => {
+      asked = true;
+      return { stream: answerFrames(CALENDAR_ANSWER, "Three events changed."), delay: 90 };
+    },
+    ...Object.fromEntries(
+      CALENDAR_ANSWER.proposals.map((p) => [
+        `POST ${CHATS}/${MARTA_CHAT.id}/proposals/${p.id}`,
+        (body: unknown) => {
+          const state = (body as { state: string }).state;
+          states.set(p.id, state);
+          return { body: { ...p, state } };
+        },
+      ]),
+    ),
+  });
+}
+
+/**
+ * Scout proposes calendar changes: three cards, the dentist moved, an
+ * invitation accepted and the key handover added to the Google calendar;
+ * each is confirmed on its own, with Undo.
+ */
+export const CalendarProposals: Story = {
+  args: { path: HOME, api: calendarProposalsApi() },
+  play: async ({ canvasElement }) => {
+    await openFromHome(canvasElement);
+    const page = within(document.body);
+    const field = await page.findByRole("textbox", { name: "Ask about this" });
+    await userEvent.type(field, `${CALENDAR_SAID}{Enter}`);
+    const move = await page.findByRole(
+      "region",
+      { name: /^Move this event to/u },
+      { timeout: 15_000 },
+    );
+    await expect(within(move).getByText(/Dentist check-up/u)).toBeVisible();
+    await userEvent.click(within(move).getByRole("button", { name: "Confirm" }));
+    await expect(await within(move).findByText("Done.")).toBeVisible();
+    await userEvent.click(within(move).getByRole("button", { name: "Undo" }));
+    await expect(await within(move).findByText("Undone.")).toBeVisible();
+  },
+};
+
+/** The same, without a play: say it, then Confirm each card and Undo one (recordings). */
+export const CalendarProposalsLive: Story = {
+  args: { path: HOME, api: calendarProposalsApi() },
 };
 
 /**

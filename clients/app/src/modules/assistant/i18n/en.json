@@ -361,11 +361,26 @@
         "plan_day": "Plan it for {{day}}",
         "task_later": "Later, until {{until}}",
         "due": "Due on {{day}}",
-        "hand_off": "Hand to {{name}}"
+        "hand_off": "Hand to {{name}}",
+        "create_event": "Add to your calendar: {{when}}",
+        "update_event": "Change this event",
+        "update_event_moved": "Move this event to {{when}}",
+        "update_event_renamed": "Rename this event",
+        "update_event_ends": "End this event at {{when}}",
+        "delete_event": "Delete this event",
+        "respond_event": "Reply: {{response}}",
+        "push_event": "Add to {{calendar}}",
+        "unpush_event": "Take off {{calendar}}"
       },
       "taskLine": "{{title}} · due {{due}}",
       "taskNoDue": "{{title}}",
       "handOffNote": "It goes to {{name}}’s Home.",
+      "eventLine": "{{title}} · {{when}}",
+      "responses": {
+        "accepted": "Going",
+        "tentative": "Maybe",
+        "declined": "Not going"
+      },
       "streams": {
         "primary": "Primary",
         "updates": "Updates",

@@ -87,6 +87,10 @@ const CATALOGUE: [ScopeInfo; 6] = [
 pub const ORIGIN: &str = "http://localhost:8080";
 /// The scope the fake intake asks for.
 pub const MAIL_SCOPE: &str = "https://mail.example.com/modify";
+
+/// The scope of the fake calendar capability, which a connect or reconnect
+/// asks for besides the mailbox when it names `calendar`.
+pub const CALENDAR_SCOPE: &str = "https://calendar.example.com/events";
 /// The fake Microsoft's tenant.
 pub const TENANT: &str = "2b5a2c1e-6f1d-4c8e-9a3b-7d4e5f6a7b8c";
 /// The connection the fake intake lets its grantor reconnect: its grant
@@ -200,6 +204,14 @@ impl GrantIntake for FakeIntake {
         }
     }
 
+    fn capability_scopes(&self, provider: &str, capabilities: &[String]) -> Vec<String> {
+        if provider == "google" && capabilities.iter().any(|c| c == "calendar") {
+            vec![CALENDAR_SCOPE.to_owned()]
+        } else {
+            Vec::new()
+        }
+    }
+
     fn adopt<'a>(&'a self, _state: &'a AppState, grant: ProviderGrant) -> AdoptFuture<'a> {
         if self
             .refuse_next
@@ -268,6 +280,7 @@ impl GrantIntake for FakeIntake {
                     address: RECONNECTABLE_ADDRESS.to_owned(),
                     account_subject: TestUser::default().subject,
                     needs_reauth,
+                    capabilities: vec!["messages".to_owned()],
                 })
                 .ok_or(Error::NotFound)
         })

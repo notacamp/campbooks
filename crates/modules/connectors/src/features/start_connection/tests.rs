@@ -196,15 +196,16 @@ async fn refusals(db: PgPool) {
     kit.join(&ana, ws, Role::Member);
     let uri = format!("/api/v1/w/{ws}/connections/authorizations");
 
-    let calendar = kit
+    // Files are not offered yet (Zoho Calendar's flag: `calendar_tests`).
+    let files = kit
         .post(
             &ana,
             &uri,
-            serde_json::json!({"provider": "google", "capabilities": ["calendar"]}),
+            serde_json::json!({"provider": "google", "capabilities": ["files"]}),
         )
         .await;
-    assert_eq!(calendar.status, StatusCode::BAD_REQUEST);
-    assert_eq!(calendar.json["code"], "capability_not_offered");
+    assert_eq!(files.status, StatusCode::BAD_REQUEST);
+    assert_eq!(files.json["code"], "capability_not_offered");
     let nothing = kit
         .post(
             &ana,

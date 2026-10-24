@@ -488,6 +488,7 @@ async fn the_consent_door_starts_a_connect_for_other_modules(db: PgPool) {
                 workspace: campbooks_kernel::tenancy::WorkspaceId::new(),
                 provider: "google".to_owned(),
                 connection: None,
+                capabilities: Vec::new(),
             },
         )
         .await
@@ -499,6 +500,35 @@ async fn the_consent_door_starts_a_connect_for_other_modules(db: PgPool) {
     );
     let to_google = kit.get(&started.url).await;
     assert_eq!(query(&to_google.location())["access_type"], "offline");
+    // A mailbox consent asks for nothing besides the mailbox.
+    let scope = query(&to_google.location())["scope"].clone();
+    assert!(scope.contains(crate::testkit::MAIL_SCOPE), "{scope}");
+    assert!(!scope.contains(crate::testkit::CALENDAR_SCOPE), "{scope}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_consent_that_names_calendar_asks_for_its_scopes_too(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let principal = kit.state.auth.verify(&access).await.unwrap();
+    let door = crate::consent_door(kit.deps.clone());
+    let started = door
+        .start(
+            &kit.state,
+            ConsentRequest {
+                principal,
+                workspace: campbooks_kernel::tenancy::WorkspaceId::new(),
+                provider: "google".to_owned(),
+                connection: None,
+                capabilities: vec!["messages".to_owned(), "calendar".to_owned()],
+            },
+        )
+        .await
+        .unwrap();
+    let to_google = kit.get(&started.url).await;
+    let scope = query(&to_google.location())["scope"].clone();
+    assert!(scope.contains(crate::testkit::MAIL_SCOPE), "{scope}");
+    assert!(scope.contains(crate::testkit::CALENDAR_SCOPE), "{scope}");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

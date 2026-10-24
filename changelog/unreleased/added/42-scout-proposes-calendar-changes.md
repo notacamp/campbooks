@@ -1,0 +1,1 @@
+- **Scout can propose changes to your calendar** (Scout chat). Ask Scout to move a meeting, add or remove an event, answer an invitation, or put an event on your Google calendar, and it shows a card with the event's own title and time for you to confirm, with Undo afterwards. It never changes your calendar without your yes.

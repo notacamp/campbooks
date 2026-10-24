@@ -174,3 +174,35 @@ that connection and their events, keeping the member's Campbooks calendar.
 #### Scenario: Calendar access removed
 - **WHEN** Inês disconnects her Google connection
 - **THEN** her Google calendars and their events are gone and her Campbooks calendar is kept
+
+### Requirement: Whose calendar it is
+A provider calendar SHALL carry the provider's name (`google` or `zoho`) when
+the calendar list of its grant names one, and the calendar view SHALL show it,
+so a client can say "Google" and not "the provider". A calendar made before
+the list named one SHALL have none.
+
+#### Scenario: The provider on a calendar
+- **WHEN** Inês grants calendar access on her Google connection
+- **THEN** each of her Google calendars shows `google` as its provider and her Campbooks calendar shows none
+
+### Requirement: Which event an item became
+An event view SHALL list the keys of the read items it stands for, so that a
+reader can tell which event an item became without comparing titles or times.
+
+#### Scenario: The dentist's email
+- **WHEN** Scout added "Dentist" from the item `<message>:model:item:0`
+- **THEN** the event lists that key and the reader shows the item as added
+
+### Requirement: Events made from an email
+A client that makes an event from an email MAY name the email
+(`conversations.message`) and its conversation. The module SHALL accept it
+only when the caller may read that message, and answer 404 when not; the
+event then leads back to the email like one Scout added.
+
+#### Scenario: Add by hand from a flagged email
+- **WHEN** Inês adds an event from an email she can read
+- **THEN** the event keeps the link to that email and its sheet offers to open it
+
+#### Scenario: An email she cannot read
+- **WHEN** a request names an email Inês cannot read
+- **THEN** it is answered with 404 and no event is made

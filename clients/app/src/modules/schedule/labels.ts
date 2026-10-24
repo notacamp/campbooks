@@ -24,6 +24,20 @@ export function eventKey(event: Pick<EventView, "id" | "occurrence">): string {
     : `${event.id}~${event.occurrence}`;
 }
 
+/** Whose calendar it is, as the member knows it ("Google"); none when the server did not say. */
+export function providerName(
+  calendar: Pick<CalendarView, "provider"> | undefined,
+): string | undefined {
+  switch (calendar?.provider) {
+    case "google":
+      return "Google";
+    case "zoho":
+      return "Zoho";
+    default:
+      return undefined;
+  }
+}
+
 export const dueKeyOf = (item: Pick<DueItem, "id">) => `due:${item.id}`;
 
 /** "09:30 – 10:00", "All day", "From 15:00": the short time of an event. */

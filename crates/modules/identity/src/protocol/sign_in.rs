@@ -254,11 +254,25 @@ pub(super) async fn redirect_to_provider(
     let browser = random_token();
     upstream::store_flow(&ctx.state.db, &issuer.cipher, &state, &browser, &flow, now).await?;
     let mut scopes: Vec<String> = IDENTITY_SCOPES.iter().map(|s| (*s).to_owned()).collect();
-    let mailbox = if asks_mailbox(&flow) {
+    let mut mailbox = if asks_mailbox(&flow) {
         ctx.state.grants.mailbox_scopes(flow.provider.as_str())
     } else {
         Vec::new()
     };
+    // The scopes of the capabilities a connect or reconnect adds to the
+    // mailbox (calendar). Not part of what the mailbox grant must hold: a
+    // provider that lets the person leave them out still grants the mailbox.
+    if !mailbox.is_empty() && !flow.capabilities.is_empty() {
+        let extra = ctx
+            .state
+            .grants
+            .capability_scopes(flow.provider.as_str(), &flow.capabilities);
+        for scope in extra {
+            if !mailbox.contains(&scope) {
+                mailbox.push(scope);
+            }
+        }
+    }
     let offline = !mailbox.is_empty();
     scopes.extend(mailbox);
     let location = upstream.authorize_url(&AuthorizeRequest {
