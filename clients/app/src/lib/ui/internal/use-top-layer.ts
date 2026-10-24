@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
 
 /** Whether this browser has the popover API (the top layer). jsdom does not. */
-export function hasTopLayer(): boolean {
+function hasTopLayer(): boolean {
   return (
     typeof HTMLElement !== "undefined" &&
     typeof (HTMLElement.prototype as Partial<HTMLElement>).showPopover === "function"
