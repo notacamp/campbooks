@@ -9,17 +9,29 @@
 //! against the well-known names of the languages Campbooks ships and of
 //! common providers. Only folder names given by the server are matched,
 //! never anything in a message (ADR 0018).
+//!
+//! A folder named like a stream mark (`Campbooks/Updates`, under its
+//! parents and whatever the server's delimiter) is a **stream folder**:
+//! part of the inbox, where that stream's mail is filed (campbooks-cloud#312).
+//! Campbooks creates one when a move needs it, its name built by
+//! [`created_name`] as if a member had chosen it.
 
 use std::collections::HashSet;
 
+use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
 use serde::{Deserialize, Serialize};
 
-/// What a folder is to the adapter.
+use crate::{contract::ProviderStream, domain::marks};
+
+/// What a folder is to the adapter. The order is the order folders are
+/// read and kept in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     /// The Inbox.
     Inbox,
+    /// A stream's folder (`Campbooks/<Stream>`): part of the inbox.
+    Stream,
     /// Sent mail.
     Sent,
     /// Spam.
@@ -37,6 +49,7 @@ impl Role {
     pub const fn token(self) -> &'static str {
         match self {
             Self::Inbox => "INBOX",
+            Self::Stream => "STREAM",
             Self::Sent => "SENT",
             Self::Junk => "JUNK",
             Self::Trash => "TRASH",
@@ -145,6 +158,9 @@ pub fn role(folder: &Listed) -> Option<Role> {
         }
     }
     let decoded = decode(&folder.name)?;
+    if stream_of(&display(&folder.name, folder.delimiter)).is_some() {
+        return Some(Role::Stream);
+    }
     let leaf = without_inbox(&decoded, folder.delimiter).to_lowercase();
     let named = |names: &[&str]| names.contains(&leaf.as_str());
     if named(DRAFTS) {
@@ -200,6 +216,105 @@ fn hidden(c: char) -> bool {
             c,
             '\u{061C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
         )
+}
+
+/// The stream a folder shown as `display` files (`Campbooks/Updates`, any
+/// case), if it is a stream folder.
+pub fn stream_of(display: &str) -> Option<ProviderStream> {
+    marks::of_name(display)
+}
+
+/// Longest part of a folder name Campbooks creates, in characters.
+pub const MAX_PART: usize = 64;
+
+/// Longest folder name Campbooks creates, encoded, in bytes.
+pub const MAX_CREATED_NAME: usize = 255;
+
+/// The name of a folder Campbooks creates, as the server spells it: `parts`
+/// (each checked by [`part`], then encoded in modified UTF-7) joined by the
+/// server's hierarchy `delimiter` (a flat server, without one, takes them as
+/// one name joined by `/`), under `parent` (a folder name the server gave,
+/// such as `INBOX`) when given. `None` when a part could escape its place
+/// (the delimiter, `/`, a `LIST` wildcard, `.` or `..`), cannot be shown
+/// (controls, direction marks), is empty or too long, or the whole name is
+/// longer than [`MAX_CREATED_NAME`].
+pub fn created_name(
+    parts: &[&str],
+    delimiter: Option<char>,
+    parent: Option<&str>,
+) -> Option<String> {
+    if parts.is_empty() {
+        return None;
+    }
+    let joint = delimiter.unwrap_or('/');
+    let mut name = String::new();
+    if let Some(parent) = parent {
+        if parent.is_empty() || !parent.bytes().all(|b| (0x21..0x7f).contains(&b)) {
+            return None;
+        }
+        name.push_str(parent);
+        name.push(joint);
+    }
+    for (n, text) in parts.iter().enumerate() {
+        if n > 0 {
+            name.push(joint);
+        }
+        name.push_str(&part(text, delimiter)?);
+    }
+    (name.len() <= MAX_CREATED_NAME).then_some(name)
+}
+
+/// One part of a folder name Campbooks creates, encoded; `None` when it is
+/// refused (see [`created_name`]).
+pub fn part(text: &str, delimiter: Option<char>) -> Option<String> {
+    let refused =
+        |c: char| Some(c) == delimiter || matches!(c, '/' | '\\' | '*' | '%' | '"') || hidden(c);
+    let length = text.chars().count();
+    if length == 0
+        || length > MAX_PART
+        || text.trim() != text
+        || text == "."
+        || text == ".."
+        || text.chars().any(refused)
+    {
+        return None;
+    }
+    Some(encode(text))
+}
+
+/// `name` in modified UTF-7 (RFC 3501 §5.1.3): printable ASCII as itself
+/// (`&` as `&-`), anything else as `&`, the modified base64 of its UTF-16,
+/// and `-`.
+pub fn encode(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut wide: Vec<u16> = Vec::new();
+    for c in name.chars() {
+        if (' '..='~').contains(&c) {
+            flush(&mut out, &mut wide);
+            if c == '&' {
+                out.push_str("&-");
+            } else {
+                out.push(c);
+            }
+        } else {
+            let mut units = [0_u16; 2];
+            wide.extend_from_slice(c.encode_utf16(&mut units));
+        }
+    }
+    flush(&mut out, &mut wide);
+    out
+}
+
+/// Write the run of `wide` characters (UTF-16) as modified base64.
+fn flush(out: &mut String, wide: &mut Vec<u16>) {
+    if wide.is_empty() {
+        return;
+    }
+    let bytes: Vec<u8> = wide.iter().flat_map(|unit| unit.to_be_bytes()).collect();
+    out.push('&');
+    out.push_str(&STANDARD_NO_PAD.encode(bytes).replace('/', ","));
+    out.push('-');
+    wide.clear();
 }
 
 /// Whether `name` can be read: printable ASCII (modified UTF-7 is), short
@@ -374,6 +489,114 @@ mod tests {
         assert_eq!(capped.unwrap().len(), 2);
         // No Inbox: not believed.
         assert_eq!(tracked(&[listed("Sent", &[])], 10), None);
+    }
+
+    #[test]
+    fn stream_folders_are_found_by_name_under_their_parents() {
+        assert_eq!(role(&listed("Campbooks.Updates", &[])), Some(Role::Stream));
+        assert_eq!(
+            role(&listed("INBOX.campbooks.NEWSLETTERS", &[])),
+            Some(Role::Stream)
+        );
+        let slash = Listed {
+            delimiter: Some('/'),
+            ..listed("Campbooks/Receipts", &[])
+        };
+        assert_eq!(role(&slash), Some(Role::Stream));
+        assert_eq!(role(&listed("Campbooks", &[])), Some(Role::User));
+        assert_eq!(role(&listed("Campbooks.Recibos", &[])), Some(Role::User));
+        assert_eq!(
+            stream_of(&display("INBOX.Campbooks.Updates", Some('.'))),
+            Some(ProviderStream::Updates)
+        );
+        // Kept right after the Inbox, so a cap on folders never drops one.
+        let kept = tracked(
+            &[
+                listed("A", &[]),
+                listed("Campbooks.Updates", &[]),
+                listed("INBOX", &[]),
+            ],
+            2,
+        )
+        .unwrap();
+        assert_eq!(kept[1].role, Role::Stream);
+    }
+
+    #[test]
+    fn modified_utf7_is_encoded_as_it_is_decoded() {
+        for name in [
+            "Entwürfe",
+            "Éléments envoyés",
+            "Tom & Jerry",
+            "日本語",
+            "Café ☕ 🍞",
+            "Plain",
+        ] {
+            let encoded = encode(name);
+            assert!(
+                encoded.bytes().all(|b| (0x20..0x7f).contains(&b)),
+                "{encoded}"
+            );
+            assert_eq!(decode(&encoded).as_deref(), Some(name), "{encoded}");
+        }
+        assert_eq!(encode("Entwürfe"), "Entw&APw-rfe");
+        assert_eq!(encode("Tom & Jerry"), "Tom &- Jerry");
+        assert_eq!(encode("日本語"), "&ZeVnLIqe-");
+    }
+
+    #[test]
+    fn created_names_cannot_escape_or_nest() {
+        assert_eq!(
+            created_name(&["Campbooks", "Updates"], Some('.'), None).as_deref(),
+            Some("Campbooks.Updates")
+        );
+        assert_eq!(
+            created_name(&["Campbooks", "Updates"], Some('.'), Some("INBOX")).as_deref(),
+            Some("INBOX.Campbooks.Updates")
+        );
+        assert_eq!(
+            created_name(&["Campbooks", "Updates"], None, None).as_deref(),
+            Some("Campbooks/Updates")
+        );
+        // Non-ASCII letters: one part, encoded.
+        assert_eq!(
+            created_name(&["Campbooks", "Reçus"], Some('/'), None).as_deref(),
+            Some("Campbooks/Re&AOc-us")
+        );
+        let long = "x".repeat(MAX_PART + 1);
+        for hostile in [
+            "Up.dates",
+            "Up/dates",
+            "Up*",
+            "%",
+            "..",
+            ".",
+            "",
+            " Updates",
+            "Line\r\nBreak",
+            "Bell\u{7}",
+            "Right\u{202E}to-left",
+            "Quote\"d",
+            "Back\\slash",
+            long.as_str(),
+        ] {
+            assert_eq!(
+                created_name(&["Campbooks", hostile], Some('.'), None),
+                None,
+                "{hostile:?}"
+            );
+        }
+        // Another delimiter is refused too, whatever the server's.
+        assert_eq!(created_name(&["Campbooks", "A|B"], Some('|'), None), None);
+        assert_eq!(
+            created_name(&["Campbooks", "A.B"], Some('/'), None).as_deref(),
+            Some("Campbooks/A.B")
+        );
+        // A whole name past the bound.
+        let parts: Vec<String> = (0..5).map(|_| "y".repeat(MAX_PART)).collect();
+        let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
+        assert_eq!(created_name(&parts, Some('.'), None), None);
+        assert_eq!(created_name(&[], Some('.'), None), None);
     }
 
     #[test]

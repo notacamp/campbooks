@@ -49,7 +49,10 @@ use super::{
 use crate::{
     config::ImapConfig,
     contract::{MessageChange, NormalizedMessage},
-    domain::model::{Phase, StreamId},
+    domain::{
+        model::{Phase, StreamId},
+        outbound,
+    },
     mail::{self, Fetched, IndexOp, ReadError, Receiver},
 };
 
@@ -133,6 +136,12 @@ impl From<WireError> for Stop {
 impl From<ReadError> for Stop {
     fn from(err: ReadError) -> Self {
         Self::Read(err)
+    }
+}
+
+impl From<campbooks_kernel::Error> for Stop {
+    fn from(err: campbooks_kernel::Error) -> Self {
+        Self::Read(ReadError::Kernel(err))
     }
 }
 
@@ -387,6 +396,9 @@ struct Run {
     oversized: HashSet<String>,
     /// Folders `STATUS` or `EXAMINE` refused: not read this run.
     refused: HashSet<String>,
+    /// Messages to emit again whatever their state (a member's change was
+    /// refused, overtaken or given up: `connectors.messages.reemit`).
+    forced: HashSet<String>,
     downloads: usize,
     headers: usize,
     swept: bool,
@@ -1126,7 +1138,8 @@ impl Reader<'_> {
             [(role, place.folder.as_str(), header.seen, header.flagged)],
             header.from_self,
         );
-        let flags = state::flags(&tokens, &run.cursor);
+        let mut flags = state::flags(&tokens, &run.cursor);
+        flags.provider_stream = state::provider_stream(None, &tokens, &run.cursor);
         let (message, op) = mail::store_message(
             self.blobs,
             &self.workspace.to_string(),
@@ -1463,6 +1476,8 @@ impl Reader<'_> {
     /// changed; then, when every folder is read, messages left with no
     /// location are looked for and removed.
     async fn settle(&mut self, run: &mut Run, complete: bool) -> Result<(), Stop> {
+        run.forced = self.reemits().await?;
+        run.touched.extend(run.forced.iter().cloned());
         let touched: Vec<String> = run.touched.iter().cloned().collect();
         let mut orphans = self.settle_states(run, &touched).await?;
         if !complete || !run.cursor.backfilled() {
@@ -1588,6 +1603,24 @@ impl Reader<'_> {
         Ok(whole)
     }
 
+    /// Messages flagged to be emitted again (a member's change was refused,
+    /// overtaken or given up), at most [`MAX_DOWNLOADS`].
+    async fn reemits(&self) -> Result<HashSet<String>, Stop> {
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        let keys: Vec<String> = sqlx::query_scalar(
+            "SELECT provider_message_id FROM connectors.messages
+              WHERE stream_id = $1 AND reemit
+              ORDER BY internal_date DESC
+              LIMIT $2",
+        )
+        .bind(self.stream)
+        .bind(i64::try_from(MAX_DOWNLOADS).unwrap_or(50))
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(keys.into_iter().collect())
+    }
+
     /// Indexed messages of the stream with no stored location (at most
     /// [`MAX_UNLOCATED`]), not already settled by this run.
     async fn unlocated(&self, run: &Run) -> Result<Vec<String>, Stop> {
@@ -1662,6 +1695,8 @@ impl Reader<'_> {
         }
         let mut unlocated = Vec::new();
         let workspace = self.workspace.to_string();
+        // A member's change still waiting to be made shows as they left it.
+        let pending = outbound::overlay(self.pool, self.workspace, self.stream, keys).await?;
         for key in keys {
             let located: Vec<(Role, &str, bool, bool)> = places
                 .get(key)
@@ -1685,7 +1720,8 @@ impl Reader<'_> {
             }
             if let Some(inserted) = run.inserted.get(key).copied() {
                 let tokens = state::tokens(located, inserted.from_self);
-                let flags = state::flags(&tokens, &run.cursor);
+                let mut flags = state::flags(&tokens, &run.cursor);
+                flags.provider_stream = state::provider_stream(None, &tokens, &run.cursor);
                 if let Some(MessageChange::Upsert { message }) =
                     run.changes.get_mut(inserted.change)
                 {
@@ -1702,12 +1738,18 @@ impl Reader<'_> {
             let tokens = state::tokens(located, known.labels.iter().any(|t| t == state::SELF));
             let mut before = known.labels.clone();
             before.sort();
-            if before == tokens {
+            if before == tokens && !run.forced.contains(key) {
                 continue;
             }
             let mut message: NormalizedMessage =
                 mail::document(self.blobs, &workspace, &known.document).await?;
-            mail::apply_flags(&mut message, &state::flags(&tokens, &run.cursor));
+            let mut flags = state::flags(&tokens, &run.cursor);
+            flags.provider_stream =
+                state::provider_stream(Some(before.as_slice()), &tokens, &run.cursor);
+            if let Some(changes) = pending.get(key) {
+                state::overlay(&mut flags, changes);
+            }
+            mail::apply_flags(&mut message, &flags);
             run.changes.push(MessageChange::Upsert {
                 message: Box::new(message),
             });
@@ -1776,7 +1818,7 @@ fn check(done: &Done) -> Result<(), Stop> {
 }
 
 /// `uids` as a sequence set (`1:5,7`).
-fn sequence(uids: &[u32]) -> String {
+pub(crate) fn sequence(uids: &[u32]) -> String {
     let mut sorted = uids.to_vec();
     sorted.sort_unstable();
     sorted.dedup();

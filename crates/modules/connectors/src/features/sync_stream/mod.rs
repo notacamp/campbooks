@@ -15,7 +15,9 @@
 //!
 //! An IMAP stream (`imap::read`) reads over one session to its server,
 //! holding one of the host's few session slots, and keeps where each
-//! message is (`connectors.imap_locations`) with the index.
+//! message is (`connectors.imap_locations`) with the index. Its pending
+//! changes are made over that session first (`imap::write`), and how they
+//! ended (the locations and index they leave) recorded before it reads.
 
 mod calendar;
 
@@ -135,13 +137,25 @@ impl JobHandler for SyncStream {
             return Ok(());
         };
         if target.provider == Provider::Imap {
+            // As for the other providers: stale changes given up first, then
+            // only changes bound to where this run makes them.
+            let retention = TimeDelta::days(i64::from(self.deps.config.batch_retention_days));
+            outbound::expire(ctx.pool(), workspace, target.stream, now - retention, now).await?;
+            let backlog = outbound::backlog(
+                ctx.pool(),
+                &ctx.state().binding,
+                workspace,
+                (target.stream, target.at()),
+                now,
+            )
+            .await?;
             let read = self
-                .run_imap(ctx, workspace, &target, now)
+                .run_imap(ctx, workspace, &target, &backlog, now)
                 .await
                 .inspect_err(|_| metrics::sync_finished(target.provider, SyncOutcome::Failed))?;
             return match read {
                 Some(read) => {
-                    self.finish(ctx, workspace, &target, inbox, read, None, now)
+                    self.finish(ctx, workspace, &target, inbox, read, backlog.last(), now)
                         .await
                 }
                 None => Ok(()),
@@ -272,7 +286,7 @@ impl SyncStream {
                      VALUES ($1, $2, $3, $4, now())
                      ON CONFLICT (stream_id, label_id) DO UPDATE SET name = EXCLUDED.name",
                 ),
-                // No label cache yet (write-back lands with campbooks-cloud#312).
+                // IMAP has no label cache (its stream folders are in the cursor).
                 Provider::Imap => continue,
             };
             insert
@@ -617,8 +631,9 @@ impl SyncStream {
     }
 
     /// An IMAP run: the account and its password, one of its host's
-    /// session slots, then one page over one session. `None` once the run
-    /// has ended without a page (waiting, trouble recorded).
+    /// session slots, then over one session `backlog`'s changes and one
+    /// page. `None` once the run has ended without a page (waiting, trouble
+    /// recorded).
     #[allow(
         clippy::too_many_lines,
         reason = "one run read top to bottom: account, slot, read, outcome"
@@ -628,6 +643,7 @@ impl SyncStream {
         ctx: &mut JobContext,
         workspace: WorkspaceId,
         target: &Target,
+        backlog: &Backlog,
         now: DateTime<Utc>,
     ) -> Result<Option<RunPage>, JobError> {
         let Some(cipher) = self.deps.cipher.clone() else {
@@ -703,8 +719,12 @@ impl SyncStream {
             password: &password,
             pool: ctx.pool(),
             blobs: &state.blobs,
+            binding: &state.binding,
             workspace,
+            connection: target.connection,
             stream: target.stream,
+            at: target.at(),
+            backlog,
             phase: target.phase,
             cursor,
             now,
@@ -1256,7 +1276,7 @@ fn imap_rate(sessions: u32) -> Rate {
     }
 }
 
-/// What one IMAP run reads with.
+/// What one IMAP run writes and reads with.
 struct ImapRun<'a> {
     imap: &'a imap::Imap,
     server: &'a imap::Server,
@@ -1264,8 +1284,14 @@ struct ImapRun<'a> {
     password: &'a SecretString,
     pool: &'a PgPool,
     blobs: &'a campbooks_kernel::blobs::BlobStore,
+    binding: &'a campbooks_kernel::binding::Binding,
     workspace: WorkspaceId,
+    connection: ConnectionId,
     stream: StreamId,
+    /// Where the stream's changes are made (their binding, #242).
+    at: outbound::At<'a>,
+    /// The changes to make before reading.
+    backlog: &'a Backlog,
     phase: Phase,
     cursor: Cursor,
     now: DateTime<Utc>,
@@ -1281,13 +1307,23 @@ enum ImapTrouble {
     Failed(Failure),
 }
 
-/// Sign in, read one page, sign out.
+/// Sign in, make the pending changes, read one page, sign out.
 async fn read_imap(run: ImapRun<'_>) -> Result<Page, ImapTrouble> {
     let opening = Session::open(run.imap, run.server, run.username, run.password);
     let mut session = tokio::time::timeout(run.imap.timeout(), opening)
         .await
         .unwrap_or(Err(Refusal::ImapUnreachable))
         .map_err(ImapTrouble::Refused)?;
+    let mut cursor = run.cursor.clone();
+    if !run.backlog.pending.is_empty() {
+        match push_imap(&run, &mut session).await {
+            Ok(after) => cursor = after,
+            Err(trouble) => {
+                session.logout().await;
+                return Err(trouble);
+            }
+        }
+    }
     let page = imap::read::Reader {
         session: &mut session,
         pool: run.pool,
@@ -1295,7 +1331,7 @@ async fn read_imap(run: ImapRun<'_>) -> Result<Page, ImapTrouble> {
         workspace: run.workspace,
         stream: run.stream,
         phase: run.phase,
-        cursor: run.cursor,
+        cursor,
         now: run.now,
         config: &run.imap.config,
         address: run.address,
@@ -1304,6 +1340,63 @@ async fn read_imap(run: ImapRun<'_>) -> Result<Page, ImapTrouble> {
     .await;
     session.logout().await;
     page.map_err(ImapTrouble::Failed)
+}
+
+/// Make `run`'s pending changes over `session` and record how they ended,
+/// with the locations, index and cursor they leave, before anything is
+/// read (so the read never takes them for the server's). The cursor the
+/// read starts from; trouble that stopped the push once it is recorded.
+async fn push_imap(run: &ImapRun<'_>, session: &mut Session) -> Result<Cursor, ImapTrouble> {
+    let pushed = imap::write::Writer {
+        session,
+        pool: run.pool,
+        workspace: run.workspace,
+        stream: run.stream,
+        cursor: run.cursor.clone(),
+        config: &run.imap.config,
+    }
+    .push(run.backlog)
+    .await
+    .map_err(|err| ImapTrouble::Failed(Failure::Read(err)))?;
+    let trouble = pushed.trouble;
+    let cursor = record_imap_push(run, pushed)
+        .await
+        .map_err(|err| ImapTrouble::Failed(Failure::Read(err)))?;
+    match trouble {
+        None => Ok(cursor),
+        Some(imap::write::Trouble::Busy) => Err(ImapTrouble::Failed(Failure::Busy)),
+        Some(other) => Err(ImapTrouble::Failed(Failure::Server(other.code()))),
+    }
+}
+
+/// Record, in one transaction of the stream's workspace, how `pushed`'s
+/// changes ended and the index tokens, locations and cursor they leave.
+async fn record_imap_push(
+    run: &ImapRun<'_>,
+    pushed: imap::write::Pushed,
+) -> Result<Cursor, ReadError> {
+    let mut tx = run.pool.begin_for(run.workspace).await?;
+    // The connection before the stream (removal's order).
+    health::lock(&mut tx, run.connection).await?;
+    outbound::record_outcome(
+        &mut tx,
+        run.binding,
+        run.workspace,
+        (run.stream, run.at),
+        &pushed.push.outcome,
+        run.now,
+    )
+    .await?;
+    imap::state::apply(&mut tx, run.workspace, run.stream, pushed.locations).await?;
+    let cursor = serde_json::to_value(&pushed.cursor)
+        .map_err(|e| ReadError::Corrupt(format!("encoding a cursor: {}", redact::json(&e))))?;
+    sqlx::query("UPDATE connectors.streams SET cursor = cursor || $2 WHERE id = $1")
+        .bind(run.stream)
+        .bind(cursor)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(pushed.cursor)
 }
 
 /// An IMAP page as the run applies it.
@@ -1768,5 +1861,7 @@ pub(crate) async fn read_page(
 mod calendar_tests;
 #[cfg(test)]
 mod imap_tests;
+#[cfg(test)]
+mod imap_write_tests;
 #[cfg(test)]
 mod tests;

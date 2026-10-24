@@ -157,6 +157,9 @@ pub struct ImapConfig {
     /// [`workspace_sessions_per_host`](Self::workspace_sessions_per_host)
     /// too.
     pub workspace_idle_sessions_per_host: u32,
+    /// Folders Campbooks creates in one mailbox at most (stream folders,
+    /// `Campbooks/<Stream>`; default 10, at most 100).
+    pub max_created_folders: u32,
 }
 
 /// `CAMPBOOKS_CONNECTORS__POLL__*`.
@@ -251,6 +254,7 @@ impl Default for ImapConfig {
             idle_quiet_days: 14,
             idle_poll_seconds: 900,
             workspace_idle_sessions_per_host: 10,
+            max_created_folders: 10,
         }
     }
 }
@@ -371,6 +375,13 @@ impl ConnectorsConfig {
             );
         }
         self.check_idle()?;
+        // Checked only where IMAP runs: a stray value never stops an instance
+        // that does not read IMAP.
+        if imap.enabled && (imap.max_created_folders == 0 || imap.max_created_folders > 100) {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__IMAP__MAX_CREATED_FOLDERS must be 1 to 100".to_owned(),
+            );
+        }
         if self.failing_after == 0 {
             return Err("CAMPBOOKS_CONNECTORS__FAILING_AFTER must be positive".to_owned());
         }
@@ -649,6 +660,39 @@ mod tests {
             ))
             .unwrap_err();
             assert!(refused.contains(setting), "{refused}");
+        }
+    }
+
+    #[test]
+    fn imap_write_back_settings_are_checked() {
+        let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
+        assert_eq!(config.imap.max_created_folders, 10);
+        let read = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"imap": {"max_created_folders": 3}}
+        })))
+        .unwrap();
+        assert_eq!(read.imap.max_created_folders, 3);
+        for bad in [0, 101] {
+            let refused = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"imap": {"enabled": true, "max_created_folders": bad}}
+            })))
+            .unwrap_err();
+            assert!(refused.contains("MAX_CREATED_FOLDERS"), "{refused}");
+            // IMAP off: it starts, whatever the value.
+            ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"imap": {"max_created_folders": bad}}
+            })))
+            .unwrap();
+        }
+        // The defaults start with prod's narrowed poll bounds, IMAP on or off.
+        for enabled in [false, true] {
+            ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {
+                    "poll": {"min_seconds": 60, "max_seconds": 120},
+                    "imap": {"enabled": enabled}
+                }
+            })))
+            .unwrap();
         }
     }
 

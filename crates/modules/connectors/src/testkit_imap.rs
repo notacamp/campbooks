@@ -143,6 +143,17 @@ pub struct Seen {
     pub dones: usize,
     pub noops: usize,
     pub logouts: usize,
+    /// IMAP, signed in: each command's verb (`UID MOVE`, `EXPUNGE`), and
+    /// its whole line past the tag, in order.
+    pub commands: Vec<String>,
+    pub lines: Vec<String>,
+}
+
+impl Seen {
+    /// How many commands with verb `verb` it received.
+    pub fn count(&self, verb: &str) -> usize {
+        self.commands.iter().filter(|c| *c == verb).count()
+    }
 }
 
 #[derive(Debug)]
@@ -430,6 +441,9 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                         (offers.qresync, "QRESYNC"),
                         (offers.objectid, "OBJECTID"),
                         (offers.idle, "IDLE"),
+                        (offers.moves, "MOVE"),
+                        (offers.uidplus, "UIDPLUS"),
+                        (offers.unselect, "UNSELECT"),
                     ] {
                         if offered {
                             caps.push(name);
@@ -641,7 +655,20 @@ fn signed_in(
         selected,
         &mut effects,
     );
+    let named = if verb.eq_ignore_ascii_case("UID") {
+        format!(
+            "UID {}",
+            args.split_whitespace()
+                .next()
+                .unwrap_or_default()
+                .to_ascii_uppercase()
+        )
+    } else {
+        verb.to_ascii_uppercase()
+    };
     shared.see(|seen| {
+        seen.commands.push(named);
+        seen.lines.push(format!("{verb} {args}"));
         if let Some((folder, write)) = effects.opened {
             seen.opened.push(folder);
             seen.selected |= write;

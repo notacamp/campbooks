@@ -31,6 +31,7 @@ fn a_busy_server_is_told_from_a_refusal() {
         code: Some(Code {
             name: code.to_owned(),
             number: None,
+            sets: Vec::new(),
         }),
     };
     assert_eq!(sign_in_refusal(&done("UNAVAILABLE")), Refusal::ImapBusy);
@@ -79,6 +80,7 @@ fn only_known_response_codes_are_logged() {
     let code = |name: &str| Code {
         name: name.to_owned(),
         number: None,
+        sets: Vec::new(),
     };
     assert_eq!(logged_code(None), "");
     assert_eq!(
