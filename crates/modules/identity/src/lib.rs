@@ -44,6 +44,9 @@ mod prune;
 mod resources;
 pub mod scopes;
 mod token_revocation;
+/// The module's tracked events, generated from the tracking plan (ADR 0020).
+#[path = "tracking.gen.rs"]
+pub mod tracking;
 pub mod upstream;
 mod web;
 pub mod webauthn;
@@ -153,5 +156,7 @@ mod suspension_tests;
 mod testkit;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tracking_tests;
 #[cfg(test)]
 mod ways_in_tests;

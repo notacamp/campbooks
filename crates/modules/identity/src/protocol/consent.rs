@@ -36,9 +36,10 @@ use crate::{
         consents::{self, NewConsent},
         sessions::{self, Session},
         step_up::STEP_UP_WINDOW,
+        tracked,
     },
     events::ConsentGranted,
-    web,
+    tracking, web,
 };
 
 /// Answers one address may send.
@@ -315,6 +316,10 @@ pub struct Answered {
             content_type = "application/problem+json"),
     ),
 )]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one flow, read top to bottom; its tracked events sit next to the changes they record"
+)]
 pub async fn answer(
     State(ctx): State<Ctx>,
     Path(id): Path<String>,
@@ -371,6 +376,17 @@ pub async fn answer(
     .filter(|r| r.consent_due && r.consent_account_id == Some(session.account_id))
     .ok_or(Error::NotFound)?;
     if answer.decision == Decision::Deny {
+        ctx.state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::ConsentDenied {
+                    account_id: session.account_id,
+                    client_kind: tracked::client_kind(client.kind),
+                    client_id: tracked::client_ref(&client.id),
+                },
+            )
+            .await?;
         tx.commit().await?;
         let redirect = request.redirect(&issuer.url, &[("error", "access_denied")]);
         return Ok(web::no_store(Json(Answered { redirect }).into_response()));
@@ -380,7 +396,7 @@ pub async fn answer(
         .split_whitespace()
         .map(ToOwned::to_owned)
         .collect();
-    consents::grant(
+    let consent = consents::grant(
         &mut tx,
         &NewConsent {
             account_id: session.account_id,
@@ -412,6 +428,11 @@ pub async fn answer(
                 workspace: workspace.map(|w| w.to_string()),
             },
         )
+        .await?;
+    let consent = tracked::consent(&mut tx, consent).await?;
+    ctx.state
+        .tracker
+        .track(&mut tx, &tracking::ConsentGranted { consent })
         .await?;
     tx.commit().await?;
     let redirect =

@@ -34,8 +34,10 @@ use crate::{
         clients::{self, Client, Kind},
         consents, sessions,
         tokens::{self, Grant, Mint, OFFLINE_ACCESS, Refusal, TOKEN_LIFETIME},
+        tracked,
     },
     events::RefreshReuseDetected,
+    tracking,
     web::{no_store, oauth_error},
 };
 
@@ -197,7 +199,7 @@ pub async fn token(
         return client_credentials(&ctx, issuer, &client, form.scope.as_deref(), now).await;
     }
     let mut tx = ctx.state.db.begin().await?;
-    let (grant, refresh_token, nonce, family) = match form.grant_type.as_deref() {
+    let (grant, refresh_token, nonce, family, code) = match form.grant_type.as_deref() {
         Some("authorization_code") => {
             let (Some(code), Some(redirect_uri), Some(verifier)) =
                 (&form.code, &form.redirect_uri, &form.code_verifier)
@@ -227,7 +229,7 @@ pub async fn token(
                         None
                     };
                     let (family, refresh) = refresh.unzip();
-                    (redeemed.grant, refresh, redeemed.nonce, family)
+                    (redeemed.grant, refresh, redeemed.nonce, family, true)
                 }
                 Err(refusal) => return refused(&ctx, tx, &client, refusal).await,
             }
@@ -237,7 +239,7 @@ pub async fn token(
                 return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request"));
             };
             match tokens::rotate(&mut tx, token, &client, &issuer.resource, now).await? {
-                Ok((grant, next, family)) => (grant, Some(next), None, Some(family)),
+                Ok((grant, next, family)) => (grant, Some(next), None, Some(family), false),
                 Err(refusal) => return refused(&ctx, tx, &client, refusal).await,
             }
         }
@@ -254,6 +256,7 @@ pub async fn token(
         refresh_token,
         nonce,
         family,
+        code,
     };
     respond(&ctx, issuer, &client, tx, exchanged, now).await
 }
@@ -265,6 +268,9 @@ struct Issued {
     nonce: Option<String>,
     /// The refresh family the sign-in holds, stamped on the access token.
     family: Option<uuid::Uuid>,
+    /// Whether an authorization code was redeemed (not a refresh token
+    /// rotated): only that is tracked, once per sign-in per client.
+    code: bool,
 }
 
 /// Commit `tx` and answer the tokens `exchanged` stands for, with an ID token
@@ -282,6 +288,7 @@ async fn respond(
         refresh_token,
         nonce,
         family,
+        code,
     } = exchanged;
     // A code or refresh token of an app that needs consent stands on that
     // consent: revoked, replaced by one for another workspace, or narrower,
@@ -326,6 +333,26 @@ async fn respond(
     // more, whatever code or refresh token it still holds.
     if profile.revoked_for(grant.auth_time) {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
+    }
+    // A refresh rotation (every few minutes per session) is routine and not
+    // tracked; the sign-in it renews, its abuse and its end are.
+    if code {
+        ctx.state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::TokensIssued {
+                    account_id: grant.account_id,
+                    session_id: grant.session_id,
+                    client_kind: tracked::client_kind(client.kind),
+                    client_id: tracked::client_ref(&client.id),
+                    refresh_token_issued: refresh_token.is_some(),
+                    scope_count: i64::try_from(grant.scope.split_whitespace().count())
+                        .unwrap_or(i64::MAX),
+                    workspace_bound: grant.workspace.is_some(),
+                },
+            )
+            .await?;
     }
     tx.commit().await?;
     if !client.is_first_party() {
@@ -466,6 +493,17 @@ async fn refused(
         )
         .await?;
         ctx.state.events.publish(&mut tx, &event).await?;
+        ctx.state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::RefreshReuseDetected {
+                    account_id,
+                    client_kind: tracked::client_kind(client.kind),
+                    client_id: tracked::client_ref(&client.id),
+                },
+            )
+            .await?;
         tracing::warn!(
             client = %client.id,
             "a spent code or rotated refresh token was used again; its tokens are revoked"
@@ -517,7 +555,23 @@ pub async fn revoke(
     let Some(token) = &form.token else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request"));
     };
-    let mut conn = ctx.state.db.acquire().await?;
-    tokens::revoke_token(&mut conn, token, &client.id, issuer.now()).await?;
+    let mut tx = ctx.state.db.begin().await?;
+    if let Some((family, account_id)) =
+        tokens::revoke_token(&mut tx, token, &client.id, issuer.now()).await?
+    {
+        ctx.state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::RefreshTokenRevoked {
+                    family_id: family,
+                    account_id,
+                    client_kind: tracked::client_kind(client.kind),
+                    client_id: tracked::client_ref(&client.id),
+                },
+            )
+            .await?;
+    }
+    tx.commit().await?;
     Ok(no_store(StatusCode::OK.into_response()))
 }

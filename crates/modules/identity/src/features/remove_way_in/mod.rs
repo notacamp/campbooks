@@ -15,9 +15,10 @@ use uuid::Uuid;
 use crate::{
     MESSAGES,
     deps::Deps,
-    domain::{accounts, sessions, step_up, ways_in},
+    domain::{accounts, sessions, step_up, tracked, ways_in},
     events::WayInRemoved,
     scopes::IdentityWrite,
+    tracking,
 };
 
 /// The way in a path names (by field, so routes nested under the web BFF's
@@ -88,6 +89,14 @@ pub async fn handler(
     let provider = accounts::remove(&mut tx, path.id, account)
         .await?
         .ok_or(Error::NotFound)?;
+    let removed = tracking::WayInRemoved {
+        way_in_id: path.id,
+        account_id: account,
+        provider: tracked::provider(&provider)
+            .ok_or_else(|| Error::internal("a way in names an unknown provider"))?,
+        cause: tracking::WayInRemoval::Member,
+        sessions_ended: i64::try_from(ended).unwrap_or(i64::MAX),
+    };
     accounts::audit(
         &mut tx,
         Some(account),
@@ -107,6 +116,7 @@ pub async fn handler(
             },
         )
         .await?;
+    state.tracker.track(&mut tx, &removed).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }

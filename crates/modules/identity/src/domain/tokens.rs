@@ -338,14 +338,15 @@ pub async fn rotate(
 
 /// Revoke the family refresh token `token` of `client` belongs to. Unknown
 /// tokens and other clients' tokens are ignored (RFC 7009 §2.2).
+/// The family and its account, when a live family was revoked.
 pub async fn revoke_token(
     conn: &mut PgConnection,
     token: &str,
     client_id: &str,
     now: DateTime<Utc>,
-) -> Result<()> {
-    let family: Option<Uuid> = sqlx::query_scalar(
-        "SELECT f.id FROM identity.refresh_tokens t
+) -> Result<Option<(Uuid, Uuid)>> {
+    let family: Option<(Uuid, Uuid)> = sqlx::query_as(
+        "SELECT f.id, f.account_id FROM identity.refresh_tokens t
            JOIN identity.refresh_families f ON f.id = t.family_id
           WHERE t.token_hash = $1 AND f.client_id = $2",
     )
@@ -353,20 +354,22 @@ pub async fn revoke_token(
     .bind(client_id)
     .fetch_optional(&mut *conn)
     .await?;
-    if let Some(family) = family {
-        revoke_family(conn, family, "revoked", now).await?;
-    }
-    Ok(())
+    let Some((family, account)) = family else {
+        return Ok(None);
+    };
+    let revoked = revoke_family(conn, family, "revoked", now).await?;
+    Ok(revoked.then_some((family, account)))
 }
 
-/// Revoke every token of `family`.
+/// Revoke every token of `family`; whether it was live (and is revoked
+/// now).
 pub async fn revoke_family(
     conn: &mut PgConnection,
     family: Uuid,
     reason: &str,
     now: DateTime<Utc>,
-) -> Result<()> {
-    sqlx::query(
+) -> Result<bool> {
+    let revoked = sqlx::query(
         "UPDATE identity.refresh_families SET revoked_at = $2, revoke_reason = $3
           WHERE id = $1 AND revoked_at IS NULL",
     )
@@ -374,8 +377,9 @@ pub async fn revoke_family(
     .bind(now)
     .bind(reason)
     .execute(conn)
-    .await?;
-    Ok(())
+    .await?
+    .rows_affected();
+    Ok(revoked == 1)
 }
 
 #[derive(Serialize)]

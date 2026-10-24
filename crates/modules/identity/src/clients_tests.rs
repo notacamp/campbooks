@@ -10,6 +10,7 @@ use sqlx::PgPool;
 use crate::{
     domain::clients::NATIVE_CLIENT_ID,
     testkit::{FOREIGN, HOME, Kit, MEMBER_IN_HOME, MEMBER_ONLY, ORIGIN, Response, WORK, query},
+    tracking_tests::{account_of, no_address, tracked},
 };
 
 const LOOPBACK: &str = "http://127.0.0.1:53124/callback";
@@ -179,6 +180,42 @@ async fn the_native_app_is_asked_for_every_time_and_works_in_every_workspace(db:
     // The request is spent either way.
     let replayed = answer(&kit, &id, &serde_json::json!({ "decision": "allow" })).await;
     assert_eq!(replayed.status, StatusCode::NOT_FOUND);
+
+    // Tracked (ADR 0020): the yes with the consent, the no, and the code
+    // the app redeemed; by nobody signed in to the API yet.
+    let account = account_of(tokens.json["access_token"].as_str().unwrap_or_default());
+    let granted = tracked(&kit, "identity.consent_granted").await;
+    assert_eq!(granted.len(), 1);
+    assert_eq!(
+        granted[0].envelope["actor"],
+        serde_json::json!({"type": "anonymous"})
+    );
+    assert_eq!(granted[0].envelope["operation"], "identity.answer_consent");
+    let consent = &granted[0].body["consent"];
+    assert_eq!(consent["account_id"], account.as_str());
+    assert_eq!(consent["client_id"], NATIVE_CLIENT_ID);
+    assert_eq!(consent["client_kind"], "first_party");
+    assert_eq!(consent["scope_count"], 3);
+    assert_eq!(consent["remembered"], false);
+    assert!(consent.get("bound_workspace_id").is_none());
+    no_address(&granted[0]);
+    let denied = tracked(&kit, "identity.consent_denied").await;
+    assert_eq!(denied.len(), 1);
+    assert_eq!(denied[0].envelope["operation"], "identity.answer_consent");
+    assert_eq!(
+        denied[0].body,
+        serde_json::json!({"account_id": account, "client_kind": "first_party",
+            "client_id": NATIVE_CLIENT_ID})
+    );
+    let issued = tracked(&kit, "identity.tokens_issued").await;
+    assert_eq!(
+        issued.len(),
+        1,
+        "the native app's code; the web's was never redeemed"
+    );
+    assert_eq!(issued[0].body["client_id"], NATIVE_CLIENT_ID);
+    assert_eq!(issued[0].body["refresh_token_issued"], true);
+    assert_eq!(issued[0].body["workspace_bound"], false);
 }
 
 /// Authorize the native app again (asked every time), allow, redeem: its
@@ -464,6 +501,43 @@ async fn revoking_a_consent_ends_its_tokens_and_asks_again(db: PgPool) {
     assert_eq!(refreshed.json["error"], "invalid_grant");
     let (next, _) = Kit::authorize_url(&client, AGENT_CALLBACK, "conversations:read");
     to_consent(&kit, &next).await;
+
+    // Tracked (ADR 0020): the registration (never its name or redirect
+    // URIs), the consent in Work, and its revocation by the person.
+    let registered = tracked(&kit, "identity.dynamic_client_registered").await;
+    assert_eq!(registered.len(), 1);
+    assert_eq!(registered[0].envelope["operation"], "identity.register");
+    assert_eq!(
+        registered[0].body["client"],
+        serde_json::json!({
+            "client_id": client, "kind": "dynamic", "confidential": false, "scope_count": 1,
+            "redirect_uri_count": 2,
+            "created_at": registered[0].body["client"]["created_at"],
+        })
+    );
+    assert!(!registered[0].body.to_string().contains("Helpful"));
+    let granted = tracked(&kit, "identity.consent_granted").await;
+    assert_eq!(granted.len(), 1);
+    assert_eq!(granted[0].body["consent"]["client_kind"], "dynamic");
+    assert_eq!(
+        granted[0].body["consent"]["bound_workspace_id"],
+        WORK.to_string()
+    );
+    assert_eq!(granted[0].body["consent"]["remembered"], true);
+    let revoked = tracked(&kit, "identity.consent_revoked").await;
+    assert_eq!(revoked.len(), 1, "revoking it again tracks nothing");
+    let account = account_of(&web);
+    assert_eq!(
+        revoked[0].envelope["actor"],
+        serde_json::json!({"type": "user", "id": account})
+    );
+    assert_eq!(revoked[0].envelope["operation"], "identity.revoke_consent");
+    assert_eq!(revoked[0].body["consent"]["id"], consent.as_str());
+    assert!(revoked[0].body["consent"]["revoked_at"].is_string());
+    let issued = tracked(&kit, "identity.tokens_issued").await;
+    assert_eq!(issued.last().unwrap().body["client_kind"], "dynamic");
+    assert_eq!(issued.last().unwrap().body["workspace_bound"], true);
+    no_address(&revoked[0]);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -518,9 +592,22 @@ async fn a_member_leaving_or_a_workspace_going_ends_the_apps_allowed_there(db: P
         2,
         "nothing ended while still a member"
     );
+    assert!(tracked(&kit, "identity.consents_revoked").await.is_empty());
     kit.member_gone(HOME, MEMBER_IN_HOME);
     member_left().await;
     assert_eq!(live(&kit, &web).await, 1, "the Home consent ended");
+    // One summary in Home, by the handler (ADR 0020).
+    let revoked = tracked(&kit, "identity.consents_revoked").await;
+    assert_eq!(revoked.len(), 1);
+    assert_eq!(revoked[0].workspace_id, Some(HOME));
+    assert_eq!(
+        revoked[0].envelope["actor"],
+        serde_json::json!({"type": "system", "id": "identity.revoke_departed_consents"})
+    );
+    assert_eq!(
+        revoked[0].body,
+        serde_json::json!({"member_id": MEMBER_IN_HOME.to_string(), "consents": 1})
+    );
 
     let deleting = || async {
         let work = campbooks_kernel::tenancy::WorkspaceId::from_uuid(WORK);
@@ -826,7 +913,10 @@ async fn a_workspace_registers_rotates_and_removes_its_own_clients(db: PgPool) {
         .as_str()
         .unwrap_or_default()
         .to_owned();
-    assert_eq!(credentials(secret).await.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        credentials(secret.clone()).await.status,
+        StatusCode::UNAUTHORIZED
+    );
     assert_eq!(credentials(fresh.clone()).await.status, StatusCode::OK);
 
     // Removal: no more tokens.
@@ -834,11 +924,54 @@ async fn a_workspace_registers_rotates_and_removes_its_own_clients(db: PgPool) {
         .api(Method::DELETE, &format!("{clients}/{client}"), &web)
         .await;
     assert_eq!(removed.status, StatusCode::NO_CONTENT);
-    assert_eq!(credentials(fresh).await.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        credentials(fresh.clone()).await.status,
+        StatusCode::UNAUTHORIZED
+    );
     let gone = kit
         .api(Method::DELETE, &format!("{clients}/{client}"), &web)
         .await;
     assert_eq!(gone.status, StatusCode::NOT_FOUND);
+
+    // Tracked in Home (ADR 0020), never the name or a secret; the
+    // client-credentials tokens are routine and not tracked.
+    let person = serde_json::json!({"type": "user", "id": account_of(&web)});
+    for (name, operation) in [
+        ("identity.client_registered", "identity.register_client"),
+        (
+            "identity.client_secret_rotated",
+            "identity.rotate_client_secret",
+        ),
+        ("identity.client_removed", "identity.remove_client"),
+    ] {
+        let events = tracked(&kit, name).await;
+        assert_eq!(events.len(), 1, "{name}");
+        let event = &events[0];
+        assert_eq!(event.workspace_id, Some(HOME), "{name}");
+        assert_eq!(event.envelope["actor"], person, "{name}");
+        assert_eq!(event.envelope["operation"], operation, "{name}");
+        let body = event.body.to_string();
+        assert!(!body.contains("Nightly"), "{body}");
+        assert!(!body.contains(&secret) && !body.contains(&fresh), "{body}");
+        no_address(event);
+    }
+    let registered = &tracked(&kit, "identity.client_registered").await[0].body["client"];
+    assert_eq!(registered["client_id"], client.as_str());
+    assert_eq!(registered["kind"], "workspace");
+    assert_eq!(registered["confidential"], true);
+    assert_eq!(registered["scope_count"], 1);
+    assert_eq!(registered["redirect_uri_count"], 0);
+    let rotated = &tracked(&kit, "identity.client_secret_rotated").await[0].body["client"];
+    assert!(rotated["secret_rotated_at"].is_string());
+    assert_eq!(
+        tracked(&kit, "identity.client_removed").await[0].body,
+        serde_json::json!({"client_id": client, "cause": "removed", "consents_revoked": 0})
+    );
+    assert_eq!(
+        tracked(&kit, "identity.tokens_issued").await.len(),
+        1,
+        "the web sign-in only"
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

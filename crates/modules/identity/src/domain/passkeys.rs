@@ -201,7 +201,12 @@ pub async fn record_use(
 
 /// Rename `account`'s passkey `id`; the renamed passkey, or `None` when it
 /// is not theirs.
-pub async fn rename(db: &PgPool, id: Uuid, account: Uuid, name: &str) -> Result<Option<Passkey>> {
+pub async fn rename(
+    conn: &mut PgConnection,
+    id: Uuid,
+    account: Uuid,
+    name: &str,
+) -> Result<Option<Passkey>> {
     Ok(sqlx::query_as(concat!(
         "UPDATE identity.passkeys SET name = $3 WHERE id = $1 AND account_id = $2 RETURNING ",
         columns!()
@@ -209,7 +214,19 @@ pub async fn rename(db: &PgPool, id: Uuid, account: Uuid, name: &str) -> Result<
     .bind(id)
     .bind(account)
     .bind(name)
-    .fetch_optional(db)
+    .fetch_optional(conn)
+    .await?)
+}
+
+/// The name of `account`'s passkey `id`, its row held (`FOR UPDATE`) until
+/// the transaction ends; `None` when it is not theirs.
+pub async fn name_of(conn: &mut PgConnection, id: Uuid, account: Uuid) -> Result<Option<String>> {
+    Ok(sqlx::query_scalar(
+        "SELECT name FROM identity.passkeys WHERE id = $1 AND account_id = $2 FOR UPDATE",
+    )
+    .bind(id)
+    .bind(account)
+    .fetch_optional(conn)
     .await?)
 }
 
