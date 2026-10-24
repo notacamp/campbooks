@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 
 import { Dialog } from "../Dialog/Dialog";
 import { TextField } from "../Field/Field";
@@ -106,7 +106,8 @@ export const InADialog: Story = {
   play: async ({ canvasElement }) => {
     const page = within(canvasElement.ownerDocument.body);
     await userEvent.click(page.getByRole("button", { name: /^Date/u }));
-    await expect(page.getByRole("grid", { name: "October 2026" })).toBeVisible();
+    // The dialog fades in: the grid shows once it has.
+    await waitFor(() => expect(page.getByRole("grid", { name: "October 2026" })).toBeVisible());
     await expect(page.getByRole("button", { name: "Today" })).toBeVisible();
     await userEvent.keyboard("{Escape}");
     await expect(page.getByRole("dialog", { name: "New event" })).toBeVisible();

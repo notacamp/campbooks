@@ -52,8 +52,6 @@ export function Popover({
   const open = controlledOpen ?? uncontrolledOpen;
   const panelId = useId();
   const anchor = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panel = useRef<HTMLDivElement>(null);
   const setOpen = (next: boolean) => {
     setUncontrolledOpen(next);
     onOpenChange?.(next);
@@ -63,16 +61,17 @@ export function Popover({
   useEffect(() => {
     change.current = setOpen;
   });
-  const onTop =
-    useTopLayer({
-      open: open && layer === "top",
-      anchor: triggerRef,
-      panel,
-      align: placement === "bottom-end" ? "end" : "start",
-      onAway: () => {
-        change.current(false);
-      },
-    }) && layer === "top";
+  // The trigger and the panel; in the top layer when asked and possible.
+  const layered = useTopLayer<HTMLButtonElement, HTMLDivElement>({
+    open: open && layer === "top",
+    align: placement === "bottom-end" ? "end" : "start",
+    onAway: () => {
+      change.current(false);
+    },
+  });
+  const triggerRef = layered.anchor;
+  const panelRef = layered.panel;
+  const onTop = layered.onTop && layer === "top";
 
   useEffect(() => {
     if (!open) {
@@ -82,8 +81,8 @@ export function Popover({
     // focus; otherwise the first one.
     // In the top layer, focusing scrolls nothing under it (a dialog's body).
     (
-      panel.current?.querySelector<HTMLElement>("[data-autofocus]") ??
-      panel.current?.querySelector<HTMLElement>(FOCUSABLE)
+      panelRef.current?.querySelector<HTMLElement>("[data-autofocus]") ??
+      panelRef.current?.querySelector<HTMLElement>(FOCUSABLE)
     )?.focus({ preventScroll: onTop });
     const onPointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && anchor.current?.contains(event.target) !== true) {
@@ -123,7 +122,7 @@ export function Popover({
         },
       })}
       <div
-        ref={panel}
+        ref={panelRef}
         id={panelId}
         className={styles["panel"]}
         role="dialog"

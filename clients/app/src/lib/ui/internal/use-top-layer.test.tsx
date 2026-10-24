@@ -1,13 +1,17 @@
 import { render, screen } from "@testing-library/react";
-import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useTopLayer } from "./use-top-layer";
 
 function Harness({ open, onAway }: { open: boolean; onAway: () => void }) {
-  const anchor = useRef<HTMLButtonElement>(null);
-  const panel = useRef<HTMLDivElement>(null);
-  const top = useTopLayer({ open, anchor, panel, onAway });
+  const {
+    anchor,
+    panel,
+    onTop: top,
+  } = useTopLayer<HTMLButtonElement, HTMLDivElement>({
+    open,
+    onAway,
+  });
   return (
     <div>
       <button ref={anchor} type="button">

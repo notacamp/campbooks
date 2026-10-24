@@ -57,8 +57,6 @@ export function TimePicker({
   const { t, i18n } = useTranslation("ui");
   const ids = useFieldIds(id);
   const listId = useId();
-  const list = useRef<HTMLDivElement>(null);
-  const box = useRef<HTMLDivElement>(null);
   const locale = i18n.language;
   const current = value !== undefined && isTime(value) ? value : undefined;
   const shown = current === undefined ? "" : formatTime(current, locale);
@@ -85,20 +83,21 @@ export function TimePicker({
     setActive(-1);
   };
   // In the top layer the list hangs under the field where no dialog clips it.
-  const onTop = useTopLayer({
+  const layered = useTopLayer<HTMLDivElement, HTMLDivElement>({
     open,
-    anchor: box,
-    panel: list,
     matchWidth: true,
     onAway: () => {
       setOpen(false);
       setActive(-1);
     },
   });
+  const boxRef = layered.anchor;
+  const listRef = layered.panel;
+  const onTop = layered.onTop;
   // The active time scrolls into view as it moves, inside the list only:
   // nothing around it (a dialog's body) scrolls.
   useEffect(() => {
-    const listbox = list.current;
+    const listbox = listRef.current;
     const option =
       open && active >= 0
         ? listbox?.querySelector<HTMLElement>(`[data-index="${CSS.escape(String(active))}"]`)
@@ -171,7 +170,7 @@ export function TimePicker({
     keys.current = onKeyDown;
   });
   useEffect(() => {
-    const element = box.current;
+    const element = boxRef.current;
     if (element === null) {
       return;
     }
@@ -187,7 +186,7 @@ export function TimePicker({
   const activeId = open && active >= 0 ? `${listId}-${String(active)}` : undefined;
   return (
     <FieldFrame label={label} hideLabel={hideLabel} hint={hint} error={error} ids={ids}>
-      <div ref={box} className={styles["box"]}>
+      <div ref={boxRef} className={styles["box"]}>
         <Icon name="clock" className={styles["icon"]} />
         <input
           id={ids.controlId}
@@ -229,7 +228,7 @@ export function TimePicker({
           onBlur={settle}
         />
         <div
-          ref={list}
+          ref={listRef}
           id={listId}
           role="listbox"
           aria-label={label}

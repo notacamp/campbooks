@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 
 import { Dialog } from "../Dialog/Dialog";
 import { TextField } from "../Field/Field";
@@ -83,7 +83,8 @@ export const InADialog: Story = {
     const page = within(canvasElement.ownerDocument.body);
     const field = page.getByRole("combobox", { name: "Starts" });
     await userEvent.click(field);
-    await expect(page.getByRole("listbox", { name: "Starts" })).toBeVisible();
+    // The dialog fades in: the list shows once it has.
+    await waitFor(() => expect(page.getByRole("listbox", { name: "Starts" })).toBeVisible());
     await userEvent.keyboard("930{Enter}");
     await expect((field as HTMLInputElement).value).toMatch(/^9:30\sAM$/u);
     await userEvent.keyboard("{Escape}");
