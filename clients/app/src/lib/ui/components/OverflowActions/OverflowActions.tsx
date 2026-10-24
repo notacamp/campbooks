@@ -30,15 +30,30 @@ export interface OverflowActionsProps {
   actions: OverflowAction[];
   /** Actions at the end of the row (Previous, Next), folded with the rest. */
   end?: OverflowAction[] | undefined;
+  /**
+   * Show `actions` as labelled buttons (name and key) instead of icons, for a
+   * row of a few words-first choices (Scout noticed). A glyph icon (the visor)
+   * goes before the name; an icon name shows in the menu only.
+   */
+  buttons?: boolean | undefined;
+  /** Actions that always live in the More menu, after the rest. */
+  more?: OverflowAction[] | undefined;
 }
 
 /**
- * The rest of a toolbar row: icon actions while they fit, else one "More"
- * menu holding them all, each with its name and key, so the row never wraps.
+ * The rest of a toolbar row: icon actions (or labelled buttons) while they
+ * fit, else one "More" menu holding them all, each with its name and key, so
+ * the row never wraps. `more` actions are always in the menu.
  * It takes the row's free space (it is a flex item that grows), so whatever
  * sits before it keeps its place; the actions' keys work either way.
  */
-export function OverflowActions({ label, actions, end = [] }: OverflowActionsProps) {
+export function OverflowActions({
+  label,
+  actions,
+  end = [],
+  buttons = false,
+  more = [],
+}: OverflowActionsProps) {
   const row = useRef<HTMLDivElement>(null);
   const [folded, setFolded] = useState(false);
   // The width the icons took when last shown: they come back once it fits.
@@ -72,7 +87,7 @@ export function OverflowActions({ label, actions, end = [] }: OverflowActionsPro
   }, []);
 
   // Different actions take a different width: show them and measure again.
-  const count = actions.length + end.length;
+  const count = actions.length + end.length + more.length;
   const [measuredCount, setMeasuredCount] = useState(count);
   if (measuredCount !== count) {
     setMeasuredCount(count);
@@ -82,35 +97,39 @@ export function OverflowActions({ label, actions, end = [] }: OverflowActionsPro
     check.current();
   });
 
+  const menu = (items: OverflowAction[]) => (
+    <Popover
+      label={label}
+      renderTrigger={(trigger) => <IconButton {...trigger} label={label} icon="more" />}
+    >
+      {(close) => (
+        <div className={styles["menu"]}>
+          {items.map((action) => (
+            <Button
+              key={action.id}
+              variant="ghost"
+              icon={typeof action.icon === "string" ? action.icon : undefined}
+              leading={typeof action.icon === "string" ? undefined : action.icon}
+              shortcut={action.shortcut}
+              onKeyDown={moveFocus}
+              onClick={() => {
+                close();
+                action.onSelect();
+              }}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </div>
+      )}
+    </Popover>
+  );
+
   if (folded) {
     return (
       <div ref={row} className={styles["row"]} data-folded="">
         <span className={styles["spacer"]} />
-        <Popover
-          label={label}
-          renderTrigger={(trigger) => <IconButton {...trigger} label={label} icon="more" />}
-        >
-          {(close) => (
-            <div className={styles["menu"]}>
-              {[...actions, ...end].map((action) => (
-                <Button
-                  key={action.id}
-                  variant="ghost"
-                  icon={typeof action.icon === "string" ? action.icon : undefined}
-                  leading={typeof action.icon === "string" ? undefined : action.icon}
-                  shortcut={action.shortcut}
-                  onKeyDown={moveFocus}
-                  onClick={() => {
-                    close();
-                    action.onSelect();
-                  }}
-                >
-                  {action.label}
-                </Button>
-              ))}
-            </div>
-          )}
-        </Popover>
+        {menu([...actions, ...end, ...more])}
       </div>
     );
   }
@@ -125,9 +144,22 @@ export function OverflowActions({ label, actions, end = [] }: OverflowActionsPro
       onClick={action.onSelect}
     />
   );
+  const button = (action: OverflowAction) => (
+    <Button
+      key={action.id}
+      variant="secondary"
+      leading={typeof action.icon === "string" ? undefined : action.icon}
+      shortcut={action.shortcut}
+      aria-pressed={action.pressed}
+      onClick={action.onSelect}
+    >
+      {action.label}
+    </Button>
+  );
   return (
-    <div ref={row} className={styles["row"]}>
-      {actions.map(icon)}
+    <div ref={row} className={styles["row"]} data-buttons={buttons || undefined}>
+      {actions.map(buttons ? button : icon)}
+      {more.length === 0 ? null : menu(more)}
       <span className={styles["spacer"]} />
       {end.map(icon)}
     </div>

@@ -266,7 +266,8 @@
     "trash": "Go to Trash",
     "delete": "Delete, or restore from Trash",
     "reportSpam": "Report spam, or not spam",
-    "noticedAsk": "Ask Scout about the suggestion"
+    "noticedAsk": "Ask Scout about the suggestion",
+    "noticedSee": "Scout noticed: see the emails"
   },
   "compose": {
     "title": {
@@ -807,7 +808,10 @@
     "verbArchive": "Archive them…",
     "verbFile": "File under {{stream}}…",
     "other": "Something else…",
-    "ask": "Ask Scout"
+    "ask": "Ask Scout",
+    "see_one": "See the email",
+    "see_other": "See the {{count}} emails",
+    "more": "More"
   },
   "forward": {
     "title": "Forward {{name}}’s email to…",

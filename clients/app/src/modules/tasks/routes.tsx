@@ -10,8 +10,7 @@ export interface TasksRouteOptions {
 
 /**
  * `/w/$workspaceId/tasks` and `/tasks/$taskId`: the Tasks place, with a task
- * open beside the list. `?add=` changes whenever `n t` asks to add a task
- * from another page.
+ * open beside the list. `/tasks?new=1` opens the new-task form there instead.
  */
 export function buildTasksRoutes<TParent extends AnyRoute>(
   parent: TParent,
@@ -19,21 +18,20 @@ export function buildTasksRoutes<TParent extends AnyRoute>(
 ) {
   function TasksRoute() {
     const params: { workspaceId?: string; taskId?: string } = useParams({ strict: false });
-    const search: { add?: number } = useSearch({ strict: false });
+    const search: { new?: 1 } = useSearch({ strict: false });
     return (
       <TasksPage
         key={params.workspaceId}
         workspaceId={params.workspaceId ?? ""}
         taskId={params.taskId}
-        addRequest={search.add}
+        creating={params.taskId === undefined && search.new === 1}
         useSources={useSources}
       />
     );
   }
-  const validateSearch = (search: Record<string, unknown>): { add?: number } => {
-    const add = Number(search["add"]);
-    return Number.isFinite(add) && add > 0 ? { add } : {};
-  };
+  // `new` is the form's only state: present (1) or not.
+  const validateSearch = (search: Record<string, unknown>): { new?: 1 } =>
+    search["new"] === 1 || search["new"] === "1" || search["new"] === true ? { new: 1 } : {};
   const list = createRoute({
     getParentRoute: () => parent,
     path: "/tasks",

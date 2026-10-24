@@ -45,7 +45,8 @@ export default async function scoutChatEverywhere({ page }: ScenarioContext): Pr
   await noticed.waitFor();
   await noticed.scrollIntoViewIfNeeded();
   await caption(page, "Scout noticed a sender you never open", 2000);
-  await noticed.getByRole("button", { name: /Ask Scout/u }).click();
+  await noticed.getByRole("button", { name: "More" }).click();
+  await noticed.getByRole("button", { name: /^Ask Scout/u }).click();
   const why = page.getByRole("button", { name: "Why do you suggest this?" });
   await why.waitFor();
   await caption(page, "Ask Scout: the chat about that suggestion", 2200);

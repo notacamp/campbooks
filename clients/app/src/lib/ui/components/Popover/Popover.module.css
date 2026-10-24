@@ -29,6 +29,11 @@
   left: 0;
 }
 
+.panel[data-placement="bottom-start"] {
+  top: calc(100% + var(--space-1));
+  left: 0;
+}
+
 .panel[data-placement="bottom-end"] {
   top: calc(100% + var(--space-1));
   right: 0;
@@ -54,4 +59,15 @@
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   color: var(--text-tertiary);
+}
+
+/* In the top layer (`layer="top"`): fixed, at the coordinates the trigger
+   gives; none of the browser's popover box. After the placements, so their
+   offsets are reset. */
+.panel[data-layer="top"] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }

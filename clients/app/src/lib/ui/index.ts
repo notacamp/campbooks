@@ -164,6 +164,7 @@ export {
   type ConversationRowProps,
   type RowLeaving,
 } from "./components/ConversationRow/ConversationRow";
+export { DatePicker, type DatePickerProps } from "./components/DatePicker/DatePicker";
 export { Disclosure, type DisclosureProps } from "./components/Disclosure/Disclosure";
 export {
   HowDecided,
@@ -340,6 +341,7 @@ export { TabBar, type TabBarItem, type TabBarProps } from "./components/TabBar/T
 export { Tag, type TagProps } from "./components/Tag/Tag";
 export { TaskRow, type TaskRowChip, type TaskRowProps } from "./components/TaskRow/TaskRow";
 export { ThinkingTrace, type ThinkingTraceProps } from "./components/ThinkingTrace/ThinkingTrace";
+export { TimePicker, type TimePickerProps } from "./components/TimePicker/TimePicker";
 export {
   Toast,
   ToastRegion,

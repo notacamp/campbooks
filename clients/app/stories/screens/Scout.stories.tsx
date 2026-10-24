@@ -332,6 +332,22 @@ function sse(event: string, data: unknown): string {
  * about the Ledger rule, about Rui's contract; Recent lists Sam's chats;
  * Marta's Reply dialog and who Scout waits on are there to open Scout from.
  */
+/** The CI sender's builds, as search returns them for "See the 34 emails". */
+const BUILD_HITS = ["main #4127 passed", "main #4126 failed", "release #311 passed"].map(
+  (subject, index) => ({
+    container: { type: "conversations.inbox", id: INBOX.id },
+    record: {
+      type: "conversations.conversation",
+      id: `0192f1a0-0000-7000-8000-00000000c1${String(index)}0`,
+    },
+    facets: { stream: "updates", count: 1, unread: index === 0 },
+    from: { address: BUILDS_NOTICE.sender, name: BUILDS_NOTICE.sender_name },
+    occurred_at: `2026-10-${String(23 - index)}T08:12:00Z`,
+    title: [{ text: subject, hit: false }],
+    snippet: [{ text: "All 412 checks ran on the pipeline for this commit.", hit: false }],
+  }),
+);
+
 function everywhere(): Record<string, MockRoute> {
   const asked = new Set<string>();
   const ruiChat = {
@@ -397,10 +413,13 @@ function everywhere(): Record<string, MockRoute> {
         }
       }
     },
-    // ⌘K searches the mail as you type: nothing matches a question.
+    // ⌘K searches the mail as you type: nothing matches a question. "See
+    // the 34 emails" searches the CI sender's mail: its builds come back.
     [`GET ${W}/search`]: (_body, url) => ({
       body: {
-        hits: [],
+        hits: (url.searchParams.get("q") ?? "").startsWith(`from:${BUILDS_NOTICE.sender}`)
+          ? BUILD_HITS
+          : [],
         indexing: false,
         next_cursor: null,
         query: { filters: [], text: url.searchParams.get("q") ?? "", warnings: [] },
@@ -507,7 +526,8 @@ export const AskFromScoutNoticed: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const note = await canvas.findByRole("region", { name: "Scout noticed" });
-    await userEvent.click(within(note).getByRole("button", { name: /Ask Scout/u }));
+    await userEvent.click(within(note).getByRole("button", { name: "More" }));
+    await userEvent.click(within(note).getByRole("button", { name: /^Ask Scout/u }));
     const page = within(document.body);
     await expect(
       await page.findByText("Scout’s suggestion for CI (builds@ci.example.com)"),

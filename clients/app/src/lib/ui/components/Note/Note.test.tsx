@@ -79,4 +79,24 @@ describe("Note", () => {
     );
     expect(screen.getByText("Move")).toBeInTheDocument();
   });
+
+  it("reads a titled note's sentence in the body font, with the title and its meta above", () => {
+    renderUi(
+      <Note title="Scout noticed" meta="1 of 5" after={<button type="button">See them</button>}>
+        You got 34 emails from CI.
+      </Note>,
+    );
+    const sentence = screen.getByText("You got 34 emails from CI.");
+    expect(sentence).toHaveAttribute("data-body");
+    expect(screen.getByText("Scout noticed")).toBeVisible();
+    expect(screen.getByText("1 of 5")).toBeVisible();
+    expect(screen.getByRole("button", { name: "See them" })).toBeVisible();
+  });
+
+  it("keeps the display line when there is no title", () => {
+    renderUi(<Note meta="1 of 5">Sofia is waiting on your review.</Note>);
+    expect(screen.getByText("Sofia is waiting on your review.")).not.toHaveAttribute("data-body");
+    // Meta goes with a title only.
+    expect(screen.queryByText("1 of 5")).toBeNull();
+  });
 });

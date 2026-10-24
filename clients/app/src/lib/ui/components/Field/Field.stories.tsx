@@ -27,6 +27,11 @@ export const WithError: Story = {
   },
 };
 
+/** A page's title edited in place (a task's, and the new-task form's). */
+export const Title: Story = {
+  args: { size: "title", hideLabel: true, label: "Task title", placeholder: "What needs doing?" },
+};
+
 export const HiddenLabel: Story = { args: { hideLabel: true, label: "Search members" } };
 
 export const Disabled: Story = { args: { disabled: true, defaultValue: "Household" } };

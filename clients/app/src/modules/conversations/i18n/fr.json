@@ -266,7 +266,8 @@
     "trash": "Aller à Corbeille",
     "delete": "Supprimer, ou restaurer depuis la Corbeille",
     "reportSpam": "Signaler comme spam, ou pas un spam",
-    "noticedAsk": "Demander à Scout à propos de la suggestion"
+    "noticedAsk": "Demander à Scout à propos de la suggestion",
+    "noticedSee": "Scout a remarqué : voir les e-mails"
   },
   "compose": {
     "title": {
@@ -807,7 +808,10 @@
     "verbArchive": "Les archiver…",
     "verbFile": "Classer dans {{stream}}…",
     "other": "Autre chose…",
-    "ask": "Demander à Scout"
+    "ask": "Demander à Scout",
+    "see_one": "Voir l’e-mail",
+    "see_other": "Voir les {{count}} e-mails",
+    "more": "Plus"
   },
   "forward": {
     "title": "Transférer l’e-mail de {{name}} à…",

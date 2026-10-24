@@ -36,6 +36,9 @@ export const Announced: Story = {
 
 export const OneOffKeys: Story = { args: { keys: "1" } };
 
+/** Small and quiet, for compact controls (the calendar's views). */
+export const Small: Story = { args: { shortcut: "item.done", size: "sm" } };
+
 /** Every default binding. */
 export const AllDefaults: Story = {
   render: () => (

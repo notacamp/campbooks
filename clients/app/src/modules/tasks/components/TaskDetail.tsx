@@ -10,6 +10,7 @@ import {
   ButtonLink,
   Chip,
   ChipRow,
+  DatePicker,
   Heading,
   PaneHeader,
   ReaderBody,
@@ -23,7 +24,6 @@ import type { TaskView } from "../api/queries";
 import { dayLabel, isLater, isoDay, laterChoices, laterOnDay, whenLabel } from "../model";
 import type { TaskSource } from "../source";
 
-import { DateCommitField } from "./DateCommitField";
 import { DueChips } from "./DueChips";
 import { HandOff } from "./HandOff";
 import type { useTaskActions } from "./use-task-actions";
@@ -130,6 +130,7 @@ export function TaskDetail({
           <TextField
             label={t("detail.titleLabel")}
             hideLabel
+            size="title"
             value={title}
             disabled={!mine}
             onChange={(event) => {
@@ -166,8 +167,6 @@ export function TaskDetail({
                 label={t("add.due")}
                 value={task.due_on ?? undefined}
                 now={now}
-                idPrefix="detail-due"
-                commit="settled"
                 onChange={(day) => {
                   actions.setDue(task, day ?? null);
                   setChangingDue(false);
@@ -223,12 +222,16 @@ export function TaskDetail({
               </Button>
             </div>
             {pickingDay ? (
-              <DateCommitField
+              <DatePicker
+                inline
                 label={t("add.date")}
-                value={task.plan_on ?? ""}
+                value={task.plan_on ?? undefined}
                 min={isoDay(clock)}
-                onCommit={(day) => {
-                  actions.planDay(task, day);
+                now={now}
+                onChange={(day) => {
+                  if (day !== undefined) {
+                    actions.planDay(task, day);
+                  }
                   setPickingDay(false);
                 }}
               />
@@ -257,12 +260,16 @@ export function TaskDetail({
                   </Chip>
                 </ChipRow>
                 {pickingLater ? (
-                  <DateCommitField
+                  <DatePicker
+                    inline
                     label={t("add.date")}
-                    value=""
+                    value={undefined}
                     min={isoDay(clock)}
-                    onCommit={(day) => {
-                      actions.later(task, laterOnDay(day));
+                    now={now}
+                    onChange={(day) => {
+                      if (day !== undefined) {
+                        actions.later(task, laterOnDay(day));
+                      }
                       setPickingLater(false);
                       onLaterOpen(false);
                     }}

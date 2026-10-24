@@ -266,7 +266,8 @@
     "trash": "Ir para Lixo",
     "delete": "Eliminar, ou restaurar do Lixo",
     "reportSpam": "Denunciar spam, ou não é spam",
-    "noticedAsk": "Perguntar ao Scout sobre a sugestão"
+    "noticedAsk": "Perguntar ao Scout sobre a sugestão",
+    "noticedSee": "O Scout reparou: ver os emails"
   },
   "compose": {
     "title": {
@@ -807,7 +808,10 @@
     "verbArchive": "Arquivá-los…",
     "verbFile": "Arquivar em {{stream}}…",
     "other": "Outra coisa…",
-    "ask": "Perguntar ao Scout"
+    "ask": "Perguntar ao Scout",
+    "see_one": "Ver o email",
+    "see_other": "Ver os {{count}} emails",
+    "more": "Mais"
   },
   "forward": {
     "title": "Reencaminhar o email de {{name}} para…",

@@ -94,3 +94,77 @@ export const WithScout: Story = {
     ],
   },
 };
+
+const CHOICES: OverflowAction[] = [
+  {
+    id: "other",
+    label: "Something else…",
+    icon: <Visor size="xs" />,
+    shortcut: "inbox.noticed.other",
+    onSelect: fn(),
+  },
+  {
+    id: "later",
+    label: "Not now",
+    icon: "clock",
+    shortcut: "inbox.noticed.not_now",
+    onSelect: fn(),
+  },
+];
+
+const SECONDARY: OverflowAction[] = [
+  {
+    id: "never",
+    label: "Don’t suggest this",
+    icon: "close",
+    shortcut: "inbox.noticed.never",
+    onSelect: fn(),
+  },
+  {
+    id: "ask",
+    label: "Ask Scout",
+    icon: <Visor size="xs" />,
+    shortcut: "inbox.noticed.ask",
+    onSelect: fn(),
+  },
+];
+
+/**
+ * Labelled buttons while they fit, and the rarer actions always in More
+ * (Scout noticed's row).
+ */
+export const Buttons: Story = {
+  args: { actions: CHOICES, more: SECONDARY, end: [], buttons: true },
+  render: (args) => (
+    <div className="flex items-center gap-2">
+      <Button shortcut="inbox.noticed.apply">Archive them…</Button>
+      <OverflowActions {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "Not now" })).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: "Ask Scout" })).toBeNull();
+    await userEvent.click(canvas.getByRole("button", { name: "More actions" }));
+    const menu = canvas.getByRole("dialog", { name: "More actions" });
+    await expect(within(menu).getByRole("button", { name: /Ask Scout/u })).toBeVisible();
+  },
+};
+
+/** The same row on a phone: the buttons fold into More with the rest. */
+export const ButtonsFolded: Story = {
+  args: { actions: CHOICES, more: SECONDARY, end: [], buttons: true },
+  render: (args) => (
+    <div className="flex w-sidebar items-center gap-2">
+      <Button shortcut="inbox.noticed.apply">File under Updates…</Button>
+      <OverflowActions {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "More actions" }));
+    const menu = canvas.getByRole("dialog", { name: "More actions" });
+    await expect(within(menu).getByRole("button", { name: /Not now/u })).toBeVisible();
+    await expect(within(menu).getByRole("button", { name: /Don’t suggest this/u })).toBeVisible();
+  },
+};

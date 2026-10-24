@@ -16,7 +16,7 @@ import {
   SettingsSection,
   Switch,
   Text,
-  TextField,
+  TimePicker,
 } from "~/lib/ui";
 import { useConnections, type MailboxConsent } from "~/modules/connectors";
 
@@ -345,9 +345,10 @@ function HoursFields({
   const { t } = useTranslation("schedule");
   const [start, setStart] = useState(savedStart);
   const [end, setEnd] = useState(savedEnd);
-  const commit = () => {
-    if (start !== "" && end !== "" && (start !== savedStart || end !== savedEnd)) {
-      onCommit(start, end);
+  // A picked or typed time is whole: it is saved at once.
+  const commit = (from: string, to: string) => {
+    if (from !== "" && to !== "" && (from !== savedStart || to !== savedEnd)) {
+      onCommit(from, to);
     }
   };
   return (
@@ -357,25 +358,24 @@ function HoursFields({
       </Text>
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="flex-1">
-          <TextField
+          <TimePicker
             label={t("settings.time.from")}
-            type="time"
-            value={start}
-            onChange={(event) => {
-              setStart(event.target.value);
+            value={start === "" ? undefined : start}
+            onChange={(next) => {
+              setStart(next);
+              commit(next, end);
             }}
-            onBlur={commit}
           />
         </div>
         <div className="flex-1">
-          <TextField
+          <TimePicker
             label={t("settings.time.to")}
-            type="time"
-            value={end}
-            onChange={(event) => {
-              setEnd(event.target.value);
+            value={end === "" ? undefined : end}
+            min={start === "" ? undefined : start}
+            onChange={(next) => {
+              setEnd(next);
+              commit(start, next);
             }}
-            onBlur={commit}
           />
         </div>
       </div>

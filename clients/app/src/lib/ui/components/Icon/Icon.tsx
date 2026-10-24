@@ -82,6 +82,7 @@ const ICONS = {
   key: [<circle key="c" cx="8" cy="12" r="3.5" />, path("M11.5 12H20M17 12v3M20 12v2.5")],
   mail: [<rect key="r" x="3.5" y="5.5" width="17" height="13" rx="2" />, path("m4 7 8 6 8-6")],
   "chevron-right": [path("m9 6 6 6-6 6")],
+  "arrow-right": [path("M4.5 12h15M13.5 6l6 6-6 6")],
   close: [path("M6 6l12 12M18 6 6 18")],
   copy: [
     <rect key="r" x="8.5" y="8.5" width="11.5" height="11.5" rx="2" />,

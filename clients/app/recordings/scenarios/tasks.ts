@@ -3,7 +3,7 @@ import { pause, type ScenarioContext } from "../context.ts";
 import { caption } from "./inbox.ts";
 
 // Tasks (campbooks-cloud#43), in Storybook with demo data only: a member's
-// open tasks, quick add, a task opened, Done with Undo, a task handed to a
+// open tasks, the new-task form, a task opened, Done with Undo, a task handed to a
 // teammate, Home, and "Make it a task" in the reader.
 //   pnpm --dir clients storybook
 //   pnpm --dir clients record tasks --base-url http://localhost:6006
@@ -56,22 +56,22 @@ export default async function tasks({ page }: ScenarioContext): Promise<void> {
     return;
   }
 
-  // Quick add: N T, a title, a due chip, Enter.
+  // The new-task form: N T opens it in the right pane; a title, a due chip, Enter.
   await page.keyboard.press("n");
   await pause(150);
   await page.keyboard.press("t");
-  await caption(page, "N then T: add a task", 1400);
-  await page
-    .getByRole("textbox", { name: "Add a task" })
-    .pressSequentially("Renew the parking permit", {
-      delay: 45,
-    });
+  const title = page.getByRole("textbox", { name: "Task title" });
+  await title.waitFor();
+  await caption(page, "N then T: a new task, in the right pane", 1400);
+  await title.pressSequentially("Renew the parking permit", { delay: 45 });
   await page.getByRole("button", { name: "Tomorrow" }).click();
   await caption(page, "A due chip: Tomorrow", 1400);
-  await page.getByRole("textbox", { name: "Add a task" }).focus();
+  await title.focus();
   await page.keyboard.press("Enter");
   await page.getByText("Renew the parking permit").first().waitFor();
-  await caption(page, "Enter adds it: the list updates and the field is ready again", 2600);
+  await caption(page, "Enter adds it: the list updates and the form is ready for the next", 2600);
+  await page.keyboard.press("Escape");
+  await pause(400);
   await leaveField(page);
 
   // Open one with J and Enter; S offers Later.

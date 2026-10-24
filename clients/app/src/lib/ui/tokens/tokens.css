@@ -349,6 +349,7 @@
   --row-radius: var(--radius-md);
   --pill-height: 22px;
   --kbd-size: 18px;
+  --kbd-size-sm: 16px;
   --kbd-opacity: 1;
   --kbd-on-accent-opacity: var(--opacity-soft);
   --nav-height: var(--size-control-md);

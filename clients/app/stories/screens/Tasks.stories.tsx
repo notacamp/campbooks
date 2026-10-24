@@ -180,17 +180,30 @@ export const DoneWithUndo: Story = {
   },
 };
 
-/** Type a title, pick Tomorrow, press Enter: it joins the list and the field is ready again. */
-export const QuickAdd: Story = {
-  args: { path: PATH, api: tasks() },
+/**
+ * The new-task form in the right pane (New task, or N T): a title, Tomorrow,
+ * Enter. It joins the list and the form is ready for the next one.
+ */
+export const NewTask: Story = {
+  args: { path: `${PATH}?new=1`, api: tasks() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const field = await canvas.findByRole("textbox", { name: "Add a task" });
+    const field = await canvas.findByRole("textbox", { name: "Task title" });
     await userEvent.type(field, "Renew the parking permit");
     await userEvent.click(await canvas.findByRole("button", { name: "Tomorrow" }));
     await userEvent.type(field, "{Enter}");
     await expect(await canvas.findByText("Renew the parking permit")).toBeVisible();
     await expect(field).toHaveValue("");
+  },
+};
+
+/** Pick a date: the month grid in place, under the chips. */
+export const NewTaskPickADate: Story = {
+  args: { path: `${PATH}?new=1`, api: tasks() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Pick a date" }));
+    await expect(await canvas.findByRole("grid")).toBeVisible();
   },
 };
 
