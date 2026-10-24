@@ -73,10 +73,12 @@ use crate::{
         policy::Policy,
         redact,
         streams::{self, Inbound, sort_first_inbound},
+        tracked,
     },
     events::{Change, MessageReceived, Origin},
     ingest::Headers,
     model::{Address, ConversationId, InboxId, MessageId, StreamSource},
+    tracking,
 };
 
 /// How long a backlog pass waits for the answers check's first run.
@@ -337,6 +339,7 @@ impl Pass {
         };
         let events = ctx.state().events.clone();
         let binding = ctx.state().binding.clone();
+        let tracker = ctx.state().tracker.clone();
         let ws = workspace.to_string();
         let tx = ctx.tx().await?;
         // Holding the inbox `FOR SHARE` until this commits, as a batch does:
@@ -395,6 +398,34 @@ impl Pass {
             streams::mirror(&binding, &events, tx, &ws, loaded.conversation, &[]).await?;
         }
         needs::refresh(tx, &events, &ws, loaded.conversation, &self.needs).await?;
+        // What the pass stored, counted; never what it read or answered
+        // (campbooks-cloud#325). A pass that abstained on everything stored
+        // nothing, and tracks nothing.
+        let answer_count = answers.iter().flatten().count();
+        let conversation = if answer_count > 0 || placed {
+            tracked::conversation_now(tx, loaded.conversation).await?
+        } else {
+            None
+        };
+        if let Some(conversation) = conversation {
+            tracker
+                .track(
+                    tx,
+                    &tracking::MessageDecided {
+                        workspace,
+                        message_id: *message.as_uuid(),
+                        conversation,
+                        pass: match answered {
+                            Answered::Any => tracking::DecidePass::Arrival,
+                            Answered::Every => tracking::DecidePass::Backlog,
+                        },
+                        answer_count: tracked::count(answer_count),
+                        placed,
+                        moves_only,
+                    },
+                )
+                .await?;
+        }
         Ok(Passed::Done)
     }
 }

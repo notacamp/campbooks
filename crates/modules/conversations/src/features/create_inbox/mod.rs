@@ -14,6 +14,7 @@ use crate::{
     domain::{blobs::read_bytes, redact},
     events::{AccountDocument, CapabilityGranted, InboxChanged},
     model::{Channel, ConnectionId, InboxId, InboxRole},
+    tracking,
 };
 
 /// Largest account document read, in bytes.
@@ -27,6 +28,7 @@ impl EventHandler for CreateInbox {
     const NAME: &'static str = "conversations.create_inbox";
     const QUEUE: &'static str = "default";
 
+    #[allow(clippy::too_many_lines)]
     async fn handle(ctx: &mut JobContext, event: Event<CapabilityGranted>) -> Result<(), JobError> {
         let granted = event.payload;
         let Some(inbox) = granted.inbox_id else {
@@ -65,7 +67,7 @@ impl EventHandler for CreateInbox {
 
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
-        sqlx::query!(
+        let created = sqlx::query!(
             r#"
             INSERT INTO conversations.inboxes
                 (id, workspace_id, channel, address, display_name, connection_id, owner)
@@ -82,7 +84,8 @@ impl EventHandler for CreateInbox {
             granted.granted_by.as_uuid(),
         )
         .execute(&mut **tx)
-        .await?;
+        .await?
+        .rows_affected();
         // The member is added to the inbox with this id, whether it was just
         // created or already there (a replay, an incremental consent). An
         // inbox for the same address under another id is left alone: its
@@ -113,6 +116,20 @@ impl EventHandler for CreateInbox {
                     &InboxChanged {
                         workspace: granted.workspace.clone(),
                         inbox,
+                    },
+                )
+                .await?;
+        }
+        if created > 0 {
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::InboxCreated {
+                        workspace,
+                        inbox_id: *inbox.as_uuid(),
+                        connection_id: *granted.connection.as_uuid(),
+                        member_added: added > 0,
                     },
                 )
                 .await?;
@@ -180,7 +197,7 @@ mod tests {
 
     #[sqlx::test(migrations = "../../../migrations")]
     async fn a_messages_grant_creates_the_inbox_and_its_batches_flow_in(db: PgPool) {
-        let kit = Kit::new(db.clone()).await;
+        let kit = Kit::new(db.clone()).await.tracking();
         let workspace = WorkspaceId::new();
         let (token, sam) = kit.member("sam", workspace);
         let inbox = InboxId::new();
@@ -192,6 +209,18 @@ mod tests {
         // A replay, or an incremental consent, changes nothing.
         grant(&kit, workspace, inbox, sam, "messages").await;
         assert_eq!(kit.events("conversations.inbox_changed").await.len(), 1);
+        // Tracked once, by ids: never the account's address or name.
+        let created =
+            campbooks_kernel::testing::tracked_events(&kit.db, "conversations.inbox_created").await;
+        assert_eq!(created.len(), 1);
+        assert_eq!(created[0].version, 1);
+        assert_eq!(created[0].workspace_id, Some(*workspace.as_uuid()));
+        assert_eq!(created[0].envelope["actor"]["type"], "system");
+        assert_eq!(created[0].body["inbox_id"], inbox.to_string());
+        assert!(created[0].body["connection_id"].is_string());
+        assert_eq!(created[0].body["member_added"], true);
+        let text = created[0].body.to_string();
+        assert!(!text.contains("Sam") && !text.contains('@'), "{text}");
 
         let inboxes = kit
             .get(&token, &format!("/api/v1/w/{workspace}/inboxes"))

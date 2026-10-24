@@ -58,6 +58,7 @@ use crate::{
         policy::Policy,
         redact, rules,
         streams::{self, Inbound, sort_first_inbound},
+        tracked,
     },
     events::{Change, MESSAGE_RECORD, MessageFacts, MessageReceived, MessageSent, Origin},
     ingest::{
@@ -68,6 +69,7 @@ use crate::{
         Address, AttachmentId, BlobPointer, Channel, ConversationId, Direction, InboxId, LabelId,
         MessageId, Stream, StreamSource,
     },
+    tracking,
 };
 
 /// A message's stored provider stream when the provider has it in none of
@@ -219,6 +221,7 @@ impl JobHandler for ApplyChanges {
             new_in: BTreeSet::new(),
             taught: None,
             correspondents: BTreeSet::new(),
+            tally: Tally::default(),
         };
         for change in &batch.changes {
             match change {
@@ -438,6 +441,17 @@ struct Apply<'a> {
     /// them in another conversation is worked out again (hearing back,
     /// campbooks-cloud#293).
     correspondents: BTreeSet<String>,
+    /// What the batch changed, for its tracked event.
+    tally: Tally,
+}
+
+/// What a batch changed, counted for its tracked event (campbooks-cloud#325).
+#[derive(Debug, Default)]
+struct Tally {
+    added: usize,
+    updated: usize,
+    removed: usize,
+    rules_acted: usize,
 }
 
 /// A stored message's mutable state.
@@ -540,6 +554,7 @@ impl Apply<'_> {
         if changes.is_empty() {
             return Ok(());
         }
+        self.tally.updated += 1;
         sqlx::query!(
             r#"
             UPDATE conversations.messages
@@ -705,6 +720,7 @@ impl Apply<'_> {
                     rules::on_arrival(tx, &self.state.binding, self.events, &arrival, &outcome)
                         .await?;
                 if !changes.is_empty() {
+                    self.tally.rules_acted += 1;
                     let entry = self.touched.entry(conversation).or_default();
                     entry.0.extend(changes);
                     entry.1.insert(message.provider_message_id.clone());
@@ -726,6 +742,7 @@ impl Apply<'_> {
         }
         self.announce(tx, message, prepared, conversation, id)
             .await?;
+        self.tally.added += 1;
         self.new_in.insert(conversation);
         self.note_correspondents(message, inbound);
         Ok(())
@@ -1138,6 +1155,7 @@ impl Apply<'_> {
         }
         let keys: Vec<&String> = gone.provider_labels.iter().collect();
         unlink_provider_labels(tx, gone.conversation, &keys).await?;
+        self.tally.removed += 1;
         let entry = self.touched.entry(gone.conversation).or_default();
         entry.0.insert(Change::Messages);
         entry.1.insert(provider_message_id.to_owned());
@@ -1172,6 +1190,7 @@ impl Apply<'_> {
             .chain(self.touched.keys())
             .copied()
             .collect();
+        let conversations_changed = refresh.len();
         // The open waits on someone who just wrote, or was just written to,
         // in this inbox's other conversations: heard back, or nudged.
         if !self.correspondents.is_empty() {
@@ -1200,6 +1219,27 @@ impl Apply<'_> {
         // current (a conversation that is gone changes nothing).
         for conversation in refresh {
             needs::refresh(tx, self.events, self.ws, conversation, self.needs).await?;
+        }
+        // One summary per batch, counts only (campbooks-cloud#325): a batch
+        // that changed nothing tracks nothing.
+        let tally = &self.tally;
+        if tally.added + tally.updated + tally.removed > 0 {
+            self.state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::MessageBatchApplied {
+                        workspace: self.workspace,
+                        inbox_id: *self.inbox.as_uuid(),
+                        backfill: self.backfill,
+                        messages_added: tracked::count(tally.added),
+                        messages_updated: tracked::count(tally.updated),
+                        messages_removed: tracked::count(tally.removed),
+                        conversations_changed: tracked::count(conversations_changed),
+                        rules_acted: tracked::count(tally.rules_acted),
+                    },
+                )
+                .await?;
         }
         Ok(())
     }

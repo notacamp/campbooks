@@ -4,12 +4,17 @@
 //! connector's change batch, like any message. A late outcome for a draft
 //! that stopped waiting (`failed`, same send) still counts.
 
-use campbooks_kernel::{Event, EventConsumer, JobContext, JobError, tenancy::UserId};
+use campbooks_kernel::{
+    Event, EventConsumer, JobContext, JobError,
+    tenancy::{UserId, WorkspaceId},
+};
 
 use crate::{
+    domain::tracked,
     events::{DraftSent, SendCompleted, SendFailed, SendOutcome},
     features::update_draft::discard,
     model::{ConversationId, DraftId, DraftState, InboxId, SendId},
+    tracking,
 };
 
 /// Records send outcomes on drafts.
@@ -27,6 +32,10 @@ impl EventConsumer for RecordSend {
         event: Event<SendCompleted>,
     ) -> Result<(), JobError> {
         let completed = event.payload;
+        let workspace: WorkspaceId = completed
+            .workspace
+            .parse()
+            .map_err(|_| JobError::fatal("send_completed names an invalid workspace"))?;
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
         let Some(draft) = sqlx::query!(
@@ -45,6 +54,15 @@ impl EventConsumer for RecordSend {
         };
         match completed.outcome {
             SendOutcome::Sent => {
+                // Tracked as it left, before the draft goes
+                // (campbooks-cloud#325).
+                tracked::track_draft(&state.tracker, tx, draft.id, |mut draft| {
+                    draft.state = tracking::DraftState::Sent;
+                    draft.send_at = None;
+                    draft.failure = None;
+                    tracking::DraftSent { workspace, draft }
+                })
+                .await?;
                 discard(&state, tx, &completed.workspace, draft.id).await?;
                 state
                     .events
@@ -74,6 +92,15 @@ impl EventConsumer for RecordSend {
                     reason,
                 )
                 .execute(&mut **tx)
+                .await?;
+                let error = tracked::send_error(&reason);
+                tracked::track_draft(&state.tracker, tx, draft.id, |draft| {
+                    tracking::DraftSendFailed {
+                        workspace,
+                        draft,
+                        error,
+                    }
+                })
                 .await?;
                 state
                     .events

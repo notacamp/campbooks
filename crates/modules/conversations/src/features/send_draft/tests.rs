@@ -8,6 +8,8 @@ use campbooks_kernel::{
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
+use campbooks_kernel::testing::tracked_events;
+
 use crate::{
     events::{SendCompleted, SendOutcome},
     model::{InboxId, SendId},
@@ -302,7 +304,7 @@ async fn undo_then_send_again_releases_only_the_second(db: PgPool) {
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_scheduled_send_stays_put_once_its_author_left(db: PgPool) {
-    let kit = Kit::new(db).await;
+    let kit = Kit::new(db).await.tracking();
     let (workspace, _, sam) = kit.sams_inbox().await;
     let draft = reply(&kit, workspace, &sam).await;
     let sent = send(&kit, &sam, &draft).await;
@@ -317,6 +319,17 @@ async fn a_scheduled_send_stays_put_once_its_author_left(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(state, "draft");
+    // Tracked as taken back, by the release, on Sam's behalf.
+    let back = tracked_events(&kit.db, "conversations.draft_unscheduled").await;
+    assert_eq!(back.len(), 1);
+    assert_eq!(back[0].envelope["actor"]["type"], "system");
+    assert_eq!(back[0].body["reason"], "sender_may_not_send");
+    assert_eq!(back[0].body["draft"]["state"], "draft");
+    assert!(
+        tracked_events(&kit.db, "conversations.draft_released")
+            .await
+            .is_empty()
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -342,6 +355,118 @@ async fn a_failed_send_can_be_fixed_and_sent_again(db: PgPool) {
     let requested = kit.events("conversations.send_requested").await;
     assert_eq!(requested.len(), 2);
     assert_ne!(requested[1]["send_id"], requested[0]["send_id"]);
+}
+
+/// The tracked events named `name`.
+async fn tracked(kit: &Kit, name: &str) -> Vec<campbooks_kernel::testing::TrackedRow> {
+    tracked_events(&kit.db, name).await
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_is_tracked_by_ids_states_and_counts_from_scheduling_to_the_provider(db: PgPool) {
+    let kit = Kit::new(db).await.tracking();
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let id = draft.rsplit('/').next().unwrap().to_owned();
+    let created = tracked(&kit, "conversations.draft_created").await;
+    assert_eq!(created.len(), 1);
+    let snapshot = &created[0].body["draft"];
+    assert_eq!(snapshot["kind"], "reply");
+    assert_eq!(snapshot["to_count"], 1);
+    assert_eq!(snapshot["cc_count"], 1);
+    assert_eq!(
+        snapshot["conversation_id"],
+        kit.conversation_of("en-1").await.as_str()
+    );
+    assert_eq!(
+        snapshot["message_id"],
+        kit.message_of("en-1").await.as_str()
+    );
+
+    // Scheduled, then taken back (Undo): a draft again.
+    let sent = send(&kit, &sam, &draft).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    let scheduled = tracked(&kit, "conversations.draft_scheduled").await;
+    assert_eq!(scheduled.len(), 1);
+    assert_eq!(
+        scheduled[0].envelope["actor"],
+        json!({"type": "user", "id": "sam"})
+    );
+    assert_eq!(
+        scheduled[0].envelope["operation"],
+        "conversations.send_draft"
+    );
+    assert_eq!(scheduled[0].body["draft"]["id"], id.as_str());
+    assert_eq!(scheduled[0].body["draft"]["state"], "scheduled");
+    assert!(scheduled[0].body["draft"]["send_at"].is_string());
+    let cancel = format!("{draft}/cancel_send");
+    let undone = kit.post(&sam, &cancel, None).await;
+    assert_eq!(undone.status, StatusCode::OK, "{:?}", undone.json);
+    // Nothing scheduled any more: nothing more to take back.
+    kit.post(&sam, &cancel, None).await;
+    let back = tracked(&kit, "conversations.draft_unscheduled").await;
+    assert_eq!(back.len(), 1);
+    assert_eq!(back[0].envelope["operation"], "conversations.cancel_send");
+    assert_eq!(back[0].body["reason"], "cancelled");
+    assert_eq!(back[0].body["draft"]["state"], "draft");
+
+    // Sent again and released: handed to the connector, on Sam's behalf.
+    send(&kit, &sam, &draft).await;
+    window_ends(&kit).await;
+    let released = tracked(&kit, "conversations.draft_released").await;
+    assert_eq!(released.len(), 1);
+    assert_eq!(released[0].envelope["actor"]["type"], "system");
+    assert_eq!(
+        released[0].envelope["on_behalf_of"],
+        json!({"type": "user", "id": "sam"})
+    );
+    assert_eq!(released[0].body["draft"]["state"], "sending");
+    let first = kit.events("conversations.send_requested").await[0]["send_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    // The provider refused it: an error kind, never its words.
+    complete(&kit, workspace, inbox, &first, false).await;
+    let failed = tracked(&kit, "conversations.draft_send_failed").await;
+    assert_eq!(failed.len(), 1);
+    assert_eq!(failed[0].body["error"], "rejected");
+    assert_eq!(failed[0].body["draft"]["state"], "failed");
+    assert_eq!(failed[0].body["draft"]["failure"], "rejected");
+
+    // Fixed and sent: the provider sent it, and the draft is gone.
+    send(&kit, &sam, &draft).await;
+    window_ends(&kit).await;
+    let requested = kit.events("conversations.send_requested").await;
+    let second = requested[1]["send_id"].as_str().unwrap().to_owned();
+    complete(&kit, workspace, inbox, &second, true).await;
+    let gone = tracked(&kit, "conversations.draft_sent").await;
+    assert_eq!(gone.len(), 1);
+    assert_eq!(gone[0].envelope["actor"]["type"], "system");
+    assert_eq!(gone[0].body["draft"]["id"], id.as_str());
+    assert_eq!(gone[0].body["draft"]["state"], "sent");
+    assert_eq!(
+        tracked(&kit, "conversations.draft_scheduled").await.len(),
+        3
+    );
+    assert_eq!(tracked(&kit, "conversations.draft_released").await.len(), 2);
+
+    // Who it went to and what it said are never in an event.
+    for name in [
+        "conversations.draft_created",
+        "conversations.draft_scheduled",
+        "conversations.draft_unscheduled",
+        "conversations.draft_released",
+        "conversations.draft_send_failed",
+        "conversations.draft_sent",
+    ] {
+        for event in tracked(&kit, name).await {
+            let text = event.body.to_string();
+            for private in ["@", "Done", "Q4 plan", "Maya", "Ana"] {
+                assert!(!text.contains(private), "{private} in {name}: {text}");
+            }
+        }
+    }
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -390,7 +515,7 @@ async fn a_send_names_the_version_it_sends(db: PgPool) {
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_send_that_never_reports_back_stops_waiting(db: PgPool) {
-    let kit = Kit::new(db).await;
+    let kit = Kit::new(db).await.tracking();
     let (workspace, inbox, sam) = kit.sams_inbox().await;
     let draft = reply(&kit, workspace, &sam).await;
     send(&kit, &sam, &draft).await;
@@ -413,6 +538,12 @@ async fn a_send_that_never_reports_back_stops_waiting(db: PgPool) {
     assert_eq!(stopped.json["state"], "failed");
     assert_eq!(stopped.json["failure_reason"], "unknown_outcome");
     assert_eq!(kit.events("conversations.send_failed").await.len(), 1);
+    let failed = tracked_events(&kit.db, "conversations.draft_send_failed").await;
+    assert_eq!(failed.len(), 1);
+    assert_eq!(failed[0].envelope["actor"]["type"], "system");
+    assert_eq!(failed[0].body["error"], "unknown_outcome");
+    assert_eq!(failed[0].body["draft"]["state"], "failed");
+    assert_eq!(failed[0].body["draft"]["failure"], "unknown_outcome");
 
     // A late report still counts: it was sent after all.
     complete(&kit, workspace, inbox, &send_id, true).await;

@@ -50,11 +50,13 @@ use crate::{
     domain::{
         access::visible_inboxes,
         rules::{self, RuleAction, RuleCondition},
+        tracked,
     },
     features::rules::{PREVIEW_DEADLINE, compute_preview, may_teach, member_only},
     ingest::Headers,
     model::{InboxId, NoticeAnswer, NoticeKind, RuleId, RuleNoticeId, Stream},
     scopes::{ConversationsRead, ConversationsWrite},
+    tracking,
 };
 
 use analysis::SenderStats;
@@ -703,6 +705,19 @@ pub async fn answer(
     )
     .execute(&mut *tx)
     .await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::RuleNoticeAnswered {
+                workspace: access.workspace,
+                notice_id: *path.notice_id.as_uuid(),
+                inbox_id: *inbox.as_uuid(),
+                kind: tracked::notice_kind(kind.parse()?),
+                answer: tracked::notice_answer(body.answer),
+            },
+        )
+        .await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -743,7 +758,7 @@ pub async fn clear_answer(
     may_teach(&state, &mut tx, access, inbox).await?;
     member_only(&workspace.principal)?;
     let user = access.user.ok_or(Error::NotFound)?;
-    sqlx::query!(
+    let cleared = sqlx::query!(
         r#"DELETE FROM conversations.rule_notice_answers
             WHERE inbox_id = $1 AND user_id = $2 AND kind = $3 AND sender_address = $4"#,
         inbox as InboxId,
@@ -752,7 +767,22 @@ pub async fn clear_answer(
         sender,
     )
     .execute(&mut *tx)
-    .await?;
+    .await?
+    .rows_affected();
+    if cleared > 0 {
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::RuleNoticeAnswerCleared {
+                    workspace: access.workspace,
+                    notice_id: *path.notice_id.as_uuid(),
+                    inbox_id: *inbox.as_uuid(),
+                    kind: tracked::notice_kind(kind.parse()?),
+                },
+            )
+            .await?;
+    }
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -24,11 +24,13 @@ use campbooks_kernel::{
 use sqlx::{Postgres, Transaction};
 
 use crate::{
+    domain::tracked,
     events::{
         ConnectionRemoved, DRAFT_RECORD, InboxChanged, InboxRemoved, MESSAGE_RECORD, MailChoice,
     },
     features::apply_changes::{ATTACHMENT_RECORD, BATCH_RECORD},
     model::{ConnectionId, InboxId},
+    tracking,
 };
 
 /// Deletes or freezes a removed connection's inboxes.
@@ -160,6 +162,19 @@ pub async fn delete_inbox(
                 },
             )
             .await?;
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::InboxClosed {
+                    workspace,
+                    inbox_id: *inbox.as_uuid(),
+                    mail: tracking::ClosedMail::Deleted,
+                    message_count: tracked::count(messages.len()),
+                    draft_count: tracked::count(drafts.len()),
+                },
+            )
+            .await?;
     }
     tracing::info!(
         %inbox,
@@ -189,6 +204,26 @@ async fn keep_inbox(
     .await?
     .rows_affected();
     if frozen > 0 {
+        let (messages, drafts): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT count(*) FROM conversations.messages WHERE inbox_id = $1),
+                    (SELECT count(*) FROM conversations.drafts WHERE inbox_id = $1)",
+        )
+        .bind(inbox)
+        .fetch_one(&mut **tx)
+        .await?;
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::InboxClosed {
+                    workspace,
+                    inbox_id: *inbox.as_uuid(),
+                    mail: tracking::ClosedMail::Kept,
+                    message_count: messages,
+                    draft_count: drafts,
+                },
+            )
+            .await?;
         // Nothing is sent from it: scheduled sends go back to drafts (their
         // release jobs act only at the generation they were given).
         sqlx::query!(
