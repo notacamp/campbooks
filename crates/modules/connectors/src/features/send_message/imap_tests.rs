@@ -206,9 +206,10 @@ impl Mailbox {
         }
     }
 
-    /// The stream's next run (the send made it due).
+    /// The stream's next run: past its longest interval, so it is due
+    /// however the last run set it (a send makes it due at once).
     async fn run(&self) {
-        self.kit.tick(TimeDelta::minutes(1)).await;
+        self.kit.tick(TimeDelta::hours(5)).await;
     }
 
     /// The `connectors.send_completed` events, checked against the contract.
@@ -724,8 +725,7 @@ async fn a_busy_append_waits_for_the_next_run(db: PgPool) {
     m.run().await;
     assert_eq!(m.copy(send).await, (Some("pending".to_owned()), None));
     m.imap.script(|imap| imap.offers.append_busy = false);
-    // Throttled for twice the interval at most.
-    m.kit.tick(TimeDelta::hours(1)).await;
+    m.run().await;
     assert_eq!(m.copy(send).await, (Some("appended".to_owned()), None));
     assert_eq!(m.imap.mailbox(|store| store.uids("Sent")).len(), 1);
 }
