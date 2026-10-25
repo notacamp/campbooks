@@ -62,6 +62,10 @@ resource = "schedule.calendar"
 call = "access::require_task("
 resource = "tasks.task"
 
+[[access.helpers]]
+call = "access::require_page("
+resource = "pages.page"
+
 # Functions that build the reference an `authorize` call is given: a handler
 # calling `authorize` with one names that resource type.
 [[access.references]]
@@ -209,6 +213,10 @@ reason = "Needs that change with time alone (campbooks-cloud#275): the one-minut
 [[access.maintenance_scope]]
 path = "crates/modules/assistant/src/features/expire_chats/mod.rs"
 reason = "Chats are kept 30 days after their last message (campbooks-cloud#305): the daily dispatcher reads which workspaces hold a chat to expire (`assistant.chats` maintenance policy: read only, ids and times) and enqueues each workspace's expiry job in that workspace; it deletes nothing itself."
+
+[[access.maintenance_scope]]
+path = "crates/modules/pages/src/features/purge_trash/mod.rs"
+reason = "Pages are kept 30 days in the trash (campbooks-cloud#363): the daily dispatcher reads which workspaces hold a trash root older than that (`pages.pages` maintenance policy: read only, trash roots, ids and times) and enqueues each workspace's purge job in that workspace; it deletes nothing itself."
 
 # Published events nothing consumes yet, and why they exist.
 [[access.unconsumed_events]]

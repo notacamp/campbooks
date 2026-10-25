@@ -1,0 +1,203 @@
+{
+  "title": "Pages",
+  "untitled": "Sans titre",
+  "shortcuts": {
+    "create": "Nouvelle page"
+  },
+  "tree": {
+    "label": "Pages",
+    "workspace": "Espace de travail",
+    "private": "Privées",
+    "shared": "Partagées avec vous",
+    "trash": "Corbeille",
+    "newPage": "Nouvelle page",
+    "addSubPage": "Ajouter une sous-page à {{title}}",
+    "showSubPages": "Afficher les sous-pages de {{title}}",
+    "hideSubPages": "Masquer les sous-pages de {{title}}",
+    "workspaceEmpty": "Des pages que tout le monde ici peut lire et modifier.",
+    "privateEmpty": "Vous seul les voyez, tant que vous n’en partagez pas une."
+  },
+  "empty": {
+    "title": "Écrivez-le une fois",
+    "body": "Notes, plans et listes, à côté de vos e-mails et de vos tâches. Liez une page à un e-mail, une tâche ou un événement avec @.",
+    "add": "Écrire une page"
+  },
+  "error": {
+    "title": "Impossible de charger vos pages",
+    "body": "Rien n’a été modifié. Réessayez.",
+    "retry": "Réessayer"
+  },
+  "screen": {
+    "label": "Page",
+    "back": "Retour aux pages",
+    "trail": "Où se trouve cette page",
+    "more": "Plus",
+    "trash": "Mettre à la corbeille",
+    "inTrash": "Cette page est à la corbeille.",
+    "icon": "Icône",
+    "iconCurrent": "Icône de la page : {{name}}",
+    "titleLabel": "Titre de la page",
+    "edited": "Modifiée {{when}}",
+    "emptyTitle": "Choisissez une page",
+    "emptyBody": "Choisissez-en une dans la liste ou écrivez-en une nouvelle.",
+    "missingTitle": "Cette page n’est pas là",
+    "missingBody": "Elle a peut-être été supprimée, ou elle n’a jamais été partagée avec vous."
+  },
+  "save": {
+    "saved": "Enregistré",
+    "saving": "Enregistrement…",
+    "retrying": "Hors ligne, nouvel essai à venir",
+    "rejected": "Impossible d’enregistrer ce changement"
+  },
+  "backlinks": {
+    "title_one": "Lien depuis {{count}} endroit",
+    "title_other": "Liens depuis {{count}} endroits"
+  },
+  "share": {
+    "title": "Partager {{title}}",
+    "button": "Partager",
+    "placeWorkspace": "Tout l’espace de travail",
+    "placeWorkspaceNote": "Toute personne ici peut lire et modifier cette page.",
+    "placePrivate": "Page privée",
+    "placePrivateNote": "Seules les personnes ci-dessous peuvent l’ouvrir.",
+    "people": "Personnes avec accès",
+    "someone": "Quelqu’un",
+    "owner": "Propriétaire",
+    "accessOf": "Accès de {{name}}",
+    "remove": "Retirer {{name}}",
+    "add": "Ajouter une personne",
+    "who": "Personne",
+    "access": "Accès",
+    "invite": "Partager",
+    "mentions": "Mentionner quelqu’un dans une page ne la partage pas avec cette personne.",
+    "role": {
+      "reader": "Peut lire",
+      "writer": "Peut modifier",
+      "manager": "Peut gérer"
+    }
+  },
+  "trash": {
+    "label": "Pages à la corbeille",
+    "note": "Les pages ici sont supprimées définitivement après 30 jours.",
+    "emptyTitle": "La corbeille est vide",
+    "emptyBody": "Les pages que vous supprimez attendent ici pendant 30 jours.",
+    "deletedOn": "Supprimée {{date}}",
+    "restore": "Restaurer",
+    "purge": "Supprimer définitivement",
+    "purgeConfirm": "Supprimer définitivement",
+    "cancel": "Garder",
+    "purgeWarning": "Supprimer définitivement {{title}} et ses sous-pages ? Cette action est irréversible."
+  },
+  "toast": {
+    "created": "Page créée",
+    "createFailed": "Impossible de créer la page. Rien n’a été enregistré.",
+    "renameFailed": "Impossible de renommer la page. Rien n’a été modifié.",
+    "trashed": "{{title}} mise à la corbeille",
+    "trashFailed": "Impossible de mettre {{title}} à la corbeille. Rien n’a été modifié.",
+    "restored": "{{title}} restaurée",
+    "restoreFailed": "Impossible de restaurer {{title}}. Rien n’a été modifié.",
+    "purged": "{{title}} supprimée définitivement",
+    "purgeFailed": "Impossible de supprimer {{title}}. Rien n’a été modifié.",
+    "moved": "{{title}} déplacée",
+    "moveFailed": "Impossible de déplacer {{title}}. Rien n’a été modifié.",
+    "shared": "Partagée avec {{name}}",
+    "shareFailed": "Impossible de changer l’accès de {{name}}. Rien n’a été modifié.",
+    "unshared": "{{name}} retiré",
+    "unshareFailed": "Impossible de retirer {{name}}. Rien n’a été modifié."
+  },
+  "editor": {
+    "label": "Texte de la page",
+    "placeholder": "Écrivez, ou tapez / pour les blocs",
+    "heading": "Titre"
+  },
+  "block": {
+    "add": "Ajouter un bloc",
+    "menu": "Options du bloc",
+    "turnInto": "Transformer en",
+    "block": "Bloc",
+    "duplicate": "Dupliquer",
+    "delete": "Supprimer"
+  },
+  "format": {
+    "label": "Mise en forme",
+    "block": "Transformer en",
+    "mention": "Mentionner",
+    "todo": "Tâche",
+    "bold": "Gras",
+    "italic": "Italique",
+    "hide": "Fermer"
+  },
+  "mention": {
+    "label": "Mentionner",
+    "empty": "Rien trouvé",
+    "searching": "Recherche…",
+    "closed": "Quelque chose que vous ne pouvez pas ouvrir",
+    "group": {
+      "people": "Personnes",
+      "threads": "Conversations",
+      "tasks": "Tâches",
+      "events": "Événements",
+      "pages": "Pages"
+    }
+  },
+  "embed": {
+    "page": "Page",
+    "person": "Personne",
+    "thread": "Conversation",
+    "task": "Tâche",
+    "event": "Événement"
+  },
+  "toggle": {
+    "show": "Afficher",
+    "hide": "Masquer"
+  },
+  "slash": {
+    "label": "Blocs",
+    "empty": "Aucun bloc ne correspond",
+    "group": {
+      "basic": "De base",
+      "campbooks": "De votre travail"
+    },
+    "text": "Texte",
+    "heading1": "Titre 1",
+    "heading2": "Titre 2",
+    "heading3": "Titre 3",
+    "todo": "Liste de tâches",
+    "bullets": "Liste à puces",
+    "numbers": "Liste numérotée",
+    "toggle": "Section repliable",
+    "quote": "Citation",
+    "callout": "Encadré",
+    "divider": "Séparateur",
+    "code": "Code",
+    "mention": "Mention",
+    "embed": "Intégrer un élément",
+    "subpage": "Sous-page",
+    "file": "Fichier",
+    "image": "Image"
+  },
+  "upload": {
+    "failed": "Impossible d’envoyer {{name}}."
+  },
+  "subpage": {
+    "failed": "Impossible d’ajouter la sous-page."
+  },
+  "icon": {
+    "document": "Document",
+    "tasks": "Tâches",
+    "schedule": "Calendrier",
+    "people": "Personnes",
+    "star": "Étoile",
+    "pin": "Épingle",
+    "mail": "Courrier",
+    "money": "Argent",
+    "home": "Maison",
+    "inbox": "Boîte de réception",
+    "archive": "Archives",
+    "image": "Image",
+    "travel": "Voyage",
+    "dining": "Repas",
+    "parcel": "Colis",
+    "ticket": "Billet"
+  }
+}

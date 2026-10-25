@@ -1,0 +1,203 @@
+{
+  "title": "Pages",
+  "untitled": "Untitled",
+  "shortcuts": {
+    "create": "New page"
+  },
+  "tree": {
+    "label": "Pages",
+    "workspace": "Workspace",
+    "private": "Private",
+    "shared": "Shared with you",
+    "trash": "Trash",
+    "newPage": "New page",
+    "addSubPage": "Add a sub-page to {{title}}",
+    "showSubPages": "Show the sub-pages of {{title}}",
+    "hideSubPages": "Hide the sub-pages of {{title}}",
+    "workspaceEmpty": "Pages everyone here can read and write.",
+    "privateEmpty": "Only you see these, until you share one."
+  },
+  "empty": {
+    "title": "Write it down once",
+    "body": "Notes, plans and checklists, next to your mail and tasks. Link a page to an email, a task or an event with @.",
+    "add": "Write a page"
+  },
+  "error": {
+    "title": "Couldn’t load your pages",
+    "body": "Nothing was changed. Try again.",
+    "retry": "Try again"
+  },
+  "screen": {
+    "label": "Page",
+    "back": "Back to pages",
+    "trail": "Where this page is",
+    "more": "More",
+    "trash": "Move to trash",
+    "inTrash": "This page is in the trash.",
+    "icon": "Icon",
+    "iconCurrent": "Page icon: {{name}}",
+    "titleLabel": "Page title",
+    "edited": "Edited {{when}}",
+    "emptyTitle": "Pick a page",
+    "emptyBody": "Choose one from the list, or write a new one.",
+    "missingTitle": "This page isn’t here",
+    "missingBody": "It may have been deleted, or it was never shared with you."
+  },
+  "save": {
+    "saved": "Saved",
+    "saving": "Saving…",
+    "retrying": "Offline, will retry",
+    "rejected": "Couldn’t save this change"
+  },
+  "backlinks": {
+    "title_one": "Linked from {{count}} place",
+    "title_other": "Linked from {{count}} places"
+  },
+  "share": {
+    "title": "Share {{title}}",
+    "button": "Share",
+    "placeWorkspace": "Everyone in the workspace",
+    "placeWorkspaceNote": "Anyone here can read and edit this page.",
+    "placePrivate": "Private page",
+    "placePrivateNote": "Only the people below can open it.",
+    "people": "People with access",
+    "someone": "Someone",
+    "owner": "Owner",
+    "accessOf": "Access for {{name}}",
+    "remove": "Remove {{name}}",
+    "add": "Add a person",
+    "who": "Person",
+    "access": "Access",
+    "invite": "Share",
+    "mentions": "Mentioning someone in a page doesn’t share it with them.",
+    "role": {
+      "reader": "Can read",
+      "writer": "Can edit",
+      "manager": "Can manage"
+    }
+  },
+  "trash": {
+    "label": "Pages in the trash",
+    "note": "Pages here are deleted for good after 30 days.",
+    "emptyTitle": "The trash is empty",
+    "emptyBody": "Pages you delete wait here for 30 days.",
+    "deletedOn": "Deleted {{date}}",
+    "restore": "Restore",
+    "purge": "Delete for good",
+    "purgeConfirm": "Delete for good",
+    "cancel": "Keep it",
+    "purgeWarning": "Delete {{title}} and its sub-pages for good? This can’t be undone."
+  },
+  "toast": {
+    "created": "Page created",
+    "createFailed": "Couldn’t create the page. Nothing was saved.",
+    "renameFailed": "Couldn’t rename the page. Nothing was changed.",
+    "trashed": "{{title}} moved to the trash",
+    "trashFailed": "Couldn’t move {{title}} to the trash. Nothing was changed.",
+    "restored": "{{title}} restored",
+    "restoreFailed": "Couldn’t restore {{title}}. Nothing was changed.",
+    "purged": "{{title}} deleted for good",
+    "purgeFailed": "Couldn’t delete {{title}}. Nothing was changed.",
+    "moved": "{{title}} moved",
+    "moveFailed": "Couldn’t move {{title}}. Nothing was changed.",
+    "shared": "Shared with {{name}}",
+    "shareFailed": "Couldn’t change access for {{name}}. Nothing was changed.",
+    "unshared": "{{name}} removed",
+    "unshareFailed": "Couldn’t remove {{name}}. Nothing was changed."
+  },
+  "editor": {
+    "label": "Page text",
+    "placeholder": "Write, or press / for blocks",
+    "heading": "Heading"
+  },
+  "block": {
+    "add": "Add a block",
+    "menu": "Block options",
+    "turnInto": "Turn into",
+    "block": "Block",
+    "duplicate": "Duplicate",
+    "delete": "Delete"
+  },
+  "format": {
+    "label": "Format",
+    "block": "Turn into",
+    "mention": "Mention",
+    "todo": "To-do",
+    "bold": "Bold",
+    "italic": "Italic",
+    "hide": "Close"
+  },
+  "mention": {
+    "label": "Mention",
+    "empty": "Nothing found",
+    "searching": "Searching…",
+    "closed": "Something you can’t open",
+    "group": {
+      "people": "People",
+      "threads": "Conversations",
+      "tasks": "Tasks",
+      "events": "Events",
+      "pages": "Pages"
+    }
+  },
+  "embed": {
+    "page": "Page",
+    "person": "Person",
+    "thread": "Conversation",
+    "task": "Task",
+    "event": "Event"
+  },
+  "toggle": {
+    "show": "Show",
+    "hide": "Hide"
+  },
+  "slash": {
+    "label": "Blocks",
+    "empty": "No block matches",
+    "group": {
+      "basic": "Basic",
+      "campbooks": "From your work"
+    },
+    "text": "Text",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "todo": "To-do list",
+    "bullets": "Bulleted list",
+    "numbers": "Numbered list",
+    "toggle": "Toggle",
+    "quote": "Quote",
+    "callout": "Callout",
+    "divider": "Divider",
+    "code": "Code",
+    "mention": "Mention",
+    "embed": "Embed a record",
+    "subpage": "Sub-page",
+    "file": "File",
+    "image": "Image"
+  },
+  "upload": {
+    "failed": "Couldn’t upload {{name}}."
+  },
+  "subpage": {
+    "failed": "Couldn’t add the sub-page."
+  },
+  "icon": {
+    "document": "Document",
+    "tasks": "Tasks",
+    "schedule": "Calendar",
+    "people": "People",
+    "star": "Star",
+    "pin": "Pin",
+    "mail": "Mail",
+    "money": "Money",
+    "home": "Home",
+    "inbox": "Inbox",
+    "archive": "Archive",
+    "image": "Image",
+    "travel": "Travel",
+    "dining": "Dining",
+    "parcel": "Parcel",
+    "ticket": "Ticket"
+  }
+}
