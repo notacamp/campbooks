@@ -2,7 +2,9 @@
 //! change this module asked for ended at the provider.
 //!
 //! - **Applied**: the provider's id and etag are stored and the pending mark
-//!   is cleared; what the member changed is now the provider's version.
+//!   is cleared; what the member changed is now the provider's version. A
+//!   hold released before its block reached the provider is deleted there
+//!   now.
 //! - **Superseded** (412, the event changed there meanwhile): the provider's
 //!   version is kept, the mark is cleared and the event says the member's
 //!   change was not kept because it changed at the provider.
@@ -18,6 +20,7 @@ use crate::{
         publish,
         rows::{calendar_by_id, event_by_id},
     },
+    features::holds,
     inbound::{CalendarChangeCompleted, Outcome},
 };
 
@@ -100,6 +103,11 @@ impl EventHandler for ApplyOutcome {
                         .bind(Snapshot::of(&now).to_json())
                         .execute(&mut **tx)
                         .await?;
+                        // A hold released while it was on its way there
+                        // (`features::holds`): it goes at the provider now.
+                        if now.deleted_at.is_some() && change == "create" {
+                            holds::ask_delete(tx, workspace, now.id).await?;
+                        }
                     }
                 }
             }

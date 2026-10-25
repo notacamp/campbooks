@@ -11,6 +11,7 @@ pub mod forget;
 pub mod free_slots;
 pub mod get_event;
 pub mod grant_calendars;
+pub mod holds;
 pub mod list_events;
 pub mod push_event;
 pub mod respond_event;
