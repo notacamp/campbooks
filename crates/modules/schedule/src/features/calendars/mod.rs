@@ -224,7 +224,7 @@ async fn track_change(
     if syncing == before.syncing && !recoloured {
         return Ok(());
     }
-    let Some(calendar) = tracked::calendar(&mut **tx, before.id).await? else {
+    let Some(calendar) = tracked::calendar(tx, before.id).await? else {
         return Ok(());
     };
     match (before.syncing, syncing) {

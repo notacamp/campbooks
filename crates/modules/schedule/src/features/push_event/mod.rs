@@ -144,7 +144,7 @@ pub async fn push_row(
     .await?;
     publish::created(state, tx, workspace, member, &made).await?;
     publish::cancelled(state, tx, workspace, member, row).await?;
-    if let Some(calendar_event) = tracked::calendar_event(&mut **tx, id).await? {
+    if let Some(calendar_event) = tracked::calendar_event(tx, id).await? {
         state
             .tracker
             .track(

@@ -343,7 +343,7 @@ pub async fn changes(
     workspace: WorkspaceId,
     before: &EventRow,
 ) -> Result<()> {
-    let Some(after) = super::rows::event_by_id(&mut **tx, before.id).await? else {
+    let Some(after) = super::rows::event_by_id(tx, before.id).await? else {
         return Ok(());
     };
     let fields = edited(before, &after);
@@ -351,7 +351,7 @@ pub async fn changes(
     if fields.is_empty() && !was_moved {
         return Ok(());
     }
-    let Some(snapshot) = calendar_event(&mut **tx, before.id).await? else {
+    let Some(snapshot) = calendar_event(tx, before.id).await? else {
         return Ok(());
     };
     if was_moved {
@@ -394,7 +394,7 @@ pub async fn created(
     workspace: WorkspaceId,
     id: EventId,
 ) -> Result<()> {
-    if let Some(calendar_event) = calendar_event(&mut **tx, id).await? {
+    if let Some(calendar_event) = calendar_event(tx, id).await? {
         state
             .tracker
             .track(
