@@ -34,13 +34,18 @@ import { buildScheduleRoutes } from "./index";
 
 const S = `${W}/schedule`;
 
-const consent = (start: MailboxConsent["start"] = vi.fn()): MailboxConsent => ({
+const signInAgain = vi.fn();
+
+const consent = (
+  start: MailboxConsent["start"] = vi.fn(),
+  refusal?: MailboxConsent["refusal"],
+): MailboxConsent => ({
   providers: ["google", "zoho"],
   providersFailed: false,
   start,
   starting: false,
-  refusal: undefined,
-  signInAgain: vi.fn(),
+  refusal,
+  signInAgain,
   wayInFate: () => "unchanged",
 });
 
@@ -62,7 +67,15 @@ const useSources: UseTaskSources = (_workspaceId, ids) =>
 
 function renderAt(
   path: string,
-  { locale = "en", start }: { locale?: "en" | "pt-PT"; start?: MailboxConsent["start"] } = {},
+  {
+    locale = "en",
+    start,
+    refusal,
+  }: {
+    locale?: "en" | "pt-PT";
+    start?: MailboxConsent["start"];
+    refusal?: MailboxConsent["refusal"];
+  } = {},
 ) {
   const root = createRootRoute({ component: Outlet });
   const workspace = createRoute({
@@ -73,7 +86,7 @@ function renderAt(
   const router = createRouter({
     routeTree: root.addChildren([
       workspace.addChildren(
-        buildScheduleRoutes(workspace, { useConsent: () => consent(start), useSources }),
+        buildScheduleRoutes(workspace, { useConsent: () => consent(start, refusal), useSources }),
       ),
     ]),
     history: createMemoryHistory({ initialEntries: [path] }),
@@ -454,12 +467,13 @@ describe("tasks on the calendar", () => {
 
 describe("Settings → Calendar", () => {
   const connections = [
-    { ...CONNECTION, capabilities: ["messages", "calendar"] },
+    { ...CONNECTION, capabilities: ["messages", "calendar"], offers: [] },
     {
       ...ZOHO_CONNECTION,
       address: "ana@lopesimoveis.example",
       health: "ok",
       capabilities: ["messages"],
+      offers: [],
     },
     {
       ...CONNECTION,
@@ -497,7 +511,8 @@ describe("Settings → Calendar", () => {
     settings();
     renderAt(`/w/${DUARTE.id}/settings/calendar`, { start });
 
-    // Only the Google mailbox without calendar access: not the one that has it, not Zoho.
+    // Only the Google mailbox without calendar access: not the one that has it, and not
+    // Zoho, which the server does not offer it for.
     const add = await screen.findByRole("button", { name: "Add calendar access" });
     expect(screen.getAllByRole("button", { name: "Add calendar access" })).toHaveLength(1);
     fireEvent.click(add);
@@ -505,7 +520,58 @@ describe("Settings → Calendar", () => {
     expect(start).toHaveBeenCalledWith({
       purpose: "reconnect",
       connection: "0192f1a0-0000-7000-8000-0000000000c9",
+      capabilities: ["calendar"],
     });
+  });
+
+  it("offers calendar access to a Zoho mailbox when the server offers it", async () => {
+    const start = vi.fn();
+    api({
+      [`GET ${W}/connections`]: {
+        body: {
+          connections: [
+            { ...connections[1], offers: ["calendar"] },
+            { ...connections[2], offers: [] },
+          ],
+        },
+      },
+    });
+    renderAt(`/w/${DUARTE.id}/settings/calendar`, { start });
+
+    const add = await screen.findByRole("button", { name: "Add calendar access" });
+    expect(screen.getAllByRole("button", { name: "Add calendar access" })).toHaveLength(1);
+    expect(screen.getByText("ana@lopesimoveis.example")).toBeVisible();
+    fireEvent.click(add);
+    expect(start).toHaveBeenCalledWith({
+      purpose: "reconnect",
+      connection: ZOHO_CONNECTION.id,
+      capabilities: ["calendar"],
+    });
+  });
+
+  it("offers a recent sign-in when adding calendar access needs one", async () => {
+    signInAgain.mockClear();
+    settings();
+    renderAt(`/w/${DUARTE.id}/settings/calendar`, { refusal: "step_up" });
+
+    expect(await screen.findByText("Sign in again first")).toBeVisible();
+    expect(screen.queryByText("Couldn’t start that. Try again.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in again" }));
+    expect(signInAgain).toHaveBeenCalledTimes(1);
+  });
+
+  it("says plainly why else adding calendar access was refused", async () => {
+    settings();
+    const { unmount } = renderAt(`/w/${DUARTE.id}/settings/calendar`, { refusal: "rate_limited" });
+    expect(
+      await screen.findByText("Too many tries. Wait a few minutes, then try again."),
+    ).toBeVisible();
+    unmount();
+
+    renderAt(`/w/${DUARTE.id}/settings/calendar`, { refusal: "unsupported" });
+    expect(
+      await screen.findByText("This Campbooks can’t add calendar access to that account."),
+    ).toBeVisible();
   });
 
   it("turns off a kind Scout adds, keeping the others", async () => {

@@ -2,7 +2,7 @@
 //! may see: their own, or all of the workspace's for owners, admins and
 //! client tokens. Never a credential.
 
-use axum::{Json, extract::State};
+use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result,
     authz::{self, Action},
@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
+    deps::Deps,
     domain::{connections, model::ConnectionView, resources},
     events::CONNECTION_RECORD,
     scopes::ConnectorsRead,
@@ -46,13 +47,14 @@ pub struct ConnectionList {
 )]
 pub async fn handler(
     State(state): State<AppState>,
+    Extension(deps): Extension<Deps>,
     workspace: Workspace<ConnectorsRead>,
 ) -> Result<Json<ConnectionList>> {
-    execute(&state, &workspace.access).await.map(Json)
+    execute(&state, &deps, &workspace.access).await.map(Json)
 }
 
 /// The connections `access` may see.
-pub async fn execute(state: &AppState, access: &Access) -> Result<ConnectionList> {
+pub async fn execute(state: &AppState, deps: &Deps, access: &Access) -> Result<ConnectionList> {
     authz::require_type(state, access, Action::Read, CONNECTION_RECORD, || {
         Error::Forbidden
     })?;
@@ -60,7 +62,7 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<ConnectionList
     let mut views = Vec::new();
     for connection in connections::list(&mut tx).await? {
         if resources::visible(&state.resources, access, connection.granted_by) {
-            views.push(connections::view(&mut tx, connection, access.user).await?);
+            views.push(connections::view(&mut tx, connection, access.user, deps).await?);
         }
     }
     tx.commit().await?;

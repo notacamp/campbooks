@@ -475,6 +475,34 @@ async fn reconnecting_needs_no_step_up_and_names_the_connection(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_reconnect_can_ask_for_calendar_access_and_nothing_else(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let stale = kit.stale(&access).await;
+    let workspace = uuid::Uuid::now_v7();
+    let started = kit
+        .start_link(
+            &stale,
+            &json!({ "purpose": "reconnect", "workspace_id": workspace,
+                     "connection_id": RECONNECTABLE, "capabilities": ["calendar"] }),
+        )
+        .await;
+    assert_eq!(started.status, StatusCode::CREATED, "{started:?}");
+    let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
+    let scope = query(&to_google.location())["scope"].clone();
+    assert!(scope.contains(crate::testkit::CALENDAR_SCOPE), "{scope}");
+
+    let other = kit
+        .start_link(
+            &stale,
+            &json!({ "purpose": "reconnect", "workspace_id": workspace,
+                     "connection_id": RECONNECTABLE, "capabilities": ["files"] }),
+        )
+        .await;
+    assert_eq!(other.status, StatusCode::BAD_REQUEST, "{other:?}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn the_consent_door_starts_a_connect_for_other_modules(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;

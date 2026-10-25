@@ -224,6 +224,9 @@ pub struct ConnectionView {
     pub granted_by_you: bool,
     /// What it lets Campbooks do.
     pub capabilities: Vec<Capability>,
+    /// What it could still be given by consenting again: `calendar` for a
+    /// Google connection, and for a Zoho one while its adapter is on.
+    pub offers: Vec<Capability>,
     /// How it is doing.
     pub health: Health,
     /// Why, when it is not `ok` (`grant_revoked`, `rate_limited`, …).

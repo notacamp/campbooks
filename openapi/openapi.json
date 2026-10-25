@@ -18936,6 +18936,7 @@
           "granted_by",
           "granted_by_you",
           "capabilities",
+          "offers",
           "health",
           "health_changed_at",
           "streams",
@@ -19007,6 +19008,13 @@
           "id": {
             "$ref": "#/components/schemas/ConnectionId",
             "description": "The connection."
+          },
+          "offers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "description": "What it could still be given by consenting again: `calendar` for a\nGoogle connection, and for a Zoho one while its adapter is on."
           },
           "provider": {
             "$ref": "#/components/schemas/Provider",
@@ -26207,6 +26215,13 @@
           "purpose"
         ],
         "properties": {
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Besides the mailbox, what to ask for (`calendar`); a reconnect also\nasks for what the connection already has."
+          },
           "connection_id": {
             "type": [
               "string",

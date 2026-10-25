@@ -44,6 +44,7 @@ impl ConsentDoor for FrontDoor {
                     provider: Some(request.provider),
                     workspace_id: Some(request.workspace),
                     connection_id: request.connection,
+                    capabilities: Vec::new(),
                     return_to: None,
                     // As before the choice existed: the account becomes a
                     // way in. The Mailboxes screen asks first.

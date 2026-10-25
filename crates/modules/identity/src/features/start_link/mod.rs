@@ -66,6 +66,10 @@ pub struct StartLink {
     /// The connection, for `reconnect`.
     #[serde(default)]
     pub connection_id: Option<String>,
+    /// Besides the mailbox, what to ask for (`calendar`); a reconnect also
+    /// asks for what the connection already has.
+    #[serde(default)]
+    pub capabilities: Vec<String>,
     /// For `connect`: also sign in with the account (default `true`).
     /// `false` for a shared mailbox (support@): it is connected, never
     /// added as a way in. Ignored by the other purposes.
@@ -156,6 +160,15 @@ pub async fn execute_asking(
 ) -> Result<StartedLink> {
     let (issuer, account) = super::account(deps, principal)?;
     let now = issuer.now();
+    let asked: Vec<String> = capabilities
+        .iter()
+        .chain(&input.capabilities)
+        .cloned()
+        .collect();
+    let capabilities = asked.as_slice();
+    if input.capabilities.iter().any(|name| name != "calendar") {
+        return Err(Error::BadRequest(MESSAGES.reason("link_incomplete")));
+    }
     let return_to = web::return_to(input.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
     let incomplete = || Error::BadRequest(MESSAGES.reason("link_incomplete"));

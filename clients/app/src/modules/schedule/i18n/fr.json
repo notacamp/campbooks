@@ -180,7 +180,14 @@
       "colour": "Couleur de {{name}}",
       "access": "Donner l’accès à l’agenda",
       "accessHint": "E-mails seulement. Donnez l’accès à l’agenda pour voir ici les agendas de ce compte.",
-      "refused": "Impossible de commencer. Réessayez."
+      "refused": "Impossible de commencer. Réessayez.",
+      "stepUp": {
+        "title": "Reconnectez-vous d’abord",
+        "lead": "Pour donner l’accès à l’agenda, il faut vous être connecté au cours des dix dernières minutes.",
+        "action": "Se reconnecter"
+      },
+      "unsupported": "Ce Campbooks ne peut pas donner l’accès à l’agenda pour ce compte.",
+      "rateLimited": "Trop d’essais. Attendez quelques minutes, puis réessayez."
     },
     "kinds": {
       "title": "Ce que Scout ajoute à partir de vos e-mails",
