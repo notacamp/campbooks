@@ -78,6 +78,12 @@
       "date": "2026-10-25",
       "plan_version": 7,
       "pr": "#661"
+    },
+    {
+      "change": "The admin module instrumented (campbooks-cloud#331): 2 instance-wide events for an administrator's profile granted (created or given more permissions) and revoked (permissions taken away or the profile removed) by the server's admin command, as system; record profile and enum permission; no Coverage rows (the module serves no operation and runs no job, schedule or handler).",
+      "date": "2026-10-25",
+      "plan_version": 8,
+      "pr": ""
     }
   ],
   "coverage": [
@@ -1439,6 +1445,46 @@
   ],
   "description": "The tracking plan (ADR 0020), generated from tracking/tracking-plan.xlsx by campbooks-tracking-plan. Do not edit: change the workbook and regenerate. Every event's `schema` is the JSON Schema of its body; `envelope` is the schema of what the kernel adds around it.",
   "enums": [
+    {
+      "description": "See background jobs (jobs.read).",
+      "enum": "admin.permission",
+      "value": "jobs_read"
+    },
+    {
+      "description": "Retry failed background jobs (jobs.retry).",
+      "enum": "admin.permission",
+      "value": "jobs_retry"
+    },
+    {
+      "description": "Approve or refuse signup requests (signups.review).",
+      "enum": "admin.permission",
+      "value": "signups_review"
+    },
+    {
+      "description": "Everything, including permissions added later (super).",
+      "enum": "admin.permission",
+      "value": "super"
+    },
+    {
+      "description": "See the system overview (system.read).",
+      "enum": "admin.permission",
+      "value": "system_read"
+    },
+    {
+      "description": "See accounts (users.read).",
+      "enum": "admin.permission",
+      "value": "users_read"
+    },
+    {
+      "description": "Suspend and restore accounts (users.suspend).",
+      "enum": "admin.permission",
+      "value": "users_suspend"
+    },
+    {
+      "description": "See workspaces, metadata only (workspaces.read).",
+      "enum": "admin.permission",
+      "value": "workspaces_read"
+    },
     {
       "description": "The model's answers are not trusted yet.",
       "enum": "assistant.answer_failure",
@@ -3251,6 +3297,272 @@
     "type": "object"
   },
   "events": [
+    {
+      "action": "granted",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 8,
+      "description": "An account was made an instance administrator, or an administrator was given more permissions, by the operator's `campbooks-server admin grant`. The snapshot is the profile afterwards, with the permissions it held before.",
+      "fires_when": "admin grant (campbooks_admin::cli::grant) creates the profile or adds a permission it lacked, in the transaction that writes the profile and its audit entry; permissions it already holds track nothing, with or without a new note.",
+      "module": "admin",
+      "name": "admin.profile_granted",
+      "object": "profile",
+      "openspec_change": "track-admin-events",
+      "rust_type": "ProfileGranted",
+      "schema": {
+        "$id": "urn:campbooks:tracking:admin.profile_granted:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An account was made an instance administrator, or an administrator was given more permissions, by the operator's `campbooks-server admin grant`. The snapshot is the profile afterwards, with the permissions it held before.",
+        "properties": {
+          "before": {
+            "description": "The permissions it held before; empty when the account was not an administrator.",
+            "items": {
+              "enum": [
+                "jobs_read",
+                "jobs_retry",
+                "signups_review",
+                "super",
+                "system_read",
+                "users_read",
+                "users_suspend",
+                "workspaces_read"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          },
+          "granted": {
+            "description": "The permissions it gained.",
+            "items": {
+              "enum": [
+                "jobs_read",
+                "jobs_retry",
+                "signups_review",
+                "super",
+                "system_read",
+                "users_read",
+                "users_suspend",
+                "workspaces_read"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          },
+          "new_profile": {
+            "description": "Whether the grant created the profile: the account was not an administrator.",
+            "type": "boolean",
+            "x-classification": "operational"
+          },
+          "profile": {
+            "additionalProperties": false,
+            "description": "The profile afterwards.",
+            "properties": {
+              "account_id": {
+                "description": "The administrator: their Campbooks account id. Absent when the profile names an account of another identity provider (a token subject that is not a Campbooks id, which may be an address).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "granted_at": {
+                "description": "When the profile was first granted.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "permissions": {
+                "description": "What the administrator may do; empty once the profile is removed.",
+                "items": {
+                  "enum": [
+                    "jobs_read",
+                    "jobs_retry",
+                    "signups_review",
+                    "super",
+                    "system_read",
+                    "users_read",
+                    "users_suspend",
+                    "workspaces_read"
+                  ],
+                  "type": "string"
+                },
+                "type": "array",
+                "x-classification": "operational"
+              },
+              "removed_at": {
+                "description": "When a revoke removed the whole profile: the account is no longer an administrator.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "with_note": {
+                "description": "Whether the operator wrote a note (never the note).",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "granted_at",
+              "permissions",
+              "updated_at",
+              "with_note"
+            ],
+            "title": "admin.profile",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "granted",
+          "new_profile",
+          "profile"
+        ],
+        "title": "admin.profile_granted",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "revoked",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 8,
+      "description": "An administrator lost permissions, or stopped being one (the whole profile removed), by the operator's `campbooks-server admin revoke`. The snapshot is the profile afterwards: with no permissions and removed_at set when it was removed.",
+      "fires_when": "admin revoke (campbooks_admin::cli::revoke) takes away at least one permission the profile held, or removes the profile, in the transaction that writes the change and its audit entry; an account with no profile, or only permissions it does not hold, track nothing.",
+      "module": "admin",
+      "name": "admin.profile_revoked",
+      "object": "profile",
+      "openspec_change": "track-admin-events",
+      "rust_type": "ProfileRevoked",
+      "schema": {
+        "$id": "urn:campbooks:tracking:admin.profile_revoked:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An administrator lost permissions, or stopped being one (the whole profile removed), by the operator's `campbooks-server admin revoke`. The snapshot is the profile afterwards: with no permissions and removed_at set when it was removed.",
+        "properties": {
+          "before": {
+            "description": "The permissions it held before.",
+            "items": {
+              "enum": [
+                "jobs_read",
+                "jobs_retry",
+                "signups_review",
+                "super",
+                "system_read",
+                "users_read",
+                "users_suspend",
+                "workspaces_read"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          },
+          "profile": {
+            "additionalProperties": false,
+            "description": "The profile afterwards; with no permissions and removed_at set when it was removed.",
+            "properties": {
+              "account_id": {
+                "description": "The administrator: their Campbooks account id. Absent when the profile names an account of another identity provider (a token subject that is not a Campbooks id, which may be an address).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "granted_at": {
+                "description": "When the profile was first granted.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "permissions": {
+                "description": "What the administrator may do; empty once the profile is removed.",
+                "items": {
+                  "enum": [
+                    "jobs_read",
+                    "jobs_retry",
+                    "signups_review",
+                    "super",
+                    "system_read",
+                    "users_read",
+                    "users_suspend",
+                    "workspaces_read"
+                  ],
+                  "type": "string"
+                },
+                "type": "array",
+                "x-classification": "operational"
+              },
+              "removed_at": {
+                "description": "When a revoke removed the whole profile: the account is no longer an administrator.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "with_note": {
+                "description": "Whether the operator wrote a note (never the note).",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "granted_at",
+              "permissions",
+              "updated_at",
+              "with_note"
+            ],
+            "title": "admin.profile",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "revoked": {
+            "description": "The permissions it lost.",
+            "items": {
+              "enum": [
+                "jobs_read",
+                "jobs_retry",
+                "signups_review",
+                "super",
+                "system_read",
+                "users_read",
+                "users_suspend",
+                "workspaces_read"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "profile",
+          "revoked"
+        ],
+        "title": "admin.profile_revoked",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
     {
       "action": "finished",
       "actor_types": [
@@ -15070,8 +15382,99 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-25",
-  "plan_version": 7,
+  "plan_version": 8,
   "properties": [
+    {
+      "classification": "operational",
+      "description": "The permissions it held before; empty when the account was not an administrator.",
+      "event": "admin.profile_granted",
+      "example": "",
+      "list": true,
+      "of": "admin.permission",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The permissions it gained.",
+      "event": "admin.profile_granted",
+      "example": "",
+      "list": true,
+      "of": "admin.permission",
+      "pattern": "",
+      "property": "granted",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether the grant created the profile: the account was not an administrator.",
+      "event": "admin.profile_granted",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "new_profile",
+      "required": true,
+      "type": "bool",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The profile afterwards.",
+      "event": "admin.profile_granted",
+      "example": "",
+      "list": false,
+      "of": "admin.profile",
+      "pattern": "",
+      "property": "profile",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The permissions it held before.",
+      "event": "admin.profile_revoked",
+      "example": "",
+      "list": true,
+      "of": "admin.permission",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The profile afterwards; with no permissions and removed_at set when it was removed.",
+      "event": "admin.profile_revoked",
+      "example": "",
+      "list": false,
+      "of": "admin.profile",
+      "pattern": "",
+      "property": "profile",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The permissions it lost.",
+      "event": "admin.profile_revoked",
+      "example": "",
+      "list": true,
+      "of": "admin.permission",
+      "pattern": "",
+      "property": "revoked",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
     {
       "classification": "operational",
       "description": "The answer, as stored.",
@@ -18220,6 +18623,72 @@
     }
   ],
   "records": [
+    {
+      "classification": "pseudonymous",
+      "description": "The administrator: their Campbooks account id. Absent when the profile names an account of another identity provider (a token subject that is not a Campbooks id, which may be an address).",
+      "enum": "",
+      "field": "account_id",
+      "list": false,
+      "pattern": "",
+      "record": "admin.profile",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "When the profile was first granted.",
+      "enum": "",
+      "field": "granted_at",
+      "list": false,
+      "pattern": "",
+      "record": "admin.profile",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "What the administrator may do; empty once the profile is removed.",
+      "enum": "admin.permission",
+      "field": "permissions",
+      "list": true,
+      "pattern": "",
+      "record": "admin.profile",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "When a revoke removed the whole profile: the account is no longer an administrator.",
+      "enum": "",
+      "field": "removed_at",
+      "list": false,
+      "pattern": "",
+      "record": "admin.profile",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "When it last changed.",
+      "enum": "",
+      "field": "updated_at",
+      "list": false,
+      "pattern": "",
+      "record": "admin.profile",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether the operator wrote a note (never the note).",
+      "enum": "",
+      "field": "with_note",
+      "list": false,
+      "pattern": "",
+      "record": "admin.profile",
+      "required": true,
+      "type": "bool"
+    },
     {
       "classification": "id",
       "description": "The chat it is in.",

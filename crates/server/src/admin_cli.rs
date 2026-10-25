@@ -3,6 +3,10 @@
 //! stop it. It runs with shell access to the server, on the **migration
 //! login** (`CAMPBOOKS_DATABASE_MIGRATION_URL`, else the database URL): the
 //! runtime role every request runs as cannot write a profile.
+//!
+//! A change of a profile is tracked (ADR 0020) with the tracker
+//! `CAMPBOOKS_TRACKING__*` configures, as `system` `admin` (the command's
+//! name, outside any request or job) with the role `cli`.
 
 use std::{
     io::{BufRead as _, Write as _},
@@ -10,7 +14,7 @@ use std::{
 };
 
 use campbooks_admin::cli::{self, Profile, Revoked};
-use campbooks_kernel::{Config, admin::Permission, db};
+use campbooks_kernel::{Config, admin::Permission, db, tracking::Tracker};
 use clap::{Args, Subcommand};
 use sqlx::{Connection as _, PgConnection};
 use uuid::Uuid;
@@ -99,18 +103,29 @@ pub fn run(command: AdminCommand) -> ExitCode {
 
 async fn execute(config: &Config, command: AdminCommand) -> Result<(), String> {
     let mut conn = connect(config).await?;
+    let tracker = Tracker::new(&config.tracking).with_role("cli");
     let result = match command {
         AdminCommand::Grant {
             who,
             permissions,
             note,
             yes,
-        } => grant(&mut conn, &who, &permissions, note.as_deref(), yes).await,
+        } => {
+            grant(
+                &mut conn,
+                &tracker,
+                &who,
+                &permissions,
+                note.as_deref(),
+                yes,
+            )
+            .await
+        }
         AdminCommand::Revoke {
             who,
             permissions,
             yes,
-        } => revoke(&mut conn, &who, &permissions, yes).await,
+        } => revoke(&mut conn, &tracker, &who, &permissions, yes).await,
         AdminCommand::List => list(&mut conn).await,
         AdminCommand::Log { limit } => log(&mut conn, limit).await,
     };
@@ -120,6 +135,7 @@ async fn execute(config: &Config, command: AdminCommand) -> Result<(), String> {
 
 async fn grant(
     conn: &mut PgConnection,
+    tracker: &Tracker,
     who: &Who,
     permissions: &[Permission],
     note: Option<&str>,
@@ -135,9 +151,16 @@ async fn grant(
             names.join(", ")
         ),
     )?;
-    let profile = cli::grant(conn, &account.id, permissions, note, chrono::Utc::now())
-        .await
-        .map_err(|e| format!("could not grant: {e}"))?;
+    let profile = cli::grant(
+        conn,
+        tracker,
+        &account.id,
+        permissions,
+        note,
+        chrono::Utc::now(),
+    )
+    .await
+    .map_err(|e| format!("could not grant: {e}"))?;
     say(&format!(
         "granted: {} is an administrator with {}",
         account.label,
@@ -148,6 +171,7 @@ async fn grant(
 
 async fn revoke(
     conn: &mut PgConnection,
+    tracker: &Tracker,
     who: &Who,
     permissions: &[Permission],
     yes: bool,
@@ -163,7 +187,7 @@ async fn revoke(
             .join(", ")
     };
     confirm(yes, &format!("Take {what} away from {}?", account.label))?;
-    let outcome = cli::revoke(conn, &account.id, permissions, chrono::Utc::now())
+    let outcome = cli::revoke(conn, tracker, &account.id, permissions, chrono::Utc::now())
         .await
         .map_err(|e| format!("could not revoke: {e}"))?;
     say(&match outcome {

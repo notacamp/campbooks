@@ -63,6 +63,7 @@ async fn administrator(db: &PgPool) -> Uuid {
     let mut conn = db.acquire().await.unwrap();
     campbooks_admin::cli::grant(
         &mut conn,
+        &campbooks_kernel::tracking::Tracker::default(),
         &account.to_string(),
         &[Permission::Super],
         None,

@@ -103,8 +103,12 @@ What else the module does, and why it tracks nothing:
 - The audit trail still records a revoke of permissions the profile does
   not hold (it records the command), and a re-grant; only the tracked event
   is skipped, because nothing changed.
-- A grant with an empty list of permissions (the command requires at least
-  one) on an account with no profile creates an empty profile; it is
-  tracked as `new_profile` with nothing `granted`.
+- A profile always holds at least one permission (a check on
+  `admin.profiles`), so `new_profile` is true exactly when `before` is
+  empty; it is there so a reader need not know that.
+- The snapshot of a removed profile is built in the revoke's transaction
+  from the row read (and locked) before the delete: its `granted_at` and
+  whether it had a note, no permissions, and `updated_at` = `removed_at` =
+  the time of the revoke.
 - Patch numbers and plan versions are taken in merge order; this one builds
   on plan version 7 (`0007-assistant-attention-search-system`).

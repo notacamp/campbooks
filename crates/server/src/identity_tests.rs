@@ -891,6 +891,7 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
     };
     campbooks_admin::cli::grant(
         &mut db.acquire().await.unwrap(),
+        &campbooks_kernel::tracking::Tracker::default(),
         &account,
         &[campbooks_kernel::admin::Permission::Super],
         None,
