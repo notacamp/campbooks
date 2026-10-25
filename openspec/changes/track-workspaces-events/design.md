@@ -75,7 +75,7 @@ All are version 1, `live`, added in plan version 5 by this change.
 | `member_joined` | a person becomes a member: the creator of a workspace (`workspaces.create`, via `created`) or an invitee accepting (`workspaces.accept_invitation`, via `invitation`) | `member`, `via`, `invitation`? (accepted) |
 | `member_role_changed` | `workspaces.change_role` gives a member another role; the same role tracks nothing | `member`, `before` (role) |
 | `member_left` | a member leaves (`workspaces.leave`, or `workspaces.remove_member` on oneself: `left`) or is removed (`workspaces.remove_member`: `removed`) | `member` (as it stood), `how` (`left`, `removed`), `mail` (`delete`, `keep`) |
-| `member_suspended` | `workspaces.announce_member_suspended` announces an account's suspension in a workspace its user belongs to (`system`); a replay of the change announced already, or an older one, tracks nothing | `member` |
+| `member_suspended` | `workspaces.announce_member_suspended` announces an account's suspension in a workspace its user belongs to (`system`); a change that leaves them as they were (a replay, an older change) tracks nothing | `member` |
 | `member_unsuspended` | `workspaces.announce_member_unsuspended` announces the lift, likewise | `member` |
 
 ### Invitations (workspace)
@@ -163,9 +163,10 @@ patch where the name changed:
 - Suspension announcements are delivered in a transaction per workspace,
   and a change announced again (a replay, or a retry after a partial
   failure) is published again for consumers to ignore. It is tracked only
-  when it is new for the user (not the change already recorded), so a
-  replay tracks nothing; a retry after a partial failure may track a
-  workspace twice (at least once, as the relay is).
+  when it changes whether the user is suspended (against the change
+  recorded on the user's row), so a replay tracks nothing; a retry after a
+  partial failure may track a workspace twice (at least once, as the relay
+  is).
 - Revoking a code and deciding a request are idempotent; they now say
   whether anything changed, and only a change is tracked. An update that
   sets the values a workspace already has tracks nothing.

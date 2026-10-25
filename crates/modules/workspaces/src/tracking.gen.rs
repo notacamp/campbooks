@@ -115,7 +115,7 @@ impl types::TrackedEvent for MemberRoleChanged {
 
 /// `workspaces.member_suspended` v1: A member's account was suspended: whatever acts in their name in the workspace stops until it is lifted. Tracked in each workspace they belong to.
 ///
-/// Fires when: workspaces.announce_member_suspended announces identity.account_suspended in the workspace, in the transaction that publishes workspaces.member_suspended there; a replay of the change announced already, or an older change, tracks nothing.
+/// Fires when: workspaces.announce_member_suspended announces identity.account_suspended in the workspace, in the transaction that publishes workspaces.member_suspended there; a change that leaves them as they were (a replay, an older change, a second suspension with no lift between) tracks nothing.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct MemberSuspended {
     /// The workspace it happened in (written in the envelope, not the body).
@@ -138,7 +138,7 @@ impl types::TrackedEvent for MemberSuspended {
 
 /// `workspaces.member_unsuspended` v1: A member's suspension was lifted. Tracked in each workspace they belong to.
 ///
-/// Fires when: workspaces.announce_member_unsuspended announces identity.account_unsuspended in the workspace, likewise; a replay or an older change tracks nothing.
+/// Fires when: workspaces.announce_member_unsuspended announces identity.account_unsuspended in the workspace, likewise; a lift that leaves them as they were (a replay, an older change) tracks nothing.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct MemberUnsuspended {
     /// The workspace it happened in (written in the envelope, not the body).

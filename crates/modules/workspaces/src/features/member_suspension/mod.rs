@@ -112,9 +112,9 @@ async fn announce(
 }
 
 /// Lock the user whose identity subject is `subject`, record `change` as
-/// theirs and list the workspaces to announce it in, with whether the change
-/// is new for them (not the one recorded already: a replay is announced
-/// again, but tracked only once); `None` when there is nothing to announce:
+/// theirs and list the workspaces to announce it in, with whether it changes
+/// whether they are suspended (a replay is announced again, but tracked
+/// only once); `None` when there is nothing to announce:
 /// no such user (never signed in), or a newer change already announced.
 /// The lock is held until `tx` ends, so a workspace the user joins
 /// meanwhile is told on joining, and one they leave meanwhile is left
@@ -135,7 +135,11 @@ pub(crate) async fn record(
         );
         return Ok(None);
     }
-    let fresh = known != Some(change);
+    // Tracked only when it changes whether they are suspended: a replay,
+    // or a second suspension with no lift between, changes nothing.
+    let fresh = known.map_or(change.suspended, |known| {
+        known.suspended != change.suspended
+    });
     suspension::record(tx, user, change).await?;
     // Across workspaces, as that user: row-level security applies.
     set_user(tx, user).await?;
@@ -153,7 +157,8 @@ pub(crate) async fn record(
 }
 
 /// Publish `change` in `workspace`, in a transaction working there, and
-/// track it there when it is `fresh` (new for the user).
+/// track it there when it is `fresh` (it changes whether the user is
+/// suspended).
 pub(crate) async fn publish(
     state: &AppState,
     workspace: WorkspaceId,
