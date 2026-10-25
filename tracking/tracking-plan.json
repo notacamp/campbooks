@@ -95,7 +95,7 @@
       "change": "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check and the kernel's maintenance schedules and change-feed sequencer.",
       "date": "2026-10-25",
       "plan_version": 11,
-      "pr": ""
+      "pr": "#666"
     }
   ],
   "coverage": [
