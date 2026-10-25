@@ -102,7 +102,7 @@ last error.
 | Record | Fields |
 | --- | --- |
 | `assistant.chat` | `id`, `about`? (record reference), `questions`, `created_at`, `last_message_at` |
-| `assistant.answer` | `id`, `chat_id`, `finish` (`done`, `cut_short`, `failed`), `tools` (list of `assistant.chat_tool`), `proposals`, `failure`? (`over_cap`, `provider`, `rounds`, `timed_out`) |
+| `assistant.answer` | `id`, `chat_id`, `finish` (`done`, `cut_short`, `failed`), `tools` (list of `assistant.chat_tool`), `proposals`, `failure`? (`assistant.answer_failure`) |
 | `assistant.proposal` | `id`, `chat_id`, `kind` (`change`, `rule`, `reply`), `state` (`pending`, `done`, `declined`, `failed`, `undone`), `action`? (`assistant.proposal_action`), `record`? (record reference) |
 | `assistant.profile` | `user_id`, `proactivity` (`ask_first`, `act_then_tell`), `asked`, `asked_at`?, `revision` |
 | `attention.item` | `id`, `record` (record reference), `reason` (`review`, `reply`, `decide`, `do`, `pay`, `nudge`, `worth_a_look`, `waiting`), `trust` (`sure`, `check`), `due_on`?, `urgent`, `state` (`open`, `cleared`), `since`, `snoozed_until`? |
@@ -114,7 +114,12 @@ last error.
 is the tools of `ChatTool` (`find_conversations`, `read_conversation`,
 `conversation_history`, `find_people`, `what_needs_me`, `my_inboxes`,
 `my_tasks`, `read_task`, `my_calendar`, `free_time`, `read_event`);
-`assistant.proposal_action` the 31 changes of `ProposalAction`. An
+`assistant.proposal_action` the 31 changes of `ProposalAction`;
+`assistant.answer_failure` the answer loop's kinds of failure (`over_cap`,
+`rounds`, `timed_out`, `provider`) and the gateway's (`timeout`,
+`transport`, `status`, `invalid_response`, `config`,
+`external_content_refused`, `role_not_configured`, `answers_not_trusted`,
+`unattributed`, `metering`), never the provider's words. An
 attention item's `snoozed_until` is the acting member's own Later.
 
 ## Events
@@ -221,9 +226,8 @@ no row.
 
 - `answer_finished` reads the stored answer back: its `finish`, the tools of
   its steps in order, how many proposals it holds. A failure's kind is the
-  one the answer loop reports (`over_cap`, `provider`, `rounds`,
-  `timed_out`); a kind the plan does not know leaves `failure` out rather
-  than guessing.
+  word the answer loop logs (`Failure::kind`, `answer::error_kind`); a word
+  the plan does not know leaves `failure` out rather than guessing.
 - Deleting a chat reads it before the delete, in the same transaction:
   `chat_deleted` carries the chat as it stood.
 - The meter's refusal is tracked in the transaction that counts it

@@ -2,7 +2,10 @@
 //! kind; and discard the pending or stuck row of a schedule
 //! (campbooks-cloud#207). Requires `jobs.retry` (or `super`). Only dead jobs
 //! and a schedule's blocking row are ever touched, and repeating a call is a
-//! no-op success: the answer says whether anything changed.
+//! no-op success: the answer says whether anything changed. What changed is
+//! tracked by the kernel, in its transaction (`kernel.job_retried`,
+//! `kernel.jobs_retried`, `kernel.job_discarded`,
+//! `kernel.schedule_run_discarded`).
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -69,7 +72,7 @@ pub async fn retry(
     State(state): State<AppState>,
     Path(JobPath { id }): Path<JobPath>,
 ) -> Result<Json<JobAction>> {
-    let outcome = match admin::retry(&state.db, &admin.grant, id).await? {
+    let outcome = match admin::retry(&state.db, &state.tracker, &admin.grant, id).await? {
         Retry::Requeued => Outcome::Applied,
         Retry::Unchanged => Outcome::Unchanged,
         Retry::Superseded => Outcome::Superseded,
@@ -100,7 +103,7 @@ pub async fn discard(
     State(state): State<AppState>,
     Path(JobPath { id }): Path<JobPath>,
 ) -> Result<Json<JobAction>> {
-    let outcome = match admin::discard(&state.db, &admin.grant, id).await? {
+    let outcome = match admin::discard(&state.db, &state.tracker, &admin.grant, id).await? {
         Discard::Discarded => Outcome::Applied,
         Discard::Unchanged | Discard::Missing => Outcome::Unchanged,
     };
@@ -191,7 +194,13 @@ pub async fn retry_kind(
     JsonBody(body): JsonBody<RetryKind>,
 ) -> Result<Json<RetryKindResult>> {
     let requeued =
-        admin::retry_kind(&state.db, &admin.grant, &body.kind, body.queue.as_deref()).await?;
+        admin::retry_kind(
+        &state.db,
+        &state.tracker,
+        &admin.grant,
+        &body.kind,
+        body.queue.as_deref(),
+    ).await?;
     Ok(Json(RetryKindResult {
         requeued,
         more: i64::try_from(requeued).is_ok_and(|n| n >= admin::RETRY_BATCH),

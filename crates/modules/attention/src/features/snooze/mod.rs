@@ -1,6 +1,10 @@
 //! `POST …/attention/{item_id}/snooze` and `/unsnooze` — "Later": a member
 //! puts an item off until a time, for themselves only. A new cause (the
 //! sender writes again) brings it back sooner.
+//!
+//! Tracked (ADR 0020): `attention.item_snoozed` and `attention.item_unsnoozed`,
+//! with the item afterwards and the Later it replaced or ended (`before`). The
+//! same Later again, or ending one there is not, tracks nothing.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -16,9 +20,13 @@ use sqlx::{Postgres, Transaction};
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{ItemId, ItemRow, ItemView, key, resources::ITEM_RECORD, visible_containers},
+    domain::{
+        ItemId, ItemRow, ItemView, ItemState, Reason, Trust, key, resources::ITEM_RECORD,
+        visible_containers,
+    },
     events::ItemChanged,
     scopes::AttentionWrite,
+    tracking,
 };
 
 /// `/api/v1/w/{workspace_id}/attention/{item_id}…`
@@ -153,6 +161,15 @@ async fn change(
         )))
     })
     .ok_or(Error::NotFound)?;
+    // The caller's Later before the change (the item's row is locked), so a
+    // change that changes nothing tracks nothing.
+    let before: Option<DateTime<Utc>> = sqlx::query_scalar(
+        "SELECT until FROM attention.snoozes WHERE item_id = $1 AND user_id = $2",
+    )
+    .bind(id)
+    .bind(user.as_uuid())
+    .fetch_optional(&mut *tx)
+    .await?;
     match until {
         Some(until) => {
             sqlx::query!(
@@ -183,8 +200,74 @@ async fn change(
     let container = RecordRef::new(item.container_type, &item.container_id);
     announce(state, &mut tx, access, id, container).await?;
     let view = read(&mut tx, id, *user.as_uuid()).await?;
+    track(state, &mut tx, access, &view, before, until).await?;
     tx.commit().await?;
     Ok(view)
+}
+
+/// Track the change of the caller's Later from `before` to `until` (none:
+/// ended), when there is one. `view` is the item afterwards, as the caller
+/// sees it, read in this transaction.
+async fn track(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    access: &Access,
+    view: &ItemView,
+    before: Option<DateTime<Utc>>,
+    until: Option<DateTime<Utc>>,
+) -> Result<()> {
+    let workspace = access.workspace;
+    match (before, until) {
+        (before, Some(until)) if before != Some(until) => {
+            let event = tracking::ItemSnoozed {
+                workspace,
+                item: snapshot(view),
+                before,
+            };
+            state.tracker.track(tx, &event).await?;
+        }
+        (Some(before), None) => {
+            let event = tracking::ItemUnsnoozed {
+                workspace,
+                item: snapshot(view),
+                before,
+            };
+            state.tracker.track(tx, &event).await?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// The plan's snapshot of an item: ids, enums and dates (never its
+/// producer's words, such as why it was cleared).
+fn snapshot(view: &ItemView) -> tracking::ItemSnapshot {
+    tracking::ItemSnapshot {
+        id: *view.id.as_uuid(),
+        record: view.record.clone(),
+        reason: match view.reason {
+            Reason::Review => tracking::Reason::Review,
+            Reason::Reply => tracking::Reason::Reply,
+            Reason::Decide => tracking::Reason::Decide,
+            Reason::Do => tracking::Reason::Do,
+            Reason::Pay => tracking::Reason::Pay,
+            Reason::Nudge => tracking::Reason::Nudge,
+            Reason::WorthALook => tracking::Reason::WorthALook,
+            Reason::Waiting => tracking::Reason::Waiting,
+        },
+        trust: match view.trust {
+            Trust::Sure => tracking::Trust::Sure,
+            Trust::Check => tracking::Trust::Check,
+        },
+        due_on: view.due_on,
+        urgent: view.urgent,
+        state: match view.state {
+            ItemState::Open => tracking::ItemState::Open,
+            ItemState::Cleared => tracking::ItemState::Cleared,
+        },
+        since: view.since,
+        snoozed_until: view.snoozed_until,
+    }
 }
 
 async fn announce(

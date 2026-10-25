@@ -28,6 +28,7 @@ use campbooks_kernel::{
     jobs::Worker,
     tenancy::WorkspaceId,
     testing::{self, TestIdp, TestResponse},
+    tracking::Tracker,
 };
 use campbooks_system::AiUsageMeter;
 use chrono::{TimeDelta, Utc};
@@ -157,7 +158,7 @@ fn composed(laya: &MockServer, cap: u32) -> (Option<Gateway>, AiUsageMeter) {
         .into(),
         daily_calls_per_workspace: Some(cap),
         ..AiConfig::default()
-    })
+    }, Tracker::default())
     .unwrap()
 }
 
@@ -408,7 +409,7 @@ fn the_composed_gateway_is_metered_with_the_default_cap() {
     let (gateway, meter) = ai_gateway(AiConfig {
         roles: [(Role::Decide, provider.clone())].into(),
         ..AiConfig::default()
-    })
+    }, Tracker::default())
     .unwrap();
     assert!(gateway.unwrap().is_metered());
     assert_eq!(
@@ -419,10 +420,10 @@ fn the_composed_gateway_is_metered_with_the_default_cap() {
         roles: [(Role::Decide, provider)].into(),
         daily_calls_per_workspace: Some(0),
         ..AiConfig::default()
-    })
+    }, Tracker::default())
     .unwrap();
     assert_eq!(unlimited.cap(), None);
-    let (none, _) = ai_gateway(AiConfig::default()).unwrap();
+    let (none, _) = ai_gateway(AiConfig::default(), Tracker::default()).unwrap();
     assert!(none.is_none(), "no role, no gateway");
 }
 

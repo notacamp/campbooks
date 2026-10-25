@@ -1908,6 +1908,7 @@ mod administration {
     use crate::{
         admin::{AdminGrant, PermissionSet},
         jobs::admin::{self, Discard, FailedFilter, Retry},
+        tracking::Tracker,
     };
 
     fn grant() -> AdminGrant {
@@ -2136,7 +2137,7 @@ mod administration {
         for id in [pending, running, done] {
             let before = job(&db, id).await;
             assert_eq!(
-                admin::retry(&db, &grant(), id).await.unwrap(),
+                admin::retry(&db, &Tracker::default(), &grant(), id).await.unwrap(),
                 Retry::Unchanged
             );
             let after = job(&db, id).await;
@@ -2146,12 +2147,12 @@ mod administration {
             );
         }
         assert_eq!(
-            admin::retry(&db, &grant(), JobId::new()).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), JobId::new()).await.unwrap(),
             Retry::Missing
         );
 
         assert_eq!(
-            admin::retry(&db, &grant(), dead).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), dead).await.unwrap(),
             Retry::Requeued
         );
         let row = job(&db, dead).await;
@@ -2159,7 +2160,7 @@ mod administration {
         assert!(row.finished_at.is_none() && row.locked_by.is_none());
         // Twice is the same as once.
         assert_eq!(
-            admin::retry(&db, &grant(), dead).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), dead).await.unwrap(),
             Retry::Unchanged
         );
 
@@ -2182,16 +2183,16 @@ mod administration {
         let pending =
             created(enqueue_probe(&state, &Probe::note("p"), EnqueueOptions::default()).await);
         assert_eq!(
-            admin::discard(&db, &grant(), pending).await.unwrap(),
+            admin::discard(&db, &Tracker::default(), &grant(), pending).await.unwrap(),
             Discard::Unchanged
         );
         assert_eq!(job(&db, pending).await.state, "pending");
         assert_eq!(
-            admin::discard(&db, &grant(), dead).await.unwrap(),
+            admin::discard(&db, &Tracker::default(), &grant(), dead).await.unwrap(),
             Discard::Discarded
         );
         assert_eq!(
-            admin::discard(&db, &grant(), dead).await.unwrap(),
+            admin::discard(&db, &Tracker::default(), &grant(), dead).await.unwrap(),
             Discard::Missing
         );
         assert_eq!(count(&db, "SELECT count(*) FROM kernel.jobs").await, 1);
@@ -2211,7 +2212,7 @@ mod administration {
             .unwrap();
 
         // `a` and `b` share a key: only one of them comes back.
-        let n = admin::retry_kind(&db, &grant(), "test.probe", None)
+        let n = admin::retry_kind(&db, &Tracker::default(), &grant(), "test.probe", None)
             .await
             .unwrap();
         assert_eq!(n, 2);
@@ -2226,13 +2227,13 @@ mod administration {
         assert_eq!(job(&db, other).await.state, "failed");
         // The other of the pair stays dead while its key is held; nothing more to do.
         assert_eq!(
-            admin::retry_kind(&db, &grant(), "test.probe", None)
+            admin::retry_kind(&db, &Tracker::default(), &grant(), "test.probe", None)
                 .await
                 .unwrap(),
             0
         );
         assert_eq!(
-            admin::retry_kind(&db, &grant(), "test.probe", Some("nope"))
+            admin::retry_kind(&db, &Tracker::default(), &grant(), "test.probe", Some("nope"))
                 .await
                 .unwrap(),
             0
@@ -2253,17 +2254,17 @@ mod administration {
         created(enqueue_probe(&state, &Probe::note("held"), keyed("ana")).await);
 
         assert_eq!(
-            admin::retry(&db, &grant(), ana).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), ana).await.unwrap(),
             Retry::Superseded
         );
         assert_eq!(
-            admin::retry(&db, &grant(), bob).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), bob).await.unwrap(),
             Retry::Requeued,
             "ana's job does not hold bob's key"
         );
         // Dead jobs of two workspaces sharing the key both come back.
         assert_eq!(
-            admin::retry_kind(&db, &grant(), "test.probe", None)
+            admin::retry_kind(&db, &Tracker::default(), &grant(), "test.probe", None)
                 .await
                 .unwrap(),
             2
@@ -2294,11 +2295,12 @@ mod administration {
             .map(|_| Worker::new(state.clone()))
             .collect::<Vec<_>>();
         let g = grant();
+        let tracker = Tracker::default();
         let retrying = async {
             for _ in 0..4 {
                 let (a, b) = tokio::join!(
-                    admin::retry_kind(&db, &g, "test.probe", None),
-                    admin::retry_kind(&db, &g, "test.probe", None)
+                    admin::retry_kind(&db, &tracker, &g, "test.probe", None),
+                    admin::retry_kind(&db, &tracker, &g, "test.probe", None)
                 );
                 a.unwrap();
                 b.unwrap();
@@ -2709,16 +2711,16 @@ mod kernel_scope {
         assert_eq!(page.items.len(), 1);
         let dead = page.items[0].id;
         assert_eq!(
-            admin::retry(&state.db, &grant, dead).await.unwrap(),
+            admin::retry(&state.db, &state.tracker, &grant, dead).await.unwrap(),
             Retry::Requeued
         );
         Worker::new(state.clone()).run_until_idle().await;
         assert_eq!(
-            admin::discard(&state.db, &grant, dead).await.unwrap(),
+            admin::discard(&state.db, &state.tracker, &grant, dead).await.unwrap(),
             Discard::Discarded
         );
         assert_eq!(
-            admin::retry_kind(&state.db, &grant, "test.probe", None)
+            admin::retry_kind(&state.db, &state.tracker, &grant, "test.probe", None)
                 .await
                 .unwrap(),
             0

@@ -32,6 +32,9 @@ pub mod events;
 mod features;
 pub mod handbook;
 pub mod scopes;
+/// The module's tracked events, generated from the tracking plan (ADR 0020).
+#[path = "tracking.gen.rs"]
+pub mod tracking;
 
 pub use handbook::{Handbook, Section};
 

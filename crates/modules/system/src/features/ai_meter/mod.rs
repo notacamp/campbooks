@@ -12,6 +12,10 @@
 //!   and counted as refused; the first refusal of the day logs one line.
 //! - **Settling** adds a call's failure and tokens to the day it was
 //!   admitted on (the gateway skips it when there is nothing to add).
+//! - **Tracked** (ADR 0020): the day's first refusal is
+//!   `system.ai_limit_reached`, in the transaction that counts it, as
+//!   whoever made the refused call. Counting calls is bookkeeping and tracks
+//!   nothing.
 //!
 //! The day comes from a [`Clock`], so tests move it without sleeping.
 
@@ -24,6 +28,7 @@ use campbooks_ai::{
 use campbooks_kernel::{
     clock::{Clock, SystemClock},
     db::BeginFor as _,
+    tracking::Tracker,
 };
 use chrono::{DateTime, NaiveDate, TimeDelta, Utc};
 use sqlx::PgPool;
@@ -35,6 +40,7 @@ use sqlx::PgPool;
 pub struct AiUsageMeter {
     cap: Option<u32>,
     clock: Arc<dyn Clock>,
+    tracker: Tracker,
 }
 
 impl fmt::Debug for AiUsageMeter {
@@ -71,7 +77,16 @@ impl AiUsageMeter {
         Self {
             cap: cap.filter(|cap| *cap > 0),
             clock: Arc::new(SystemClock),
+            tracker: Tracker::default(),
         }
+    }
+
+    /// The same meter, tracking the day's first refusal with `tracker` (the
+    /// server's; none by default).
+    #[must_use]
+    pub fn with_tracker(mut self, tracker: Tracker) -> Self {
+        self.tracker = tracker;
+        self
     }
 
     /// The same meter reading the time from `clock`.
@@ -167,8 +182,20 @@ impl AiUsageMeter {
             )
             .fetch_one(&mut *tx)
             .await?;
+            let cap = self.cap.unwrap_or(u32::MAX);
+            if refused == 1 {
+                let event = crate::tracking::AiLimitReached {
+                    workspace: call.workspace,
+                    day,
+                    cap: i64::from(cap),
+                    reserve: i64::from(self.reserve().unwrap_or(0)),
+                    interactive: call.interactive,
+                    role: ai_role(call.role),
+                };
+                self.tracker.track(&mut tx, &event).await?;
+            }
             Admitted::No {
-                cap: self.cap.unwrap_or(u32::MAX),
+                cap,
                 first: refused == 1,
             }
         };
@@ -210,6 +237,17 @@ impl AiUsageMeter {
         .execute(&mut *tx)
         .await?;
         tx.commit().await
+    }
+}
+
+/// The plan's AI role.
+fn ai_role(role: campbooks_ai::Role) -> crate::tracking::AiRole {
+    use crate::tracking::AiRole;
+    match role {
+        campbooks_ai::Role::Decide => AiRole::Decide,
+        campbooks_ai::Role::Embed => AiRole::Embed,
+        campbooks_ai::Role::Complete => AiRole::Complete,
+        campbooks_ai::Role::Vision => AiRole::Vision,
     }
 }
 
