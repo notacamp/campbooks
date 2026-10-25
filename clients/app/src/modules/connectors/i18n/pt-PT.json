@@ -2,7 +2,8 @@
   "provider": {
     "google": "Gmail",
     "zoho": "Zoho Mail",
-    "microsoft": "Microsoft 365"
+    "microsoft": "Microsoft 365",
+    "imap": "IMAP"
   },
   "mail": {
     "title": "O seu correio",
@@ -31,7 +32,11 @@
     "reconnect": "Voltar a ligar",
     "reconnectLabel": "Voltar a ligar {{address}}",
     "disconnect": "Desligar",
-    "disconnectLabel": "Desligar {{address}}"
+    "disconnectLabel": "Desligar {{address}}",
+    "checking": "A verificar o seu endereço…",
+    "unverified": "Não conseguimos verificar este endereço: o envio continua desligado",
+    "retry": "Tentar de novo",
+    "retryLabel": "Verificar {{address}} de novo"
   },
   "health": {
     "ok": "A sincronizar",
@@ -69,14 +74,13 @@
     }
   },
   "connect": {
-    "title": "Ligar uma caixa de correio",
-    "lead": "Vai ao fornecedor para autorizar o acesso e depois volta aqui.",
+    "title": "Adicionar uma caixa de correio",
+    "lead": "Escreva o endereço e o Campbooks descobre como se liga: com o início de sessão do seu fornecedor ou com uma palavra-passe de aplicação.",
     "provider": "Ligar {{provider}}",
     "none": "Este Campbooks ainda não tem nenhum fornecedor de correio configurado. Quem o gere pode adicionar o Gmail ou o Zoho Mail.",
-    "loading": "A carregar os fornecedores",
-    "loadError": "Não foi possível carregar os fornecedores que pode ligar. Recarregue a página para tentar novamente.",
     "signIn": "Usar também esta conta para iniciar sessão",
-    "signInHint": "Deixe assinalado para a sua própria caixa de correio. Desassinale para uma partilhada, como support@: fica ligada, mas não passa a ser uma nova forma de iniciar sessão no Campbooks."
+    "signInHint": "Deixe assinalado para a sua própria caixa de correio. Desassinale para uma partilhada, como support@: fica ligada, mas não passa a ser uma nova forma de iniciar sessão no Campbooks.",
+    "add": "Adicionar uma caixa de correio"
   },
   "connected": {
     "title": "A sua caixa de correio está ligada",
@@ -156,7 +160,7 @@
     }
   },
   "shortcuts": {
-    "connect": "Ligar uma caixa de correio",
+    "connect": "Adicionar uma caixa de correio",
     "reconnect": "Voltar a ligar a caixa de correio",
     "disconnect": "Desligar a caixa de correio"
   },
@@ -189,5 +193,150 @@
     "paused": "Em pausa",
     "failures_one": "{{count}} execução falhada seguida",
     "failures_other": "{{count}} execuções falhadas seguidas"
+  },
+  "add": {
+    "title": "Adicionar uma caixa de correio",
+    "address": {
+      "label": "Endereço de email",
+      "hint": "O endereço da caixa de correio que quer no Campbooks.",
+      "invalid": "Escreva um endereço de email válido, como nome@example.com."
+    },
+    "continue": "Continuar",
+    "cancel": "Cancelar",
+    "back": "Voltar",
+    "finding": "A descobrir como esta caixa de correio se liga…",
+    "native": {
+      "title": "Ligar {{provider}}",
+      "lead": "{{address}} é uma caixa de correio {{provider}}. Liga-se com o início de sessão do próprio {{provider}}, por isso não escreve aqui nenhuma palavra-passe.",
+      "notHere": "Este Campbooks ainda não tem {{provider}} configurado. Peça a quem o gere."
+    },
+    "outlook": {
+      "title": "O Outlook chega em breve",
+      "lead": "{{address}} é uma caixa de correio Outlook ou Microsoft 365. O Campbooks ainda não as consegue ligar; vai conseguir em breve."
+    },
+    "fallback": {
+      "title": "Ligar uma caixa de correio",
+      "lead": "Este Campbooks liga caixas de correio destes fornecedores:"
+    },
+    "password": {
+      "title": "Ligar {{address}}",
+      "appLead": "O {{provider}} pede uma palavra-passe de aplicação: uma palavra-passe só para o Campbooks, que pode remover no {{provider}} quando quiser.",
+      "lead": "Use uma palavra-passe de aplicação se o seu fornecedor as tiver. Caso contrário, use a palavra-passe da própria caixa de correio.",
+      "label": "Palavra-passe",
+      "appLabel": "Palavra-passe de aplicação",
+      "hint": "O Campbooks guarda-a cifrada e nunca a volta a mostrar.",
+      "required": "Escreva a palavra-passe.",
+      "connect": "Ligar",
+      "connecting": "A ligar…"
+    },
+    "guide": {
+      "label": "Como obter uma palavra-passe de aplicação no {{provider}}",
+      "help": "Página de ajuda do {{provider}}",
+      "imap": "Ativar o IMAP no {{provider}}"
+    },
+    "guides": {
+      "yahoo": {
+        "name": "Yahoo",
+        "s1": "Inicie sessão no Yahoo e abra Segurança da conta.",
+        "s2": "Em Ligações externas, escolha Criar palavra-passe de aplicação, chame-lhe Campbooks e escolha Gerar palavra-passe.",
+        "s3": "Copie a palavra-passe que o Yahoo mostra e cole-a aqui."
+      },
+      "aol": {
+        "name": "AOL",
+        "s1": "Inicie sessão na AOL e abra Segurança da conta.",
+        "s2": "Escolha Gerar palavra-passe de aplicação, depois Começar, chame-lhe Campbooks e escolha Gerar palavra-passe.",
+        "s3": "Copie a palavra-passe que a AOL mostra e cole-a aqui."
+      },
+      "icloud": {
+        "name": "iCloud",
+        "s1": "Inicie sessão em account.apple.com e abra Início de sessão e segurança. A autenticação de dois fatores tem de estar ativa.",
+        "s2": "Escolha Palavras-passe específicas da app e crie uma chamada Campbooks.",
+        "s3": "Copie a palavra-passe que a Apple mostra e cole-a aqui."
+      },
+      "fastmail": {
+        "name": "Fastmail",
+        "s1": "No Fastmail, abra Definições e depois Privacidade e segurança.",
+        "s2": "Em Apps ligadas e tokens de API, escolha Gerir palavras-passe de aplicação e acesso, depois Nova palavra-passe de aplicação.",
+        "s3": "Chame-lhe Campbooks, mantenha o acesso ao correio, gere-a e cole-a aqui."
+      },
+      "gmx": {
+        "name": "GMX",
+        "s1": "Primeiro ative o IMAP: nas definições de correio do GMX, abra POP3 e IMAP e permita o acesso.",
+        "s2": "Abra as definições de segurança da sua conta e procure as palavras-passe de aplicação.",
+        "s3": "Crie uma chamada Campbooks. O GMX só a mostra uma vez.",
+        "s4": "Cole-a aqui."
+      },
+      "webde": {
+        "name": "WEB.DE",
+        "s1": "Primeiro ative o IMAP: nas definições de correio do WEB.DE, abra POP3/IMAP e ligue-o.",
+        "s2": "Abra a sua conta, depois Início de sessão e segurança, depois Palavras-passe de aplicação.",
+        "s3": "Crie uma chamada Campbooks. O WEB.DE só a mostra uma vez.",
+        "s4": "Cole-a aqui."
+      },
+      "yandex": {
+        "name": "Yandex",
+        "s1": "Primeiro ative o IMAP: nas definições do Yandex Mail, abra Clientes de email, marque IMAP e Palavras-passe de aplicação e tokens OAuth, e guarde.",
+        "s2": "No Yandex ID, abra Segurança, depois Palavras-passe de aplicação, e crie uma palavra-passe de correio chamada Campbooks.",
+        "s3": "Copie-a e cole-a aqui. O Yandex só a mostra uma vez.",
+        "s4": "Uma palavra-passe de aplicação nova pode demorar algumas horas a funcionar: se o início de sessão for recusado, tente mais tarde."
+      },
+      "custom": {
+        "name": "o seu fornecedor",
+        "s1": "Se o seu serviço de correio tiver palavras-passe de aplicação, crie uma para o Campbooks nas definições e use-a aqui.",
+        "s2": "Caso contrário, use a palavra-passe da caixa de correio. Se os servidores não forem encontrados, escreva-os em Avançado: as páginas de ajuda do seu serviço indicam-nos."
+      }
+    },
+    "advanced": {
+      "summary": "Avançado: nome de utilizador e servidores",
+      "username": "Nome de utilizador",
+      "usernameHint": "Normalmente é o próprio endereço.",
+      "imap": "Correio recebido (IMAP)",
+      "smtp": "Correio enviado (SMTP)",
+      "host": "Servidor",
+      "port": "Porta",
+      "security": "Segurança",
+      "tls": "TLS",
+      "starttls": "STARTTLS",
+      "invalid": "Verifique os servidores: cada um precisa de um nome e de uma porta de 1 a 65535."
+    },
+    "errors": {
+      "imap_login_refused": "O servidor de correio recusou o início de sessão. Verifique o nome de utilizador e a palavra-passe.",
+      "imap_login_refused_app": "O servidor de correio recusou o início de sessão. O {{provider}} pede uma palavra-passe de aplicação, não a sua palavra-passe habitual: siga os passos acima.",
+      "smtp_login_refused": "O servidor de envio recusou o início de sessão. Verifique a palavra-passe e se esta caixa de correio pode enviar correio.",
+      "imap_unreachable": "O Campbooks não conseguiu contactar o servidor de correio. Verifique o nome e a porta em Avançado e tente de novo.",
+      "smtp_unreachable": "O Campbooks não conseguiu contactar o servidor de envio. Verifique o nome e a porta em Avançado e tente de novo.",
+      "imap_tls_failed": "O certificado do servidor de correio não é válido para o seu nome, por isso o Campbooks não se ligou. Verifique o nome do servidor.",
+      "smtp_tls_failed": "O certificado do servidor de envio não é válido para o seu nome, por isso o Campbooks não se ligou. Verifique o nome do servidor.",
+      "imap_not_an_imap_server": "Esse servidor e essa porta não são um servidor de correio IMAP. Verifique-os em Avançado.",
+      "imap_busy": "O servidor de correio está ocupado. Tente de novo daqui a alguns minutos.",
+      "host_refused": "O Campbooks não consegue contactar esse servidor: está numa rede privada, ou a porta não é uma porta de correio (993, 143, 465 ou 587).",
+      "starttls_missing": "Esse servidor não oferece uma ligação cifrada, por isso o Campbooks não enviou a sua palavra-passe. Use a porta 993 para IMAP e 465 para SMTP.",
+      "imap_servers_required": "O Campbooks não encontrou os servidores desta caixa de correio. Escreva-os em Avançado.",
+      "use_native_provider": "Esta caixa de correio liga-se com o início de sessão do próprio fornecedor. Volte atrás e use esse.",
+      "imap_address_invalid": "Escreva um endereço de email válido.",
+      "imap_username_invalid": "Verifique o nome de utilizador em Avançado.",
+      "imap_password_invalid": "Escreva a palavra-passe numa só linha, com 1024 caracteres no máximo.",
+      "too_many_attempts": "Demasiados inícios de sessão falhados nesta caixa de correio. Espere uma hora e tente de novo.",
+      "rate_limited": "Demasiadas tentativas. Espere alguns minutos e tente de novo.",
+      "account_connected_by_another_member": "Outro membro deste espaço de trabalho já ligou esta caixa de correio.",
+      "account_mismatch": "Essa caixa de correio não é a que está a ligar de novo.",
+      "provider_not_configured": "Este Campbooks não consegue ligar caixas de correio com palavra-passe.",
+      "connection_needs_user": "Só um membro com sessão iniciada pode ligar uma caixa de correio.",
+      "unknown": "A caixa de correio não foi ligada. Tente de novo."
+    },
+    "connected": "{{address}} está ligado. O Campbooks está a trazer o correio.",
+    "check": {
+      "title": "A verificar {{address}}",
+      "checking": "A verificar o seu endereço…",
+      "checkingLead": "O Campbooks enviou uma mensagem para {{address}} através desta caixa de correio e está a procurá-la na caixa de entrada. Demora um ou dois minutos; pode fechar esta janela.",
+      "verified": "Verificado",
+      "verifiedLead": "{{address}} pode enviar correio a partir do Campbooks.",
+      "failed": "Não conseguimos verificar este endereço: o envio continua desligado",
+      "failedLead": "O Campbooks não encontrou a mensagem na caixa de correio. Ler o correio funciona; enviar a partir de {{address}} fica desligado até o endereço ser verificado.",
+      "retry": "Tentar de novo",
+      "retryFailed": "Não foi possível iniciar a verificação. Tente de novo daqui a pouco.",
+      "retryLimited": "Este endereço já foi verificado demasiadas vezes hoje. Tente amanhã.",
+      "done": "Concluído"
+    }
   }
 }

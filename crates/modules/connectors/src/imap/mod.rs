@@ -14,6 +14,7 @@
 //! checked against the host name. A server's own words are never repeated
 //! or logged: what went wrong is a stable [`Refusal`] code.
 
+pub mod check;
 pub mod discover;
 pub mod folders;
 mod ispdb;

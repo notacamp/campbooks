@@ -3926,6 +3926,117 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/connections/{connection_id}/address-check": {
+      "post": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "Check a mailbox's address again.",
+        "operationId": "connectors.check_address",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "connection_id",
+            "in": "path",
+            "description": "The connection.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConnectionId"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "A new check is on its way (or the one under way goes on): the connection, its `address_check` `checking`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection, or you may not see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not an IMAP mailbox, or its address is verified (`address_check_not_needed`), it must be connected again first (`needs_reauth`), or IMAP is not turned on on this instance (`provider_not_configured`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Its address was checked 5 times today (`rate_limited`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "connectors.connection"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/connections/{connection_id}/sync": {
       "post": {
         "tags": [
@@ -17052,6 +17163,14 @@
           }
         }
       },
+      "AddressCheck": {
+        "type": "string",
+        "description": "Where the check of an IMAP mailbox's address is.",
+        "enum": [
+          "checking",
+          "failed"
+        ]
+      },
       "Adopted": {
         "type": "object",
         "description": "The connection the mailbox became.",
@@ -18499,9 +18618,20 @@
             "type": "string",
             "description": "The account's email address."
           },
+          "address_check": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AddressCheck",
+                "description": "Where the check of an IMAP mailbox's address is, while it is not\nverified: `checking`, or `failed` (sending stays off until it is\nchecked again); none when verified or never checked."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "address_verified": {
             "type": "boolean",
-            "description": "Whether the provider verified it."
+            "description": "Whether the provider verified it (for an IMAP mailbox: its username\nis the address, or its address check found the code)."
           },
           "capabilities": {
             "type": "array",

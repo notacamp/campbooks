@@ -26,6 +26,11 @@ export function useConnections(workspaceId: string) {
           signal,
         }),
       ).connections,
+    // While a mailbox's address is being checked, its row follows it.
+    refetchInterval: (query) =>
+      query.state.data?.some((connection) => connection.address_check === "checking") === true
+        ? 5000
+        : false,
   });
 }
 
@@ -79,4 +84,125 @@ export function useDisconnect(workspaceId: string) {
       }
     },
   });
+}
+
+export type DiscoveredImap = Schema<"DiscoveredImap">;
+export type MailServer = Schema<"Server">;
+export type MailServers = Schema<"Servers">;
+
+/**
+ * `connectors.discover_imap`: which way an address connects (its IMAP and
+ * SMTP servers, a provider connected natively, or nothing found). Reads
+ * nothing it keeps; needs a recent sign-in.
+ */
+export function useDiscoverImap(workspaceId: string) {
+  return useMutation({
+    mutationFn: async (address: string) =>
+      unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/connections/imap/discover", {
+          params: { path: { workspace_id: workspaceId } },
+          body: { address },
+        }),
+      ),
+  });
+}
+
+/** What connecting a mailbox with its password sends. */
+interface ImapConnect {
+  address: string;
+  username?: string | undefined;
+  password: string;
+  servers?: MailServers | undefined;
+}
+
+/**
+ * `connectors.connect_imap`: connect a mailbox with its (app) password. A
+ * plain call, never a `useMutation`: a mutation keeps its variables (the
+ * password) in the query cache after it settles. The connection joins the
+ * cached list.
+ */
+export async function connectImap(
+  workspaceId: string,
+  { address, username, password, servers }: ImapConnect,
+): Promise<Connection> {
+  return unwrap(
+    await api.POST("/api/v1/w/{workspace_id}/connections/imap", {
+      params: { path: { workspace_id: workspaceId } },
+      body: {
+        address,
+        password,
+        ...(username === undefined || username.trim() === "" ? {} : { username: username.trim() }),
+        ...(servers === undefined ? {} : { servers }),
+      },
+    }),
+  );
+}
+
+/**
+ * `connectors.get_connection`, asked again every few seconds while its
+ * address is being checked.
+ */
+export function useConnection(workspaceId: string, connectionId: string) {
+  return useQuery({
+    queryKey: operationKey("connectors.get_connection", {
+      workspace_id: workspaceId,
+      connection_id: connectionId,
+    }),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/connections/{connection_id}", {
+          params: { path: { workspace_id: workspaceId, connection_id: connectionId } },
+          signal,
+        }),
+      ),
+    // Not after a failed read: the page says so instead of asking for ever.
+    refetchInterval: (query) =>
+      query.state.status !== "error" &&
+      (query.state.data === undefined || query.state.data.address_check === "checking")
+        ? 3000
+        : false,
+  });
+}
+
+/**
+ * `connectors.check_address`: check an IMAP mailbox's address again (a new
+ * code through its own SMTP server). The answer replaces the cached row.
+ */
+export function useCheckAddress(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (connectionId: string) =>
+      unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/connections/{connection_id}/address-check", {
+          params: { path: { workspace_id: workspaceId, connection_id: connectionId } },
+        }),
+      ),
+    onSuccess: (connection) => {
+      remember(queryClient, workspaceId, connection);
+    },
+  });
+}
+
+/** Put `connection` in the cached list (and its own cache entry). */
+export function remember(
+  queryClient: ReturnType<typeof useQueryClient>,
+  workspaceId: string,
+  connection: Connection,
+) {
+  queryClient.setQueryData<Connection[]>(
+    operationKey("connectors.list_connections", { workspace_id: workspaceId }),
+    (connections) =>
+      connections === undefined
+        ? connections
+        : connections.some((known) => known.id === connection.id)
+          ? connections.map((known) => (known.id === connection.id ? connection : known))
+          : [...connections, connection],
+  );
+  queryClient.setQueryData(
+    operationKey("connectors.get_connection", {
+      workspace_id: workspaceId,
+      connection_id: connection.id,
+    }),
+    connection,
+  );
 }

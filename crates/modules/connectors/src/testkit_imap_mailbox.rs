@@ -379,6 +379,8 @@ pub struct Offers {
     pub append_hang: bool,
     /// `APPEND` makes it hang up at once.
     pub append_drop: bool,
+    /// `UID SEARCH` answers with every UID of the folder, whatever it asks.
+    pub lying_search: bool,
 }
 
 /// The answer to one signed-in command (`verb` and its `args`), on a
@@ -419,6 +421,9 @@ pub fn answer(
             let rest = &args[1.min(args.len())..];
             let verb = args.first().map(|v| v.to_ascii_uppercase());
             match verb.as_deref() {
+                Some("SEARCH") if offers.lying_search => {
+                    search(store, tag, &folder, &["ALL".to_owned()])
+                }
                 Some("SEARCH") => search(store, tag, &folder, rest),
                 Some("FETCH") => return fetch(store, offers, tag, &folder, rest, effects),
                 Some(write) => {

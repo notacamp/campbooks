@@ -258,6 +258,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "after",
         "the id of the last record indexed (a cursor), opaque",
     ),
+    (
+        "connectors.send_address_check",
+        "connection",
+        "the connection's id (a UUID), never its address",
+    ),
     ("connectors.send_message", "send", "the send's id (a UUID)"),
     (
         "connectors.send_message",

@@ -20,6 +20,7 @@ use campbooks_kernel::{
     authz::{self, Action},
     crypto,
     db::BeginFor as _,
+    i18n::Locale,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
 use secrecy::{ExposeSecret as _, SecretString};
@@ -30,7 +31,7 @@ use crate::{
     MESSAGES,
     deps::Deps,
     domain::{
-        connections,
+        address_checks, connections,
         grants::{Mailbox, ProviderGrant, Secret, create_or_refresh_connection},
         imap_servers::ImapAccount,
         model::{Capability, ConnectionId, ConnectionView, Provider},
@@ -125,27 +126,30 @@ pub struct ConnectImap {
 pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
+    locale: Locale,
     workspace: Workspace<ConnectorsWrite>,
     Json(input): Json<ConnectImap>,
 ) -> Result<(StatusCode, Json<ConnectionView>)> {
     let view = execute(
         &state,
         &deps,
-        &workspace.principal,
-        &workspace.access,
+        (&workspace.principal, &workspace.access),
         input,
+        locale,
     )
     .await?;
     Ok((StatusCode::CREATED, Json(view)))
 }
 
-/// Connect `input` for `principal`, the member of `access`.
+/// Connect `input` for `principal`, the member of `access`; an address the
+/// login does not prove is then checked (`address_checks`), its message
+/// written in `locale`.
 pub async fn execute(
     state: &AppState,
     deps: &Deps,
-    principal: &Principal,
-    access: &Access,
+    (principal, access): (&Principal, &Access),
     input: ConnectImap,
+    locale: Locale,
 ) -> Result<ConnectionView> {
     let user = acting_member(access)?;
     // A connection is owned by the member who makes it (ADR 0017).
@@ -157,14 +161,20 @@ pub async fn execute(
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("imap_address_invalid")))?;
     let username = username(input.username.as_deref())?;
     check_password(&input.password)?;
+    // An address verified before stays verified when the same mailbox is
+    // connected again under it.
+    let mut verified_before = false;
     if let Some(connection) = input.connection {
         let mut tx = state.db.begin_for(access.workspace).await?;
         let existing = connections::load(&mut tx, connection).await?;
         tx.commit().await?;
         // Only the grantor connects their own mailbox again.
-        if !existing.is_some_and(|c| c.granted_by == user && c.provider == Provider::Imap) {
+        let Some(existing) =
+            existing.filter(|c| c.granted_by == user && c.provider == Provider::Imap)
+        else {
             return Err(Error::NotFound);
-        }
+        };
+        verified_before = existing.address_verified && existing.address == address.address;
     }
     spend(
         state,
@@ -202,7 +212,7 @@ pub async fn execute(
     }
     guard.give_back(state).await?;
 
-    let grant = ProviderGrant {
+    let mut grant = ProviderGrant {
         extending: input.connection,
         grantor_subject: Some(principal.subject.clone()),
         ..mailbox_grant(
@@ -214,8 +224,41 @@ pub async fn execute(
             input.password,
         )
     };
+    if verified_before {
+        grant.address_verified = true;
+        for mailbox in &mut grant.mailboxes {
+            mailbox.address_verified = true;
+        }
+    }
     let view = create_or_refresh_connection(state, deps, &grant).await?;
     tracing::info!(workspace = %access.workspace, %user, connection = %view.id, "an IMAP mailbox was connected");
+    if view.address_verified {
+        return Ok(view);
+    }
+    check_address(state, deps, access, view.id, locale).await
+}
+
+/// The login does not prove connection `id`'s address: check it, with no
+/// more of the member than this (campbooks-cloud#314). Past its daily
+/// checks, the connection waits for a retry. The connection as it is then.
+async fn check_address(
+    state: &AppState,
+    deps: &Deps,
+    access: &Access,
+    id: ConnectionId,
+    locale: Locale,
+) -> Result<ConnectionView> {
+    if address_checks::take_budget(&state.db, id).await? {
+        let mut tx = state.db.begin_for(access.workspace).await?;
+        address_checks::start(&mut tx, access.workspace, id, locale, deps.clock.now()).await?;
+        tx.commit().await?;
+    }
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    let connection = connections::load(&mut tx, id)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let view = connections::view(&mut tx, connection, access.user).await?;
+    tx.commit().await?;
     Ok(view)
 }
 

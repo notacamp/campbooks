@@ -19,7 +19,10 @@
 //! changes are made over that session first (`imap::write`), then the
 //! copies in Sent of messages sent through its SMTP server (`imap::sent`),
 //! and how they ended (the locations and index they leave) recorded before
-//! it reads.
+//! it reads. While its connection's address is checked
+//! (`domain::address_checks`), the run looks for the check's message in the
+//! Inbox before it reads (`imap::check`), and the stream runs at the poll's
+//! shortest interval.
 
 mod calendar;
 
@@ -41,6 +44,7 @@ use crate::{
     contract::{BATCH_CONTENT_TYPE, MessageChange, MessageChangeBatch, ProviderStream},
     deps::Deps,
     domain::{
+        address_checks::{self, Looked, Waiting},
         credentials::{self, TokenError},
         emit,
         health::{self, LOGIN_REFUSALS},
@@ -58,6 +62,8 @@ use crate::{
     google::LabelInfo,
     imap::{
         self, Refusal,
+        check::{Found, Look},
+        folders::Role,
         read::{Failure, Page},
         sent::{self, Pending},
         session::Session,
@@ -241,6 +247,9 @@ struct RunPage {
     imap: Vec<LocationOp>,
     /// What the run offers for IDLE (IMAP only).
     idle: Option<lease::Offer>,
+    /// The connection's address is being checked: the next run is at the
+    /// poll's shortest interval (IMAP only).
+    checking: bool,
 }
 
 impl SyncStream {
@@ -461,6 +470,7 @@ impl SyncStream {
             zoho_labels: None,
             imap: Vec::new(),
             idle: None,
+            checking: false,
             phase: page.phase,
             more: page.more,
         }))
@@ -609,6 +619,7 @@ impl SyncStream {
             zoho_labels: labels.as_ref().and_then(zoho::read::LabelCache::fresh),
             imap: Vec::new(),
             idle: None,
+            checking: false,
             phase: page.phase,
             more: page.more,
         }))
@@ -672,7 +683,25 @@ impl SyncStream {
                 .flatten();
         let opened = credentials::password(&mut tx, &cipher, target.connection).await;
         let copies = pending_copies(&mut tx, target.stream).await?;
+        let waiting = address_checks::waiting(&mut tx, target.connection, now).await?;
         tx.commit().await?;
+        // The code is the one made for the connection's own address now
+        // (`waiting` gives it only while it is the checked one).
+        let check = waiting.and_then(|waiting| {
+            let domain = waiting.address.rsplit_once('@')?.1.to_owned();
+            let code = address_checks::code(
+                &ctx.state().signer,
+                target.connection,
+                waiting.nonce,
+                &waiting.address,
+            );
+            Some(CheckRun {
+                search: format!("{}{code}", address_checks::PREFIX),
+                message_id: address_checks::message_id(&code, &domain),
+                waiting,
+            })
+        });
+        let checking = check.is_some();
         let password = match opened {
             Ok(password) => password,
             Err(TokenError::NeedsReauth(reason)) => {
@@ -745,6 +774,7 @@ impl SyncStream {
             now,
             address,
             copies,
+            check,
         };
         let read = tokio::time::timeout(IMAP_RUN_LIMIT, Box::pin(read_imap(run)))
             .await
@@ -762,6 +792,7 @@ impl SyncStream {
                 };
                 let mut page = imap_page(page)?;
                 page.idle = Some(offer);
+                page.checking = checking;
                 Ok(Some(page))
             }
             Err(ImapTrouble::Refused(refusal)) => {
@@ -1036,7 +1067,12 @@ impl SyncStream {
             )
             .await?;
         } else {
-            let next = now + TimeDelta::seconds(i64::from(interval.max(least_wait)));
+            let mut next = now + TimeDelta::seconds(i64::from(interval.max(least_wait)));
+            if page.checking {
+                // An address check waits for its message: look again soon.
+                let soon = i64::from(self.deps.config.poll.min_seconds);
+                next = next.min(now + TimeDelta::seconds(soon));
+            }
             schedule::set_due(tx, workspace, target.stream, next).await?;
         }
         tracing::info!(
@@ -1349,6 +1385,16 @@ struct ImapRun<'a> {
     /// The copies in Sent still to be made (`imap::sent`), and the sends
     /// whose copy cannot be read back.
     copies: Copies,
+    /// The address check whose message to look for, if one waits.
+    check: Option<CheckRun>,
+}
+
+/// An address check a run looks for: the check, and what its message's
+/// `Message-ID` is searched by and must be.
+struct CheckRun {
+    waiting: Waiting,
+    search: String,
+    message_id: String,
 }
 
 /// The copies in Sent a run makes: those it can, and the sends whose
@@ -1431,6 +1477,14 @@ async fn read_imap(run: ImapRun<'_>) -> Result<Page, ImapTrouble> {
                 return Err(trouble);
             }
         }
+    }
+    // An address check's message before the read: once found and removed,
+    // it is never read in.
+    if let Some(check) = &run.check
+        && let Err(trouble) = check_imap(&run, &mut session, check, &cursor).await
+    {
+        session.logout().await;
+        return Err(trouble);
     }
     let page = imap::read::Reader {
         session: &mut session,
@@ -1523,6 +1577,53 @@ async fn record_imap_push(
     Ok(pushed.cursor)
 }
 
+/// Look for `check`'s message in the Inbox over `session` and record what
+/// was found (`imap::check`): found, the address is verified. A busy server
+/// waits for the next run; a cut session, or one that expunged more than it
+/// was asked to, is the run's trouble.
+async fn check_imap(
+    run: &ImapRun<'_>,
+    session: &mut Session,
+    check: &CheckRun,
+    cursor: &Cursor,
+) -> Result<(), ImapTrouble> {
+    let found = Look {
+        session,
+        search: &check.search,
+        message_id: &check.message_id,
+        trash: cursor.folder_of(Role::Trash).map(|f| f.name.as_str()),
+        timeout: run.imap.timeout(),
+    }
+    .run()
+    .await;
+    let looked = match found {
+        Ok(Found::Yes(_) | Found::Hostile) => Looked::Found,
+        Ok(Found::No) => Looked::NotFound,
+        Err(imap::write::Trouble::Busy) => return Ok(()),
+        Err(trouble) => return Err(ImapTrouble::Failed(Failure::Server(trouble.code()))),
+    };
+    if let Err(err) = address_checks::record(
+        run.pool,
+        run.workspace,
+        run.connection,
+        &check.waiting,
+        looked,
+        run.now,
+    )
+    .await
+    {
+        tracing::warn!(
+            stream = %run.stream,
+            error = %redact::error(&err),
+            "what an address check found could not be recorded"
+        );
+    }
+    if found == Ok(Found::Hostile) {
+        return Err(ImapTrouble::Failed(Failure::Server("imap_expunged_more")));
+    }
+    Ok(())
+}
+
 /// Make `run`'s copies in Sent over `session`, each recorded as it ends
 /// (`imap::sent`), after the read. Trouble is logged, never the run's: the
 /// copies left wait for the next run.
@@ -1567,6 +1668,7 @@ fn imap_page(page: Page) -> Result<RunPage, JobError> {
         zoho_labels: None,
         imap: page.locations,
         idle: None,
+        checking: false,
         phase: page.phase,
         more: page.more,
     })

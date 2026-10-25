@@ -1599,7 +1599,7 @@ fn made(write: FlagWrite, (seen, flagged): (bool, bool)) -> bool {
 
 /// How many messages `untagged` says were expunged (`EXPUNGE`, or the UIDs
 /// of a `VANISHED`).
-fn expunges(untagged: &Untagged<'_>) -> usize {
+pub(crate) fn expunges(untagged: &Untagged<'_>) -> usize {
     match untagged {
         Untagged::Expunge(_) => 1,
         Untagged::Vanished(ranges) => ranges
@@ -1616,7 +1616,7 @@ fn expunges(untagged: &Untagged<'_>) -> usize {
 
 /// A server that says it expunged more messages than it was asked to is
 /// not written to again in this push.
-fn guard_expunged(expunged: usize, asked: usize) -> Result<(), Trouble> {
+pub(crate) fn guard_expunged(expunged: usize, asked: usize) -> Result<(), Trouble> {
     if expunged > asked {
         tracing::error!(
             code = "imap_expunged_more",

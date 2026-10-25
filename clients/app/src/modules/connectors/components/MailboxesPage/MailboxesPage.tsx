@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -6,7 +6,6 @@ import { useShortcut } from "~/lib/shortcuts";
 import {
   Banner,
   Button,
-  Checkbox,
   ChoiceCards,
   EmptyState,
   InlineConfirm,
@@ -18,12 +17,18 @@ import {
   SettingsSection,
   SkeletonList,
   StatusText,
-  Text,
 } from "~/lib/ui";
 import { useMembers, type Member, type Workspace } from "~/modules/workspaces";
 
-import { useConnections, useDisconnect, type Connection, type MailChoice } from "../../api/queries";
+import {
+  useCheckAddress,
+  useConnections,
+  useDisconnect,
+  type Connection,
+  type MailChoice,
+} from "../../api/queries";
 import type { MailboxConsent, WayInFate } from "../../consent";
+import { ConnectMailbox, StepUp } from "../ConnectMailbox/ConnectMailbox";
 import {
   firstChoice,
   healthTone,
@@ -38,6 +43,8 @@ export interface MailboxesPageProps {
   consent: MailboxConsent;
   /** What the front door came back with, if anything. */
   result?: MailboxResult | undefined;
+  /** Open Add a mailbox at once (`?add=1`). */
+  adding?: boolean | undefined;
 }
 
 /** A provider's name, in the user's language when it has one. */
@@ -52,15 +59,16 @@ function useProviderName() {
  * confirmed in place: delete its mail here or keep its history read-only;
  * the mail at the provider is never touched; a way in added only by
  * connecting it goes with it), and Connect a mailbox through the front door
- * (also as a way in, or not). ⇧C connects, J/K choose a mailbox, R
- * reconnects it, ⌫ asks to disconnect it.
+ * (also as a way in, or not), or with its password (`ConnectMailbox`, by
+ * its address first). ⇧C adds a mailbox, J/K choose one, R reconnects it,
+ * ⌫ asks to disconnect it.
  */
-export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps) {
+export function MailboxesPage({ workspace, consent, result, adding = false }: MailboxesPageProps) {
   const { t } = useTranslation("connectors");
   const connections = useConnections(workspace.id);
   const members = useMembers(workspace.id);
   const providerName = useProviderName();
-  const connectGroup = useRef<HTMLDivElement>(null);
+  const [add, setAdd] = useState(adding);
   const doneRef = useRef<HTMLDivElement>(null);
   const [chosen, setChosen] = useState<string | undefined>();
   const [confirming, setConfirming] = useState<string | undefined>();
@@ -89,9 +97,9 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
   useShortcut(
     "mailboxes.connect",
     () => {
-      connectGroup.current?.querySelector("button")?.focus();
+      setAdd(true);
     },
-    { enabled: (consent.providers?.length ?? 0) > 0 },
+    { enabled: !add },
   );
   useShortcut(
     "list.next",
@@ -233,7 +241,28 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
           </List>
         )}
       </SettingsSection>
-      <ConnectSection groupRef={connectGroup} consent={consent} />
+      <SettingsSection title={t("connect.title")} description={t("connect.lead")}>
+        <div className="flex">
+          <Button
+            variant="secondary"
+            icon="plus"
+            shortcut="mailboxes.connect"
+            onClick={() => {
+              setAdd(true);
+            }}
+          >
+            {t("connect.add")}
+          </Button>
+        </div>
+      </SettingsSection>
+      <ConnectMailbox
+        workspaceId={workspace.id}
+        consent={consent}
+        open={add}
+        onClose={() => {
+          setAdd(false);
+        }}
+      />
     </SettingsPage>
   );
 }
@@ -284,20 +313,7 @@ function Refusal({ consent }: { consent: MailboxConsent }) {
     return null;
   }
   if (consent.refusal === "step_up") {
-    return (
-      <Banner
-        role="alert"
-        icon="key"
-        title={t("stepUp.title")}
-        action={
-          <Button variant="secondary" onClick={consent.signInAgain}>
-            {t("stepUp.action")}
-          </Button>
-        }
-      >
-        {t("stepUp.lead")}
-      </Banner>
-    );
+    return <StepUp consent={consent} />;
   }
   return <Banner tone="danger" role="alert" title={t(`refusal.${consent.refusal}`)} />;
 }
@@ -422,6 +438,9 @@ function MailboxRow({
       }
     >
       <StatusText tone={healthTone(connection.health)}>{health}</StatusText>
+      {connection.provider === "imap" && !connection.address_verified ? (
+        <AddressCheckLine workspaceId={workspaceId} connection={connection} mine={mine} />
+      ) : null}
       {confirming ? (
         <InlineConfirm
           confirmLabel={t("disconnect.confirm")}
@@ -514,71 +533,53 @@ function DisconnectChoice({
   );
 }
 
-function ConnectSection({
-  groupRef,
-  consent,
+/**
+ * An IMAP mailbox whose address is not verified: being checked, or not, in
+ * which case sending stays off and the member who connected it can try
+ * again.
+ */
+function AddressCheckLine({
+  workspaceId,
+  connection,
+  mine,
 }: {
-  groupRef: RefObject<HTMLDivElement | null>;
-  consent: MailboxConsent;
+  workspaceId: string;
+  connection: Connection;
+  mine: boolean;
 }) {
   const { t } = useTranslation("connectors");
-  const providerName = useProviderName();
-  const titleId = useId();
-  const providers = consent.providers;
-  const [signIn, setSignIn] = useState(true);
+  const again = useCheckAddress(workspaceId);
+  if (connection.address_check === "checking") {
+    return <StatusText tone="waiting">{t("row.checking")}</StatusText>;
+  }
   return (
-    <SettingsSection
-      title={t("connect.title")}
-      description={providers !== undefined && providers.length > 0 ? t("connect.lead") : undefined}
-      titleId={titleId}
-    >
-      {providers === undefined ? (
-        consent.providersFailed ? (
-          <Text tone="tertiary" size="sm">
-            {t("connect.loadError")}
-          </Text>
-        ) : (
-          <div role="status" aria-label={t("connect.loading")}>
-            <SkeletonList rows={1} />
-          </div>
-        )
-      ) : providers.length === 0 ? (
-        <Text tone="tertiary" size="sm">
-          {t("connect.none")}
-        </Text>
-      ) : (
-        <>
-          <Checkbox
-            label={t("connect.signIn")}
-            hint={t("connect.signInHint")}
-            checked={signIn}
-            onChange={(event) => {
-              setSignIn(event.currentTarget.checked);
+    <div className="flex flex-col gap-2">
+      <StatusText tone="problem">{t("row.unverified")}</StatusText>
+      {mine ? (
+        <div className="flex">
+          <Button
+            variant="secondary"
+            disabled={again.isPending}
+            aria-label={t("row.retryLabel", { address: connection.address })}
+            onClick={() => {
+              again.mutate(connection.id);
             }}
-          />
-          <div
-            ref={groupRef}
-            className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
-            role="group"
-            aria-labelledby={titleId}
           >
-            {providers.map((provider, index) => (
-              <Button
-                key={provider}
-                variant="secondary"
-                icon="plus"
-                disabled={consent.starting}
-                shortcut={index === 0 ? "mailboxes.connect" : undefined}
-                onClick={() => {
-                  consent.start({ purpose: "connect", provider, signIn });
-                }}
-              >
-                {t("connect.provider", { provider: providerName(provider) })}
-              </Button>
-            ))}
-          </div>
-        </>
-      )}
-    </SettingsSection>
+            {t("row.retry")}
+          </Button>
+        </div>
+      ) : null}
+      {again.isError ? (
+        <Banner
+          tone="danger"
+          role="alert"
+          title={
+            errorStatus(again.error) === 429
+              ? t("add.check.retryLimited")
+              : t("add.check.retryFailed")
+          }
+        />
+      ) : null}
+    </div>
   );
 }

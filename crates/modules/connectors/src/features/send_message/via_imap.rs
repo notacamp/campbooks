@@ -76,7 +76,7 @@ pub(super) struct ImapSend<'a> {
 }
 
 /// One budget a send takes from: its key, its rate and what it costs.
-type Budget = (String, Rate, u32);
+pub(crate) type Budget = (String, Rate, u32);
 
 /// How a submission ended.
 enum Submitted {
@@ -196,37 +196,14 @@ impl SendMessage {
         };
 
         // The budgets, then the login's one session.
-        let signer = &ctx.state().signer;
-        let login = lease::keyed(
-            signer,
-            b"connectors.smtp.login",
-            &format!(
-                "{}\u{0}{}",
-                username.trim().to_lowercase(),
-                server.host.to_ascii_lowercase()
-            ),
-        );
-        let host = lease::keyed(
-            signer,
-            b"connectors.smtp.host",
-            &server.host.to_ascii_lowercase(),
-        );
         let recipients = u32::try_from(to.len()).unwrap_or(u32::MAX);
-        let keys = Keys {
-            login: &login,
-            host: &host,
+        let (spend, session) = sending_budgets(
+            &ctx.state().signer,
+            config,
             workspace,
-            provider: imap::is_smtp_provider_host(&server.host),
-        };
-        let spend = budgets(config, &keys, recipients);
-        let session = [(
-            format!("smtp:session:{login}"),
-            Rate {
-                per_second: 1.0 / SLOT_SECONDS,
-                burst_seconds: SLOT_SECONDS,
-            },
-            1,
-        )];
+            (&username, &server.host),
+            recipients,
+        );
         if let Err(wait) = take_all(ctx.pool(), &spend).await? {
             tracing::info!(%workspace, %send, "waiting for the mailbox's sending budget");
             return Err(JobError::retry_after(
@@ -488,7 +465,7 @@ fn envelope(document: &OutgoingMessage) -> Option<Vec<lettre::Address>> {
 /// `address` as an SMTP mailbox: an address `lettre` accepts, with no
 /// control character or white space anywhere (not even in a quoted local
 /// part), so it can never end a command line or start another.
-fn mailbox(address: &str) -> Option<lettre::Address> {
+pub(crate) fn mailbox(address: &str) -> Option<lettre::Address> {
     if address.is_empty() || address.chars().any(|c| c.is_control() || c.is_whitespace()) {
         return None;
     }
@@ -537,6 +514,45 @@ async fn messages(
     );
     let copy = compose::rfc5322(document, attachments);
     Ok((wire.len() <= max && copy.len() <= MAX_MESSAGE_BYTES).then_some((wire, copy)))
+}
+
+/// The budgets one message to `recipients` recipients takes through the
+/// login `username` at SMTP host `host` (its messages and recipients, the
+/// workspace's, the host's), and the login's one session slot: what a send
+/// and an address check (`send_address_check`) both take.
+pub(crate) fn sending_budgets(
+    signer: &campbooks_kernel::crypto::Signer,
+    config: &crate::config::ImapConfig,
+    workspace: WorkspaceId,
+    (username, host): (&str, &str),
+    recipients: u32,
+) -> (Vec<Budget>, [Budget; 1]) {
+    let login = lease::keyed(
+        signer,
+        b"connectors.smtp.login",
+        &format!(
+            "{}\u{0}{}",
+            username.trim().to_lowercase(),
+            host.to_ascii_lowercase()
+        ),
+    );
+    let host_key = lease::keyed(signer, b"connectors.smtp.host", &host.to_ascii_lowercase());
+    let keys = Keys {
+        login: &login,
+        host: &host_key,
+        workspace,
+        provider: imap::is_smtp_provider_host(host),
+    };
+    let spend = budgets(config, &keys, recipients);
+    let session = [(
+        format!("smtp:session:{login}"),
+        Rate {
+            per_second: 1.0 / SLOT_SECONDS,
+            burst_seconds: SLOT_SECONDS,
+        },
+        1,
+    )];
+    (spend, session)
 }
 
 /// What a send's budgets are keyed by.
@@ -590,7 +606,10 @@ fn budgets(config: &crate::config::ImapConfig, keys: &Keys<'_>, recipients: u32)
 
 /// Take `cost` of each of `budgets`, in order; none when one is short (those
 /// taken are given back): how long until there is enough.
-async fn take_all(pool: &PgPool, budgets: &[Budget]) -> Result<Result<(), Duration>, JobError> {
+pub(crate) async fn take_all(
+    pool: &PgPool,
+    budgets: &[Budget],
+) -> Result<Result<(), Duration>, JobError> {
     for (n, (key, rate, cost)) in budgets.iter().enumerate() {
         if let Err(wait) = schedule::take(pool, key, *cost, *rate).await? {
             give_back(pool, &budgets[..n]).await;
@@ -601,7 +620,7 @@ async fn take_all(pool: &PgPool, budgets: &[Budget]) -> Result<Result<(), Durati
 }
 
 /// Give back what `budgets` cost (nothing was sent with it); best effort.
-async fn give_back(pool: &PgPool, budgets: &[Budget]) {
+pub(crate) async fn give_back(pool: &PgPool, budgets: &[Budget]) {
     for (key, rate, cost) in budgets {
         if let Err(err) = schedule::settle(pool, key, *cost, 0, *rate).await {
             tracing::warn!(

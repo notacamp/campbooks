@@ -64,7 +64,7 @@ use crate::{
     tracking, zoho,
 };
 
-mod via_imap;
+pub(crate) mod via_imap;
 mod via_zoho;
 
 /// The blob owner type of a send (its outgoing document).

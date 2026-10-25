@@ -33,6 +33,13 @@
     "smtp_tls_failed": "O certificado do servidor de envio não é válido para o seu nome, por isso o Campbooks não se ligou. Verifique o nome do servidor.",
     "imap_not_an_imap_server": "O servidor neste endereço e porta não é um servidor de correio IMAP. Verifique o servidor e a porta.",
     "host_refused": "O Campbooks não se pode ligar a este servidor: está numa rede privada ou a porta não é de correio (993, 143, 465 ou 587).",
-    "starttls_missing": "O servidor não oferece uma ligação cifrada, por isso o Campbooks não enviou a sua palavra-passe. Use a porta cifrada do servidor (993 para IMAP, 465 para SMTP)."
+    "starttls_missing": "O servidor não oferece uma ligação cifrada, por isso o Campbooks não enviou a sua palavra-passe. Use a porta cifrada do servidor (993 para IMAP, 465 para SMTP).",
+    "address_check_not_needed": "O endereço desta caixa de correio não precisa de verificação: já está verificado, ou não é uma caixa de correio IMAP."
+  },
+  "address_check": {
+    "subject": "O Campbooks está a verificar o seu endereço",
+    "why": "O Campbooks enviou esta mensagem para verificar que a caixa de correio que lhe ligou recebe o correio de {{address}}. Encontra esta mensagem sozinho; não tem nada a fazer.",
+    "nothing_to_do": "O Campbooks apaga esta mensagem depois de a encontrar. Se ela ficar, pode apagá-la.",
+    "not_you": "Se não ligou esta caixa de correio ao Campbooks, alguém pode ter escrito o seu endereço por engano: pode ignorar esta mensagem. Não é preciso responder."
   }
 }

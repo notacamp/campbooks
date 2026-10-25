@@ -14,10 +14,11 @@ import { MailboxesPage } from "./components/MailboxesPage/MailboxesPage";
 import type { UseMailboxConsent } from "./consent";
 import { mailboxResult } from "./model";
 
-/** What the front door comes back to Mailboxes with. */
+/** What the front door comes back to Mailboxes with, or `add=1` to open Add a mailbox. */
 interface MailboxesSearch {
   connected?: string;
   link_error?: string;
+  add?: "1";
 }
 
 const text = (value: unknown) => (typeof value === "string" && value !== "" ? value : undefined);
@@ -25,9 +26,11 @@ const text = (value: unknown) => (typeof value === "string" && value !== "" ? va
 function validateMailboxesSearch(search: Record<string, unknown>): MailboxesSearch {
   const connected = text(search["connected"]);
   const linkError = text(search["link_error"]);
+  const add = search["add"] === "1" || search["add"] === 1;
   return {
     ...(connected === undefined ? {} : { connected }),
     ...(linkError === undefined ? {} : { link_error: linkError }),
+    ...(add ? { add: "1" as const } : {}),
   };
 }
 
@@ -53,6 +56,7 @@ export function buildConnectorsRoutes<TParent extends AnyRoute>(
     const workspaces = useWorkspaces();
     const consent = useConsent({ workspaceId: workspaceId ?? "", returnTo: pathname });
     const [result] = useState(() => mailboxResult(search));
+    const [adding] = useState(() => search.add === "1");
     const hasResult = Object.keys(search).length > 0;
     useEffect(() => {
       if (hasResult) {
@@ -62,7 +66,7 @@ export function buildConnectorsRoutes<TParent extends AnyRoute>(
     const workspace = workspaces.data?.find((candidate) => candidate.id === workspaceId);
     // The workspace layout only renders its pages for a workspace in the list.
     return workspace === undefined ? null : (
-      <MailboxesPage workspace={workspace} consent={consent} result={result} />
+      <MailboxesPage workspace={workspace} consent={consent} result={result} adding={adding} />
     );
   }
 

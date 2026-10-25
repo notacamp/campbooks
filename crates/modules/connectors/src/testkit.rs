@@ -382,11 +382,15 @@ impl Kit {
     pub async fn new(db: PgPool) -> Self {
         let mut config = ConnectorsConfig::default();
         config.zoho.requests_per_minute = 1_000_000;
+        // IMAP is on by default, but no test reaches a real resolver or
+        // mail server: the IMAP tests use `testkit_imap`'s fakes.
+        config.imap.enabled = false;
         Self::with_config(db, config).await
     }
 
     /// The module with `config`.
     pub async fn with_config(db: PgPool, config: ConnectorsConfig) -> Self {
+        let imap_config = config.imap.clone();
         let google = FakeGoogle::start().await;
         let clock = Arc::new(FixedClock::new(
             DateTime::from_timestamp(Utc::now().timestamp(), 0).unwrap(),
@@ -410,7 +414,7 @@ impl Kit {
                 )
                 .unwrap(),
             )),
-            imap: Arc::new(crate::imap::Imap::default()),
+            imap: Arc::new(crate::imap::Imap::new(imap_config)),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
                 CREDENTIALS_PURPOSE,

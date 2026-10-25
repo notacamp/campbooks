@@ -204,8 +204,13 @@ pub struct ConnectionView {
     pub provider: Provider,
     /// The account's email address.
     pub address: String,
-    /// Whether the provider verified it.
+    /// Whether the provider verified it (for an IMAP mailbox: its username
+    /// is the address, or its address check found the code).
     pub address_verified: bool,
+    /// Where the check of an IMAP mailbox's address is, while it is not
+    /// verified: `checking`, or `failed` (sending stays off until it is
+    /// checked again); none when verified or never checked.
+    pub address_check: Option<AddressCheck>,
     /// The account's display name, when the provider gives one.
     pub display_name: Option<String>,
     /// The member who granted it.
@@ -224,6 +229,17 @@ pub struct ConnectionView {
     pub streams: Vec<StreamView>,
     /// When it was connected.
     pub created_at: DateTime<Utc>,
+}
+
+/// Where the check of an IMAP mailbox's address is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AddressCheck {
+    /// A code is on its way to the address, or is being looked for in the
+    /// mailbox's Inbox.
+    Checking,
+    /// The code was not found (or could not be sent): sending stays off.
+    Failed,
 }
 
 /// A change stream as the API shows it.

@@ -2,6 +2,7 @@
 
 pub mod admin_list_connections;
 pub mod apply_calendar_sync;
+pub mod check_address;
 pub mod connect_imap;
 pub mod disconnect;
 pub mod discover_imap;
@@ -14,6 +15,7 @@ pub mod queue_send;
 pub mod record_calendar_change;
 pub mod request_changes;
 pub mod retag_bindings;
+pub mod send_address_check;
 pub mod send_message;
 pub mod start_connection;
 pub mod sync_now;

@@ -2,7 +2,8 @@
   "provider": {
     "google": "Gmail",
     "zoho": "Zoho Mail",
-    "microsoft": "Microsoft 365"
+    "microsoft": "Microsoft 365",
+    "imap": "IMAP"
   },
   "mail": {
     "title": "Vos e-mails",
@@ -31,7 +32,11 @@
     "reconnect": "Reconnecter",
     "reconnectLabel": "Reconnecter {{address}}",
     "disconnect": "Déconnecter",
-    "disconnectLabel": "Déconnecter {{address}}"
+    "disconnectLabel": "Déconnecter {{address}}",
+    "checking": "Vérification de votre adresse…",
+    "unverified": "Nous n’avons pas pu vérifier cette adresse : l’envoi reste désactivé",
+    "retry": "Réessayer",
+    "retryLabel": "Vérifier {{address}} à nouveau"
   },
   "health": {
     "ok": "Synchronisation en cours",
@@ -69,14 +74,13 @@
     }
   },
   "connect": {
-    "title": "Relier une boîte mail",
-    "lead": "Vous passerez chez le fournisseur pour autoriser l’accès, puis vous reviendrez ici.",
+    "title": "Ajouter une boîte mail",
+    "lead": "Saisissez son adresse et Campbooks trouve comment la connecter : par la connexion de votre fournisseur, ou avec un mot de passe d’application.",
     "provider": "Relier {{provider}}",
     "none": "Ce Campbooks n’a encore aucun fournisseur de messagerie configuré. La personne qui le gère peut ajouter Gmail ou Zoho Mail.",
-    "loading": "Chargement des fournisseurs",
-    "loadError": "Les fournisseurs que vous pouvez relier n’ont pas pu être chargés. Rechargez la page pour réessayer.",
     "signIn": "Utiliser aussi ce compte pour se connecter",
-    "signInHint": "Laissez coché pour votre propre boîte mail. Décochez pour une boîte partagée, comme support@ : elle est reliée, mais ne devient pas un nouveau moyen de connexion à Campbooks."
+    "signInHint": "Laissez coché pour votre propre boîte mail. Décochez pour une boîte partagée, comme support@ : elle est reliée, mais ne devient pas un nouveau moyen de connexion à Campbooks.",
+    "add": "Ajouter une boîte mail"
   },
   "connected": {
     "title": "Votre boîte mail est reliée",
@@ -156,7 +160,7 @@
     }
   },
   "shortcuts": {
-    "connect": "Relier une boîte mail",
+    "connect": "Ajouter une boîte mail",
     "reconnect": "Reconnecter la boîte mail",
     "disconnect": "Déconnecter la boîte mail"
   },
@@ -189,5 +193,150 @@
     "paused": "En pause",
     "failures_one": "{{count}} échec d’affilée",
     "failures_other": "{{count}} échecs d’affilée"
+  },
+  "add": {
+    "title": "Ajouter une boîte mail",
+    "address": {
+      "label": "Adresse e-mail",
+      "hint": "L’adresse de la boîte mail que vous voulez dans Campbooks.",
+      "invalid": "Saisissez une adresse e-mail valide, comme nom@example.com."
+    },
+    "continue": "Continuer",
+    "cancel": "Annuler",
+    "back": "Retour",
+    "finding": "Recherche de la façon dont cette boîte mail se connecte…",
+    "native": {
+      "title": "Connecter {{provider}}",
+      "lead": "{{address}} est une boîte {{provider}}. Elle se connecte avec la connexion de {{provider}} lui-même : aucun mot de passe n’est saisi ici.",
+      "notHere": "Ce Campbooks n’a pas encore {{provider}} configuré. Demandez à la personne qui le gère."
+    },
+    "outlook": {
+      "title": "Outlook arrive bientôt",
+      "lead": "{{address}} est une boîte Outlook ou Microsoft 365. Campbooks ne peut pas encore les connecter ; ce sera bientôt possible."
+    },
+    "fallback": {
+      "title": "Connecter une boîte mail",
+      "lead": "Ce Campbooks connecte les boîtes mail de ces fournisseurs :"
+    },
+    "password": {
+      "title": "Connecter {{address}}",
+      "appLead": "{{provider}} demande un mot de passe d’application : un mot de passe réservé à Campbooks, que vous pouvez supprimer chez {{provider}} à tout moment.",
+      "lead": "Utilisez un mot de passe d’application si votre fournisseur en propose. Sinon, utilisez le mot de passe de la boîte mail.",
+      "label": "Mot de passe",
+      "appLabel": "Mot de passe d’application",
+      "hint": "Campbooks le garde chiffré et ne le montre plus jamais.",
+      "required": "Saisissez le mot de passe.",
+      "connect": "Connecter",
+      "connecting": "Connexion…"
+    },
+    "guide": {
+      "label": "Comment obtenir un mot de passe d’application chez {{provider}}",
+      "help": "Page d’aide de {{provider}}",
+      "imap": "Activer l’IMAP chez {{provider}}"
+    },
+    "guides": {
+      "yahoo": {
+        "name": "Yahoo",
+        "s1": "Connectez-vous à Yahoo et ouvrez Sécurité du compte.",
+        "s2": "Sous Connexions externes, choisissez Créer un mot de passe d’application, nommez-le Campbooks, puis Générer le mot de passe.",
+        "s3": "Copiez le mot de passe affiché par Yahoo et collez-le ici."
+      },
+      "aol": {
+        "name": "AOL",
+        "s1": "Connectez-vous à AOL et ouvrez Sécurité du compte.",
+        "s2": "Choisissez Générer un mot de passe d’application, puis Commencer, nommez-le Campbooks et choisissez Générer le mot de passe.",
+        "s3": "Copiez le mot de passe affiché par AOL et collez-le ici."
+      },
+      "icloud": {
+        "name": "iCloud",
+        "s1": "Connectez-vous sur account.apple.com et ouvrez Connexion et sécurité. L’identification à deux facteurs doit être activée.",
+        "s2": "Choisissez Mots de passe pour app et créez-en un nommé Campbooks.",
+        "s3": "Copiez le mot de passe affiché par Apple et collez-le ici."
+      },
+      "fastmail": {
+        "name": "Fastmail",
+        "s1": "Dans Fastmail, ouvrez Réglages, puis Confidentialité et sécurité.",
+        "s2": "Sous Apps connectées et jetons d’API, choisissez Gérer les mots de passe d’application et les accès, puis Nouveau mot de passe d’application.",
+        "s3": "Nommez-le Campbooks, gardez l’accès au courrier, générez-le et collez-le ici."
+      },
+      "gmx": {
+        "name": "GMX",
+        "s1": "Activez d’abord l’IMAP : dans les réglages de messagerie de GMX, ouvrez POP3 et IMAP et autorisez l’accès.",
+        "s2": "Ouvrez les réglages de sécurité de votre compte et trouvez les mots de passe d’application.",
+        "s3": "Créez-en un nommé Campbooks. GMX ne l’affiche qu’une fois.",
+        "s4": "Collez-le ici."
+      },
+      "webde": {
+        "name": "WEB.DE",
+        "s1": "Activez d’abord l’IMAP : dans les réglages de messagerie de WEB.DE, ouvrez POP3/IMAP et activez-le.",
+        "s2": "Ouvrez votre compte, puis Connexion et sécurité, puis Mots de passe d’application.",
+        "s3": "Créez-en un nommé Campbooks. WEB.DE ne l’affiche qu’une fois.",
+        "s4": "Collez-le ici."
+      },
+      "yandex": {
+        "name": "Yandex",
+        "s1": "Activez d’abord l’IMAP : dans les réglages de Yandex Mail, ouvrez Clients de messagerie, cochez IMAP et Mots de passe d’application et jetons OAuth, puis enregistrez.",
+        "s2": "Dans Yandex ID, ouvrez Sécurité, puis Mots de passe d’application, et créez un mot de passe de messagerie nommé Campbooks.",
+        "s3": "Copiez-le et collez-le ici. Yandex ne l’affiche qu’une fois.",
+        "s4": "Un nouveau mot de passe d’application peut mettre quelques heures à fonctionner : si la connexion est refusée, réessayez plus tard."
+      },
+      "custom": {
+        "name": "votre fournisseur",
+        "s1": "Si votre hébergeur de messagerie propose des mots de passe d’application, créez-en un pour Campbooks dans ses réglages et utilisez-le ici.",
+        "s2": "Sinon, utilisez le mot de passe de la boîte mail. Si ses serveurs ne sont pas trouvés, saisissez-les dans Avancé : les pages d’aide de votre hébergeur les indiquent."
+      }
+    },
+    "advanced": {
+      "summary": "Avancé : nom d’utilisateur et serveurs",
+      "username": "Nom d’utilisateur",
+      "usernameHint": "En général, l’adresse elle-même.",
+      "imap": "Courrier entrant (IMAP)",
+      "smtp": "Courrier sortant (SMTP)",
+      "host": "Serveur",
+      "port": "Port",
+      "security": "Sécurité",
+      "tls": "TLS",
+      "starttls": "STARTTLS",
+      "invalid": "Vérifiez les serveurs : chacun a besoin d’un nom et d’un port de 1 à 65535."
+    },
+    "errors": {
+      "imap_login_refused": "Le serveur de messagerie a refusé la connexion. Vérifiez le nom d’utilisateur et le mot de passe.",
+      "imap_login_refused_app": "Le serveur de messagerie a refusé la connexion. {{provider}} demande un mot de passe d’application, pas votre mot de passe habituel : suivez les étapes ci-dessus.",
+      "smtp_login_refused": "Le serveur d’envoi a refusé la connexion. Vérifiez le mot de passe, et que cette boîte mail peut envoyer du courrier.",
+      "imap_unreachable": "Campbooks n’a pas pu joindre le serveur de messagerie. Vérifiez son nom et son port dans Avancé, puis réessayez.",
+      "smtp_unreachable": "Campbooks n’a pas pu joindre le serveur d’envoi. Vérifiez son nom et son port dans Avancé, puis réessayez.",
+      "imap_tls_failed": "Le certificat du serveur de messagerie n’est pas valide pour son nom : Campbooks ne s’est pas connecté. Vérifiez le nom du serveur.",
+      "smtp_tls_failed": "Le certificat du serveur d’envoi n’est pas valide pour son nom : Campbooks ne s’est pas connecté. Vérifiez le nom du serveur.",
+      "imap_not_an_imap_server": "Ce serveur et ce port ne sont pas un serveur de messagerie IMAP. Vérifiez-les dans Avancé.",
+      "imap_busy": "Le serveur de messagerie est occupé. Réessayez dans quelques minutes.",
+      "host_refused": "Campbooks ne peut pas joindre ce serveur : il est sur un réseau privé, ou le port n’est pas un port de messagerie (993, 143, 465 ou 587).",
+      "starttls_missing": "Ce serveur ne propose pas de connexion chiffrée : Campbooks n’a pas envoyé votre mot de passe. Utilisez le port 993 pour l’IMAP et 465 pour le SMTP.",
+      "imap_servers_required": "Campbooks n’a pas trouvé les serveurs de cette boîte mail. Saisissez-les dans Avancé.",
+      "use_native_provider": "Cette boîte mail se connecte avec la connexion de son propre fournisseur. Revenez en arrière et utilisez-la.",
+      "imap_address_invalid": "Saisissez une adresse e-mail valide.",
+      "imap_username_invalid": "Vérifiez le nom d’utilisateur dans Avancé.",
+      "imap_password_invalid": "Saisissez le mot de passe sur une seule ligne, 1024 caractères au plus.",
+      "too_many_attempts": "Trop de connexions échouées à cette boîte mail. Attendez une heure, puis réessayez.",
+      "rate_limited": "Trop d’essais. Attendez quelques minutes, puis réessayez.",
+      "account_connected_by_another_member": "Un autre membre de cet espace de travail a déjà connecté cette boîte mail.",
+      "account_mismatch": "Ce n’est pas la boîte mail que vous reconnectez.",
+      "provider_not_configured": "Ce Campbooks ne peut pas connecter de boîte mail avec un mot de passe.",
+      "connection_needs_user": "Seul un membre connecté peut connecter une boîte mail.",
+      "unknown": "La boîte mail n’a pas été connectée. Réessayez."
+    },
+    "connected": "{{address}} est connectée. Campbooks récupère son courrier.",
+    "check": {
+      "title": "Vérification de {{address}}",
+      "checking": "Vérification de votre adresse…",
+      "checkingLead": "Campbooks a envoyé un message à {{address}} par cette boîte mail et le cherche dans sa boîte de réception. Cela prend une ou deux minutes ; vous pouvez fermer cette fenêtre.",
+      "verified": "Vérifiée",
+      "verifiedLead": "{{address}} peut envoyer du courrier depuis Campbooks.",
+      "failed": "Nous n’avons pas pu vérifier cette adresse : l’envoi reste désactivé",
+      "failedLead": "Campbooks n’a pas trouvé son message dans la boîte mail. La lecture fonctionne ; l’envoi depuis {{address}} reste désactivé tant que l’adresse n’est pas vérifiée.",
+      "retry": "Réessayer",
+      "retryFailed": "La vérification n’a pas pu démarrer. Réessayez dans un moment.",
+      "retryLimited": "Cette adresse a été vérifiée trop souvent aujourd’hui. Réessayez demain.",
+      "done": "Terminé"
+    }
   }
 }
