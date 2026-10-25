@@ -8,4 +8,4 @@
 
 ## 2. Before merge
 
-- [ ] 2.1 Recording (375px and desktop), then archive this change
+- [x] 2.1 Recording (375px and desktop), then archive this change
