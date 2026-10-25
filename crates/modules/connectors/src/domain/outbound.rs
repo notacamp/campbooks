@@ -290,6 +290,16 @@ pub fn map_imap(change: &RequestedChange) -> Mapped {
     }
 }
 
+/// `change` in a Microsoft message's tokens as the push sees them
+/// (`microsoft/write.rs`, campbooks-cloud#317): those of an IMAP message
+/// ([`map_imap`]): read, starred, the inbox, the trash, spam and a move to a
+/// stream by its stream mark (none for Primary). A member's folder is a
+/// place, not a label, and no other Outlook category is written, so label
+/// changes are not made (`unsupported`).
+pub fn map_microsoft(change: &RequestedChange) -> Mapped {
+    map_imap(change)
+}
+
 /// Out of the trash or spam (`bin`), and into the inbox too for mail the
 /// inbox received.
 fn out_of(bin: &str, inbound: bool) -> Mapped {
@@ -1437,6 +1447,7 @@ mod tests {
         ];
         for (change, want) in cases {
             assert_eq!(map_imap(&change), want, "{change:?}");
+            assert_eq!(map_microsoft(&change), want, "{change:?}");
         }
     }
 

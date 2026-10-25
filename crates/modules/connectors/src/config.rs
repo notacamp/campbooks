@@ -1209,6 +1209,28 @@ mod tests {
     }
 
     #[test]
+    fn microsoft_write_back_and_sending_add_no_setting() {
+        // Production's settings (cloud#317): its poll bounds and no Microsoft
+        // mail variable. Writing back and sending read nothing of their own,
+        // so neither a stray key nor Microsoft mail turned on stops a server.
+        for microsoft in [
+            serde_json::json!({}),
+            serde_json::json!({"send_max_bytes": "lots", "write_back": "maybe"}),
+            serde_json::json!({"enabled": true, "send_max_bytes": -1, "write_back": [1]}),
+        ] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {
+                    "poll": {"min_seconds": 60, "max_seconds": 120},
+                    "microsoft": microsoft
+                }
+            })))
+            .unwrap();
+            assert_eq!(config.poll.max_seconds, 120);
+            assert_eq!(config.microsoft.adapter(), MicrosoftAdapter::default());
+        }
+    }
+
+    #[test]
     fn microsoft_adapter_settings_never_stop_a_server_that_does_not_offer_it() {
         // Production's settings (cloud#316): its poll bounds, no Microsoft
         // mail, subscription or callback variable.
