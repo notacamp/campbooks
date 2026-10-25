@@ -1,11 +1,19 @@
 {
-  "extends": "./tsconfig.base.json",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "types": ["vite/client"],
-    "paths": { "~/*": ["./src/*"] }
+    // @notacamp/ui from its source (clients/ui/src), so no package build is needed.
+    "paths": {
+      "~/*": ["./src/*"],
+      "@notacamp/ui": ["../ui/src/index.ts"],
+      "@notacamp/ui/shortcuts": ["../ui/src/shortcuts/index.ts"],
+      "@notacamp/ui/tokens.css": ["../ui/src/tokens/tokens.css"],
+      "@notacamp/ui/base.css": ["../ui/src/styles/base.css"],
+      "@notacamp/ui/fonts.css": ["../ui/src/styles/fonts.css"]
+    }
   },
   "include": ["src", "test", "stories", ".storybook/preview.tsx", ".storybook/longest.ts"],
   "exclude": ["test/fixtures", "test/architecture", "test/webkit", "test/tauri"]

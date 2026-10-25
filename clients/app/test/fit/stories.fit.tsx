@@ -30,7 +30,11 @@ const VIEWPORTS = [
 type Annotations = Record<string, unknown>;
 
 const modules = import.meta.glob<Annotations>(
-  ["../../src/**/*.stories.tsx", "../../stories/**/*.stories.tsx"],
+  [
+    "../../../ui/src/**/*.stories.tsx",
+    "../../src/**/*.stories.tsx",
+    "../../stories/**/*.stories.tsx",
+  ],
   { eager: true },
 );
 

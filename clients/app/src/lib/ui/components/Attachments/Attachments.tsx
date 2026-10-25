@@ -2,11 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ShortcutId } from "~/lib/shortcuts";
 
-import { formatSize } from "../../internal/format-size";
-import { Overlay } from "../../internal/Overlay";
-import { Icon, type IconName } from "../Icon/Icon";
-import { IconButton } from "../IconButton/IconButton";
-import { Kbd, KbdHint } from "../Kbd/Kbd";
+import { formatSize, Overlay, Icon, type IconName, IconButton, Kbd, KbdHint } from "@notacamp/ui";
 
 import styles from "./Attachments.module.css";
 

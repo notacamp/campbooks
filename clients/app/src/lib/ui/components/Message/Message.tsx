@@ -1,7 +1,6 @@
 import { Fragment, useId, useState, type ReactNode } from "react";
 
-import { Avatar, type AvatarProps } from "../Avatar/Avatar";
-import { Icon } from "../Icon/Icon";
+import { Avatar, type AvatarProps, Icon } from "@notacamp/ui";
 
 import styles from "./Message.module.css";
 

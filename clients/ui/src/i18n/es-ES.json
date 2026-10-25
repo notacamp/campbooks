@@ -1,0 +1,86 @@
+{
+  "close": "Cerrar",
+  "undo": "Deshacer",
+  "redo": "Rehacer",
+  "loading": "Cargando",
+  "kbd": {
+    "then": "después",
+    "or": "o",
+    "shortcut": "Atajo: {{keys}}"
+  },
+  "toast": {
+    "region": "Notificaciones",
+    "undone": "Deshecho: {{label}}",
+    "redone": "Rehecho: {{label}}",
+    "dismiss": "Cerrar",
+    "retry": "Reintentar",
+    "cancelled": "Detenido: {{label}}"
+  },
+  "note": {
+    "label": "Cómo están las cosas"
+  },
+  "search": {
+    "label": "Buscar o preguntar"
+  },
+  "commandMenu": {
+    "label": "Menú de comandos",
+    "placeholder": "Busca, pregunta o ejecuta",
+    "empty": "Nada coincide con «{{query}}»",
+    "results": "Comandos",
+    "ask": "Preguntar a Scout: {{query}}",
+    "askAlone": "Preguntar a Scout",
+    "askGroup": "Preguntar",
+    "hintMove": "Mover",
+    "hintOpen": "Abrir",
+    "hintAll": "Todos los resultados",
+    "hintClose": "Cerrar"
+  },
+  "shortcutSheet": {
+    "title": "Atajos de teclado"
+  },
+  "workspace": {
+    "switch": "Cambiar de espacio de trabajo",
+    "current": "Cambiar de espacio de trabajo (actual: {{name}})",
+    "create": "Crear un espacio de trabajo"
+  },
+  "visor": {
+    "idle": "Campbooks",
+    "reading": "Campbooks está leyendo",
+    "thinking": "Campbooks está pensando",
+    "unsure": "Campbooks no está seguro",
+    "happy": "Campbooks está contento",
+    "alert": "Campbooks necesita tu atención",
+    "asleep": "Campbooks está en pausa",
+    "dizzy": "Campbooks ha tenido un tropiezo",
+    "starry": "Campbooks está encantado",
+    "hearts": "A Campbooks le encanta"
+  },
+  "signal": {
+    "review": "Revisar",
+    "reply": "Responder",
+    "decide": "Decidir",
+    "do": "Hacer",
+    "pay": "Pagar",
+    "nudge": "Recordar",
+    "sort": "Ordenar",
+    "look": "Merece un vistazo"
+  },
+  "navigation": {
+    "main": "Principal"
+  },
+  "searchField": {
+    "clear": "Borrar la búsqueda",
+    "filters": "Filtros de la búsqueda",
+    "remove": "Quitar el filtro: {{filter}}"
+  },
+  "datePicker": {
+    "choose": "Elegir una fecha",
+    "previous": "Mes anterior",
+    "next": "Mes siguiente",
+    "today": "Hoy",
+    "clear": "Borrar"
+  },
+  "timePicker": {
+    "choose": "Elegir una hora"
+  }
+}

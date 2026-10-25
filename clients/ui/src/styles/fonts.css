@@ -1,0 +1,6 @@
+/*
+ * The design system's typefaces, self-hosted: Funnel Sans for text and Funnel
+ * Display for headings (--font-sans, --font-display in tokens.css).
+ */
+@import "@fontsource-variable/funnel-sans";
+@import "@fontsource-variable/funnel-display";

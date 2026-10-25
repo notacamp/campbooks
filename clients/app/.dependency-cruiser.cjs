@@ -45,6 +45,22 @@ module.exports = {
       to: { path: "^src/lib/ui/", pathNot: String.raw`^src/lib/ui/index\.ts$` },
     },
     {
+      name: "design-system-through-lib-ui",
+      comment:
+        "Modules and the app shell use @notacamp/ui (clients/ui) through src/lib/ui/index.ts too, which adds Campbooks' own components, preferences and strings to it.",
+      severity: "error",
+      from: { path: "^src/(modules|app)/" },
+      to: { path: String.raw`^\.\./ui/` },
+    },
+    {
+      name: "design-system-knows-no-app",
+      comment:
+        "@notacamp/ui is shared by several apps: nothing in clients/ui imports the app (its ESLint says so too).",
+      severity: "error",
+      from: { path: String.raw`^\.\./ui/` },
+      to: { path: "^src/" },
+    },
+    {
       name: "modules-have-no-stylesheets",
       comment:
         "Visual styling lives in lib/ui components (token-only CSS); modules compose them and use Tailwind for layout only.",
@@ -54,7 +70,8 @@ module.exports = {
     },
     {
       name: "shortcuts-below-ui",
-      comment: "lib/ui renders the shortcut registry; the registry never depends on lib/ui.",
+      comment:
+        "lib/ui renders the shortcut registry; Campbooks' catalogue never depends on lib/ui.",
       severity: "error",
       from: { path: "^src/lib/shortcuts/" },
       to: { path: "^src/lib/ui/" },

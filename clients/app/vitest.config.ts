@@ -8,7 +8,14 @@ export default mergeConfig(
     test: {
       environment: "jsdom",
       setupFiles: ["./test/setup.ts"],
-      include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
+      include: [
+        "src/**/*.test.{ts,tsx}",
+        "test/**/*.test.{ts,tsx}",
+        "scripts/**/*.test.ts",
+        // The design system's tests run here, against the app's toolchain, and
+        // count toward the same coverage gate (clients/ui has no runner).
+        "../ui/src/**/*.test.{ts,tsx}",
+      ],
       exclude: ["test/fixtures/**"],
       restoreMocks: true,
       // Above Testing Library's async timeout (test/setup.ts): screens load
@@ -20,7 +27,9 @@ export default mergeConfig(
       unstubGlobals: true,
       coverage: {
         provider: "v8",
-        include: ["src/lib/**", "src/modules/**"],
+        include: ["src/lib/**", "src/modules/**", "../ui/src/**"],
+        // clients/ui is outside this package's root.
+        allowExternal: true,
         exclude: ["**/*.gen.ts", "**/*.test.{ts,tsx}", "**/*.stories.tsx", "**/*.json", "**/*.css"],
         reporter: ["text", "html", "lcov"],
         thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },

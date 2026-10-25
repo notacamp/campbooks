@@ -3,10 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
 
-import { formatSize } from "../../internal/format-size";
-import { Button } from "../Button/Button";
-import { Icon, type IconName } from "../Icon/Icon";
-import { IconButton } from "../IconButton/IconButton";
+import { formatSize, Button, Icon, type IconName, IconButton } from "@notacamp/ui";
 import {
   RecipientField,
   type Recipient,

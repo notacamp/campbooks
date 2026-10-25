@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
-import { Progress } from "../Progress/Progress";
+import { Progress } from "@notacamp/ui";
 
 import { Offer } from "./Offer";
 

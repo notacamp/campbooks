@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { Signal } from "../../tokens/tokens";
-import { Dot } from "../Dot/Dot";
-import { Heading } from "../Typography/Typography";
-import { Visor, type VisorState } from "../Visor/Visor";
+import { type Signal, Dot, Heading, Visor, type VisorState } from "@notacamp/ui";
 
 import styles from "./Queue.module.css";
 
