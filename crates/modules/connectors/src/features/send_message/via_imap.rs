@@ -404,12 +404,12 @@ impl SendMessage {
         connection: ConnectionId,
         reason: &'static str,
     ) -> Result<(), JobError> {
-        let events = ctx.state().events.clone();
+        let state = ctx.state().clone();
         if let Some(granted_by) = target.granted_by {
             health::needs_reauth(
                 ctx.tx().await?,
-                &events,
-                &workspace.to_string(),
+                &state,
+                workspace,
                 connection,
                 granted_by,
                 reason,

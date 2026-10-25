@@ -444,8 +444,8 @@ async fn refused(shared: &Shared, row: &Row, granted_by: UserId) -> Ended {
         if reauth {
             health::needs_reauth(
                 &mut tx,
-                &shared.state.events,
-                &row.workspace.to_string(),
+                &shared.state,
+                row.workspace,
                 row.connection,
                 granted_by,
                 "imap_login_refused",

@@ -16,6 +16,7 @@ use crate::{
     events::SendRequested,
     mail::parse as normalize,
     testkit::{Kit, assert_contract, synthetic},
+    tracking_tests::{job, tracked, tracked_as},
 };
 
 /// Ana connected, with one message from Sender 1 synced: the workspace,
@@ -170,6 +171,25 @@ async fn a_reply_goes_into_its_thread_and_comes_back_once(db: PgPool) {
     assert_eq!(done[0]["outcome"], "sent");
     assert_eq!(done[0]["provider_message_id"], sent[0].id);
     assert_eq!(done[0]["send_id"], send_id.to_string());
+    // Tracked once, as the send job, with the send and never its message.
+    let succeeded = tracked(&kit, "connectors.send_succeeded").await;
+    assert_eq!(succeeded.len(), 1);
+    tracked_as(
+        &succeeded[0],
+        "connectors.send_succeeded",
+        ws,
+        &job("connectors.send_message"),
+        None,
+    );
+    let send = &succeeded[0].body["send"];
+    assert_eq!(send["id"], send_id.to_string());
+    assert_eq!(send["inbox_id"], inbox.to_string());
+    assert_eq!(send["state"], "sent");
+    assert_eq!(send["provider"], "google");
+    assert_eq!(send["attempts"], 1);
+    assert!(send["stream_id"].is_string());
+    assert!(!succeeded[0].body.to_string().contains("Thursday"));
+    assert!(tracked(&kit, "connectors.send_failed").await.is_empty());
     // No address, subject or body in the event log.
     for event in kit.payloads(ws, "connectors.send_completed").await {
         let text = event.to_string();
@@ -271,6 +291,20 @@ async fn a_refused_message_fails_at_once(db: PgPool) {
     assert_eq!(done.len(), 1);
     assert_eq!(done[0]["outcome"], "failed");
     assert_eq!(done[0]["reason"], "rejected");
+    // Tracked once, with the kind of failure, never the provider's words.
+    let failed = tracked(&kit, "connectors.send_failed").await;
+    assert_eq!(failed.len(), 1);
+    tracked_as(
+        &failed[0],
+        "connectors.send_failed",
+        ws,
+        &job("connectors.send_message"),
+        None,
+    );
+    assert_eq!(failed[0].body["error"], "rejected");
+    assert_eq!(failed[0].body["send"]["state"], "failed");
+    assert_eq!(failed[0].body["send"]["provider"], "google");
+    assert!(tracked(&kit, "connectors.send_succeeded").await.is_empty());
     let held: i64 = sqlx::query_scalar!(
         r#"SELECT count(*) AS "n!" FROM kernel.blob_refs WHERE owner_type = 'connectors.send'"#
     )

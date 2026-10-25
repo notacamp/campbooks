@@ -1,24 +1,32 @@
 //! A connection's health and its transitions.
 
-use campbooks_kernel::{EventBus, Result, tenancy::UserId};
+use campbooks_kernel::{
+    AppState, Result,
+    tenancy::{UserId, WorkspaceId},
+    tracking::Tracker,
+};
 use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, Postgres, Transaction};
 
 use super::{
     model::{ConnectionId, Health, StreamId},
-    schedule,
+    schedule, tracked,
 };
-use crate::events::ConnectionNeedsReauth;
+use crate::{events::ConnectionNeedsReauth, tracking};
 
-/// Set `connection`'s health to `health` (with `reason`) if it differs.
+/// Set `connection`'s health to `health` (with `reason`) if it differs, and
+/// track the change (`connectors.connection_health_changed`) in `tx`.
 /// Returns whether it changed.
 pub async fn set(
-    conn: &mut PgConnection,
+    tx: &mut Transaction<'_, Postgres>,
+    tracker: &Tracker,
+    workspace: WorkspaceId,
     connection: ConnectionId,
     health: Health,
     reason: Option<&str>,
     now: DateTime<Utc>,
 ) -> Result<bool> {
+    let before = tracked::health_of(tx, connection).await?;
     let changed = sqlx::query!(
         r#"UPDATE connectors.connections
               SET health = $2, health_reason = $3, health_changed_at = $4, updated_at = $4
@@ -28,9 +36,24 @@ pub async fn set(
         reason,
         now,
     )
-    .execute(conn)
+    .execute(&mut **tx)
     .await?
     .rows_affected();
+    if changed > 0
+        && let Some(before) = before
+    {
+        let snapshot = tracked::connection(tx, connection).await?;
+        tracker
+            .track(
+                tx,
+                &tracking::ConnectionHealthChanged {
+                    workspace,
+                    before: tracked::health(before),
+                    connection: snapshot,
+                },
+            )
+            .await?;
+    }
     Ok(changed > 0)
 }
 
@@ -77,11 +100,11 @@ pub async fn count_login_refusal(
 
 /// The grant stopped working: `needs_reauth`, every stream paused and off
 /// the schedule, its IDLE lease withdrawn, and [`ConnectionNeedsReauth`]
-/// published once.
+/// published once; the health change is tracked.
 pub async fn needs_reauth(
     tx: &mut Transaction<'_, Postgres>,
-    events: &EventBus,
-    workspace: &str,
+    state: &AppState,
+    workspace: WorkspaceId,
     connection: ConnectionId,
     granted_by: UserId,
     reason: &'static str,
@@ -96,7 +119,16 @@ pub async fn needs_reauth(
     let Some(already) = already else {
         return Ok(());
     };
-    set(tx, connection, Health::NeedsReauth, Some(reason), now).await?;
+    set(
+        tx,
+        &state.tracker,
+        workspace,
+        connection,
+        Health::NeedsReauth,
+        Some(reason),
+        now,
+    )
+    .await?;
     let streams = sqlx::query_scalar!(
         r#"UPDATE connectors.streams SET paused = true WHERE connection_id = $1
         RETURNING id AS "id: StreamId""#,
@@ -110,18 +142,19 @@ pub async fn needs_reauth(
     // An IDLE session on it ends at its holder's next renewal.
     crate::features::imap_idle::lease::withdraw(tx, connection).await?;
     if !already {
-        events
+        state
+            .events
             .publish(
                 tx,
                 &ConnectionNeedsReauth {
-                    workspace: workspace.to_owned(),
+                    workspace: workspace.to_string(),
                     connection,
                     granted_by,
                     reason: reason.to_owned(),
                 },
             )
             .await?;
-        tracing::info!(workspace, %connection, reason, "connection needs reauthorisation");
+        tracing::info!(%workspace, %connection, reason, "connection needs reauthorisation");
     }
     Ok(())
 }

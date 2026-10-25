@@ -21,7 +21,7 @@ use super::{
     imap_servers::{self, ImapAccount},
     model::{Capability, ConnectionId, ConnectionView, InboxId, Phase, Provider, StreamId},
     removal::CONNECTION_OWNER,
-    schedule,
+    schedule, tracked,
 };
 use crate::{
     MESSAGES,
@@ -30,6 +30,7 @@ use crate::{
     events::{ACCOUNT_CONTENT_TYPE, AccountDocument, CapabilityGranted, ConnectionAdded},
     google::CalendarError,
     provider::TokenGrant,
+    tracking,
 };
 
 /// A provider grant already obtained for a member.
@@ -275,6 +276,14 @@ async fn save(
     capabilities.dedup();
     let capability_names: Vec<String> =
         capabilities.iter().map(|c| c.as_str().to_owned()).collect();
+    // How a refreshed connection stood, for the record of the reconnect.
+    let before = match &existing {
+        Some((id, _)) => {
+            let stood = tracked::connection(tx, *id).await?;
+            Some((stood.health, stood.mailboxes))
+        }
+        None => None,
+    };
     sqlx::query!(
         r#"INSERT INTO connectors.connections
                (id, workspace_id, provider, account_subject, address, display_name, granted_by,
@@ -361,6 +370,45 @@ async fn save(
         )
         .await?;
     start_streams(tx, state, deps, g, id, &had).await?;
+    let connection = tracked::connection(tx, id).await?;
+    match before {
+        None => {
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::ConnectionAdded {
+                        workspace: g.grant.workspace,
+                        connection,
+                    },
+                )
+                .await?;
+        }
+        Some((before_health, mailboxes)) => {
+            let mut added: Vec<Capability> = g
+                .grant
+                .capabilities
+                .iter()
+                .copied()
+                .filter(|capability| !had.contains(capability))
+                .collect();
+            added.sort_unstable();
+            added.dedup();
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::ConnectionReconnected {
+                        workspace: g.grant.workspace,
+                        before_health,
+                        capabilities_added: added.into_iter().map(tracked::capability).collect(),
+                        mailboxes_added: (connection.mailboxes - mailboxes).max(0),
+                        connection,
+                    },
+                )
+                .await?;
+        }
+    }
     Ok(id)
 }
 

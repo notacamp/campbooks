@@ -23,6 +23,7 @@ use crate::{
     domain::model::ConnectionId,
     events::OutboundRequested,
     testkit::{ACCOUNT_SUB, Caller, Kit, assert_contract},
+    tracking_tests::{job, tracked, tracked_as},
 };
 
 const CALENDAR: &str = "sam@example.com";
@@ -310,6 +311,32 @@ async fn a_move_reaches_google_with_the_etag_and_is_not_echoed_back(db: PgPool) 
     assert_eq!(done[0]["outcome"], "applied");
     assert_eq!(done[0]["provider_event_id"], "e1");
     assert_eq!(done[0]["etag"], "\"2\"");
+    // Tracked once, by the schedule module's ids, never the provider's.
+    let tracked_done = tracked(&kit, "connectors.calendar_change_completed").await;
+    assert_eq!(tracked_done.len(), 1);
+    tracked_as(
+        &tracked_done[0],
+        "connectors.calendar_change_completed",
+        ws,
+        &job("connectors.sync_stream"),
+        None,
+    );
+    let body = &tracked_done[0].body;
+    assert_eq!(body["request_id"], request.to_string());
+    assert_eq!(body["change"], "update");
+    assert_eq!(body["outcome"], "applied");
+    assert!(body.get("reason").is_none());
+    assert_eq!(body["stream_id"], stream(&kit).await["id"]);
+    // The first read of the calendar was one summary of its run.
+    let synced: Vec<_> = tracked(&kit, "connectors.stream_synced")
+        .await
+        .into_iter()
+        .filter(|event| event.body["stream"]["capability"] == "calendar")
+        .collect();
+    assert!(!synced.is_empty());
+    assert_eq!(synced[0].body["before_phase"], "backfill");
+    assert!(synced[0].body["changes"].as_i64().unwrap() >= 1);
+    assert_eq!(synced[0].body["stream"]["phase"], "incremental");
     // Nothing came back as a change.
     assert_eq!(batches(&kit, ws).await.len(), before);
     assert_eq!(sync_token(&kit).await.as_deref(), Some("t2"));
@@ -369,6 +396,19 @@ async fn a_change_nobody_asked_for_is_never_made(db: PgPool) {
         .await;
     assert_eq!(done[0]["outcome"], "skipped");
     assert_eq!(done[0]["reason"], "unverified");
+    let tracked_done = tracked(&kit, "connectors.calendar_change_completed").await;
+    assert_eq!(tracked_done.len(), 1);
+    tracked_as(
+        &tracked_done[0],
+        "connectors.calendar_change_completed",
+        ws,
+        &job("connectors.record_calendar_change"),
+        None,
+    );
+    assert_eq!(tracked_done[0].body["outcome"], "skipped");
+    assert_eq!(tracked_done[0].body["reason"], "unverified");
+    assert_eq!(tracked_done[0].body["change"], "update");
+    assert!(tracked_done[0].body.get("stream_id").is_none());
 
     // A row planted with SQL carries no binding that verifies.
     let stream: Uuid = stream(&kit).await["id"].as_str().unwrap().parse().unwrap();
