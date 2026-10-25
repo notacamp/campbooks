@@ -912,7 +912,7 @@ mod tests {
         );
         // Without a mail client, the same one.
         let google = client(Provider::Google, Endpoints::google());
-        assert!(std::ptr::eq(google.for_mailbox(true), &google));
+        assert!(std::ptr::eq(google.for_mailbox(true), &raw const google));
     }
 
     #[test]
