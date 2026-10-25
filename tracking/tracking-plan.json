@@ -114,6 +114,12 @@
       "date": "2026-10-25",
       "plan_version": 13,
       "pr": "#666"
+    },
+    {
+      "change": "Invitations awaiting an answer on Home (campbooks-cloud#360): Coverage for schedule.release_response (connectors.calendar_change_completed), schedule.dispatch_invitation_backfills, schedule.announce_invitations and attention.project_invitation; no new event.",
+      "date": "2026-10-25",
+      "plan_version": 14,
+      "pr": "#676"
     }
   ],
   "coverage": [
@@ -146,6 +152,12 @@
       "exemption": "projection of conversations.need_changed: one item per conversation's need (a new message from the sender ends its Laters)",
       "kind": "handler",
       "name": "attention.project_conversation_need"
+    },
+    {
+      "events": [],
+      "exemption": "projection of schedule.invitation_changed: one Decide item per invitation awaiting an answer",
+      "kind": "handler",
+      "name": "attention.project_invitation"
     },
     {
       "events": [],
@@ -657,6 +669,12 @@
     },
     {
       "events": [],
+      "exemption": "maintenance, no action of anyone: invitations stored before announced once",
+      "kind": "job",
+      "name": "schedule.announce_invitations"
+    },
+    {
+      "events": [],
       "exemption": "maintenance: a deleted workspace's calendars and events deleted; the deletion is tracked by workspaces",
       "kind": "job",
       "name": "schedule.purge_workspace"
@@ -668,6 +686,14 @@
       "exemption": "",
       "kind": "job",
       "name": "schedule.release_delete"
+    },
+    {
+      "events": [
+        "connectors.calendar_change_completed"
+      ],
+      "exemption": "",
+      "kind": "job",
+      "name": "schedule.release_response"
     },
     {
       "events": [],
@@ -1946,6 +1972,12 @@
       "exemption": "maintenance, no action of anyone: only enqueues the purge of each workspace's old trash, which tracks nothing",
       "kind": "schedule",
       "name": "pages.dispatch_purge_trash"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: only enqueues the jobs that do the work",
+      "kind": "schedule",
+      "name": "schedule.dispatch_invitation_backfills"
     }
   ],
   "description": "The tracking plan (ADR 0020), generated from tracking/tracking-plan.xlsx by campbooks-tracking-plan. Do not edit: change the workbook and regenerate. Every event's `schema` is the JSON Schema of its body; `envelope` is the schema of what the kernel adds around it.",
@@ -22585,7 +22617,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-25",
-  "plan_version": 13,
+  "plan_version": 14,
   "properties": [
     {
       "classification": "operational",

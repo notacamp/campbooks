@@ -106,6 +106,9 @@ struct OpenRow {
 /// Record type of a task.
 const TASK: &str = "tasks.task";
 
+/// Record type of an invitation's event (campbooks-cloud#360).
+const INVITATION: &str = crate::features::project_invitation::EVENT;
+
 /// What left the caller's list since `$5` (the start of their day): cleared,
 /// but not replaced, cleared by a rule, opened ("Worth a look") or lapsed
 /// (none of which a member marked), or snoozed by the caller (`$3`) and still snoozed at `$4`; newest
@@ -311,6 +314,7 @@ fn ranked(
             continue;
         }
         let planned_on = row.plan_on.filter(|_| row.plan.as_deref() == Some("date"));
+        let event = row.item.record_type == INVITATION;
         let mut view = row.item.view(today)?;
         let input = BandInput {
             id: view.id,
@@ -320,6 +324,7 @@ fn ranked(
             due_on: view.due_on,
             planned_on,
             since: view.since,
+            event,
         };
         let (band, reason) = bands::band(&input, today, now);
         view.band = Some(band);

@@ -51,6 +51,10 @@ pub enum BandRule {
     DueToday,
     /// It is due tomorrow (Today).
     DueTomorrow,
+    /// An invitation whose event is today (Today, campbooks-cloud#360).
+    EventToday,
+    /// An invitation whose event is tomorrow (Today).
+    EventTomorrow,
     /// A task the member planned for today or a day before (Today).
     PlannedToday,
     /// Someone the member waits on has not written by when they were
@@ -62,6 +66,9 @@ pub enum BandRule {
     /// Its due date, `on`: within the next 7 days (This week), or later
     /// (Whenever).
     DueOn,
+    /// An invitation whose event is on `on`: within the next 7 days (This
+    /// week), or later (Whenever).
+    EventOn,
     /// A person is waiting for an answer or a choice (This week).
     WaitingAnswer,
     /// A rule the member taught keeps it on Home (Whenever).
@@ -125,6 +132,9 @@ pub struct BandInput {
     pub planned_on: Option<NaiveDate>,
     /// When its cause arrived.
     pub since: DateTime<Utc>,
+    /// Whether it is an invitation awaiting an answer, whose date is the day
+    /// its event happens (campbooks-cloud#360).
+    pub event: bool,
 }
 
 impl BandInput {
@@ -155,7 +165,15 @@ impl BandInput {
 /// 9. Kept on Home by the member's rule ("Worth a look"): Whenever.
 /// 10. Anything else: Whenever, by its due date when it has one, else
 ///     undated.
+///
+/// An invitation's date is the day its event happens: rules 3, 7 and 10 name
+/// it so (`event_today`, `event_tomorrow`, `event_on`), it is never overdue
+/// (it leaves the list once its event starts) and rule 8 does not apply to
+/// it ([`event_band`]).
 pub fn band(item: &BandInput, today: NaiveDate, now: DateTime<Utc>) -> (Band, BandReason) {
+    if item.event {
+        return event_band(item.due_on, today);
+    }
     let nudge = item.reason == Reason::Nudge;
     let due = item.due_on.filter(|_| !nudge);
     if item.warning {
@@ -197,6 +215,23 @@ pub fn band(item: &BandInput, today: NaiveDate, now: DateTime<Utc>) -> (Band, Ba
     match due {
         Some(due) => (Band::Whenever, BandReason::on(BandRule::DueOn, Some(due))),
         None => (Band::Whenever, BandReason::of(BandRule::NoDate)),
+    }
+}
+
+/// The band of an invitation whose event is `on`, on the member's `today`:
+/// today (or a day already begun, in another zone) or tomorrow is Today,
+/// within the next 7 days This week, later Whenever.
+fn event_band(on: Option<NaiveDate>, today: NaiveDate) -> (Band, BandReason) {
+    match on {
+        None => (Band::Whenever, BandReason::of(BandRule::NoDate)),
+        Some(on) if on <= today => (Band::Today, BandReason::of(BandRule::EventToday)),
+        Some(on) if on == today + TimeDelta::days(1) => {
+            (Band::Today, BandReason::of(BandRule::EventTomorrow))
+        }
+        Some(on) if on <= today + TimeDelta::days(WEEK_DAYS) => {
+            (Band::Week, BandReason::on(BandRule::EventOn, Some(on)))
+        }
+        Some(on) => (Band::Whenever, BandReason::on(BandRule::EventOn, Some(on))),
     }
 }
 
@@ -253,6 +288,7 @@ mod tests {
             due_on: None,
             planned_on: None,
             since: now() - TimeDelta::hours(1),
+            event: false,
         }
     }
 
@@ -410,6 +446,48 @@ mod tests {
                 "{reason:?}"
             );
         }
+    }
+
+    #[test]
+    fn an_invitation_is_banded_by_the_day_of_its_event() {
+        let invite = |offset: i64| {
+            let mut invite = item(Reason::Decide);
+            invite.event = true;
+            invite.from_person = Some(true);
+            invite.due_on = Some(day(offset));
+            // Old enough that a choice would have waited: not for an event.
+            invite.since = now() - TimeDelta::days(9);
+            invite
+        };
+        assert_eq!(
+            of(&invite(0)),
+            (Band::Today, BandReason::of(BandRule::EventToday))
+        );
+        assert_eq!(
+            of(&invite(1)),
+            (Band::Today, BandReason::of(BandRule::EventTomorrow))
+        );
+        assert_eq!(
+            of(&invite(5)),
+            (Band::Week, BandReason::on(BandRule::EventOn, Some(day(5))))
+        );
+        // Twelve days ahead from a person: Whenever, not "waiting".
+        assert_eq!(
+            of(&invite(12)),
+            (
+                Band::Whenever,
+                BandReason::on(BandRule::EventOn, Some(day(12)))
+            )
+        );
+        // A day already begun elsewhere is today, never overdue.
+        assert_eq!(
+            of(&invite(-1)),
+            (Band::Today, BandReason::of(BandRule::EventToday))
+        );
+        assert_eq!(
+            serde_json::to_value(BandRule::EventTomorrow).unwrap(),
+            "event_tomorrow"
+        );
     }
 
     #[test]

@@ -36,7 +36,7 @@ Three gaps are left on `next` and are closed here:
 - The server's coverage test always fails on an operation, job, schedule
   or handler with no row (`REQUIRE_FULL_COVERAGE` goes), and says how to
   fix it.
-- Tracking plan version 13 (`tracking/patches/0013-coverage-gaps.yaml`):
+- Tracking plan version 14 (`tracking/patches/0013-coverage-gaps.yaml`):
   - `connectors.address_check_requested`: a member asked for a mailbox's
     address to be checked again (`connectors.check_address`);
   - `connectors.address_check_send_completed`: the check's message went

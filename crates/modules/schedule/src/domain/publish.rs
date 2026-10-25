@@ -1,5 +1,7 @@
 //! Publishing what happened to an event, in the transaction of the change.
-//! Ids, enums and times only: never a title, place, notes or attendees.
+//! Ids, enums and times only: never a title, place, notes or attendees. An
+//! event that is or was an invitation awaiting the member's answer is
+//! announced again with it (`invitations::announce`, campbooks-cloud#360).
 
 use campbooks_kernel::{
     AppState, Result,
@@ -7,7 +9,7 @@ use campbooks_kernel::{
 };
 use sqlx::{Postgres, Transaction};
 
-use super::rows::EventRow;
+use super::{invitations, rows::EventRow};
 use crate::{
     events::{EventCancelled, EventChanged, EventCreated, EventFacts},
     model::{EventKind, EventOrigin},
@@ -45,6 +47,9 @@ pub async fn created(
             .publish(tx, &EventCreated::from_facts(facts))
             .await?;
     }
+    if invitations::concerns(row) {
+        invitations::announce(state, tx, workspace, row.id).await?;
+    }
     Ok(())
 }
 
@@ -62,6 +67,9 @@ pub async fn changed(
             .publish(tx, &EventChanged::from_facts(facts))
             .await?;
     }
+    if invitations::concerns(row) {
+        invitations::announce(state, tx, workspace, row.id).await?;
+    }
     Ok(())
 }
 
@@ -78,6 +86,9 @@ pub async fn cancelled(
             .events
             .publish(tx, &EventCancelled::from_facts(facts))
             .await?;
+    }
+    if invitations::concerns(row) {
+        invitations::announce(state, tx, workspace, row.id).await?;
     }
     Ok(())
 }

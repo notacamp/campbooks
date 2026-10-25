@@ -27,7 +27,10 @@ use sqlx::PgPool;
 
 use crate::{
     domain::{Reason, Trust},
-    events::{ConversationNeedChanged, NeedFacts, TaskChanged, TaskState, TaskVerb},
+    events::{
+        ConversationNeedChanged, InvitationChanged, InvitationFacts, NeedFacts, TaskChanged,
+        TaskState, TaskVerb,
+    },
 };
 
 /// Every scope of this module.
@@ -87,8 +90,8 @@ impl Visibility for TestInboxes {
                     .lock()
                     .is_ok_and(|m| m.contains(&(container.id.clone(), user))),
             },
-            // A member's tasks are that member's alone.
-            "tasks.assignee" => access
+            // A member's tasks, and their invitations, are that member's alone.
+            "tasks.assignee" | "schedule.member" => access
                 .user
                 .is_some_and(|user| user.to_string() == container.id),
             _ => false,
@@ -162,7 +165,69 @@ impl Task {
     }
 }
 
+/// An invitation as `schedule.invitation_changed` would carry it.
+#[derive(Clone)]
+pub struct Invitation {
+    pub event: String,
+    pub revision: i64,
+    pub owner: UserId,
+    /// The day its event starts; `None` once it no longer awaits an answer.
+    pub on: Option<NaiveDate>,
+    pub lapses_at: DateTime<Utc>,
+    pub from_person: Option<bool>,
+    /// Why it no longer awaits one, once it does not.
+    pub closed_because: Option<String>,
+}
+
+impl Invitation {
+    /// An open invitation numbered `revision` for an event on `on`, from a
+    /// person, lapsing a year from now.
+    pub fn open(event: &str, revision: i64, owner: UserId, on: NaiveDate) -> Self {
+        Self {
+            event: event.into(),
+            revision,
+            owner,
+            on: Some(on),
+            lapses_at: Utc::now() + chrono::TimeDelta::days(365),
+            from_person: Some(true),
+            closed_because: None,
+        }
+    }
+
+    /// The same invitation closed `because`, numbered `revision`.
+    #[must_use]
+    pub fn closed(&self, revision: i64, because: &str) -> Self {
+        Self {
+            revision,
+            on: None,
+            closed_because: Some(because.into()),
+            ..self.clone()
+        }
+    }
+}
+
 impl Kit {
+    /// Publish `schedule.invitation_changed` for `invitation` and run the
+    /// jobs it causes.
+    pub async fn invitation(&self, workspace: WorkspaceId, invitation: &Invitation) -> WorkerStats {
+        let event = InvitationChanged {
+            workspace: workspace.to_string(),
+            event: invitation.event.clone(),
+            owner: invitation.owner,
+            revision: invitation.revision,
+            invitation: invitation.on.map(|on| InvitationFacts {
+                on,
+                lapses_at: invitation.lapses_at,
+                from_person: invitation.from_person,
+            }),
+            closed_because: invitation.closed_because.clone(),
+        };
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        self.state.events.publish(&mut tx, &event).await.unwrap();
+        tx.commit().await.unwrap();
+        self.run_jobs().await
+    }
+
     /// Publish `tasks.task_changed` for `task` and run the jobs it causes.
     pub async fn task(&self, workspace: WorkspaceId, task: &Task) -> WorkerStats {
         let event = TaskChanged {

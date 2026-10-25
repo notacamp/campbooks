@@ -8,12 +8,13 @@
 //! workspace).
 
 use campbooks_kernel::{DomainEvent, RecordRef, blobs::BlobRef, tenancy::UserId};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::model::{
     BlobPointer, CalendarChange, CalendarId, ConnectionId, EventId, EventKind, EventOrigin,
-    RequestId,
+    InvitationClosed, RequestId,
 };
 
 /// What the three events about an event of a calendar carry; each is built
@@ -178,6 +179,57 @@ pub struct CalendarSyncChanged {
 
 impl DomainEvent for CalendarSyncChanged {
     const NAME: &'static str = "schedule.calendar_sync_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// An invitation awaiting the member's answer opened, changed or closed
+/// (`contracts/schedule.invitation_changed.v1.schema.json`,
+/// campbooks-cloud#360): an event of a provider calendar that syncs, which
+/// the member was asked to and did not organise, not yet answered, cancelled
+/// or started. Ids, a day, a time and flags only: never the title, the place
+/// or who asked.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct InvitationChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The event.
+    pub event: EventId,
+    /// Its calendar.
+    pub calendar: CalendarId,
+    /// The member whose calendar it is, who is asked.
+    pub owner: UserId,
+    /// Grows with every announcement of this event's invitation: a consumer
+    /// applies only newer ones.
+    pub revision: i64,
+    /// The invitation while it awaits the member's answer; absent once it
+    /// does not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invitation: Option<InvitationFacts>,
+    /// Why it no longer awaits an answer, when it does not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed_because: Option<InvitationClosed>,
+}
+
+/// An invitation that awaits the member's answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct InvitationFacts {
+    /// The day the event starts, in the member's time zone.
+    pub on: NaiveDate,
+    /// When it stops awaiting an answer: when the event starts, or for an
+    /// all-day event when its first day ends, in the member's time zone.
+    pub lapses_at: DateTime<Utc>,
+    /// Whether a person rather than a machine sent it, from the organiser's
+    /// address alone; absent when unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_person: Option<bool>,
+}
+
+impl DomainEvent for InvitationChanged {
+    const NAME: &'static str = "schedule.invitation_changed";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

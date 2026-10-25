@@ -307,7 +307,9 @@ pub fn handbook() -> campbooks_assistant::Handbook {
 /// `workspaces` module answers who belongs to which workspace and which
 /// language each user chose; the `conversations` module, who may see the
 /// change feed's records inside an inbox and search's results, and how
-/// search reads its conversations (ADR 0016); the `admin` module, who is an
+/// search reads its conversations (ADR 0016); the `tasks` and `schedule`
+/// modules, who sees inside a member's own containers (their tasks, their
+/// invitations); the `admin` module, who is an
 /// administrator, and keeps the trail of what they do; the `assistant`
 /// module, whether a member lets Scout act on its own proposals; the
 /// `connectors` module, where each inbox's sends go (campbooks-cloud#242).
@@ -322,6 +324,7 @@ pub fn with_ports(state: AppState) -> AppState {
             vec![
                 campbooks_conversations::visibility(),
                 campbooks_tasks::visibility(),
+                campbooks_schedule::visibility(),
                 campbooks_pages::visibility(),
             ],
         )))
@@ -1058,7 +1061,7 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these eleven, on module tables.
+        // The maintenance scope: these twelve, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
             // The chats' expiry (assistant, campbooks-cloud#305): which
@@ -1125,6 +1128,14 @@ mod tests {
             // The trash's 30 days (pages, campbooks-cloud#363): which
             // workspaces hold a trash root that old, read only.
             ("pages.pages", "maintenance_reads_trash", "SELECT"),
+            // Invitations stored before invitations were announced
+            // (campbooks-cloud#360): which workspaces still have one to
+            // announce, read only.
+            (
+                "schedule.invitation_backfills",
+                "maintenance_reads_invitation_backfills",
+                "SELECT",
+            ),
         ]
         .map(|(table, policy, cmd)| (table.to_owned(), policy.to_owned(), cmd.to_owned()));
         assert_eq!(policies, expected);

@@ -349,9 +349,26 @@ pub struct BatchEvent {
     /// The member's own answer to an invitation.
     #[serde(default)]
     pub response: Option<String>,
+    /// Who organises it, when the provider says.
+    #[serde(default)]
+    pub organizer: Option<BatchPerson>,
     /// What Campbooks wrote on it.
     #[serde(default)]
     pub private: Option<PrivateProperties>,
+}
+
+/// An organiser of a `calendar-change-batch` v1 event.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct BatchPerson {
+    /// Their name.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Their address.
+    #[serde(default)]
+    pub email: Option<String>,
+    /// Whether it is the member.
+    #[serde(default, rename = "self")]
+    pub is_self: bool,
 }
 
 /// A removal in a `calendar-change-batch` v1 document.

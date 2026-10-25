@@ -34,6 +34,10 @@ Home orders needs by priority, whatever their reason. Each need is in one band, 
 
 Inside a band: warnings first, then dated before undated and the soonest date first, then people before services, then the oldest first. Each need says why it is in its band, such as "Overdue · 2 days" or "Marta has waited 4 days". Waiting is not in the list. Waiting is never counted in what needs the member.
 
+### Invitations on Home
+
+An invitation the member has not answered is a Decide need, from the member's provider calendars that are on. Its date is the day of the event: "Event today", "Event tomorrow" or the day. It is never overdue: it leaves Home once the event starts, or once the member accepts, declines or says maybe, or the event is cancelled. A calendar that is off shows none. An event the member organised never asks.
+
 ### Tasks on Home
 
 Home shows a task only when it is for today: overdue, due today or tomorrow, planned for today, or back from Later. The member's other tasks are in Tasks, and Home says how many.

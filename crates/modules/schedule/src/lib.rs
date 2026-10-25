@@ -50,6 +50,7 @@ pub mod tracking;
 #[cfg(test)]
 mod tracking_tests;
 
+pub use domain::resources::visibility;
 pub use features::{
     calendar_requests::calendar_requests, free_slots::availability, holds::holds,
     time_zones::time_zones,
@@ -81,6 +82,7 @@ pub fn module() -> Module {
             .publishes::<events::EventCancelled>()
             .publishes::<events::OutboundRequested>()
             .publishes::<events::CalendarSyncChanged>()
+            .publishes::<events::InvitationChanged>()
             .on_event::<features::grant_calendars::GrantCalendars>()
             .on_event::<features::apply_calendar_changes::ApplyCalendarChanges>()
             .on_event::<features::apply_outcome::ApplyOutcome>()
@@ -90,7 +92,12 @@ pub fn module() -> Module {
             .on_event::<features::forget::ScheduleWorkspacePurge>()
             .rekey::<features::retag_bindings::RetagBindings>()
             .job::<features::forget::PurgeWorkspace>()
-            .job::<features::delete_event::ReleaseDelete>(),
+            .job::<features::delete_event::ReleaseDelete>()
+            .job::<features::respond_event::ReleaseResponse>()
+            .schedule::<features::announce_invitations::DispatchInvitationBackfills>(
+                features::announce_invitations::EVERY,
+            )
+            .job::<features::announce_invitations::AnnounceInvitations>(),
         resources: domain::resources::resources(),
     }
 }
@@ -151,10 +158,15 @@ mod tests {
             "schedule.schedule_workspace_purge",
             "schedule.purge_workspace",
             "schedule.release_delete",
+            "schedule.release_response",
+            "schedule.announce_invitations",
+            "schedule.dispatch_invitation_backfills",
             "schedule.retag_bindings",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
+        let schedules = registry.schedule_names();
+        assert!(schedules.contains(&"schedule.dispatch_invitation_backfills"));
     }
 
     // A runtime query rather than `query!`, so this test needs no entry in
