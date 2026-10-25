@@ -8,7 +8,7 @@
 
 ## 2. The views and the sheet
 
-- [x] 2.1 Agenda: Planned rows ("Planned", "Planned <weekday>" once slipped) beside Due rows, ordered as design.md says
+- [x] 2.1 Agenda: Planned rows ("Planned", "Was for <weekday>" once slipped) beside Due rows, ordered as design.md says
 - [x] 2.2 Week: the lane is labelled "Tasks"; Due pills dashed, Planned pills solid
 - [x] 2.3 Month: a day's tasks after its events, counted in "+N more"
 - [x] 2.4 Sheet: Due or Planned chip, planned day and due day, source, Done / Paid through the tasks module's actions (with Undo), Open task; no Hold time and no Later
@@ -21,5 +21,5 @@
 
 ## 4. Before merge
 
-- [ ] 4.1 Changelog entry file (`changelog/unreleased/added/`); `openspec validate calendar-shows-tasks --strict`; gates green in CI
-- [ ] 4.2 Recording (375px and desktop), then archive this change
+- [x] 4.1 Changelog entry file (`changelog/unreleased/added/`); `openspec validate calendar-shows-tasks --strict`; gates green in CI
+- [x] 4.2 Recording (375px and desktop), then archive this change

@@ -12,7 +12,7 @@ today as "Overdue · 2 days" in the danger colour.
 
 A task planned for a day SHALL show as a Planned row on that day, with the
 same title and the word "Planned"; once that day has passed and the task is
-still open, it SHALL stand on today as "Planned <weekday>" in the normal
+still open, it SHALL stand on today as Planned, "Was for <weekday>", in the normal
 colour. A task SHALL show at most one row on a day: when its Due row and its
 Planned row fall on the same day, only the Due row SHALL show, saying it is
 planned. A task put off Later SHALL show no Planned row.

@@ -57,7 +57,7 @@ in the Calendar's time zone:
   has passed ("Overdue · N days", danger colour). "Due 17:00" when it has a
   `due_at`.
 - **Planned row** when `plan = date` and it has a `plan_on`: on that day, or on
-  today once it has passed ("Planned <weekday>", normal colour), unless the
+  today once it has passed (Planned, "Was for <weekday>", normal colour), unless the
   Due row stands on the same day, in which case the Due row shows alone and
   its second line says "Planned".
 - A Later plan shows no Planned row; its Due row still shows.

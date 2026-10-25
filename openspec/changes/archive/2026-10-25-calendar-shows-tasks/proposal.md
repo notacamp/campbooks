@@ -19,7 +19,7 @@ Tracking: https://github.com/notacamp/campbooks-cloud/issues/350
   and the due day are the same, only the Due row shows, and it says it is
   planned. A Due row past its day stands on today as "Overdue · N days" (as
   specified); a Planned row past its day also stands on today, as
-  "Planned <day>", in the normal colour.
+  Planned, "Was for <weekday>", in the normal colour.
 - Agenda, Week (the task lane above All day, now labelled "Tasks") and Month
   all show them. Month did not show Due rows before.
 - The task sheet offers Done (Paid for a pay task) and Open task. Hold time
