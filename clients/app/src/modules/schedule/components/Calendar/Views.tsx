@@ -24,7 +24,6 @@ import {
   dueWhen,
   dueWhenIsKind,
   eventKey,
-  eventTitle,
   metaLine,
   whenLabel,
   type T,
@@ -102,7 +101,7 @@ export function AgendaView(props: ViewProps) {
                 key={key}
                 kind={event.kind}
                 when={whenLabel(t, locale, event)}
-                title={eventTitle(t, event)}
+                title={event.title}
                 kindLabel={t(`kind.${event.kind}`)}
                 meta={metaLine(event, calendars)}
                 from={fromEmail(t, event)}
@@ -201,7 +200,7 @@ export function WeekView(props: ViewProps) {
       return {
         id: key,
         kind: event.kind,
-        title: eventTitle(t, event),
+        title: event.title,
         when: whenLabel(t, locale, event),
         start: start - hours.from * 60,
         length: end - start,
@@ -221,7 +220,7 @@ export function WeekView(props: ViewProps) {
     return {
       id: key,
       kind: event.kind,
-      title: eventTitle(t, event),
+      title: event.title,
       from,
       to,
       selected: selected === key,
@@ -282,7 +281,7 @@ export function MonthView(props: ViewProps) {
       ...agendaOn(events, day).map((event) => ({
         id: eventKey(event),
         kind: event.kind,
-        title: eventTitle(t, event),
+        title: event.title,
       })),
       ...tasks
         .filter((row) => row.stands === day)

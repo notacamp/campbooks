@@ -24,11 +24,6 @@ export function eventKey(event: Pick<EventView, "id" | "occurrence">): string {
     : `${event.id}~${event.occurrence}`;
 }
 
-/** What an event is called on the calendar: time held for a task says so ("Held · Send the lease"). */
-export function eventTitle(t: T, event: Pick<EventView, "kind" | "title">): string {
-  return event.kind === "hold" ? t("heldTitle", { title: event.title }) : event.title;
-}
-
 /** Whose calendar it is, as the member knows it ("Google"); none when the server did not say. */
 export function providerName(
   calendar: Pick<CalendarView, "provider"> | undefined,

@@ -386,14 +386,14 @@ export const Held: Story = {
   },
 };
 
-/** Home with the lease in Do and the bill in Pay, over the tasks API the calls change. */
+/** Home with the lease in Do, over the tasks API the calls change. */
 function homeWithTasks() {
   const mine = week();
   return tasks(
     {
       [`GET ${W}/attention`]: (_body, url) =>
         url.searchParams.get("state") === "open"
-          ? { body: { items: [taskItem(mine.lease), taskItem(mine.bill)], counts: COUNTS } }
+          ? { body: { items: [taskItem(mine.lease)], counts: COUNTS } }
           : { body: { items: [], counts: [] } },
     },
     mine,

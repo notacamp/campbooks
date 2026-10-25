@@ -239,6 +239,5 @@
     "remove": "Quitar evento",
     "push": "Añadir a mi calendario",
     "openEmail": "Abrir el correo"
-  },
-  "heldTitle": "Reservado · {{title}}"
+  }
 }

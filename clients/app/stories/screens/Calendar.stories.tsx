@@ -389,15 +389,16 @@ const HELD_TASKS = TASKS.map((task) =>
     : task,
 );
 
-/** The week with a held task: its block on Wednesday says Held, and Thursday its Due row. */
+/** The week with a held task: its Held block on Wednesday opens the task, and Thursday its Due row. */
 export const WeekWithHeldTask: Story = {
   args: {
-    path: `${SCHEDULE}?view=agenda&date=2026-10-28`,
+    path: `${SCHEDULE}?view=agenda&date=2026-10-28&event=${HELD_BLOCK.id}`,
     api: calendarApi([...WEEK_EVENTS, HELD_BLOCK], HELD_TASKS),
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByText("Held · Send the lease")).toBeVisible();
+    const sheet = await canvas.findByRole("complementary", { name: "Send the lease" });
+    await expect(within(sheet).getByRole("button", { name: /Open task/u })).toBeVisible();
   },
 };
 

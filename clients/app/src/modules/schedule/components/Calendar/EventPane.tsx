@@ -31,7 +31,7 @@ import {
   type useEventActions,
 } from "../../api/queries";
 import { MEMBER_KINDS, type CalendarView, type EventView, type Response } from "../../api/types";
-import { eventTitle, providerName, whenLong, zoneNote, type T } from "../../labels";
+import { providerName, whenLong, zoneNote, type T } from "../../labels";
 import { canPush, dayLong, dayOf } from "../../model";
 import { AddToCalendar } from "./AddToCalendar";
 import { emailPath, useInAppLink } from "./links";
@@ -131,7 +131,7 @@ export function EventPane({
       : dayLong(locale, dayOf(source.data.sentAt));
 
   return (
-    <EventSheet label={eventTitle(t, event)}>
+    <EventSheet label={event.title}>
       <SheetTop>
         <Popover
           label={t("sheet.kindMenu")}
@@ -173,7 +173,7 @@ export function EventPane({
           onClick={onClose}
         />
       </SheetTop>
-      <SheetTitle>{eventTitle(t, event)}</SheetTitle>
+      <SheetTitle>{event.title}</SheetTitle>
       <SheetFacts>
         <SheetFact icon="clock" main={whenLong(t, locale, event)}>
           {note ?? (event.recurring ? t("sheet.series") : undefined)}

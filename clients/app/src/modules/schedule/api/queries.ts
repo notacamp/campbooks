@@ -42,7 +42,7 @@ const keys = {
       workspace_id: workspaceId,
       from: window.from,
       to: window.to,
-      minutes: window.minutes,
+      minutes: String(window.minutes),
     }),
   read: (workspaceId: string, conversationId: string, messageId: string) =>
     operationKey("conversations.get_message_read", {
