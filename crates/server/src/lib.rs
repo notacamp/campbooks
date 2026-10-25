@@ -327,6 +327,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_calendar_requests(campbooks_schedule::calendar_requests())
         .with_time_zones(campbooks_schedule::time_zones())
         .with_availability(campbooks_schedule::availability())
+        .with_holds(campbooks_schedule::holds())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
         ]))

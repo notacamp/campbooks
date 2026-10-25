@@ -21,6 +21,8 @@ import { useInboxes } from "~/modules/conversations";
 import { MailboxOffer, useHeldGrants } from "~/modules/identity";
 import { useWorkspaces } from "~/modules/workspaces";
 
+import { HOLD_SOURCES } from "../modules";
+
 /** Shortcuts worth knowing on day one, from the registry. */
 const STARTER_SHORTCUTS = ["command.open", "workspace.switch", "nav.settings", "sheet.open"];
 
@@ -102,6 +104,7 @@ export function Home() {
       <WhatNeedsYou
         workspaceId={workspaceId ?? ""}
         offer={<ScoutOffer workspaceId={workspaceId ?? ""} />}
+        holdSources={HOLD_SOURCES}
       />
     );
   }

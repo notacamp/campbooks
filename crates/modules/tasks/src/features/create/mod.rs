@@ -146,6 +146,7 @@ pub async fn handler(
         &Outcome {
             actor: actor_of(workspace.invoked_by),
             change: TaskChange::Created,
+            history: None,
             detail: TaskHistoryDetail {
                 due_on: body.due_on,
                 ..TaskHistoryDetail::default()

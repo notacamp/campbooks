@@ -41,6 +41,7 @@
     "upload_failed": "La lecture de l’envoi a échoué. Réessayez.",
     "too_many_streams": "Vous avez trop de connexions de mise à jour en direct ouvertes. Fermez quelques onglets ou fenêtres et réessayez.",
     "rate_limited": "Trop de tentatives. Patientez un instant et réessayez.",
-    "mailbox_unsupported": "La connexion de ce type de boîte mail n’est pas disponible sur cette instance."
+    "mailbox_unsupported": "La connexion de ce type de boîte mail n’est pas disponible sur cette instance.",
+    "holds_unsupported": "La réservation de temps dans un calendrier n’est pas disponible sur cette instance."
   }
 }

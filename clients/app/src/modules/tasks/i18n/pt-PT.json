@@ -93,7 +93,9 @@
     "done": "Feita",
     "paid": "Paga",
     "notNeeded": "Não é preciso",
-    "payNote": "O Campbooks nunca paga por si. Isto só a marca como paga."
+    "payNote": "O Campbooks nunca paga por si. Isto só a marca como paga.",
+    "holdTime": "Reservar tempo",
+    "release": "Libertar"
   },
   "toast": {
     "done": "Feita · {{title}}",
@@ -107,7 +109,9 @@
     "handedOff": "Passada a {{name}} · {{title}}",
     "takenBack": "Retomada · {{title}}",
     "failed": "Não foi possível alterar {{title}}. Ficou como estava.",
-    "changed": "{{title}} mudou entretanto. Veja de novo."
+    "changed": "{{title}} mudou entretanto. Veja de novo.",
+    "held": "Reservado {{when}} · {{title}}",
+    "released": "Libertado · {{title}}"
   },
   "make": {
     "button": "Criar uma tarefa",
@@ -121,5 +125,21 @@
     "title": "Adiar até…",
     "description": "Sai do Início até lá e volta sozinha.",
     "choices": "Quando"
+  },
+  "hold": {
+    "length": "Duração",
+    "minutes": "{{minutes}} min",
+    "calendar": "Calendário",
+    "campbooks": "Campbooks",
+    "slots": "Tempo livre",
+    "looking": "A procurar tempo livre…",
+    "failed": "Não foi possível ler o seu tempo livre. Tente de novo daqui a pouco.",
+    "noneBeforeDue": "Sem tempo livre antes do prazo. Experimente outra duração.",
+    "noneThisWeek": "Sem tempo livre nos próximos 7 dias. Experimente outra duração.",
+    "held": "Reservado {{when}}"
+  },
+  "holdDialog": {
+    "title": "Reservar tempo",
+    "description": "Um bloco ocupado no seu calendário, no seu tempo livre."
   }
 }

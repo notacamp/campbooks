@@ -18,6 +18,13 @@ Tasks are what the member has to do or pay. The Tasks place lists them, and Home
 - Later puts a task off until a time. It leaves Home and the list's groups until then, and comes back by itself. It stays in the Later group meanwhile.
 - A task past its due day is overdue. A task planned for today, or due today, is for today.
 
+### Held time
+
+- The member can hold time for a Do task: a busy block on one of their calendars (their Campbooks calendar, or a provider calendar they can write to), from a free slot of their working hours. The task is then planned for that day and shows "Held" with the day and the times.
+- A task has at most one hold. Holding again moves it; Release takes it off the calendar and leaves the task with no plan.
+- Moving or removing the block on the calendar moves or releases the hold. Marking the task done or not needed, or handing it over, releases a hold that has not started yet.
+- Scout does not hold time. If the member asks, say they can press `h` on the task.
+
 ### Handing a task to someone
 
 - The member can hand an open task to one teammate. The teammate holds it from then on.

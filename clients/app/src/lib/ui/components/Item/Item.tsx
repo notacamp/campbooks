@@ -4,6 +4,7 @@ import type { Signal } from "../../tokens/tokens";
 import { Avatar, type AvatarProps } from "../Avatar/Avatar";
 import { Dot } from "../Dot/Dot";
 import { Icon, type IconName } from "../Icon/Icon";
+import { Pill } from "../Pill/Pill";
 import { Tag } from "../Tag/Tag";
 import { Visor } from "../Visor/Visor";
 
@@ -46,6 +47,8 @@ export interface ItemProps {
   age?: { text: string; dateTime: string; label: string } | undefined;
   /** Facts shown as tags under the line. */
   tags?: string[] | undefined;
+  /** Facts in a signal's colour, before the tags ("Held Wed 10:00–10:30" in Do's). */
+  pills?: readonly { text: string; signal: Signal }[] | undefined;
   /** The keyboard cursor is here (J/K). */
   selected?: boolean | undefined;
   /** The detail is open below the row. */
@@ -86,6 +89,7 @@ export function Item({
   soon = false,
   age,
   tags = [],
+  pills = [],
   selected = false,
   expanded = false,
   onToggle,
@@ -132,8 +136,13 @@ export function Item({
       </span>{" "}
       <span className={styles["what"]}>{what}</span>
       {excerpt === undefined || expanded ? null : <q className={styles["excerpt"]}>{excerpt}</q>}
-      {tags.length > 0 ? (
+      {tags.length + pills.length > 0 ? (
         <span className={styles["meta"]}>
+          {pills.map((pill) => (
+            <Pill key={pill.text} signal={pill.signal}>
+              {pill.text}
+            </Pill>
+          ))}
           {tags.map((tag) => (
             <Tag key={tag}>{tag}</Tag>
           ))}

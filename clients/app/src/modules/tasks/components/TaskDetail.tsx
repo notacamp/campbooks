@@ -13,6 +13,7 @@ import {
   DatePicker,
   Heading,
   PaneHeader,
+  Pill,
   ReaderBody,
   Spacer,
   Tag,
@@ -21,11 +22,14 @@ import {
 } from "~/lib/ui";
 
 import type { TaskView } from "../api/queries";
+import { holdable, type HoldSources } from "../hold";
 import { dayLabel, isLater, isoDay, laterChoices, laterOnDay, whenLabel } from "../model";
 import type { TaskSource } from "../source";
+import { heldText } from "../task-text";
 
 import { DueChips } from "./DueChips";
 import { HandOff } from "./HandOff";
+import { HoldTime } from "./HoldTime";
 import type { useTaskActions } from "./use-task-actions";
 
 export interface TaskDetailProps {
@@ -39,6 +43,11 @@ export interface TaskDetailProps {
   /** Later's choices are showing (the `s` key opens them). */
   laterOpen: boolean;
   onLaterOpen: (open: boolean) => void;
+  /** The member's free time and calendars, for Hold time (none: no Hold time). */
+  holdSources?: HoldSources | undefined;
+  /** Hold time is showing (the `h` key opens it). */
+  holdOpen?: boolean | undefined;
+  onHoldOpen?: ((open: boolean) => void) | undefined;
   /** Below `lg` the detail replaces the list: this goes back. */
   onBack: () => void;
   now?: Date | undefined;
@@ -53,6 +62,9 @@ export function TaskDetail({
   actions,
   laterOpen,
   onLaterOpen,
+  holdSources,
+  holdOpen = false,
+  onHoldOpen,
   onBack,
   now,
 }: TaskDetailProps) {
@@ -95,6 +107,8 @@ export function TaskDetail({
   };
   useShortcut("scout.ask", askScout, { enabled: scout !== undefined });
 
+  const held = heldText(task, t, i18n.language);
+  const canHold = holdSources !== undefined && holdable(task);
   const planChip =
     task.plan === "date" && task.plan_on !== null && task.plan_on !== undefined
       ? t("plan.planned", { date: dayLabel(task.plan_on, i18n.language) })
@@ -194,9 +208,15 @@ export function TaskDetail({
             <Heading level={3} size="section">
               {t("detail.when")}
             </Heading>
-            {planChip === undefined ? null : (
+            {held === undefined ? (
+              planChip === undefined ? null : (
+                <div>
+                  <Tag>{planChip}</Tag>
+                </div>
+              )
+            ) : (
               <div>
-                <Tag>{planChip}</Tag>
+                <Pill signal="do">{held}</Pill>
               </div>
             )}
             <div className="flex flex-wrap gap-2">
@@ -206,6 +226,7 @@ export function TaskDetail({
                   setPickingDay((open) => !open);
                   setPickingLater(false);
                   onLaterOpen(false);
+                  onHoldOpen?.(false);
                 }}
               >
                 {t("detail.pickDay")}
@@ -215,12 +236,47 @@ export function TaskDetail({
                 aria-pressed={laterOpen}
                 onClick={() => {
                   setPickingDay(false);
+                  onHoldOpen?.(false);
                   onLaterOpen(!laterOpen);
                 }}
               >
                 {t("detail.later")}
               </Button>
+              {canHold ? (
+                <Button
+                  shortcut="item.hold"
+                  aria-pressed={holdOpen}
+                  onClick={() => {
+                    setPickingDay(false);
+                    onLaterOpen(false);
+                    onHoldOpen?.(!holdOpen);
+                  }}
+                >
+                  {t("detail.holdTime")}
+                </Button>
+              ) : null}
+              {held === undefined ? null : (
+                <Button
+                  onClick={() => {
+                    actions.release(task);
+                  }}
+                >
+                  {t("detail.release")}
+                </Button>
+              )}
             </div>
+            {holdSources !== undefined && canHold && holdOpen ? (
+              <HoldTime
+                workspaceId={workspaceId}
+                task={task}
+                sources={holdSources}
+                now={now}
+                onPick={(pick) => {
+                  actions.hold(task, pick);
+                  onHoldOpen?.(false);
+                }}
+              />
+            ) : null}
             {pickingDay ? (
               <DatePicker
                 inline
