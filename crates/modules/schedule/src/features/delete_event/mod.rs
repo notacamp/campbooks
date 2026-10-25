@@ -24,9 +24,11 @@ use crate::{
         ops::{self, EventPath},
         outbound, publish,
         rows::{calendar_by_id, calendar_of, event_by_id, event_of},
+        tracked,
     },
     model::{CalendarChange, EventId},
     scopes::ScheduleWrite,
+    tracking,
 };
 
 /// How long a delete can be undone before it reaches the provider, in
@@ -131,6 +133,18 @@ pub async fn handler(
         campbooks_kernel::jobs::enqueue(&mut tx, &ReleaseDelete { event: row.id }, options).await?;
     }
     publish::cancelled(&state, &mut tx, access.workspace, member, &row).await?;
+    if let Some(calendar_event) = tracked::calendar_event(&mut tx, row.id).await? {
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::CalendarEventDeleted {
+                    workspace: access.workspace,
+                    calendar_event,
+                },
+            )
+            .await?;
+    }
     tx.commit().await?;
     Ok(Json(DeletedEvent {
         id: row.id,

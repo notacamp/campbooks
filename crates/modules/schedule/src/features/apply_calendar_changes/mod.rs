@@ -21,9 +21,11 @@ use crate::{
         provider::{self, Parsed, Snapshot},
         publish,
         rows::{CALENDAR_COLUMNS, CalendarRow, EVENT_COLUMNS, EventRow},
+        tracked,
     },
     inbound::{BatchEvent, CalendarBatch, CalendarChanged},
     model::{EventId, EventKind},
+    tracking,
 };
 
 /// Applies the changes of a calendar batch.
@@ -90,7 +92,7 @@ impl EventHandler for ApplyCalendarChanges {
             }
         }
         for removal in &batch.removals {
-            remove_event(
+            if remove_event(
                 &state,
                 tx,
                 workspace,
@@ -98,7 +100,10 @@ impl EventHandler for ApplyCalendarChanges {
                 owner,
                 &removal.provider_id,
             )
-            .await?;
+            .await?
+            {
+                applied.cancelled += 1;
+            }
         }
         if batch.full {
             let kept: HashSet<&str> = batch
@@ -117,8 +122,8 @@ impl EventHandler for ApplyCalendarChanges {
             .await?;
             for row in gone {
                 let id = row.provider_event_id.as_deref().unwrap_or_default();
-                if !kept.contains(id) {
-                    cancel(&state, tx, workspace, owner, &row).await?;
+                if !kept.contains(id) && cancel(&state, tx, workspace, owner, &row).await? {
+                    applied.cancelled += 1;
                 }
             }
         }
@@ -128,16 +133,54 @@ impl EventHandler for ApplyCalendarChanges {
             cancelled = applied.cancelled,
             "calendar batch applied"
         );
+        applied
+            .track(&state, tx, workspace, &calendar, batch.full)
+            .await?;
         Ok(())
     }
 }
 
-/// What a batch did, for the log.
+/// What a batch did, for the log and the record.
 #[derive(Default)]
 struct Applied {
     created: u32,
     changed: u32,
     cancelled: u32,
+}
+
+impl Applied {
+    /// Track, in `tx`, one summary of the batch for `calendar`
+    /// (`schedule.provider_changes_applied`), when it did anything.
+    async fn track(
+        &self,
+        state: &AppState,
+        tx: &mut Transaction<'static, Postgres>,
+        workspace: WorkspaceId,
+        calendar: &CalendarRow,
+        full: bool,
+    ) -> Result<(), JobError> {
+        if self.created + self.changed + self.cancelled == 0 {
+            return Ok(());
+        }
+        let Some(snapshot) = tracked::calendar(tx, calendar.id).await? else {
+            return Ok(());
+        };
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::ProviderChangesApplied {
+                    workspace,
+                    calendar: snapshot,
+                    created: i64::from(self.created),
+                    changed: i64::from(self.changed),
+                    cancelled: i64::from(self.cancelled),
+                    full,
+                },
+            )
+            .await?;
+        Ok(())
+    }
 }
 
 /// The event of `calendar` with the provider id `provider_id`.
@@ -358,7 +401,7 @@ async fn upsert_event(
 }
 
 /// The provider deleted `provider_id`: the event is cancelled (an event the
-/// member deleted is gone for good).
+/// member deleted is gone for good). Whether an event was cancelled.
 async fn remove_event(
     state: &AppState,
     tx: &mut Transaction<'static, Postgres>,
@@ -366,9 +409,9 @@ async fn remove_event(
     calendar: &CalendarRow,
     owner: UserId,
     provider_id: &str,
-) -> Result<(), JobError> {
+) -> Result<bool, JobError> {
     let Some(row) = by_provider_id(tx, calendar, provider_id).await? else {
-        return Ok(());
+        return Ok(false);
     };
     if row.deleted_at.is_some() {
         // Deleted by the member, and now at the provider too: the row only
@@ -381,21 +424,22 @@ async fn remove_event(
         .bind(row.id)
         .execute(&mut **tx)
         .await?;
-        return Ok(());
+        return Ok(false);
     }
     cancel(state, tx, workspace, owner, &row).await
 }
 
-/// Mark `row` (and the exceptions of a series) cancelled, once.
+/// Mark `row` (and the exceptions of a series) cancelled, once. Whether it
+/// was cancelled now.
 async fn cancel(
     state: &AppState,
     tx: &mut Transaction<'static, Postgres>,
     workspace: WorkspaceId,
     owner: UserId,
     row: &EventRow,
-) -> Result<(), JobError> {
+) -> Result<bool, JobError> {
     if row.status == "cancelled" {
-        return Ok(());
+        return Ok(false);
     }
     sqlx::query(
         "UPDATE schedule.events SET status = 'cancelled', updated_at = now()
@@ -405,5 +449,5 @@ async fn cancel(
     .execute(&mut **tx)
     .await?;
     publish::cancelled(state, tx, workspace, owner, row).await?;
-    Ok(())
+    Ok(true)
 }

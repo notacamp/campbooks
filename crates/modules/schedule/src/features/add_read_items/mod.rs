@@ -32,11 +32,13 @@ use crate::{
             event_by_id,
         },
         settings::{self, Settings},
+        tracked,
         write::{MAX_PLACE, MAX_TITLE, NewRow, insert, tidy},
     },
     features::push_event::push_row,
     inbound::{MessageRead, ReadItem, ReadItemText, ReadTexts},
     model::{EventKind, EventOrigin},
+    tracking,
 };
 
 /// Largest `texts` document read.
@@ -175,6 +177,18 @@ async fn add_item(
             if let Some(now) = event_by_id(tx, row.id).await? {
                 publish::cancelled(state, tx, workspace, owner, &now).await?;
             }
+            if let Some(calendar_event) = tracked::calendar_event(tx, row.id).await? {
+                state
+                    .tracker
+                    .track(
+                        tx,
+                        &tracking::CalendarEventCancelled {
+                            workspace,
+                            calendar_event,
+                        },
+                    )
+                    .await?;
+            }
         }
         return Ok(());
     }
@@ -232,6 +246,7 @@ async fn add_item(
         if let Some(now) = event_by_id(tx, row.id).await? {
             publish::changed(state, tx, workspace, owner, &now).await?;
         }
+        tracked::changes(state, tx, workspace, &row).await?;
         return Ok(());
     }
 
@@ -263,6 +278,8 @@ async fn add_item(
             .bind(&item.key)
             .execute(&mut **tx)
             .await?;
+            // Linked to its email: `source`, when it had none.
+            tracked::changes(state, tx, workspace, &row).await?;
             return Ok(());
         }
     }
@@ -298,6 +315,7 @@ async fn add_item(
         return Ok(());
     };
     publish::created(state, tx, workspace, owner, &row).await?;
+    tracked::created(state, tx, workspace, id).await?;
 
     // Where the member wants this kind of event also added.
     if let Some(target) = place.settings.also_add_to.get(kind.as_str()) {
