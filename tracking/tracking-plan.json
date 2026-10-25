@@ -77,7 +77,7 @@
       "change": "The assistant, attention, search and system modules instrumented (campbooks-cloud#330): 15 events for chats with Scout started, continued, answered and deleted, its proposals confirmed, declined and undone, a member's profile updated, an item snoozed and unsnoozed, a workspace's daily AI limit reached, and (the kernel's queue, from the system admin actions) a dead job retried or discarded, a kind's dead jobs retried and a schedule's stuck run discarded; records chat, answer, proposal, profile, item and job; Coverage for every operation, job, schedule and handler of the four modules (search and the telemetry reports exempt).",
       "date": "2026-10-25",
       "plan_version": 7,
-      "pr": ""
+      "pr": "#661"
     }
   ],
   "coverage": [
