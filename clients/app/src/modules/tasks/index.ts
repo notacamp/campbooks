@@ -16,4 +16,4 @@ export {
   type HoldSources,
 } from "./hold";
 export { CONVERSATION, type TaskSource, type UseTaskSources } from "./source";
-export { dueText, heldText, planText } from "./task-text";
+export { heldText } from "./task-text";

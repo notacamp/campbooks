@@ -15,6 +15,7 @@ import { useShortcut } from "~/lib/shortcuts";
 import {
   AsideSection,
   Button,
+  ButtonLink,
   Dialog,
   DialogChoices,
   Disclosure,
@@ -32,12 +33,12 @@ import {
   SkeletonList,
   useUndoToast,
   type ItemAction,
+  type ItemEyebrow,
 } from "~/lib/ui";
 import {
   awaitedOf,
   billKind,
   displayName,
-  dueLabel,
   ForwardDialog,
   howRows,
   NeedMessage,
@@ -60,11 +61,9 @@ import {
   type ReplyResume,
 } from "~/modules/conversations";
 import {
-  dueText,
   heldText,
   holdable,
   HoldTime,
-  planText,
   useTaskActions,
   useTasksByIds,
   type HoldSources,
@@ -74,8 +73,11 @@ import {
 import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../../api/queries";
 import {
   ageLabel,
+  bandOf,
   doneTodayKind,
-  groupByReason,
+  groupByBand,
+  isPressing,
+  reasonSentence,
   remindTime,
   rowChoices,
   signalOf,
@@ -241,8 +243,9 @@ const kindOf = (need: NeedView): RowKind => {
 };
 
 /**
- * Home: what needs the member, grouped Review, Reply, Decide, Do, Pay, due
- * soonest first. The selected item shows its actions under it (its own on
+ * Home: what needs the member, by priority band (Now, Today, This week,
+ * Whenever, campbooks-cloud#358), each row saying first what it is and why
+ * it is there. The selected item shows its actions under it (its own on
  * 1 to 3, then Done E, Snooze S, Not needed X); ↑/↓ (J/K) move, ←/→ walk
  * the buttons, Enter presses one or opens the item, Esc clears, Z undoes.
  * A row acted on folds away with a one-line confirmation. The rows are the
@@ -330,8 +333,9 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     return [{ item, conversation, need, name }];
   });
   const rows = shown.filter((row) => row.confirmation === undefined);
-  const groups = groupByReason(shown.map((row) => row.item)).map((group) => ({
-    reason: group.reason,
+  // By band, Now first (campbooks-cloud#358), in the server's order inside each.
+  const groups = groupByBand(shown.map((row) => row.item)).map((group) => ({
+    band: group.band,
     rows: group.items.flatMap((item) => shown.filter((row) => row.item.id === item.id)),
   }));
   const order = groups
@@ -683,15 +687,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     });
   };
 
-  // A row's end: how long it has waited above its due date. A nudge says
-  // when it was asked ("Asked 14 Oct") and how many nudges went.
-  const rowEnd = (row: Row) => {
-    if (kindOf(row.need) !== "nudge") {
-      return dueLabel(tc, row.need, i18n.language, now);
-    }
-    const nudges = row.need.nudges ?? 0;
-    return nudges > 0 ? { text: t("nudge.nudged", { count: nudges }), soon: false } : undefined;
-  };
+  // A row's end: how long it has waited (its due date is in its eyebrow).
+  // A nudge says when it was asked ("Asked 14 Oct").
   const rowAge = (row: Row) => {
     const asked = kindOf(row.need) === "nudge";
     const age = ageLabel(row.item.since, now ?? new Date(), i18n.language, { asDate: asked });
@@ -1162,6 +1159,58 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   );
 
   const today = now ?? new Date();
+  // A row's eyebrow (campbooks-cloud#358): its kind, then why it is in its
+  // band, naming the person by their first name.
+  const eyebrowOf = (entry: Entry): ItemEyebrow => {
+    const { item } = entry;
+    const name = isTask(entry) ? undefined : firstNameOf(entry.name);
+    const reason = reasonSentence(item.band_reason, { name, today, locale: i18n.language });
+    let kind = `kinds.${item.reason}`;
+    if (isTask(entry)) {
+      kind = entry.task.verb === "pay" ? "kinds.payTask" : "kinds.doTask";
+    }
+    return {
+      signal: signalOf(item.reason),
+      kind: t(kind),
+      reason: t(reason.key, reason.values),
+      danger: isPressing(item.band_reason),
+    };
+  };
+  // Why it's here, in the opened item: the band and why, then what the band
+  // holds and, for a bill or a nudge, what Campbooks does about it.
+  const whyOf = (row: Row) => {
+    const band = bandOf(row.item);
+    const sentence = reasonSentence(row.item.band_reason, {
+      name: firstNameOf(row.name),
+      today,
+      locale: i18n.language,
+    });
+    const reason = t(sentence.key, sentence.values);
+    // A sentence starting with the person's name keeps its capital.
+    const named = "name" in sentence.values && reason.startsWith(String(sentence.values["name"]));
+    const notes = [t(`bandNotes.${band}`)];
+    const kind = kindOf(row.need);
+    if (kind === "bill") {
+      notes.push(t("pay.note"));
+    }
+    if (kind === "nudge") {
+      notes.push(t("nudge.note"));
+      const nudges = row.need.nudges ?? 0;
+      if (nudges > 0) {
+        notes.push(t("nudge.nudged", { count: nudges }));
+      }
+    }
+    return {
+      label: t("why.title"),
+      text: t("why.sentence", {
+        band: t(`bands.${band}`),
+        reason: named
+          ? reason
+          : reason.charAt(0).toLocaleLowerCase(i18n.language) + reason.slice(1),
+      }),
+      notes,
+    };
+  };
   const dateLine = new Intl.DateTimeFormat(i18n.language, {
     weekday: "long",
     day: "numeric",
@@ -1278,25 +1327,22 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     </>
   );
 
-  // A task as a row: where it came from, its title, its date; the row opens it in Tasks.
+  // A task as a row: its eyebrow (its kind and why it is here, its date
+  // among them), where it came from, its title; the row opens it in Tasks.
   const renderTask = (entry: TaskEntry) => {
     const { task, conversation } = entry;
     const isSelected = entry.item.id === selected?.item.id;
     const actions = isSelected ? actionsOf(entry) : undefined;
-    const due = dueText(task, tt, i18n.language, today);
-    const plan = planText(task, tt, i18n.language, today);
     const held = heldText(task, tt, i18n.language);
     const from = conversation === undefined ? undefined : displayName(conversation.latest_from);
-    const dueLine = [due?.text, plan].filter((part) => part !== undefined).join(" · ");
     return (
       <Item
         key={entry.item.id}
         id={itemId(entry.item.id)}
+        eyebrow={eyebrowOf(entry)}
         who={from === undefined ? tt("row.own") : tt("row.fromEmail", { name: from })}
         what={task.title}
         avatar={{ name: from ?? task.title, kind: task.verb === "pay" ? "service" : "person" }}
-        due={dueLine === "" ? undefined : dueLine}
-        soon={due?.late === true}
         pills={held === undefined ? undefined : [{ text: held, signal: "do" }]}
         selected={isSelected}
         confirmation={entry.confirmation}
@@ -1325,6 +1371,50 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       />
     );
   };
+
+  // At the end of the list: every bill Campbooks asks about, paid at once;
+  // and the tasks that are not for today (campbooks-cloud#358).
+  const elsewhere = open.data?.tasks_elsewhere ?? 0;
+  const ends =
+    askedBills.length > 1 || elsewhere > 0 ? (
+      <div className="flex flex-col gap-1">
+        {askedBills.length > 1 ? (
+          <Line
+            trailing={
+              <Button
+                shortcut="item.all_paid"
+                onClick={() => {
+                  allPaid(askedBills);
+                }}
+              >
+                {t("pay.allPaid", { count: askedBills.length })}
+              </Button>
+            }
+          >
+            {t("pay.asked", { count: askedBills.length })}
+          </Line>
+        ) : null}
+        {elsewhere > 0 ? (
+          <Line
+            trailing={
+              <ButtonLink
+                variant="link"
+                shortcut="nav.tasks"
+                href={`/w/${workspaceId}/tasks`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void navigate({ to: `/w/${workspaceId}/tasks` });
+                }}
+              >
+                {t("openTasks")}
+              </ButtonLink>
+            }
+          >
+            {t("tasksElsewhere", { count: elsewhere })}
+          </Line>
+        ) : null}
+      </div>
+    ) : null;
 
   if (open.isError) {
     return (
@@ -1365,14 +1455,10 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       <div ref={list} className="flex flex-col gap-6">
         {groups.map((group, position) => {
           const live = group.rows.filter((row) => row.confirmation === undefined);
-          const bills = live.filter(
-            (row): row is Row => !isTask(row) && kindOf(row.need) === "bill",
-          );
           const items = group.rows.map((row) => {
             if (isTask(row)) {
               return renderTask(row);
             }
-            const due = rowEnd(row);
             const expanded = expandedId === row.item.id;
             const isSelected = row.item.id === selected?.item.id;
             const actions = isSelected ? actionsOf(row) : undefined;
@@ -1380,6 +1466,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
               <Item
                 key={row.item.id}
                 id={itemId(row.item.id)}
+                eyebrow={eyebrowOf(row)}
                 who={row.name}
                 what={needSentence(
                   tc,
@@ -1396,8 +1483,6 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
                       ? "service"
                       : "person",
                 }}
-                due={due?.text}
-                soon={due?.soon === true}
                 age={rowAge(row)}
                 selected={isSelected}
                 expanded={expanded}
@@ -1429,6 +1514,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
                   <NeedDetail
                     workspaceId={workspaceId}
                     row={row}
+                    why={whyOf(row)}
                     t={t}
                     tc={tc}
                     locale={i18n.language}
@@ -1450,35 +1536,16 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
               />
             );
           });
-          // The last row folding away takes its group with it: no "Nudge 0".
+          // The last row folding away takes its group with it: no "Today 0".
           return (
-            <Fragment key={group.reason}>
+            <Fragment key={group.band}>
               {live.length === 0 ? (
                 <div className="flex flex-col">{items}</div>
               ) : (
                 <QueueGroup
-                  signal={signalOf(group.reason)}
-                  name={t(`groups.${group.reason}`)}
+                  tone={group.band === "now" ? "danger" : undefined}
+                  name={t(`bands.${group.band}`)}
                   count={live.length}
-                  note={
-                    bills.length > 0
-                      ? t("pay.note")
-                      : group.reason === "nudge"
-                        ? t("nudge.note")
-                        : undefined
-                  }
-                  action={
-                    bills.length > 1 ? (
-                      <Button
-                        shortcut="item.all_paid"
-                        onClick={() => {
-                          allPaid(bills);
-                        }}
-                      >
-                        {t("pay.allPaid", { count: bills.length })}
-                      </Button>
-                    ) : undefined
-                  }
                 >
                   {items}
                 </QueueGroup>
@@ -1488,6 +1555,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
           );
         })}
         {groups.length === 0 ? noticed : null}
+        {ends}
       </div>
       {narrow && waitingList !== null ? (
         <Disclosure summary={t("waiting.fold", { count: waiting.length })} defaultOpen>
@@ -1701,6 +1769,8 @@ const waitKey = (conversation: ConversationSummary) =>
 interface NeedDetailProps {
   workspaceId: string;
   row: Row;
+  /** Why it's here (campbooks-cloud#358). */
+  why: { label: string; text: string; notes: string[] };
   t: Translate;
   tc: Translate;
   locale: string;
@@ -1712,10 +1782,14 @@ interface NeedDetailProps {
   onOpen: () => void;
 }
 
-/** An opened item: the warning's tells, the email itself and how it was decided. */
+/**
+ * An opened item: the warning's tells, Scout's summary, why it is here, the
+ * email itself and how it was decided.
+ */
 function NeedDetail({
   workspaceId,
   row,
+  why,
   t,
   tc,
   locale,
@@ -1757,6 +1831,7 @@ function NeedDetail({
         }
         summaryLabel={tc("needs.summary.heading")}
         summary={detail.data?.need_summary ?? undefined}
+        why={why}
         mail={
           needMessageOf(detail.data?.messages ?? [], need) === undefined ? undefined : (
             <NeedMessage

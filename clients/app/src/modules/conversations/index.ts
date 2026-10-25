@@ -21,7 +21,6 @@ export { NeedMessage, needMessageOf } from "./components/NeedMessage/NeedMessage
 export {
   awaitedOf,
   billKind,
-  dueLabel,
   howRows,
   needSender,
   needSentence,

@@ -169,6 +169,59 @@ export const ACME = conversation({
   },
 });
 
+/**
+ * Tiago has waited four days for an answer about the worktop
+ * (campbooks-cloud#358: Today, "Tiago has waited 4 days"). Not among NEEDS.
+ */
+export const TIAGO = conversation({
+  n: 9,
+  subject: "Kitchen worktop: oak or walnut?",
+  from: { name: "Tiago Nunes", address: "tiago@nunes-marcenaria.example" },
+  sent: "2026-10-09T10:05:00Z",
+  need: {
+    reason: "reply",
+    trust: "sure",
+    question: "needs_reply",
+    rule: "model.decide",
+    due_on: null,
+    quote: "Do you want the oak or the walnut worktop? I need to order it this week.",
+  },
+});
+
+/** A water bill due on Thursday, asked about. Not among NEEDS. */
+export const WATER = conversation({
+  n: 10,
+  subject: "Your water bill for September",
+  from: { name: "Águas do Vale", address: "faturas@aguas-do-vale.example" },
+  sent: "2026-10-12T07:30:00Z",
+  need: {
+    reason: "pay",
+    trust: "check",
+    question: "money",
+    rule: "model.decide",
+    due_on: "2026-10-15",
+    quote: "Amount due: €23.10. Payment due by 15 October.",
+  },
+  service: true,
+});
+
+/** João asks whether Sam can join the offsite: an answer he waits for. Not among NEEDS. */
+export const OFFSITE = conversation({
+  n: 11,
+  subject: "Offsite planning on Thursday?",
+  from: { name: "João Pereira", address: "joao.pereira@atelier-lume.example" },
+  sent: "2026-10-12T09:30:00Z",
+  need: {
+    reason: "reply",
+    trust: "sure",
+    question: "needs_reply",
+    rule: "model.decide",
+    due_on: null,
+    quote:
+      "Can you join the offsite planning on Thursday afternoon, or should we find another day?",
+  },
+});
+
 /** Sofia's thread: replied this morning, so its need is gone. */
 export const SOFIA: Summary = {
   ...base,
@@ -183,7 +236,7 @@ export const SOFIA: Summary = {
   need: null,
 };
 
-/** Everything on Home, in the order the attention API returns it. */
+/** Everything on Home (the conversations `conversations.list` returns). */
 export const NEEDS = [PHISH, MARTA, JONAS, PEDRO, LUZ, ACME];
 
 function item(summary: Summary, extra: Partial<Item> = {}): Item {
@@ -208,7 +261,20 @@ function item(summary: Summary, extra: Partial<Item> = {}): Item {
   };
 }
 
-export const ITEMS: Item[] = NEEDS.map((summary) => item(summary));
+/**
+ * What needs Sam on Tuesday, in the order the attention API returns it: by
+ * band (campbooks-cloud#358), Now (the warning, Luz's bill a day late),
+ * Today (Marta, due tomorrow), This week (Pedro's lease due Friday, then
+ * Jonas waiting for an answer), Whenever (Acme's bill, due on the 30th).
+ */
+export const ITEMS: Item[] = [
+  item(PHISH, { band: "now", band_reason: { rule: "warning" } }),
+  item(LUZ, { band: "now", band_reason: { rule: "overdue", days: 1 } }),
+  item(MARTA, { band: "today", band_reason: { rule: "due_tomorrow" } }),
+  item(PEDRO, { band: "week", band_reason: { rule: "due_on", on: "2026-10-16" } }),
+  item(JONAS, { band: "week", band_reason: { rule: "waiting_answer" } }),
+  item(ACME, { band: "whenever", band_reason: { rule: "due_on", on: "2026-10-30" } }),
+];
 
 /**
  * Mail a rule the member taught ("Highlight them") keeps in front of them
@@ -229,7 +295,10 @@ export const DIGEST = conversation({
   },
 });
 
-export const DIGEST_ITEM: Item = item(DIGEST);
+export const DIGEST_ITEM: Item = item(DIGEST, {
+  band: "whenever",
+  band_reason: { rule: "kept_by_rule" },
+});
 
 export const COUNTS = (["review", "reply", "decide", "do", "pay"] as const).map((reason) => ({
   reason,
@@ -345,7 +414,10 @@ export const ANA = conversation({
   },
 });
 
-export const ANA_ITEM: Item = item(ANA);
+export const ANA_ITEM: Item = item(ANA, {
+  band: "today",
+  band_reason: { rule: "nudge_due", on: "2026-10-12" },
+});
 
 /** João's email to Ana, as the reader (and the nudge dialog) reads it. */
 export const ANA_DETAIL: Detail = {
@@ -441,4 +513,33 @@ export const RUI_DETAIL: Detail = {
   ],
   decisions: [],
   need_summary: null,
+};
+
+/** Tiago's conversation as the reader (and Home's opened item) reads it. */
+export const TIAGO_DETAIL: Detail = {
+  conversation: TIAGO,
+  messages: [
+    {
+      id: TIAGO.need?.message_id ?? "",
+      direction: "inbound",
+      from: { name: "Tiago Nunes", address: "tiago@nunes-marcenaria.example" },
+      to: [{ name: "Sam Rivera", address: "sam.rivera@example.com" }],
+      cc: [],
+      reply_to: [],
+      subject: TIAGO.subject,
+      sent_at: TIAGO.last_message_at,
+      read: true,
+      starred: false,
+      text: {
+        content:
+          "Hi Sam,\n\nDo you want the oak or the walnut worktop? I need to order it this week so it arrives before the fitting.\n\nTiago",
+        truncated: false,
+      },
+      has_html: false,
+      attachments: [],
+    },
+  ],
+  decisions: [],
+  need_summary:
+    "Tiago needs to know whether you want the oak or the walnut worktop, so he can order it this week.",
 };
