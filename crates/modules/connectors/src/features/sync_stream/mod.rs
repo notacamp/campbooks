@@ -899,7 +899,8 @@ impl SyncStream {
     /// call for another at once.
     #[allow(
         clippy::too_many_arguments,
-        reason = "one call site; the values are distinct"
+        clippy::too_many_lines,
+        reason = "one call site; the values are distinct; one transaction read top to bottom"
     )]
     async fn apply(
         &self,
@@ -989,7 +990,7 @@ impl SyncStream {
         }
         // One summary per run, only when it stored something or moved on.
         if change_count > 0 || page.phase != target.phase {
-            let (stream, provider) = tracked::stream(&mut **tx, target.stream).await?;
+            let (stream, provider) = tracked::stream(tx, target.stream).await?;
             state
                 .tracker
                 .track(

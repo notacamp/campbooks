@@ -26,7 +26,7 @@ pub async fn set(
     reason: Option<&str>,
     now: DateTime<Utc>,
 ) -> Result<bool> {
-    let before = tracked::health_of(&mut **tx, connection).await?;
+    let before = tracked::health_of(tx, connection).await?;
     let changed = sqlx::query!(
         r#"UPDATE connectors.connections
               SET health = $2, health_reason = $3, health_changed_at = $4, updated_at = $4
@@ -42,7 +42,7 @@ pub async fn set(
     if changed > 0
         && let Some(before) = before
     {
-        let snapshot = tracked::connection(&mut **tx, connection).await?;
+        let snapshot = tracked::connection(tx, connection).await?;
         tracker
             .track(
                 tx,

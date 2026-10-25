@@ -279,7 +279,7 @@ async fn save(
     // How a refreshed connection stood, for the record of the reconnect.
     let before = match &existing {
         Some((id, _)) => {
-            let stood = tracked::connection(&mut **tx, *id).await?;
+            let stood = tracked::connection(tx, *id).await?;
             Some((stood.health, stood.mailboxes))
         }
         None => None,
@@ -370,7 +370,7 @@ async fn save(
         )
         .await?;
     start_streams(tx, state, deps, g, id, &had).await?;
-    let connection = tracked::connection(&mut **tx, id).await?;
+    let connection = tracked::connection(tx, id).await?;
     match before {
         None => {
             state

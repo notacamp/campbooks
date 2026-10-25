@@ -95,6 +95,10 @@ pub async fn revoke(state: &AppState, deps: &Deps, workspace: WorkspaceId, id: C
 /// is tracked (`connectors.connection_removed`, the connection as it
 /// stood); a deleted workspace's connections are not. Returns `false` if it
 /// was gone already.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction read top to bottom: lock, detach, delete, announce, track"
+)]
 pub async fn delete(
     tx: &mut Transaction<'_, Postgres>,
     state: &AppState,
@@ -123,7 +127,7 @@ pub async fn delete(
     .await?;
     // The connection as it stands, locked, for the record of its removal.
     let snapshot = match (cause, &removed) {
-        (Some(_), Some(_)) => Some(tracked::connection(&mut **tx, id).await?),
+        (Some(_), Some(_)) => Some(tracked::connection(tx, id).await?),
         _ => None,
     };
     let inbox_ids = sqlx::query_scalar!(

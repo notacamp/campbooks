@@ -599,7 +599,7 @@ impl SendMessage {
                 },
             )
             .await?;
-        let snapshot = tracked::send(&mut **tx, *send.as_uuid()).await?;
+        let snapshot = tracked::send(tx, *send.as_uuid()).await?;
         state
             .tracker
             .track(
@@ -990,7 +990,7 @@ async fn fail(
             },
         )
         .await?;
-    let snapshot = tracked::send(&mut **tx, *send.as_uuid()).await?;
+    let snapshot = tracked::send(tx, *send.as_uuid()).await?;
     state
         .tracker
         .track(

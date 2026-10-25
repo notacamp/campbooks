@@ -445,11 +445,11 @@ impl SyncStream {
         .await?;
         // One summary per run, only when it stored something or moved on.
         if batches > 0 || target.phase != Phase::Incremental {
-            let changes: usize = done
+            let stored: usize = done
                 .iter()
                 .flat_map(|read| read.batches.iter().map(|(_, count)| *count))
                 .sum();
-            let (stream, provider) = tracked::stream(&mut **tx, target.stream).await?;
+            let (stream, provider) = tracked::stream(tx, target.stream).await?;
             state
                 .tracker
                 .track(
@@ -459,7 +459,7 @@ impl SyncStream {
                         stream,
                         provider,
                         before_phase: tracked::phase(target.phase),
-                        changes: i64::try_from(changes).unwrap_or(i64::MAX),
+                        changes: i64::try_from(stored).unwrap_or(i64::MAX),
                         batches: i64::try_from(batches).unwrap_or(i64::MAX),
                     },
                 )
