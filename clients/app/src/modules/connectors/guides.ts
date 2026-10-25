@@ -75,7 +75,7 @@ const BY_HINT: Readonly<Record<string, GuideId>> = {
 
 /** The guide of a domain, by its own name, for addresses found another way. */
 function byDomain(domain: string): GuideId | undefined {
-  const brand = domain.split(".")[0] ?? "";
+  const brand = domain.split(".", 1)[0] ?? "";
   if (brand === "yahoo" || domain === "ymail.com" || domain === "rocketmail.com") {
     return "yahoo";
   }

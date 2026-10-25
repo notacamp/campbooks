@@ -52,6 +52,19 @@ async function add(address: string) {
 const passwordField = () =>
   screen.getByLabelText<HTMLInputElement>(/password/iu, { selector: "input" });
 
+/** The password field, once the app-password step is shown. */
+const findPasswordField = () =>
+  screen.findByLabelText<HTMLInputElement>(/password/iu, { selector: "input" });
+
+/** Item `index` of `items`, or a failed test. */
+function nth<T>(items: readonly T[], index: number): T {
+  const item = items[index];
+  if (item === undefined) {
+    throw new Error(`no item ${String(index)}`);
+  }
+  return item;
+}
+
 describe("ConnectMailbox", () => {
   it("asks for the address first, with Enter on Continue and the address field focused", async () => {
     openDialog({});
@@ -170,9 +183,9 @@ describe("ConnectMailbox", () => {
     fireEvent.change(passwordField(), { target: { value: "app-pass" } });
     fireEvent.click(screen.getByRole("button", { name: /^Connect/u }));
     expect(await screen.findByText(/Check the servers/u)).toBeVisible();
-    const [imapHost, smtpHost] = screen.getAllByLabelText("Server");
-    fireEvent.change(imapHost as HTMLElement, { target: { value: "mail.bakery.example" } });
-    fireEvent.change(smtpHost as HTMLElement, { target: { value: "mail.bakery.example" } });
+    const hosts = screen.getAllByLabelText("Server");
+    fireEvent.change(nth(hosts, 0), { target: { value: "mail.bakery.example" } });
+    fireEvent.change(nth(hosts, 1), { target: { value: "mail.bakery.example" } });
     fireEvent.change(passwordField(), { target: { value: "app-pass" } });
     fireEvent.click(screen.getByRole("button", { name: /^Connect/u }));
     await waitFor(() => {
@@ -193,8 +206,8 @@ describe("ConnectMailbox", () => {
     openDialog({ [DISCOVER]: { body: YAHOO_DISCOVERY } });
     await add("ana@yahoo.example");
 
-    const [security] = await screen.findAllByLabelText("Security");
-    const options = within(security as HTMLElement)
+    const security = nth(await screen.findAllByLabelText("Security"), 0);
+    const options = within(security)
       .getAllByRole("option")
       .map((option) => option.textContent);
     expect(options).toEqual(["TLS", "STARTTLS"]);
@@ -207,7 +220,7 @@ describe("ConnectMailbox", () => {
     });
     await add("ana@yahoo.example");
 
-    fireEvent.change(passwordField(), { target: { value: "s3cret-pass" } });
+    fireEvent.change(await findPasswordField(), { target: { value: "s3cret-pass" } });
     fireEvent.click(screen.getByRole("button", { name: /^Connect/u }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Yahoo needs an app password, not your usual password",
@@ -234,7 +247,7 @@ describe("ConnectMailbox", () => {
     openDialog({ [DISCOVER]: { body: YAHOO_DISCOVERY }, [CONNECT]: problem(400, code) });
     await add("ana@yahoo.example");
 
-    fireEvent.change(passwordField(), { target: { value: "pw" } });
+    fireEvent.change(await findPasswordField(), { target: { value: "pw" } });
     fireEvent.click(screen.getByRole("button", { name: /^Connect/u }));
     expect(await screen.findByRole("alert")).toHaveTextContent(text);
   });
@@ -264,7 +277,7 @@ describe("ConnectMailbox", () => {
       [GET]: { body: { ...IMAP_CONNECTION, address_verified: true, address_check: null } },
     });
     await add("ana@bakery.example");
-    fireEvent.change(passwordField(), { target: { value: "pw" } });
+    fireEvent.change(await findPasswordField(), { target: { value: "pw" } });
     fireEvent.click(screen.getByRole("button", { name: /^Connect/u }));
 
     expect(await screen.findByText("Verified")).toBeVisible();
@@ -285,7 +298,7 @@ describe("ConnectMailbox", () => {
       },
     });
     await add("ana@bakery.example");
-    fireEvent.change(passwordField(), { target: { value: "pw" } });
+    fireEvent.change(await findPasswordField(), { target: { value: "pw" } });
     fireEvent.click(screen.getByRole("button", { name: /^Connect/u }));
 
     expect(
@@ -310,7 +323,7 @@ describe("ConnectMailbox", () => {
   it("links only to the providers' own HTTPS help pages", () => {
     const hosts = new Set(GUIDE_LINKS.map((link) => new URL(link).host));
     expect(GUIDE_LINKS.every((link) => link.startsWith("https://"))).toBe(true);
-    expect([...hosts].sort()).toEqual([
+    expect([...hosts].toSorted()).toEqual([
       "help.aol.com",
       "help.yahoo.com",
       "hilfe.gmx.net",

@@ -111,7 +111,7 @@ describe("MailboxesPage", () => {
     renderPage({ adding: true });
 
     expect(await screen.findByRole("dialog", { name: "Add a mailbox" })).toBeVisible();
-    expect(screen.getByText("No mailboxes yet")).toBeVisible();
+    expect(await screen.findByText("No mailboxes yet")).toBeVisible();
   });
 
   it("says when a mailbox's address is being checked", async () => {

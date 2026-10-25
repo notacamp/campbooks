@@ -108,7 +108,9 @@ function addMailbox({
 
 /** Type `address` in the open Add a mailbox, and continue. */
 async function addAddress(canvasElement: HTMLElement, address: string) {
-  const dialog = within(canvasElement.ownerDocument.body);
+  const dialog = within(
+    await within(canvasElement.ownerDocument.body).findByRole("dialog", { name: "Add a mailbox" }),
+  );
   const field = await dialog.findByLabelText("Email address");
   await userEvent.type(field, address);
   await userEvent.click(dialog.getByRole("button", { name: /Continue/u }));
@@ -558,9 +560,9 @@ export const AddVerifying: Story = {
   },
   play: async ({ canvasElement }) => {
     const dialog = await addAddress(canvasElement, "ana@bakery.example");
-    const [imapHost, smtpHost] = await dialog.findAllByLabelText("Server");
-    await userEvent.type(imapHost as HTMLElement, "mail.bakery.example");
-    await userEvent.type(smtpHost as HTMLElement, "mail.bakery.example");
+    for (const host of await dialog.findAllByLabelText("Server")) {
+      await userEvent.type(host, "mail.bakery.example");
+    }
     await userEvent.type(dialog.getByLabelText("Password"), "app-password");
     await userEvent.click(dialog.getByRole("button", { name: /^Connect/u }));
     await expect(await dialog.findByText("Checking your address…")).toBeVisible();

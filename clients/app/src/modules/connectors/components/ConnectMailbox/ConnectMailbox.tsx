@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -107,7 +107,7 @@ export function ConnectMailbox({ workspaceId, consent, open, onClose }: ConnectM
     setFailed(undefined);
   };
 
-  const find = (event: FormEvent) => {
+  const find = (event: SyntheticEvent) => {
     event.preventDefault();
     const typed = address.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(typed)) {
@@ -132,14 +132,22 @@ export function ConnectMailbox({ workspaceId, consent, open, onClose }: ConnectM
       },
       onError: (error) => {
         const code = connectError(error);
-        if (code === "step_up") {
-          setStepUp(true);
-        } else if (code === "provider_not_configured") {
-          setStep({ kind: "fallback" });
-        } else if (code === "imap_address_invalid") {
-          setAddressError(t("add.address.invalid"));
-        } else {
-          setFailed(code);
+        switch (code) {
+          case "step_up": {
+            setStepUp(true);
+            break;
+          }
+          case "provider_not_configured": {
+            setStep({ kind: "fallback" });
+            break;
+          }
+          case "imap_address_invalid": {
+            setAddressError(t("add.address.invalid"));
+            break;
+          }
+          default: {
+            setFailed(code);
+          }
         }
       },
     });
@@ -258,7 +266,7 @@ function AddressStep({
   failed: ConnectError | undefined;
   busy: boolean;
   onAddress: (address: string) => void;
-  onSubmit: (event: FormEvent) => void;
+  onSubmit: (event: SyntheticEvent) => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation("connectors");
@@ -451,15 +459,16 @@ const GUIDE_STEPS = {
   custom: ["add.guides.custom.s1", "add.guides.custom.s2"],
 } as const satisfies Record<Guide["id"], readonly string[]>;
 
+/** One step's message key, of any guide. */
+type GuideStepKey = (typeof GUIDE_STEPS)[keyof typeof GUIDE_STEPS][number];
+
 function GuideSteps({ guide }: { guide: Guide }) {
   const { t } = useTranslation("connectors");
   const name = t(`add.guides.${guide.id}.name`);
+  const keys: readonly GuideStepKey[] = GUIDE_STEPS[guide.id];
   return (
     <div className="flex flex-col gap-2">
-      <Steps
-        label={t("add.guide.label", { provider: name })}
-        steps={GUIDE_STEPS[guide.id].map((key) => t(key))}
-      />
+      <Steps label={t("add.guide.label", { provider: name })} steps={keys.map((key) => t(key))} />
       {guide.help === undefined && guide.imap === undefined ? null : (
         <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:gap-4">
           {guide.imap === undefined ? null : (
@@ -528,7 +537,7 @@ function PasswordStep({
     passwordRef.current?.focus();
   }, []);
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SyntheticEvent) => {
     event.preventDefault();
     if (password === "") {
       setMissing("password");

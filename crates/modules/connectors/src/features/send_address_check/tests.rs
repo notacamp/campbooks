@@ -5,6 +5,7 @@
 //! check's code; the message removed by its UID only, or left; the limits.
 
 use axum::http::StatusCode;
+use base64::Engine as _;
 use campbooks_kernel::{
     clock::Clock as _,
     db::BeginFor as _,
@@ -458,7 +459,6 @@ fn the_message_is_plain_ascii_text_in_the_members_language() {
         assert!(head.lines().any(|l| l == header), "{header}: {head}");
     }
     assert!(head.contains("Subject: =?UTF-8?B?"), "{head}");
-    use base64::Engine as _;
     let decoded = base64::engine::general_purpose::STANDARD
         .decode(body.replace("\r\n", ""))
         .unwrap();
