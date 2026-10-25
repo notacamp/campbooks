@@ -84,6 +84,12 @@
       "date": "2026-10-25",
       "plan_version": 8,
       "pr": "#662"
+    },
+    {
+      "change": "The schedule module instrumented (campbooks-cloud#349): 16 events for events of a calendar created, edited (which fields), moved (the times before), cancelled by a later email, deleted, restored, answered (the answer before), pushed to a provider calendar and unpushed, calendars added by a grant, enabled, disabled, recoloured and removed with their connection, settings updated (which settings), and one summary per batch of a provider's changes applied (counts); records calendar_event, calendar_event_times, calendar and settings; Coverage for every operation, job and handler of the module, apply_outcome and release_delete naming connectors.calendar_change_completed.",
+      "date": "2026-10-25",
+      "plan_version": 9,
+      "pr": ""
     }
   ],
   "coverage": [
@@ -284,6 +290,62 @@
       "name": "identity.revoke_departed_consents"
     },
     {
+      "events": [
+        "schedule.calendar_event_created",
+        "schedule.calendar_event_edited",
+        "schedule.calendar_event_moved",
+        "schedule.calendar_event_cancelled",
+        "schedule.calendar_event_pushed"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "schedule.add_read_items"
+    },
+    {
+      "events": [
+        "schedule.provider_changes_applied"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "schedule.apply_calendar_changes"
+    },
+    {
+      "events": [
+        "connectors.calendar_change_completed"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "schedule.apply_outcome"
+    },
+    {
+      "events": [
+        "schedule.calendar_removed"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "schedule.forget_connection"
+    },
+    {
+      "events": [],
+      "exemption": "consequence of workspaces.member_left, tracked there: the departed member's calendars, events and settings go",
+      "kind": "handler",
+      "name": "schedule.forget_member"
+    },
+    {
+      "events": [
+        "schedule.calendar_added"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "schedule.grant_calendars"
+    },
+    {
+      "events": [],
+      "exemption": "projection of workspaces.workspace_deleted: it only schedules the purge",
+      "kind": "handler",
+      "name": "schedule.schedule_workspace_purge"
+    },
+    {
       "events": [],
       "exemption": "projection of conversations.conversation_changed: the conversation's entries in the index refreshed",
       "kind": "handler",
@@ -478,6 +540,26 @@
       "exemption": "derived state: a need worked out again from stored messages and answers (conversations.need_changed); no action of anyone",
       "kind": "job",
       "name": "conversations.wake_needs"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance: a deleted workspace's calendars and events deleted; the deletion is tracked by workspaces",
+      "kind": "job",
+      "name": "schedule.purge_workspace"
+    },
+    {
+      "events": [
+        "connectors.calendar_change_completed"
+      ],
+      "exemption": "",
+      "kind": "job",
+      "name": "schedule.release_delete"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: MACs of waiting calendar change requests re-tagged after a key rotation",
+      "kind": "job",
+      "name": "schedule.retag_bindings"
     },
     {
       "events": [],
@@ -1254,6 +1336,81 @@
       "exemption": "",
       "kind": "operation",
       "name": "identity.token"
+    },
+    {
+      "events": [
+        "schedule.calendar_event_created"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "schedule.create_event"
+    },
+    {
+      "events": [
+        "schedule.calendar_event_deleted"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "schedule.delete_event"
+    },
+    {
+      "events": [
+        "schedule.calendar_event_pushed"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "schedule.push_event"
+    },
+    {
+      "events": [
+        "schedule.calendar_event_responded"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "schedule.respond_event"
+    },
+    {
+      "events": [
+        "schedule.calendar_event_restored"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "schedule.restore_event"
+    },
+    {
+      "events": [
+        "schedule.calendar_event_unpushed"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "schedule.unpush_event"
+    },
+    {
+      "events": [
+        "schedule.calendar_enabled",
+        "schedule.calendar_disabled",
+        "schedule.calendar_recoloured"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "schedule.update_calendar"
+    },
+    {
+      "events": [
+        "schedule.calendar_event_edited",
+        "schedule.calendar_event_moved"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "schedule.update_event"
+    },
+    {
+      "events": [
+        "schedule.settings_updated"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "schedule.update_settings"
     },
     {
       "events": [
@@ -2994,6 +3151,241 @@
       "description": "Claimed by a worker.",
       "enum": "kernel.job_state",
       "value": "running"
+    },
+    {
+      "description": "Make the event at the provider.",
+      "enum": "schedule.calendar_change",
+      "value": "create"
+    },
+    {
+      "description": "Delete the event there.",
+      "enum": "schedule.calendar_change",
+      "value": "delete"
+    },
+    {
+      "description": "Send the member's answer.",
+      "enum": "schedule.calendar_change",
+      "value": "respond"
+    },
+    {
+      "description": "Change the event there.",
+      "enum": "schedule.calendar_change",
+      "value": "update"
+    },
+    {
+      "description": "Change one occurrence of a series there.",
+      "enum": "schedule.calendar_change",
+      "value": "update_occurrence"
+    },
+    {
+      "description": "The member's own Campbooks calendar: no provider sees it.",
+      "enum": "schedule.calendar_source",
+      "value": "campbooks"
+    },
+    {
+      "description": "A calendar of a connected provider account.",
+      "enum": "schedule.calendar_source",
+      "value": "provider"
+    },
+    {
+      "description": "Whether it counts for free time.",
+      "enum": "schedule.event_field",
+      "value": "busy"
+    },
+    {
+      "description": "Its kind.",
+      "enum": "schedule.event_field",
+      "value": "kind"
+    },
+    {
+      "description": "Its notes.",
+      "enum": "schedule.event_field",
+      "value": "notes"
+    },
+    {
+      "description": "Where it is.",
+      "enum": "schedule.event_field",
+      "value": "place"
+    },
+    {
+      "description": "The email it is linked to.",
+      "enum": "schedule.event_field",
+      "value": "source"
+    },
+    {
+      "description": "Whether it stands (a later email confirming it).",
+      "enum": "schedule.event_field",
+      "value": "status"
+    },
+    {
+      "description": "The time zone it is written in.",
+      "enum": "schedule.event_field",
+      "value": "time_zone"
+    },
+    {
+      "description": "Its title.",
+      "enum": "schedule.event_field",
+      "value": "title"
+    },
+    {
+      "description": "An appointment or a booked slot.",
+      "enum": "schedule.event_kind",
+      "value": "appointment"
+    },
+    {
+      "description": "Money is taken on a date.",
+      "enum": "schedule.event_kind",
+      "value": "charge"
+    },
+    {
+      "description": "A parcel arriving.",
+      "enum": "schedule.event_kind",
+      "value": "delivery"
+    },
+    {
+      "description": "Something that stops being valid on a date.",
+      "enum": "schedule.event_kind",
+      "value": "expiry"
+    },
+    {
+      "description": "Time held for a task.",
+      "enum": "schedule.event_kind",
+      "value": "hold"
+    },
+    {
+      "description": "A meeting with other people.",
+      "enum": "schedule.event_kind",
+      "value": "meeting"
+    },
+    {
+      "description": "No kind: a provider event nobody typed.",
+      "enum": "schedule.event_kind",
+      "value": "none"
+    },
+    {
+      "description": "A table or a visit booked.",
+      "enum": "schedule.event_kind",
+      "value": "reservation"
+    },
+    {
+      "description": "A ticketed event.",
+      "enum": "schedule.event_kind",
+      "value": "show"
+    },
+    {
+      "description": "A stay: a hotel or a rental.",
+      "enum": "schedule.event_kind",
+      "value": "stay"
+    },
+    {
+      "description": "A trip: a flight, a train, a bus, a rental car.",
+      "enum": "schedule.event_kind",
+      "value": "travel"
+    },
+    {
+      "description": "It changed at the provider meanwhile: the provider's version was kept.",
+      "enum": "schedule.event_notice",
+      "value": "kept_theirs"
+    },
+    {
+      "description": "The provider did not take the member's change.",
+      "enum": "schedule.event_notice",
+      "value": "not_saved"
+    },
+    {
+      "description": "The member made it.",
+      "enum": "schedule.event_origin",
+      "value": "member"
+    },
+    {
+      "description": "It came from a provider calendar.",
+      "enum": "schedule.event_origin",
+      "value": "provider"
+    },
+    {
+      "description": "Scout read it from an email.",
+      "enum": "schedule.event_origin",
+      "value": "scout"
+    },
+    {
+      "description": "It will not happen.",
+      "enum": "schedule.event_status",
+      "value": "cancelled"
+    },
+    {
+      "description": "It stands.",
+      "enum": "schedule.event_status",
+      "value": "confirmed"
+    },
+    {
+      "description": "It may happen.",
+      "enum": "schedule.event_status",
+      "value": "tentative"
+    },
+    {
+      "description": "Read from the email's prose by Scout's read.",
+      "enum": "schedule.found_by",
+      "value": "model"
+    },
+    {
+      "description": "Read from the sender's own calendar data, without a model.",
+      "enum": "schedule.found_by",
+      "value": "structured"
+    },
+    {
+      "description": "Google Calendar.",
+      "enum": "schedule.provider",
+      "value": "google"
+    },
+    {
+      "description": "Zoho Calendar.",
+      "enum": "schedule.provider",
+      "value": "zoho"
+    },
+    {
+      "description": "Going.",
+      "enum": "schedule.response",
+      "value": "accepted"
+    },
+    {
+      "description": "Not going.",
+      "enum": "schedule.response",
+      "value": "declined"
+    },
+    {
+      "description": "Not answered.",
+      "enum": "schedule.response",
+      "value": "needs_action"
+    },
+    {
+      "description": "Maybe.",
+      "enum": "schedule.response",
+      "value": "tentative"
+    },
+    {
+      "description": "Per kind, the calendar an event is also added to.",
+      "enum": "schedule.settings_field",
+      "value": "also_add_to"
+    },
+    {
+      "description": "The time zone, taken from the device because the member had none.",
+      "enum": "schedule.settings_field",
+      "value": "device_time_zone"
+    },
+    {
+      "description": "The kinds Scout adds.",
+      "enum": "schedule.settings_field",
+      "value": "scout_kinds"
+    },
+    {
+      "description": "The time zone, chosen by the member.",
+      "enum": "schedule.settings_field",
+      "value": "time_zone"
+    },
+    {
+      "description": "The working hours.",
+      "enum": "schedule.settings_field",
+      "value": "working_hours"
     },
     {
       "description": "Longer free-form generation (drafts, summaries, Scout's answers).",
@@ -13805,6 +14197,3218 @@
       "version": 1
     },
     {
+      "action": "added",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 9,
+      "description": "A calendar grant brought the member a calendar of the provider account: the primary one is on, the others wait for the member. Never its name or colour.",
+      "fires_when": "schedule.grant_calendars makes a calendar the module did not have, in the job's transaction; one per calendar.",
+      "module": "schedule",
+      "name": "schedule.calendar_added",
+      "object": "calendar",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarAdded",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_added:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A calendar grant brought the member a calendar of the provider account: the primary one is on, the others wait for the member. Never its name or colour.",
+        "properties": {
+          "calendar": {
+            "additionalProperties": false,
+            "description": "The new calendar.",
+            "properties": {
+              "connection_id": {
+                "description": "The connection it comes through (a connectors id), when it is a provider calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was added.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The calendar's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "primary": {
+                "description": "Whether it is its account's primary calendar.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "source": {
+                "description": "Where it lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "syncing": {
+                "description": "Whether it is on: its events sync and show.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "writable": {
+                "description": "Whether events may be made on it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "member_id",
+              "primary",
+              "source",
+              "syncing",
+              "writable"
+            ],
+            "title": "schedule.calendar",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar"
+        ],
+        "title": "schedule.calendar_added",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "disabled",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 9,
+      "description": "A member turned a calendar off: its events stop syncing and show nothing.",
+      "fires_when": "schedule.update_calendar clears syncing on a calendar that was on, in that transaction.",
+      "module": "schedule",
+      "name": "schedule.calendar_disabled",
+      "object": "calendar",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarDisabled",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_disabled:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member turned a calendar off: its events stop syncing and show nothing.",
+        "properties": {
+          "calendar": {
+            "additionalProperties": false,
+            "description": "The calendar, off.",
+            "properties": {
+              "connection_id": {
+                "description": "The connection it comes through (a connectors id), when it is a provider calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was added.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The calendar's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "primary": {
+                "description": "Whether it is its account's primary calendar.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "source": {
+                "description": "Where it lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "syncing": {
+                "description": "Whether it is on: its events sync and show.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "writable": {
+                "description": "Whether events may be made on it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "member_id",
+              "primary",
+              "source",
+              "syncing",
+              "writable"
+            ],
+            "title": "schedule.calendar",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar"
+        ],
+        "title": "schedule.calendar_disabled",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "enabled",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 9,
+      "description": "A member turned a calendar on: its events sync and show.",
+      "fires_when": "schedule.update_calendar sets syncing on a calendar that was off, in that transaction.",
+      "module": "schedule",
+      "name": "schedule.calendar_enabled",
+      "object": "calendar",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEnabled",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_enabled:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member turned a calendar on: its events sync and show.",
+        "properties": {
+          "calendar": {
+            "additionalProperties": false,
+            "description": "The calendar, on.",
+            "properties": {
+              "connection_id": {
+                "description": "The connection it comes through (a connectors id), when it is a provider calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was added.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The calendar's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "primary": {
+                "description": "Whether it is its account's primary calendar.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "source": {
+                "description": "Where it lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "syncing": {
+                "description": "Whether it is on: its events sync and show.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "writable": {
+                "description": "Whether events may be made on it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "member_id",
+              "primary",
+              "source",
+              "syncing",
+              "writable"
+            ],
+            "title": "schedule.calendar",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar"
+        ],
+        "title": "schedule.calendar_enabled",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "cancelled",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 9,
+      "description": "An event Scout added was cancelled by a later email: it stays, cancelled.",
+      "fires_when": "schedule.add_read_items applies an item that cancels an earlier one whose event stands, in the transaction that cancels it; one cancelled or deleted already tracks nothing.",
+      "module": "schedule",
+      "name": "schedule.calendar_event_cancelled",
+      "object": "calendar_event",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEventCancelled",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_event_cancelled:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An event Scout added was cancelled by a later email: it stays, cancelled.",
+        "properties": {
+          "calendar_event": {
+            "additionalProperties": false,
+            "description": "The event, cancelled.",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasts whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "at_provider": {
+                "description": "Whether the provider has it (never its provider id).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "busy": {
+                "description": "Whether it counts when free time is worked out.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "calendar_id": {
+                "description": "Its calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "calendar_source": {
+                "description": "Where its calendar lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was stored.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When the member deleted it, while the delete can be undone.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ends (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "found_by": {
+                "description": "How Scout found it, when Scout added it.",
+                "enum": [
+                  "model",
+                  "structured"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The event's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of dated thing it is.",
+                "enum": [
+                  "appointment",
+                  "charge",
+                  "delivery",
+                  "expiry",
+                  "hold",
+                  "meeting",
+                  "none",
+                  "reservation",
+                  "show",
+                  "stay",
+                  "travel"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "notice": {
+                "description": "Why it does not show what the member last asked for, if so.",
+                "enum": [
+                  "kept_theirs",
+                  "not_saved"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "Who made it.",
+                "enum": [
+                  "member",
+                  "provider",
+                  "scout"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pending_change": {
+                "description": "The member's change still waiting for the provider, if any.",
+                "enum": [
+                  "create",
+                  "delete",
+                  "respond",
+                  "update",
+                  "update_occurrence"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its calendar's provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pushed_from_id": {
+                "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "pushed_to_id": {
+                "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "recurring": {
+                "description": "Whether it is a series (it repeats; occurrences are not stored).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "response": {
+                "description": "The member's answer, when it is an invitation.",
+                "enum": [
+                  "accepted",
+                  "declined",
+                  "needs_action",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "series_id": {
+                "description": "An exception: the series of which it changes one occurrence.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "source_message_id": {
+                "description": "The email it was read from or made from (a conversations message id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "starts_at": {
+                "description": "When it starts (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it starts (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Whether it stands.",
+                "enum": [
+                  "cancelled",
+                  "confirmed",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day",
+              "at_provider",
+              "busy",
+              "calendar_id",
+              "calendar_source",
+              "created_at",
+              "id",
+              "kind",
+              "member_id",
+              "origin",
+              "recurring",
+              "status",
+              "updated_at"
+            ],
+            "title": "schedule.calendar_event",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar_event"
+        ],
+        "title": "schedule.calendar_event_cancelled",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "created",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 9,
+      "description": "An event was added to a member's calendar: made by the member, or read by Scout from an email in their own inbox. Never its title, place or notes.",
+      "fires_when": "schedule.create_event makes it, or schedule.add_read_items adds an item of a read to the inbox owner's Campbooks calendar, in the transaction that inserts it. The provider's events are counted by schedule.provider_changes_applied.",
+      "module": "schedule",
+      "name": "schedule.calendar_event_created",
+      "object": "calendar_event",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEventCreated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_event_created:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An event was added to a member's calendar: made by the member, or read by Scout from an email in their own inbox. Never its title, place or notes.",
+        "properties": {
+          "calendar_event": {
+            "additionalProperties": false,
+            "description": "The new event.",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasts whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "at_provider": {
+                "description": "Whether the provider has it (never its provider id).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "busy": {
+                "description": "Whether it counts when free time is worked out.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "calendar_id": {
+                "description": "Its calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "calendar_source": {
+                "description": "Where its calendar lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was stored.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When the member deleted it, while the delete can be undone.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ends (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "found_by": {
+                "description": "How Scout found it, when Scout added it.",
+                "enum": [
+                  "model",
+                  "structured"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The event's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of dated thing it is.",
+                "enum": [
+                  "appointment",
+                  "charge",
+                  "delivery",
+                  "expiry",
+                  "hold",
+                  "meeting",
+                  "none",
+                  "reservation",
+                  "show",
+                  "stay",
+                  "travel"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "notice": {
+                "description": "Why it does not show what the member last asked for, if so.",
+                "enum": [
+                  "kept_theirs",
+                  "not_saved"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "Who made it.",
+                "enum": [
+                  "member",
+                  "provider",
+                  "scout"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pending_change": {
+                "description": "The member's change still waiting for the provider, if any.",
+                "enum": [
+                  "create",
+                  "delete",
+                  "respond",
+                  "update",
+                  "update_occurrence"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its calendar's provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pushed_from_id": {
+                "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "pushed_to_id": {
+                "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "recurring": {
+                "description": "Whether it is a series (it repeats; occurrences are not stored).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "response": {
+                "description": "The member's answer, when it is an invitation.",
+                "enum": [
+                  "accepted",
+                  "declined",
+                  "needs_action",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "series_id": {
+                "description": "An exception: the series of which it changes one occurrence.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "source_message_id": {
+                "description": "The email it was read from or made from (a conversations message id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "starts_at": {
+                "description": "When it starts (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it starts (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Whether it stands.",
+                "enum": [
+                  "cancelled",
+                  "confirmed",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day",
+              "at_provider",
+              "busy",
+              "calendar_id",
+              "calendar_source",
+              "created_at",
+              "id",
+              "kind",
+              "member_id",
+              "origin",
+              "recurring",
+              "status",
+              "updated_at"
+            ],
+            "title": "schedule.calendar_event",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar_event"
+        ],
+        "title": "schedule.calendar_event_created",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "deleted",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 9,
+      "description": "A member deleted an event (a series whole). It is hidden at once and can be undone for a short time; on a provider calendar the delete reaches the provider after that (connectors.calendar_change_completed).",
+      "fires_when": "schedule.delete_event marks it deleted, in that transaction.",
+      "module": "schedule",
+      "name": "schedule.calendar_event_deleted",
+      "object": "calendar_event",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEventDeleted",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_event_deleted:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member deleted an event (a series whole). It is hidden at once and can be undone for a short time; on a provider calendar the delete reaches the provider after that (connectors.calendar_change_completed).",
+        "properties": {
+          "calendar_event": {
+            "additionalProperties": false,
+            "description": "The event, deleted (deleted_at set).",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasts whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "at_provider": {
+                "description": "Whether the provider has it (never its provider id).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "busy": {
+                "description": "Whether it counts when free time is worked out.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "calendar_id": {
+                "description": "Its calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "calendar_source": {
+                "description": "Where its calendar lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was stored.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When the member deleted it, while the delete can be undone.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ends (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "found_by": {
+                "description": "How Scout found it, when Scout added it.",
+                "enum": [
+                  "model",
+                  "structured"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The event's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of dated thing it is.",
+                "enum": [
+                  "appointment",
+                  "charge",
+                  "delivery",
+                  "expiry",
+                  "hold",
+                  "meeting",
+                  "none",
+                  "reservation",
+                  "show",
+                  "stay",
+                  "travel"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "notice": {
+                "description": "Why it does not show what the member last asked for, if so.",
+                "enum": [
+                  "kept_theirs",
+                  "not_saved"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "Who made it.",
+                "enum": [
+                  "member",
+                  "provider",
+                  "scout"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pending_change": {
+                "description": "The member's change still waiting for the provider, if any.",
+                "enum": [
+                  "create",
+                  "delete",
+                  "respond",
+                  "update",
+                  "update_occurrence"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its calendar's provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pushed_from_id": {
+                "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "pushed_to_id": {
+                "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "recurring": {
+                "description": "Whether it is a series (it repeats; occurrences are not stored).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "response": {
+                "description": "The member's answer, when it is an invitation.",
+                "enum": [
+                  "accepted",
+                  "declined",
+                  "needs_action",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "series_id": {
+                "description": "An exception: the series of which it changes one occurrence.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "source_message_id": {
+                "description": "The email it was read from or made from (a conversations message id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "starts_at": {
+                "description": "When it starts (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it starts (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Whether it stands.",
+                "enum": [
+                  "cancelled",
+                  "confirmed",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day",
+              "at_provider",
+              "busy",
+              "calendar_id",
+              "calendar_source",
+              "created_at",
+              "id",
+              "kind",
+              "member_id",
+              "origin",
+              "recurring",
+              "status",
+              "updated_at"
+            ],
+            "title": "schedule.calendar_event",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar_event"
+        ],
+        "title": "schedule.calendar_event_deleted",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "edited",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 9,
+      "description": "An event changed other than in its times: which fields, never their values (the kind is in the snapshot, and before_kind when it changed). A change of times is schedule.calendar_event_moved.",
+      "fires_when": "schedule.update_event changes at least one field other than the times (of an event, or of one occurrence: its exception), or schedule.add_read_items changes an event a later email updates or links an invitation already on a calendar to its email, in the transaction of the change; the same values again track nothing.",
+      "module": "schedule",
+      "name": "schedule.calendar_event_edited",
+      "object": "calendar_event",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEventEdited",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_event_edited:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An event changed other than in its times: which fields, never their values (the kind is in the snapshot, and before_kind when it changed). A change of times is schedule.calendar_event_moved.",
+        "properties": {
+          "before_kind": {
+            "description": "Its kind before, when the kind changed.",
+            "enum": [
+              "appointment",
+              "charge",
+              "delivery",
+              "expiry",
+              "hold",
+              "meeting",
+              "none",
+              "reservation",
+              "show",
+              "stay",
+              "travel"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "calendar_event": {
+            "additionalProperties": false,
+            "description": "The event afterwards.",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasts whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "at_provider": {
+                "description": "Whether the provider has it (never its provider id).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "busy": {
+                "description": "Whether it counts when free time is worked out.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "calendar_id": {
+                "description": "Its calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "calendar_source": {
+                "description": "Where its calendar lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was stored.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When the member deleted it, while the delete can be undone.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ends (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "found_by": {
+                "description": "How Scout found it, when Scout added it.",
+                "enum": [
+                  "model",
+                  "structured"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The event's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of dated thing it is.",
+                "enum": [
+                  "appointment",
+                  "charge",
+                  "delivery",
+                  "expiry",
+                  "hold",
+                  "meeting",
+                  "none",
+                  "reservation",
+                  "show",
+                  "stay",
+                  "travel"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "notice": {
+                "description": "Why it does not show what the member last asked for, if so.",
+                "enum": [
+                  "kept_theirs",
+                  "not_saved"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "Who made it.",
+                "enum": [
+                  "member",
+                  "provider",
+                  "scout"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pending_change": {
+                "description": "The member's change still waiting for the provider, if any.",
+                "enum": [
+                  "create",
+                  "delete",
+                  "respond",
+                  "update",
+                  "update_occurrence"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its calendar's provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pushed_from_id": {
+                "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "pushed_to_id": {
+                "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "recurring": {
+                "description": "Whether it is a series (it repeats; occurrences are not stored).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "response": {
+                "description": "The member's answer, when it is an invitation.",
+                "enum": [
+                  "accepted",
+                  "declined",
+                  "needs_action",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "series_id": {
+                "description": "An exception: the series of which it changes one occurrence.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "source_message_id": {
+                "description": "The email it was read from or made from (a conversations message id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "starts_at": {
+                "description": "When it starts (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it starts (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Whether it stands.",
+                "enum": [
+                  "cancelled",
+                  "confirmed",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day",
+              "at_provider",
+              "busy",
+              "calendar_id",
+              "calendar_source",
+              "created_at",
+              "id",
+              "kind",
+              "member_id",
+              "origin",
+              "recurring",
+              "status",
+              "updated_at"
+            ],
+            "title": "schedule.calendar_event",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "fields": {
+            "description": "The fields that changed (at least one).",
+            "items": {
+              "enum": [
+                "busy",
+                "kind",
+                "notes",
+                "place",
+                "source",
+                "status",
+                "time_zone",
+                "title"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar_event",
+          "fields"
+        ],
+        "title": "schedule.calendar_event_edited",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "moved",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 9,
+      "description": "An event's start or end changed (or it became all-day, or timed); before is its times as they were.",
+      "fires_when": "schedule.update_event, or schedule.add_read_items for a later email that updates it, changes its times, in the transaction of the change; the same times again track nothing.",
+      "module": "schedule",
+      "name": "schedule.calendar_event_moved",
+      "object": "calendar_event",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEventMoved",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_event_moved:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An event's start or end changed (or it became all-day, or timed); before is its times as they were.",
+        "properties": {
+          "before": {
+            "additionalProperties": false,
+            "description": "Its times before.",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasted whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ended (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ended (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_at": {
+                "description": "When it started (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it started (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day"
+            ],
+            "title": "schedule.calendar_event_times",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "calendar_event": {
+            "additionalProperties": false,
+            "description": "The event afterwards, with its new times.",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasts whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "at_provider": {
+                "description": "Whether the provider has it (never its provider id).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "busy": {
+                "description": "Whether it counts when free time is worked out.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "calendar_id": {
+                "description": "Its calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "calendar_source": {
+                "description": "Where its calendar lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was stored.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When the member deleted it, while the delete can be undone.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ends (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "found_by": {
+                "description": "How Scout found it, when Scout added it.",
+                "enum": [
+                  "model",
+                  "structured"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The event's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of dated thing it is.",
+                "enum": [
+                  "appointment",
+                  "charge",
+                  "delivery",
+                  "expiry",
+                  "hold",
+                  "meeting",
+                  "none",
+                  "reservation",
+                  "show",
+                  "stay",
+                  "travel"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "notice": {
+                "description": "Why it does not show what the member last asked for, if so.",
+                "enum": [
+                  "kept_theirs",
+                  "not_saved"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "Who made it.",
+                "enum": [
+                  "member",
+                  "provider",
+                  "scout"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pending_change": {
+                "description": "The member's change still waiting for the provider, if any.",
+                "enum": [
+                  "create",
+                  "delete",
+                  "respond",
+                  "update",
+                  "update_occurrence"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its calendar's provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pushed_from_id": {
+                "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "pushed_to_id": {
+                "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "recurring": {
+                "description": "Whether it is a series (it repeats; occurrences are not stored).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "response": {
+                "description": "The member's answer, when it is an invitation.",
+                "enum": [
+                  "accepted",
+                  "declined",
+                  "needs_action",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "series_id": {
+                "description": "An exception: the series of which it changes one occurrence.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "source_message_id": {
+                "description": "The email it was read from or made from (a conversations message id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "starts_at": {
+                "description": "When it starts (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it starts (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Whether it stands.",
+                "enum": [
+                  "cancelled",
+                  "confirmed",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day",
+              "at_provider",
+              "busy",
+              "calendar_id",
+              "calendar_source",
+              "created_at",
+              "id",
+              "kind",
+              "member_id",
+              "origin",
+              "recurring",
+              "status",
+              "updated_at"
+            ],
+            "title": "schedule.calendar_event",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "calendar_event"
+        ],
+        "title": "schedule.calendar_event_moved",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "pushed",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 9,
+      "description": "An event of a member's Campbooks calendar was copied to one of their provider calendars (Add to my calendar); the snapshot is the copy, whose pushed_from_id is the Campbooks event, now hidden.",
+      "fires_when": "schedule.push_event, or schedule.add_read_items for a kind the member set an also-add-to calendar for, makes the copy and asks connectors to make it there, in that transaction.",
+      "module": "schedule",
+      "name": "schedule.calendar_event_pushed",
+      "object": "calendar_event",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEventPushed",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_event_pushed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An event of a member's Campbooks calendar was copied to one of their provider calendars (Add to my calendar); the snapshot is the copy, whose pushed_from_id is the Campbooks event, now hidden.",
+        "properties": {
+          "calendar_event": {
+            "additionalProperties": false,
+            "description": "The copy on the provider calendar.",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasts whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "at_provider": {
+                "description": "Whether the provider has it (never its provider id).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "busy": {
+                "description": "Whether it counts when free time is worked out.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "calendar_id": {
+                "description": "Its calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "calendar_source": {
+                "description": "Where its calendar lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was stored.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When the member deleted it, while the delete can be undone.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ends (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "found_by": {
+                "description": "How Scout found it, when Scout added it.",
+                "enum": [
+                  "model",
+                  "structured"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The event's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of dated thing it is.",
+                "enum": [
+                  "appointment",
+                  "charge",
+                  "delivery",
+                  "expiry",
+                  "hold",
+                  "meeting",
+                  "none",
+                  "reservation",
+                  "show",
+                  "stay",
+                  "travel"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "notice": {
+                "description": "Why it does not show what the member last asked for, if so.",
+                "enum": [
+                  "kept_theirs",
+                  "not_saved"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "Who made it.",
+                "enum": [
+                  "member",
+                  "provider",
+                  "scout"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pending_change": {
+                "description": "The member's change still waiting for the provider, if any.",
+                "enum": [
+                  "create",
+                  "delete",
+                  "respond",
+                  "update",
+                  "update_occurrence"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its calendar's provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pushed_from_id": {
+                "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "pushed_to_id": {
+                "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "recurring": {
+                "description": "Whether it is a series (it repeats; occurrences are not stored).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "response": {
+                "description": "The member's answer, when it is an invitation.",
+                "enum": [
+                  "accepted",
+                  "declined",
+                  "needs_action",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "series_id": {
+                "description": "An exception: the series of which it changes one occurrence.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "source_message_id": {
+                "description": "The email it was read from or made from (a conversations message id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "starts_at": {
+                "description": "When it starts (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it starts (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Whether it stands.",
+                "enum": [
+                  "cancelled",
+                  "confirmed",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day",
+              "at_provider",
+              "busy",
+              "calendar_id",
+              "calendar_source",
+              "created_at",
+              "id",
+              "kind",
+              "member_id",
+              "origin",
+              "recurring",
+              "status",
+              "updated_at"
+            ],
+            "title": "schedule.calendar_event",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar_event"
+        ],
+        "title": "schedule.calendar_event_pushed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "responded",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 9,
+      "description": "A member answered an invitation (accepted, maybe, declined, or back to not answered); before is the answer they had.",
+      "fires_when": "schedule.respond_event stores another answer than the one the event had, in that transaction; the same answer again tracks nothing.",
+      "module": "schedule",
+      "name": "schedule.calendar_event_responded",
+      "object": "calendar_event",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEventResponded",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_event_responded:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member answered an invitation (accepted, maybe, declined, or back to not answered); before is the answer they had.",
+        "properties": {
+          "before": {
+            "description": "The answer before (needs_action when there was none).",
+            "enum": [
+              "accepted",
+              "declined",
+              "needs_action",
+              "tentative"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "calendar_event": {
+            "additionalProperties": false,
+            "description": "The event with the new answer.",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasts whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "at_provider": {
+                "description": "Whether the provider has it (never its provider id).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "busy": {
+                "description": "Whether it counts when free time is worked out.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "calendar_id": {
+                "description": "Its calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "calendar_source": {
+                "description": "Where its calendar lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was stored.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When the member deleted it, while the delete can be undone.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ends (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "found_by": {
+                "description": "How Scout found it, when Scout added it.",
+                "enum": [
+                  "model",
+                  "structured"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The event's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of dated thing it is.",
+                "enum": [
+                  "appointment",
+                  "charge",
+                  "delivery",
+                  "expiry",
+                  "hold",
+                  "meeting",
+                  "none",
+                  "reservation",
+                  "show",
+                  "stay",
+                  "travel"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "notice": {
+                "description": "Why it does not show what the member last asked for, if so.",
+                "enum": [
+                  "kept_theirs",
+                  "not_saved"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "Who made it.",
+                "enum": [
+                  "member",
+                  "provider",
+                  "scout"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pending_change": {
+                "description": "The member's change still waiting for the provider, if any.",
+                "enum": [
+                  "create",
+                  "delete",
+                  "respond",
+                  "update",
+                  "update_occurrence"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its calendar's provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pushed_from_id": {
+                "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "pushed_to_id": {
+                "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "recurring": {
+                "description": "Whether it is a series (it repeats; occurrences are not stored).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "response": {
+                "description": "The member's answer, when it is an invitation.",
+                "enum": [
+                  "accepted",
+                  "declined",
+                  "needs_action",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "series_id": {
+                "description": "An exception: the series of which it changes one occurrence.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "source_message_id": {
+                "description": "The email it was read from or made from (a conversations message id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "starts_at": {
+                "description": "When it starts (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it starts (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Whether it stands.",
+                "enum": [
+                  "cancelled",
+                  "confirmed",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day",
+              "at_provider",
+              "busy",
+              "calendar_id",
+              "calendar_source",
+              "created_at",
+              "id",
+              "kind",
+              "member_id",
+              "origin",
+              "recurring",
+              "status",
+              "updated_at"
+            ],
+            "title": "schedule.calendar_event",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "calendar_event"
+        ],
+        "title": "schedule.calendar_event_responded",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "restored",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 9,
+      "description": "A deleted event was brought back (the undo of a delete). remade_at_provider says the delete had reached the provider, so the event is made there again.",
+      "fires_when": "schedule.restore_event brings it back, in that transaction.",
+      "module": "schedule",
+      "name": "schedule.calendar_event_restored",
+      "object": "calendar_event",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEventRestored",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_event_restored:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A deleted event was brought back (the undo of a delete). remade_at_provider says the delete had reached the provider, so the event is made there again.",
+        "properties": {
+          "calendar_event": {
+            "additionalProperties": false,
+            "description": "The event, back.",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasts whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "at_provider": {
+                "description": "Whether the provider has it (never its provider id).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "busy": {
+                "description": "Whether it counts when free time is worked out.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "calendar_id": {
+                "description": "Its calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "calendar_source": {
+                "description": "Where its calendar lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was stored.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When the member deleted it, while the delete can be undone.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ends (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "found_by": {
+                "description": "How Scout found it, when Scout added it.",
+                "enum": [
+                  "model",
+                  "structured"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The event's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of dated thing it is.",
+                "enum": [
+                  "appointment",
+                  "charge",
+                  "delivery",
+                  "expiry",
+                  "hold",
+                  "meeting",
+                  "none",
+                  "reservation",
+                  "show",
+                  "stay",
+                  "travel"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "notice": {
+                "description": "Why it does not show what the member last asked for, if so.",
+                "enum": [
+                  "kept_theirs",
+                  "not_saved"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "Who made it.",
+                "enum": [
+                  "member",
+                  "provider",
+                  "scout"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pending_change": {
+                "description": "The member's change still waiting for the provider, if any.",
+                "enum": [
+                  "create",
+                  "delete",
+                  "respond",
+                  "update",
+                  "update_occurrence"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its calendar's provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pushed_from_id": {
+                "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "pushed_to_id": {
+                "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "recurring": {
+                "description": "Whether it is a series (it repeats; occurrences are not stored).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "response": {
+                "description": "The member's answer, when it is an invitation.",
+                "enum": [
+                  "accepted",
+                  "declined",
+                  "needs_action",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "series_id": {
+                "description": "An exception: the series of which it changes one occurrence.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "source_message_id": {
+                "description": "The email it was read from or made from (a conversations message id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "starts_at": {
+                "description": "When it starts (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it starts (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Whether it stands.",
+                "enum": [
+                  "cancelled",
+                  "confirmed",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day",
+              "at_provider",
+              "busy",
+              "calendar_id",
+              "calendar_source",
+              "created_at",
+              "id",
+              "kind",
+              "member_id",
+              "origin",
+              "recurring",
+              "status",
+              "updated_at"
+            ],
+            "title": "schedule.calendar_event",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "remade_at_provider": {
+            "description": "Whether the delete had reached the provider, so the event is asked to be made there again.",
+            "type": "boolean",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar_event",
+          "remade_at_provider"
+        ],
+        "title": "schedule.calendar_event_restored",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "unpushed",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 9,
+      "description": "A copy on a provider calendar was taken away again; the snapshot is the Campbooks event, shown again.",
+      "fires_when": "schedule.unpush_event deletes the copy and asks connectors to delete it there, in that transaction.",
+      "module": "schedule",
+      "name": "schedule.calendar_event_unpushed",
+      "object": "calendar_event",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarEventUnpushed",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_event_unpushed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A copy on a provider calendar was taken away again; the snapshot is the Campbooks event, shown again.",
+        "properties": {
+          "calendar_event": {
+            "additionalProperties": false,
+            "description": "The Campbooks event, shown again.",
+            "properties": {
+              "all_day": {
+                "description": "Whether it lasts whole days.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "at_provider": {
+                "description": "Whether the provider has it (never its provider id).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "busy": {
+                "description": "Whether it counts when free time is worked out.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "calendar_id": {
+                "description": "Its calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "calendar_source": {
+                "description": "Where its calendar lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was stored.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When the member deleted it, while the delete can be undone.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_at": {
+                "description": "When it ends (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "ends_on": {
+                "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "found_by": {
+                "description": "How Scout found it, when Scout added it.",
+                "enum": [
+                  "model",
+                  "structured"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The event's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of dated thing it is.",
+                "enum": [
+                  "appointment",
+                  "charge",
+                  "delivery",
+                  "expiry",
+                  "hold",
+                  "meeting",
+                  "none",
+                  "reservation",
+                  "show",
+                  "stay",
+                  "travel"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "notice": {
+                "description": "Why it does not show what the member last asked for, if so.",
+                "enum": [
+                  "kept_theirs",
+                  "not_saved"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "Who made it.",
+                "enum": [
+                  "member",
+                  "provider",
+                  "scout"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pending_change": {
+                "description": "The member's change still waiting for the provider, if any.",
+                "enum": [
+                  "create",
+                  "delete",
+                  "respond",
+                  "update",
+                  "update_occurrence"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its calendar's provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "pushed_from_id": {
+                "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "pushed_to_id": {
+                "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "recurring": {
+                "description": "Whether it is a series (it repeats; occurrences are not stored).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "response": {
+                "description": "The member's answer, when it is an invitation.",
+                "enum": [
+                  "accepted",
+                  "declined",
+                  "needs_action",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "series_id": {
+                "description": "An exception: the series of which it changes one occurrence.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "source_message_id": {
+                "description": "The email it was read from or made from (a conversations message id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "starts_at": {
+                "description": "When it starts (a timed event).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "starts_on": {
+                "description": "The day it starts (an all-day event).",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Whether it stands.",
+                "enum": [
+                  "cancelled",
+                  "confirmed",
+                  "tentative"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "all_day",
+              "at_provider",
+              "busy",
+              "calendar_id",
+              "calendar_source",
+              "created_at",
+              "id",
+              "kind",
+              "member_id",
+              "origin",
+              "recurring",
+              "status",
+              "updated_at"
+            ],
+            "title": "schedule.calendar_event",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "copy_calendar_id": {
+            "description": "The provider calendar it was taken away from.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "id"
+          },
+          "copy_id": {
+            "description": "The copy that was taken away.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "id"
+          }
+        },
+        "required": [
+          "calendar_event",
+          "copy_calendar_id",
+          "copy_id"
+        ],
+        "title": "schedule.calendar_event_unpushed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "recoloured",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 9,
+      "description": "A member changed a calendar's colour (or cleared it). Never the colour.",
+      "fires_when": "schedule.update_calendar stores another colour than the calendar had, in that transaction.",
+      "module": "schedule",
+      "name": "schedule.calendar_recoloured",
+      "object": "calendar",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarRecoloured",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_recoloured:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member changed a calendar's colour (or cleared it). Never the colour.",
+        "properties": {
+          "calendar": {
+            "additionalProperties": false,
+            "description": "The calendar afterwards.",
+            "properties": {
+              "connection_id": {
+                "description": "The connection it comes through (a connectors id), when it is a provider calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was added.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The calendar's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "primary": {
+                "description": "Whether it is its account's primary calendar.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "source": {
+                "description": "Where it lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "syncing": {
+                "description": "Whether it is on: its events sync and show.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "writable": {
+                "description": "Whether events may be made on it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "member_id",
+              "primary",
+              "source",
+              "syncing",
+              "writable"
+            ],
+            "title": "schedule.calendar",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar"
+        ],
+        "title": "schedule.calendar_recoloured",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "removed",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 9,
+      "description": "A provider calendar was deleted with its events because its connection was removed (connectors.connection_removed); the snapshot is the calendar as it stood.",
+      "fires_when": "schedule.forget_connection deletes it, in the job's transaction; one per calendar. A departed member's and a deleted workspace's calendars are not tracked (workspaces.member_left, workspaces.workspace_deleted are).",
+      "module": "schedule",
+      "name": "schedule.calendar_removed",
+      "object": "calendar",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "CalendarRemoved",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_removed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A provider calendar was deleted with its events because its connection was removed (connectors.connection_removed); the snapshot is the calendar as it stood.",
+        "properties": {
+          "calendar": {
+            "additionalProperties": false,
+            "description": "The calendar as it stood when it was removed.",
+            "properties": {
+              "connection_id": {
+                "description": "The connection it comes through (a connectors id), when it is a provider calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was added.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The calendar's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "primary": {
+                "description": "Whether it is its account's primary calendar.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "source": {
+                "description": "Where it lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "syncing": {
+                "description": "Whether it is on: its events sync and show.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "writable": {
+                "description": "Whether events may be made on it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "member_id",
+              "primary",
+              "source",
+              "syncing",
+              "writable"
+            ],
+            "title": "schedule.calendar",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "calendar_events": {
+            "description": "Events deleted with it.",
+            "type": "integer",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar",
+          "calendar_events"
+        ],
+        "title": "schedule.calendar_removed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "applied",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 9,
+      "description": "A batch of a provider calendar's changes was applied to the member's calendar: one summary per batch, with counts, never the events. connectors.stream_synced is the run that read it.",
+      "fires_when": "schedule.apply_calendar_changes creates, changes or cancels at least one event, in the job's transaction; a batch for a calendar that is off, or one that changes nothing, tracks nothing.",
+      "module": "schedule",
+      "name": "schedule.provider_changes_applied",
+      "object": "provider_changes",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "ProviderChangesApplied",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.provider_changes_applied:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A batch of a provider calendar's changes was applied to the member's calendar: one summary per batch, with counts, never the events. connectors.stream_synced is the run that read it.",
+        "properties": {
+          "calendar": {
+            "additionalProperties": false,
+            "description": "The calendar the batch was for.",
+            "properties": {
+              "connection_id": {
+                "description": "The connection it comes through (a connectors id), when it is a provider calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was added.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The calendar's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "primary": {
+                "description": "Whether it is its account's primary calendar.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "source": {
+                "description": "Where it lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "syncing": {
+                "description": "Whether it is on: its events sync and show.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "writable": {
+                "description": "Whether events may be made on it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "member_id",
+              "primary",
+              "source",
+              "syncing",
+              "writable"
+            ],
+            "title": "schedule.calendar",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "cancelled": {
+            "description": "Events cancelled or removed at the provider (series counted once).",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "changed": {
+            "description": "Events that changed.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "created": {
+            "description": "Events new to the member's calendar.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "full": {
+            "description": "Whether it was a full read (what it did not list is gone).",
+            "type": "boolean",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar",
+          "cancelled",
+          "changed",
+          "created",
+          "full"
+        ],
+        "title": "schedule.provider_changes_applied",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "updated",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 9,
+      "description": "A member changed their calendar settings: which ones, never their values (no time zone, no hours).",
+      "fires_when": "schedule.update_settings changes at least one setting, in that transaction; the same values again track nothing.",
+      "module": "schedule",
+      "name": "schedule.settings_updated",
+      "object": "settings",
+      "openspec_change": "track-schedule-events",
+      "rust_type": "SettingsUpdated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.settings_updated:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member changed their calendar settings: which ones, never their values (no time zone, no hours).",
+        "properties": {
+          "fields": {
+            "description": "The settings that changed (at least one).",
+            "items": {
+              "enum": [
+                "also_add_to",
+                "device_time_zone",
+                "scout_kinds",
+                "time_zone",
+                "working_hours"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          },
+          "settings": {
+            "additionalProperties": false,
+            "description": "The settings afterwards.",
+            "properties": {
+              "also_add_to_kinds": {
+                "description": "The kinds also added to a provider calendar (never which calendar).",
+                "items": {
+                  "enum": [
+                    "appointment",
+                    "charge",
+                    "delivery",
+                    "expiry",
+                    "hold",
+                    "meeting",
+                    "none",
+                    "reservation",
+                    "show",
+                    "stay",
+                    "travel"
+                  ],
+                  "type": "string"
+                },
+                "type": "array",
+                "x-classification": "operational"
+              },
+              "member_id": {
+                "description": "The member: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "scout_kinds": {
+                "description": "The kinds Scout adds from email.",
+                "items": {
+                  "enum": [
+                    "appointment",
+                    "charge",
+                    "delivery",
+                    "expiry",
+                    "hold",
+                    "meeting",
+                    "none",
+                    "reservation",
+                    "show",
+                    "stay",
+                    "travel"
+                  ],
+                  "type": "string"
+                },
+                "type": "array",
+                "x-classification": "operational"
+              },
+              "time_zone_set": {
+                "description": "Whether they have a time zone (else UTC is used). Never the zone.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "working_days": {
+                "description": "Weekdays with working hours in force.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "working_hours_set": {
+                "description": "Whether they set working hours (else Monday to Friday, 09:00 to 18:00). Never the hours.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "also_add_to_kinds",
+              "member_id",
+              "scout_kinds",
+              "time_zone_set",
+              "working_days",
+              "working_hours_set"
+            ],
+            "title": "schedule.settings",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "fields",
+          "settings"
+        ],
+        "title": "schedule.settings_updated",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "reached",
       "actor_types": [
         "user",
@@ -15382,7 +18986,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-25",
-  "plan_version": 8,
+  "plan_version": 9,
   "properties": [
     {
       "classification": "operational",
@@ -18233,6 +21837,383 @@
     },
     {
       "classification": "operational",
+      "description": "The new calendar.",
+      "event": "schedule.calendar_added",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar",
+      "pattern": "",
+      "property": "calendar",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The calendar, off.",
+      "event": "schedule.calendar_disabled",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar",
+      "pattern": "",
+      "property": "calendar",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The calendar, on.",
+      "event": "schedule.calendar_enabled",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar",
+      "pattern": "",
+      "property": "calendar",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The event, cancelled.",
+      "event": "schedule.calendar_event_cancelled",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event",
+      "pattern": "",
+      "property": "calendar_event",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The new event.",
+      "event": "schedule.calendar_event_created",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event",
+      "pattern": "",
+      "property": "calendar_event",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The event, deleted (deleted_at set).",
+      "event": "schedule.calendar_event_deleted",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event",
+      "pattern": "",
+      "property": "calendar_event",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Its kind before, when the kind changed.",
+      "event": "schedule.calendar_event_edited",
+      "example": "",
+      "list": false,
+      "of": "schedule.event_kind",
+      "pattern": "",
+      "property": "before_kind",
+      "required": false,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The event afterwards.",
+      "event": "schedule.calendar_event_edited",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event",
+      "pattern": "",
+      "property": "calendar_event",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The fields that changed (at least one).",
+      "event": "schedule.calendar_event_edited",
+      "example": "",
+      "list": true,
+      "of": "schedule.event_field",
+      "pattern": "",
+      "property": "fields",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Its times before.",
+      "event": "schedule.calendar_event_moved",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event_times",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The event afterwards, with its new times.",
+      "event": "schedule.calendar_event_moved",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event",
+      "pattern": "",
+      "property": "calendar_event",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The copy on the provider calendar.",
+      "event": "schedule.calendar_event_pushed",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event",
+      "pattern": "",
+      "property": "calendar_event",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The answer before (needs_action when there was none).",
+      "event": "schedule.calendar_event_responded",
+      "example": "",
+      "list": false,
+      "of": "schedule.response",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The event with the new answer.",
+      "event": "schedule.calendar_event_responded",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event",
+      "pattern": "",
+      "property": "calendar_event",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The event, back.",
+      "event": "schedule.calendar_event_restored",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event",
+      "pattern": "",
+      "property": "calendar_event",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether the delete had reached the provider, so the event is asked to be made there again.",
+      "event": "schedule.calendar_event_restored",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "remade_at_provider",
+      "required": true,
+      "type": "bool",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The Campbooks event, shown again.",
+      "event": "schedule.calendar_event_unpushed",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_event",
+      "pattern": "",
+      "property": "calendar_event",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The provider calendar it was taken away from.",
+      "event": "schedule.calendar_event_unpushed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "copy_calendar_id",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The copy that was taken away.",
+      "event": "schedule.calendar_event_unpushed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "copy_id",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The calendar afterwards.",
+      "event": "schedule.calendar_recoloured",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar",
+      "pattern": "",
+      "property": "calendar",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The calendar as it stood when it was removed.",
+      "event": "schedule.calendar_removed",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar",
+      "pattern": "",
+      "property": "calendar",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Events deleted with it.",
+      "event": "schedule.calendar_removed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "calendar_events",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The calendar the batch was for.",
+      "event": "schedule.provider_changes_applied",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar",
+      "pattern": "",
+      "property": "calendar",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Events cancelled or removed at the provider (series counted once).",
+      "event": "schedule.provider_changes_applied",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "cancelled",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Events that changed.",
+      "event": "schedule.provider_changes_applied",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "changed",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Events new to the member's calendar.",
+      "event": "schedule.provider_changes_applied",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "created",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it was a full read (what it did not list is gone).",
+      "event": "schedule.provider_changes_applied",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "full",
+      "required": true,
+      "type": "bool",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The settings that changed (at least one).",
+      "event": "schedule.settings_updated",
+      "example": "",
+      "list": true,
+      "of": "schedule.settings_field",
+      "pattern": "",
+      "property": "fields",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The settings afterwards.",
+      "event": "schedule.settings_updated",
+      "example": "",
+      "list": false,
+      "of": "schedule.settings",
+      "pattern": "",
+      "property": "settings",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "The AI role of the refused call.",
       "event": "system.ai_limit_reached",
       "example": "",
@@ -20415,6 +24396,523 @@
       "record": "kernel.job",
       "required": false,
       "type": "id"
+    },
+    {
+      "classification": "id",
+      "description": "The connection it comes through (a connectors id), when it is a provider calendar.",
+      "enum": "",
+      "field": "connection_id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was added.",
+      "enum": "",
+      "field": "created_at",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "id",
+      "description": "The calendar's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member whose calendar it is: their user id.",
+      "enum": "",
+      "field": "member_id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it is its account's primary calendar.",
+      "enum": "",
+      "field": "primary",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "Its provider, when it is a provider calendar.",
+      "enum": "schedule.provider",
+      "field": "provider",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar",
+      "required": false,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Where it lives.",
+      "enum": "schedule.calendar_source",
+      "field": "source",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it is on: its events sync and show.",
+      "enum": "",
+      "field": "syncing",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether events may be made on it.",
+      "enum": "",
+      "field": "writable",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it lasts whole days.",
+      "enum": "",
+      "field": "all_day",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether the provider has it (never its provider id).",
+      "enum": "",
+      "field": "at_provider",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it counts when free time is worked out.",
+      "enum": "",
+      "field": "busy",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "id",
+      "description": "Its calendar.",
+      "enum": "",
+      "field": "calendar_id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "Where its calendar lives.",
+      "enum": "schedule.calendar_source",
+      "field": "calendar_source",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was stored.",
+      "enum": "",
+      "field": "created_at",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "When the member deleted it, while the delete can be undone.",
+      "enum": "",
+      "field": "deleted_at",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "When it ends (a timed event).",
+      "enum": "",
+      "field": "ends_at",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "The day after it ends (an all-day event; exclusive, as the providers write it).",
+      "enum": "",
+      "field": "ends_on",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "date"
+    },
+    {
+      "classification": "operational",
+      "description": "How Scout found it, when Scout added it.",
+      "enum": "schedule.found_by",
+      "field": "found_by",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "enum"
+    },
+    {
+      "classification": "id",
+      "description": "The event's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "What kind of dated thing it is.",
+      "enum": "schedule.event_kind",
+      "field": "kind",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member whose calendar it is: their user id.",
+      "enum": "",
+      "field": "member_id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "Why it does not show what the member last asked for, if so.",
+      "enum": "schedule.event_notice",
+      "field": "notice",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Who made it.",
+      "enum": "schedule.event_origin",
+      "field": "origin",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "The member's change still waiting for the provider, if any.",
+      "enum": "schedule.calendar_change",
+      "field": "pending_change",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Its calendar's provider, when it is a provider calendar.",
+      "enum": "schedule.provider",
+      "field": "provider",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "enum"
+    },
+    {
+      "classification": "id",
+      "description": "A copy made by Add to my calendar: the Campbooks event it copies.",
+      "enum": "",
+      "field": "pushed_from_id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "id",
+      "description": "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands).",
+      "enum": "",
+      "field": "pushed_to_id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it is a series (it repeats; occurrences are not stored).",
+      "enum": "",
+      "field": "recurring",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "The member's answer, when it is an invitation.",
+      "enum": "schedule.response",
+      "field": "response",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "enum"
+    },
+    {
+      "classification": "id",
+      "description": "An exception: the series of which it changes one occurrence.",
+      "enum": "",
+      "field": "series_id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "id",
+      "description": "The email it was read from or made from (a conversations message id).",
+      "enum": "",
+      "field": "source_message_id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "When it starts (a timed event).",
+      "enum": "",
+      "field": "starts_at",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "The day it starts (an all-day event).",
+      "enum": "",
+      "field": "starts_on",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": false,
+      "type": "date"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it stands.",
+      "enum": "schedule.event_status",
+      "field": "status",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "When it last changed.",
+      "enum": "",
+      "field": "updated_at",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it lasted whole days.",
+      "enum": "",
+      "field": "all_day",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event_times",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "When it ended (a timed event).",
+      "enum": "",
+      "field": "ends_at",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event_times",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "The day after it ended (an all-day event).",
+      "enum": "",
+      "field": "ends_on",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event_times",
+      "required": false,
+      "type": "date"
+    },
+    {
+      "classification": "operational",
+      "description": "When it started (a timed event).",
+      "enum": "",
+      "field": "starts_at",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event_times",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "The day it started (an all-day event).",
+      "enum": "",
+      "field": "starts_on",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.calendar_event_times",
+      "required": false,
+      "type": "date"
+    },
+    {
+      "classification": "operational",
+      "description": "The kinds also added to a provider calendar (never which calendar).",
+      "enum": "schedule.event_kind",
+      "field": "also_add_to_kinds",
+      "list": true,
+      "pattern": "",
+      "record": "schedule.settings",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member: their user id.",
+      "enum": "",
+      "field": "member_id",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.settings",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "The kinds Scout adds from email.",
+      "enum": "schedule.event_kind",
+      "field": "scout_kinds",
+      "list": true,
+      "pattern": "",
+      "record": "schedule.settings",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether they have a time zone (else UTC is used). Never the zone.",
+      "enum": "",
+      "field": "time_zone_set",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.settings",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "Weekdays with working hours in force.",
+      "enum": "",
+      "field": "working_days",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.settings",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether they set working hours (else Monday to Friday, 09:00 to 18:00). Never the hours.",
+      "enum": "",
+      "field": "working_hours_set",
+      "list": false,
+      "pattern": "",
+      "record": "schedule.settings",
+      "required": true,
+      "type": "bool"
     },
     {
       "classification": "operational",

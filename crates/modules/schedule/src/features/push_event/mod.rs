@@ -25,12 +25,13 @@ use crate::{
         ops::{self, EventPath},
         outbound, publish,
         rows::{CalendarRow, EventRow, calendar_of, event_of},
-        settings,
+        settings, tracked,
         views::{EventView, event_view},
     },
     features::create_event::ensure_writable,
     model::{CalendarChange, CalendarId, EventId},
     scopes::ScheduleWrite,
+    tracking,
 };
 
 /// Where to add it.
@@ -143,6 +144,18 @@ pub async fn push_row(
     .await?;
     publish::created(state, tx, workspace, member, &made).await?;
     publish::cancelled(state, tx, workspace, member, row).await?;
+    if let Some(calendar_event) = tracked::calendar_event(&mut **tx, id).await? {
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::CalendarEventPushed {
+                    workspace,
+                    calendar_event,
+                },
+            )
+            .await?;
+    }
     event_of(tx, member, id).await
 }
 
@@ -259,6 +272,20 @@ pub async fn unpush(
     publish::cancelled(&state, &mut tx, access.workspace, member, &copy).await?;
     let back = event_of(&mut tx, member, original.id).await?;
     publish::created(&state, &mut tx, access.workspace, member, &back).await?;
+    if let Some(calendar_event) = tracked::calendar_event(&mut tx, back.id).await? {
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::CalendarEventUnpushed {
+                    workspace: access.workspace,
+                    calendar_event,
+                    copy_id: *copy.id.as_uuid(),
+                    copy_calendar_id: *copy.calendar_id.as_uuid(),
+                },
+            )
+            .await?;
+    }
     let zone = settings::load(&mut tx, member).await?.zone();
     tx.commit().await?;
     let event = event_view(&back, zone, None).ok_or(Error::NotFound)?;

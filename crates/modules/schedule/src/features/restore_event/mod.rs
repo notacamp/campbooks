@@ -20,11 +20,12 @@ use crate::{
         ops::{self, EventPath},
         outbound, publish,
         rows::{calendar_of, event_of},
-        settings,
+        settings, tracked,
         views::{EventView, event_view},
     },
     model::{CalendarChange, EventId},
     scopes::ScheduleWrite,
+    tracking,
 };
 
 /// The token a delete gave.
@@ -116,7 +117,8 @@ pub async fn handler(
     }
     let restored = event_of(&mut tx, member, row.id).await?;
     // The delete reached the provider already: make the event again there.
-    if !calendar.is_campbooks() && restored.provider_event_id.is_none() {
+    let remade_at_provider = !calendar.is_campbooks() && restored.provider_event_id.is_none();
+    if remade_at_provider {
         let document =
             outbound::document(CalendarChange::Create, &calendar, &restored, None, None)?;
         outbound::request(
@@ -134,6 +136,19 @@ pub async fn handler(
         .await?;
     }
     publish::created(&state, &mut tx, access.workspace, member, &restored).await?;
+    if let Some(calendar_event) = tracked::calendar_event(&mut tx, row.id).await? {
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::CalendarEventRestored {
+                    workspace: access.workspace,
+                    calendar_event,
+                    remade_at_provider,
+                },
+            )
+            .await?;
+    }
     let zone = settings::load(&mut tx, member).await?.zone();
     let after = event_of(&mut tx, member, row.id).await?;
     tx.commit().await?;

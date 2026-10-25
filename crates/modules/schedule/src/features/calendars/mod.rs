@@ -14,18 +14,21 @@ use campbooks_kernel::{
     tenancy::{Workspace, WorkspaceId},
 };
 use serde::{Deserialize, Serialize};
+use sqlx::{Postgres, Transaction};
 use utoipa::ToSchema;
 
 use crate::{
     domain::{
         blobs::{CALENDAR_REF_CONTENT_TYPE, CALENDAR_REF_OWNER},
         ops::{self, CalendarPath},
-        rows::{calendar_of, calendars_of},
+        rows::{CalendarRow, calendar_of, calendars_of},
+        tracked,
         views::CalendarView,
     },
     events::CalendarSyncChanged,
     model::CalendarId,
     scopes::{ScheduleRead, ScheduleWrite},
+    tracking,
 };
 
 /// The member's calendars.
@@ -190,12 +193,80 @@ pub async fn update(
             )
             .await?;
     }
+    let recoloured = color != calendar.color;
+    track_change(
+        &state,
+        &mut tx,
+        access.workspace,
+        &calendar,
+        syncing,
+        recoloured,
+    )
+    .await?;
     let rows = calendars_of(&mut tx, access.workspace, member).await?;
     tx.commit().await?;
     rows.iter()
         .find(|row| row.id == calendar.id)
         .map(|row| Json(CalendarView::from(row)))
         .ok_or(Error::NotFound)
+}
+
+/// Track, in `tx`, that `before` was turned on or off (`syncing` is its
+/// state now) and recoloured: each only when it changed.
+async fn track_change(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    before: &CalendarRow,
+    syncing: bool,
+    recoloured: bool,
+) -> Result<()> {
+    if syncing == before.syncing && !recoloured {
+        return Ok(());
+    }
+    let Some(calendar) = tracked::calendar(&mut **tx, before.id).await? else {
+        return Ok(());
+    };
+    match (before.syncing, syncing) {
+        (false, true) => {
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::CalendarEnabled {
+                        workspace,
+                        calendar: calendar.clone(),
+                    },
+                )
+                .await?;
+        }
+        (true, false) => {
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::CalendarDisabled {
+                        workspace,
+                        calendar: calendar.clone(),
+                    },
+                )
+                .await?;
+        }
+        _ => {}
+    }
+    if recoloured {
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::CalendarRecoloured {
+                    workspace,
+                    calendar,
+                },
+            )
+            .await?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

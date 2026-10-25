@@ -20,11 +20,12 @@ use crate::{
         ops::{self, EventPath},
         outbound,
         rows::{calendar_of, event_of},
-        settings,
+        settings, tracked,
         views::{EventView, event_view},
     },
     model::{CalendarChange, EventId, Response},
     scopes::ScheduleWrite,
+    tracking,
 };
 
 /// Your answer.
@@ -131,6 +132,22 @@ pub async fn handler(
             },
         )
         .await?;
+    }
+    // Another answer than the one it had: the same again tracks nothing.
+    if answer.response != previous
+        && let Some(calendar_event) = tracked::calendar_event(&mut tx, row.id).await?
+    {
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::CalendarEventResponded {
+                    workspace: access.workspace,
+                    calendar_event,
+                    before: tracked::response(Some(previous.as_str())),
+                },
+            )
+            .await?;
     }
     let zone = settings::load(&mut tx, member).await?.zone();
     let after = event_of(&mut tx, member, row.id).await?;
