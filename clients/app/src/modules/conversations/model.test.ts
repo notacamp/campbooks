@@ -32,6 +32,7 @@ import {
   placementLine,
   previewType,
   reasonText,
+  repliedSince,
   sentToLine,
   spamMove,
   splitQuoted,
@@ -75,6 +76,43 @@ describe("inbox model", () => {
         Q4_DETAIL.decisions.map((d) => (d.question === "needs_reply" ? { ...d, value: false } : d)),
       ),
     ).toBe(false);
+  });
+
+  it("says the member replied, and offers no Reply, once they wrote after the message Scout read", () => {
+    const messages = Q4_DETAIL.messages.slice(0, 3);
+    // A reply before the newest inbound message answered an older one.
+    expect(repliedSince(messages)).toBeNull();
+    const [, sent] = messages;
+    if (sent === undefined) {
+      throw new Error("the fixture has a reply");
+    }
+    const reply = {
+      ...sent,
+      id: "0192f1a0-0000-7000-8000-0000000000e9",
+      sent_at: "2026-10-14T09:00:00Z",
+    };
+    const later = {
+      ...reply,
+      id: "0192f1a0-0000-7000-8000-0000000000ea",
+      sent_at: "2026-10-23T15:38:00Z",
+    };
+    const replied = repliedSince([...messages, later, reply]);
+    expect(replied).toBe("2026-10-23T15:38:00Z");
+    expect(suggestsReply(Q4_DETAIL.decisions, replied)).toBe(false);
+    expect(noteSentence(t, Q4_DETAIL.decisions, "en-GB", replied)).toBe(
+      'scout.replied{"date":"23 Oct"}',
+    );
+    // A warning stands after a reply.
+    const warned = [
+      ...Q4_DETAIL.decisions,
+      ...Q4_DETAIL.decisions
+        .filter((d) => d.question === "needs_reply")
+        .map((d) => ({ ...d, question: "suspicious" })),
+    ];
+    expect(noteSentence(t, warned, "en-GB", replied)).toBe(
+      'scout.replied{"date":"23 Oct"} scout.read{"list":"scout.suspicious"}',
+    );
+    expect(repliedSince([])).toBeNull();
   });
 
   it("puts a suggestion before where the conversation is", () => {

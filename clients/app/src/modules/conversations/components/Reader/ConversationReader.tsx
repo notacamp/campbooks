@@ -41,6 +41,7 @@ import {
   openByDefault,
   placeName,
   placementLine,
+  repliedSince,
   spamMove,
   streamName,
   suggestsReply,
@@ -499,7 +500,9 @@ export function ConversationReader({
   const kind = avatarKind(conversation);
   const subject = conversation.subject === "" ? t("reader.noSubject") : conversation.subject;
   const decisions = detail?.decisions ?? [];
-  const suggestedReply = suggestsReply(decisions) ? noteReply : null;
+  // A reply since the message Scout read answered it (campbooks-cloud#355).
+  const replied = repliedSince(detail?.messages ?? []);
+  const suggestedReply = suggestsReply(decisions, replied) ? noteReply : null;
   const exists = (key: string) => i18n.exists(`conversations:${key}`);
   const unread = conversation.unread_count > 0;
   const replyButtons =
@@ -754,8 +757,8 @@ export function ConversationReader({
                 })}
           >
             {suggestion === undefined
-              ? noteSentence(t, decisions, i18n.language)
-              : `${t("scout.suggestionNote", { stream: streamName(t, suggestion.stream) })} ${noteSentence(t, decisions, i18n.language)}`}
+              ? noteSentence(t, decisions, i18n.language, replied)
+              : `${t("scout.suggestionNote", { stream: streamName(t, suggestion.stream) })} ${noteSentence(t, decisions, i18n.language, replied)}`}
           </Note>
         ) : (
           <Note

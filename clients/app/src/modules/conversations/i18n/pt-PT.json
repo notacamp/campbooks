@@ -173,6 +173,7 @@
     "sortedDefault": "Em {{stream}}: nada a moveu",
     "read": "A leitura do Campbooks, em forma de sugestão: {{list}}.",
     "nothing": "Nada aqui parece pedir-lhe alguma coisa.",
+    "replied": "Respondeu a {{date}}, por isso nada aqui fica à sua espera.",
     "needsReply": "precisa de resposta",
     "asksAction": "pede-lhe que faça algo",
     "hasDeadline": "refere uma data a cumprir",
