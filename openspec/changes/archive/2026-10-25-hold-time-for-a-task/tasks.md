@@ -25,4 +25,4 @@
 ## 4. Before merge
 
 - [x] 4.1 Changelog entry file (`changelog/unreleased/added/`); `openspec validate hold-time-for-a-task --strict`; gates green in CI
-- [ ] 4.2 Recording (375 px and desktop), then archive this change
+- [x] 4.2 Recording (375 px and desktop), then archive this change

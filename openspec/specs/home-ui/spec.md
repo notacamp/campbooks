@@ -828,3 +828,12 @@ Tasks" (one singular) with an "Open Tasks" link showing the Tasks key (`G`
 #### Scenario: Four more
 - **WHEN** Ana has four open tasks that are not for today
 - **THEN** the list ends with "4 more in Tasks" and Open Tasks opens Tasks
+
+### Requirement: Hold time from Home
+A Do task on Home SHALL offer Hold time (`h`) beside Done and Later, opening
+the same Hold time panel as the task's detail in a dialog; a held task SHALL
+show its "Held <day> <start>–<end>" chip. A Pay task SHALL not offer it.
+
+#### Scenario: Hold from Home
+- **WHEN** Ana presses `h` on "Send the signed lease" on Home and picks a slot
+- **THEN** the row shows "Held Wed 10:00–10:30", and a toast offers Undo
