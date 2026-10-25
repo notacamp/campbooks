@@ -327,6 +327,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_calendar_requests(campbooks_schedule::calendar_requests())
         .with_time_zones(campbooks_schedule::time_zones())
         .with_availability(campbooks_schedule::availability())
+        .with_holds(campbooks_schedule::holds())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
         ]))
@@ -672,6 +673,13 @@ pub fn router_with(
         .fallback(|| async { Error::NotFound })
         .with_state(state.clone());
     let bff = bff::Bff::new(bff, &state, api_only, admin_only, identity.clone());
+    // Where Microsoft Graph posts change notifications (campbooks-cloud#316):
+    // public like the issuer's endpoints, and like them outside the
+    // operation catalogue. Empty unless notifications are on.
+    let identity = identity.merge(campbooks_connectors::notifications_router(
+        state.clone(),
+        composition.connectors.clone(),
+    ));
 
     // RFC 9728: every Bearer challenge of the API names its metadata, so an
     // agent that knows only the API's URL finds the issuer.
@@ -1037,7 +1045,7 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these nine, on module tables.
+        // The maintenance scope: these ten, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
             // The chats' expiry (assistant, campbooks-cloud#305): which
@@ -1054,6 +1062,14 @@ mod tests {
             (
                 "connectors.imap_idle_leases",
                 "maintenance_reads_idle_leases",
+                "SELECT",
+            ),
+            // The Microsoft notification callback (connectors,
+            // campbooks-cloud#316): finds a subscription's workspace, read
+            // only.
+            (
+                "connectors.microsoft_subscriptions",
+                "maintenance_reads_microsoft_subscriptions",
                 "SELECT",
             ),
             // The stream dispatcher (connectors): reads and leases.

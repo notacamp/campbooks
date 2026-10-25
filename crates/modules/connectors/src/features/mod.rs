@@ -11,6 +11,7 @@ pub mod get_connection;
 pub mod imap_idle;
 pub mod list_connections;
 pub mod member_left;
+pub mod microsoft_notifications;
 pub mod queue_send;
 pub mod record_calendar_change;
 pub mod request_changes;

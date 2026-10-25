@@ -166,6 +166,13 @@ const at = (workspaceId: string, id: string) => ({
 export type PlanChange =
   { plan: "none" } | { plan: "date"; plan_on: string } | { plan: "later"; later_until: string };
 
+/** What `tasks.hold` sends: when, and on which calendar (the Campbooks one when left out). */
+export interface HoldChange {
+  starts: string;
+  ends: string;
+  calendarId?: string | undefined;
+}
+
 /** What `tasks.update` makes of a task: the whole editable set. */
 interface TaskEdit {
   title: string;
@@ -250,6 +257,29 @@ export function useTaskCalls(workspaceId: string) {
           await api.POST("/api/v1/w/{workspace_id}/tasks/{task_id}/hand_off", {
             ...at(workspaceId, task.id),
             body: { revision: task.revision, to },
+          }),
+        ),
+      ),
+    hold: async (task: TaskView, change: HoldChange): Promise<TaskView> =>
+      keep(
+        unwrap(
+          await api.POST("/api/v1/w/{workspace_id}/tasks/{task_id}/hold", {
+            ...at(workspaceId, task.id),
+            body: {
+              revision: task.revision,
+              starts: change.starts,
+              ends: change.ends,
+              ...(change.calendarId === undefined ? {} : { calendar_id: change.calendarId }),
+            },
+          }),
+        ),
+      ),
+    releaseHold: async (task: TaskView): Promise<TaskView> =>
+      keep(
+        unwrap(
+          await api.POST("/api/v1/w/{workspace_id}/tasks/{task_id}/release", {
+            ...at(workspaceId, task.id),
+            body: { revision: task.revision },
           }),
         ),
       ),

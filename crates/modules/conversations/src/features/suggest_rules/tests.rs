@@ -460,3 +460,133 @@ async fn an_impersonation_rule_never_reports_someone_the_inbox_writes_to(db: PgP
         ]
     );
 }
+
+const SHOP: &str = "orders@shop.example";
+
+/// The shop's automatic mail: `(subject, days ago, read)`, one conversation
+/// each (`<prefix>-0` …).
+fn shop_mail(prefix: &str, items: &[(String, i64, bool)]) -> serde_json::Value {
+    let now = chrono::Utc::now();
+    let changes: Vec<serde_json::Value> = items
+        .iter()
+        .enumerate()
+        .map(|(i, (subject, days, read))| {
+            json!({
+                "op": "upsert",
+                "message": {
+                    "provider_message_id": format!("{prefix}-{i}"),
+                    "thread_key": format!("thr-{prefix}-{i}"),
+                    "from": {"name": "Northwind", "address": SHOP},
+                    "to": [{"name": "Sam Rivers", "address": "sam@example.com"}],
+                    "subject": subject,
+                    "sent_at": (now - chrono::TimeDelta::days(*days)).to_rfc3339(),
+                    "direction": "inbound",
+                    "headers": {"auto_submitted": "auto-generated"},
+                    "text": "Thanks for shopping with us.",
+                    "mailbox": {"in_inbox": true},
+                    "read": read, "starred": false
+                }
+            })
+        })
+        .collect();
+    json!({"changes": changes})
+}
+
+/// Twelve weekly deals never opened, then six shipping notices all read.
+fn deals_and_parcels() -> Vec<(String, i64, bool)> {
+    let deals = (0..12).map(|i| (format!("Deals of the week {}", 40 - i), i + 1, false));
+    let parcels = (0..6).map(|i| {
+        (
+            format!("Your order {} has shipped", 5100 + i),
+            2 * i + 2,
+            true,
+        )
+    });
+    deals.chain(parcels).collect()
+}
+
+/// The likeness of each suggestion offered, and the default's.
+fn offered(json: &serde_json::Value) -> (Vec<String>, Option<String>) {
+    let all: Vec<String> = json["suggestions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["likeness"].as_str().unwrap().to_owned())
+        .collect();
+    let default = json["default"]
+        .as_u64()
+        .and_then(|i| all.get(usize::try_from(i).unwrap()).cloned());
+    (all, default)
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_machine_sender_of_mixed_mail_defaults_to_mail_like_this_one(db: PgPool) {
+    let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
+    let workspace = WorkspaceId::new();
+    let (sam, sam_id) = kit.member("sam", workspace);
+    let inbox = kit
+        .inbox(
+            workspace,
+            "sam@example.com",
+            &[(sam_id, InboxRole::Manager)],
+        )
+        .await;
+    kit.ingest_value(workspace, inbox, &shop_mail("shop", &deals_and_parcels()))
+        .await;
+    // Sam archives a deal: the shipping notices, which he reads, are not
+    // like it.
+    let deal = kit.conversation_of("shop-0").await;
+    let uri = format!("/api/v1/w/{workspace}/conversations/{deal}/rule-suggestions?action=archive");
+    let response = kit.get(&sam, &uri).await;
+    assert_eq!(response.status, StatusCode::OK, "{:?}", response.json);
+    let (all, default) = offered(&response.json);
+    assert_eq!(all, ["sender", "sender_template"]);
+    assert_eq!(default.as_deref(), Some("sender_template"));
+
+    // With the model's words for the shop's mail kept from Scout noticed,
+    // mail holding them is the default.
+    let promo = shop_mail(
+        "promo",
+        &[
+            "boots", "scarves", "coats", "gloves", "hats", "jackets", "socks", "shirts",
+        ]
+        .iter()
+        .zip(1..)
+        .map(|(item, day)| (format!("Our {item} sale starts now"), day, false))
+        .collect::<Vec<_>>(),
+    );
+    kit.ingest_value(workspace, inbox, &promo).await;
+    sqlx::query(
+        "INSERT INTO conversations.rule_notice_groupings
+             (inbox_id, workspace_id, sender_address, phrases, grouped_at)
+         VALUES ($1, $2, $3, '[\"has shipped\", \"sale starts now\"]', now())",
+    )
+    .bind(inbox)
+    .bind(workspace.as_uuid())
+    .bind(SHOP)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let sale = kit.conversation_of("promo-0").await;
+    let uri = format!("/api/v1/w/{workspace}/conversations/{sale}/rule-suggestions?action=archive");
+    let response = kit.get(&sam, &uri).await;
+    assert_eq!(response.status, StatusCode::OK, "{:?}", response.json);
+    let (all, default) = offered(&response.json);
+    // Each promotion's subject is its own template: by that, only this one.
+    assert_eq!(all, ["sender", "sender_phrase", "sender_template"]);
+    assert_eq!(
+        response.json["suggestions"][2]["preview"]["would_change"],
+        1
+    );
+    assert_eq!(default.as_deref(), Some("sender_phrase"));
+    let phrase = &response.json["suggestions"][1];
+    assert_eq!(
+        phrase["conditions"],
+        json!([
+            {"field": "sender_address", "value": SHOP},
+            {"field": "subject_contains", "value": "sale starts now"},
+        ])
+    );
+    // Every promotion, this one too (not archived yet).
+    assert_eq!(phrase["preview"]["would_change"], 8);
+}

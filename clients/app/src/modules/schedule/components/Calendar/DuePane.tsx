@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -11,66 +12,82 @@ import {
   SheetFact,
   SheetFacts,
   SheetNotice,
-  SheetQuote,
-  SheetSection,
   SheetTitle,
   SheetTop,
   SourceLink,
 } from "~/lib/ui";
 
-import type { DueAction, DueItem, useDueActions } from "../../due";
-import { dueTitle, dueWhen, overdueDays, type T } from "../../labels";
+import {
+  holdable,
+  HoldTime,
+  type HoldPick,
+  type HoldSources,
+  type TaskSource,
+  type TaskView,
+} from "~/modules/tasks";
+
+import type { TaskRow } from "../../due";
+import { dueTitle, dueWhen, dueWhenIsKind, type T } from "../../labels";
 import { dayLong, dayOf } from "../../model";
-import { emailPath, useInAppLink } from "./links";
+import { useInAppLink } from "./links";
 
 export interface DuePaneProps {
   workspaceId: string;
-  item: DueItem;
+  /** The row that was opened: it says whether the Due or the Planned chip shows. */
+  row: TaskRow;
   today: string;
-  act: ReturnType<typeof useDueActions>;
+  /** The email the task came from, when it came from one and the email is known. */
+  source: TaskSource | undefined;
+  /** The tasks module's Done (Paid), with its own Undo. */
+  done: (task: TaskView) => void;
+  /** The tasks module's Hold time, with its own Undo, and where it reads free time. */
+  hold?: { sources: HoldSources; run: (task: TaskView, pick: HoldPick) => void } | undefined;
   onClose: () => void;
 }
 
 /**
- * A task due on this day. It lives in the member's tasks, so the sheet has
- * no Remove: Paid or Done (E), Hold time (H), Later (S), Open task (↵).
+ * A task on this day, due or planned. It lives in the member's tasks, so the
+ * sheet has no Remove: Done or Paid (E), Hold time for a Do task (H), Open
+ * task (↵).
  */
-export function DuePane({ workspaceId, item, today, act, onClose }: DuePaneProps) {
+export function DuePane({ workspaceId, row, today, source, done, hold, onClose }: DuePaneProps) {
   const { t: typed, i18n } = useTranslation("schedule");
   const t: T = typed;
   const locale = i18n.language;
   const navigate = useNavigate();
   const link = useInAppLink();
-  const paying = item.verb === "pay";
-  const late = overdueDays(item, today) > 0;
-  const run = (action: DueAction) => {
-    act.mutate({ item, action });
-  };
+  const { task } = row;
+  const paying = task.verb === "pay";
   const open = () => {
-    void navigate({ to: `/w/${workspaceId}/tasks/${item.id}` });
+    void navigate({ to: `/w/${workspaceId}/tasks/${task.id}` });
   };
+  const finish = () => {
+    done(task);
+  };
+  const [holding, setHolding] = useState(false);
+  const canHold = hold !== undefined && holdable(task);
   useShortcut("overlay.close", onClose);
-  useShortcut("item.done", () => {
-    run("done");
-  });
-  useShortcut("item.hold", () => {
-    run("hold");
-  });
-  useShortcut("item.snooze", () => {
-    run("later");
-  });
+  useShortcut("item.done", finish);
   useShortcut("list.open", open);
+  useShortcut(
+    "item.hold",
+    () => {
+      setHolding((shown) => !shown);
+    },
+    { enabled: canHold },
+  );
 
-  const source = item.source ?? undefined;
-  const received =
-    source?.sentAt === null || source?.sentAt === undefined
-      ? ""
-      : dayLong(locale, dayOf(source.sentAt));
-  const day = dayLong(locale, dayOf(item.due));
+  const planned =
+    task.plan === "date" && task.plan_on !== null && task.plan_on !== undefined
+      ? task.plan_on
+      : undefined;
+  const due = task.due_on ?? undefined;
+  const late = row.kind === "due" && row.late > 0;
+  const received = source === undefined ? "" : dayLong(locale, dayOf(source.date));
   return (
-    <EventSheet label={dueTitle(t, locale, item)}>
+    <EventSheet label={dueTitle(t, row)}>
       <SheetTop>
-        <KindChip kind="due">{t("kind.due")}</KindChip>
+        <KindChip kind="due">{t(row.kind === "due" ? "kind.due" : "kind.planned")}</KindChip>
         <IconButton
           icon="close"
           label={t("sheet.close")}
@@ -78,66 +95,66 @@ export function DuePane({ workspaceId, item, today, act, onClose }: DuePaneProps
           onClick={onClose}
         />
       </SheetTop>
-      <SheetTitle>{dueTitle(t, locale, item)}</SheetTitle>
+      <SheetTitle>{dueTitle(t, row)}</SheetTitle>
       <SheetFacts>
-        <SheetFact icon="clock" main={late ? t("due.wasDue", { day }) : t("due.dueOn", { day })}>
-          {dueWhen(t, locale, item, today)}
-        </SheetFact>
-        <SheetFact icon="event" main={t("due.calendar")}>
-          {paying ? t("due.markPaid") : t("due.markDone")}
-        </SheetFact>
+        {planned === undefined ? null : (
+          <SheetFact icon="event" main={t("due.plannedFact", { day: dayLong(locale, planned) })} />
+        )}
+        {due === undefined ? null : (
+          <SheetFact
+            icon="clock"
+            main={t(late ? "due.wasDue" : "due.dueOn", { day: dayLong(locale, due) })}
+          >
+            {/* "Due today", "Due 17:00", "Overdue · 2 days"; a plain "Due" would repeat the line above. */}
+            {row.kind === "due" && !dueWhenIsKind(row, today)
+              ? dueWhen(t, locale, row, today)
+              : undefined}
+          </SheetFact>
+        )}
       </SheetFacts>
       <SheetNotice>{t("due.note")}</SheetNotice>
-      {act.isError ? <SheetNotice>{t("due.failed")}</SheetNotice> : null}
       {source === undefined ? null : (
         <SourceLink
           label={t("sheet.source.label")}
           subject={source.subject}
           meta={
             <>
-              {t("sheet.source.meta", { sender: source.sender, when: received })}
+              {t("sheet.source.meta", { sender: source.name, when: received })}
               {" · "}
               {t("sheet.source.open")}
             </>
           }
-          {...link(emailPath(workspaceId, source.stream, source.conversationId))}
+          {...link(source.href)}
         />
       )}
-      {source?.quote === undefined || source.quote === null ? null : (
-        <SheetSection label={t("sheet.how.label")}>
-          <SheetQuote>{source.quote}</SheetQuote>
-        </SheetSection>
-      )}
-      <SheetActions>
-        <Button
-          size="lg"
-          variant="primary"
-          icon="check"
-          shortcut="item.done"
-          onClick={() => {
-            run("done");
+      {hold !== undefined && canHold && holding ? (
+        <HoldTime
+          workspaceId={workspaceId}
+          task={task}
+          sources={hold.sources}
+          onPick={(pick) => {
+            setHolding(false);
+            hold.run(task, pick);
           }}
-        >
+        />
+      ) : null}
+      <SheetActions>
+        <Button size="lg" variant="primary" icon="check" shortcut="item.done" onClick={finish}>
           {paying ? t("due.paid") : t("due.done")}
         </Button>
-        <Button
-          size="lg"
-          shortcut="item.hold"
-          onClick={() => {
-            run("hold");
-          }}
-        >
-          {t("due.hold")}
-        </Button>
-        <Button
-          size="lg"
-          shortcut="item.snooze"
-          onClick={() => {
-            run("later");
-          }}
-        >
-          {t("due.later")}
-        </Button>
+        {canHold ? (
+          <Button
+            size="lg"
+            variant="ghost"
+            shortcut="item.hold"
+            aria-pressed={holding}
+            onClick={() => {
+              setHolding((shown) => !shown);
+            }}
+          >
+            {t("due.hold")}
+          </Button>
+        ) : null}
         <Button size="lg" variant="ghost" shortcut="list.open" onClick={open}>
           {t("due.open")}
         </Button>

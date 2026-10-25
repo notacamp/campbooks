@@ -6,7 +6,7 @@ use std::time::Duration;
 use secrecy::SecretString;
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
-    matchers::{body_string_contains, header, method, path, query_param},
+    matchers::{body_string_contains, header, header_exists, method, path, query_param},
 };
 
 use super::*;
@@ -369,4 +369,178 @@ fn aadsts_codes_are_read_from_a_description_only_at_its_start() {
     assert_eq!(aadsts_code("Something AADSTS70000: later"), None);
     assert_eq!(aadsts_code("AADSTS: none"), None);
     assert_eq!(aadsts_code("AADSTS12345678901234: too long"), None);
+}
+
+#[test]
+fn notifications_need_a_public_https_url() {
+    assert_eq!(
+        notification_url("https://campbooks.example.com").map(String::from),
+        Some("https://campbooks.example.com/hooks/microsoft/mail".to_owned())
+    );
+    assert_eq!(
+        notification_url("https://campbooks.example.com/").map(String::from),
+        Some("https://campbooks.example.com/hooks/microsoft/mail".to_owned())
+    );
+    for unusable in [
+        "http://localhost:8080",
+        "http://campbooks.example.com",
+        "https://localhost",
+        "https://app.localhost",
+        "https://10.0.0.5",
+        "https://[::1]",
+        "https://intranet",
+        "https://user:pass@campbooks.example.com",
+        "https://campbooks.example.com/?x=1",
+        "not a url",
+        "",
+    ] {
+        assert_eq!(notification_url(unusable), None, "{unusable}");
+    }
+}
+
+#[tokio::test]
+async fn a_message_over_the_limit_is_not_read_past_it() {
+    let (server, microsoft) = fake().await;
+    Mock::given(method("GET"))
+        .and(path("/v1.0/me/messages/msg-1/$value"))
+        .and(header_exists("prefer"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![b'x'; 5000]))
+        .mount(&server)
+        .await;
+    assert_eq!(
+        microsoft.raw("t", "msg-1", 4999).await.unwrap(),
+        Some(graph::RawFetch::TooLarge)
+    );
+    assert_eq!(
+        microsoft.raw("t", "msg-1", 5000).await.unwrap(),
+        Some(graph::RawFetch::Message(vec![b'x'; 5000]))
+    );
+    // Gone: none.
+    assert_eq!(microsoft.raw("t", "msg-2", 5000).await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn ids_are_path_segments_and_links_give_only_their_token() {
+    let (server, microsoft) = fake().await;
+    Mock::given(method("GET"))
+        .and(path("/v1.0/me/mailFolders/AQMk%2Fa=/messages/delta"))
+        .and(query_param("$deltatoken", "t-1"))
+        .respond_with(json(
+            200,
+            &serde_json::json!({
+                "value": [{"id": "m1", "isRead": true}],
+                "@odata.nextLink": "https://elsewhere.example.com/steal?$skiptoken=s-2"
+            }),
+        ))
+        .mount(&server)
+        .await;
+    let page = microsoft
+        .delta("t", "AQMk/a=", graph::Position::Delta("t-1"))
+        .await
+        .unwrap();
+    assert_eq!(
+        page,
+        graph::Delta::Page(graph::DeltaPage {
+            items: vec![graph::DeltaItem {
+                id: "m1".to_owned(),
+                state: Some(graph::MessageState {
+                    folder: None,
+                    conversation: None,
+                    received: None,
+                    read: true,
+                    draft: false,
+                    flagged: false,
+                    categories: Vec::new(),
+                }),
+            }],
+            next: graph::Next::More("s-2".to_owned()),
+        })
+    );
+    // Only the fake was asked, never the link's host.
+    let calls = server.received_requests().await.unwrap();
+    assert_eq!(calls.len(), 1);
+    assert!(
+        calls
+            .iter()
+            .all(|r| !r.url.as_str().contains("elsewhere.example.com"))
+    );
+}
+
+#[tokio::test]
+async fn an_expired_delta_and_throttling_are_told_apart() {
+    let (server, microsoft) = fake().await;
+    Mock::given(method("GET"))
+        .respond_with(json(
+            410,
+            &serde_json::json!({"error": {"code": "syncStateNotFound", "message": "x"}}),
+        ))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "86400"))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(503).insert_header("retry-after", "30"))
+        .mount(&server)
+        .await;
+    let start = graph::Position::Start(chrono::Utc::now());
+    assert_eq!(
+        microsoft.delta("t", "f1", start).await.unwrap(),
+        graph::Delta::Expired
+    );
+    // A day's Retry-After waits an hour at most.
+    assert_eq!(
+        microsoft.delta("t", "f1", start).await.unwrap_err(),
+        ProviderError::RateLimited {
+            retry_after: Some(MAX_RETRY_AFTER)
+        }
+    );
+    assert_eq!(
+        microsoft.delta("t", "f1", start).await.unwrap_err(),
+        ProviderError::RateLimited {
+            retry_after: Some(Duration::from_secs(30))
+        }
+    );
+}
+
+#[tokio::test]
+async fn a_subscription_goes_to_this_instance_with_its_client_state() {
+    let (server, microsoft) = fake().await;
+    let microsoft = microsoft.with_notifications(
+        Url::parse("https://campbooks.example.com/hooks/microsoft/mail").unwrap(),
+    );
+    Mock::given(method("POST"))
+        .and(path("/v1.0/subscriptions"))
+        .and(body_string_contains("\"clientState\":\"s3cret-state\""))
+        .and(body_string_contains(
+            "\"notificationUrl\":\"https://campbooks.example.com/hooks/microsoft/mail\"",
+        ))
+        .and(body_string_contains("\"resource\":\"me/messages\""))
+        .respond_with(json(
+            201,
+            &serde_json::json!({"id": "7f105c7d-2dc5-4530-97cd-4e7ae6534c07",
+                                "expirationDateTime": "2026-10-28T10:00:00Z"}),
+        ))
+        .mount(&server)
+        .await;
+    Mock::given(method("PATCH"))
+        .respond_with(json(
+            404,
+            &serde_json::json!({"error": {"code": "ResourceNotFound"}}),
+        ))
+        .mount(&server)
+        .await;
+    let expires = chrono::Utc::now();
+    let made = microsoft
+        .subscribe("t", "s3cret-state", expires)
+        .await
+        .unwrap();
+    assert_eq!(made.id, "7f105c7d-2dc5-4530-97cd-4e7ae6534c07");
+    assert_eq!(microsoft.renew("t", &made.id, expires).await.unwrap(), None);
+    // Without a notification URL nothing is asked of Graph.
+    let (_, plain) = fake().await;
+    assert!(plain.subscribe("t", "s", expires).await.is_err());
 }

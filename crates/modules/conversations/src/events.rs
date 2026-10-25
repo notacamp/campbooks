@@ -236,6 +236,15 @@ pub struct NeedFacts {
     pub lapses_at: Option<DateTime<Utc>>,
     /// Whether it is for today.
     pub urgent: bool,
+    /// Whether it is the warning about suspicious mail (campbooks-cloud#358):
+    /// Home puts it first. Absent when false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub warning: bool,
+    /// Whether a person sent its message rather than a machine (list,
+    /// automatic, no-reply or service mail), from the headers alone; absent
+    /// when the message could not be read, and from events written before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_person: Option<bool>,
 }
 
 /// A conversation's need changed: it opened, changed, or was cleared.

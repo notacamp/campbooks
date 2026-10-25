@@ -98,9 +98,15 @@
       "pr": "#665"
     },
     {
-      "change": "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check and the kernel's maintenance schedules and change-feed sequencer.",
+      "change": "Time held for a task (campbooks-cloud#362): tasks.task_held (minutes, moved, by the member or the calendar, the kind of calendar) and tasks.task_hold_released (minutes, by); enums hold_actor and hold_calendar; Coverage for tasks.hold, tasks.release_hold and the follow_hold handlers, and the hold released by tasks.done, tasks.not_needed and tasks.hand_off.",
       "date": "2026-10-25",
       "plan_version": 11,
+      "pr": "#674"
+    },
+    {
+      "change": "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check and the kernel's maintenance schedules and change-feed sequencer.",
+      "date": "2026-10-25",
+      "plan_version": 12,
       "pr": "#666"
     }
   ],
@@ -395,6 +401,31 @@
       "exemption": "",
       "kind": "handler",
       "name": "tasks.add_read_asks"
+    },
+    {
+      "events": [
+        "tasks.task_hold_released"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "tasks.follow_hold_cancelled"
+    },
+    {
+      "events": [
+        "tasks.task_held",
+        "tasks.task_hold_released"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "tasks.follow_hold_changed"
+    },
+    {
+      "events": [
+        "tasks.task_held"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "tasks.follow_hold_created"
     },
     {
       "events": [],
@@ -1521,7 +1552,8 @@
     },
     {
       "events": [
-        "tasks.task_done"
+        "tasks.task_done",
+        "tasks.task_hold_released"
       ],
       "exemption": "",
       "kind": "operation",
@@ -1529,7 +1561,8 @@
     },
     {
       "events": [
-        "tasks.task_reassigned"
+        "tasks.task_reassigned",
+        "tasks.task_hold_released"
       ],
       "exemption": "",
       "kind": "operation",
@@ -1537,7 +1570,16 @@
     },
     {
       "events": [
-        "tasks.task_not_needed"
+        "tasks.task_held"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.hold"
+    },
+    {
+      "events": [
+        "tasks.task_not_needed",
+        "tasks.task_hold_released"
       ],
       "exemption": "",
       "kind": "operation",
@@ -1550,6 +1592,14 @@
       "exemption": "",
       "kind": "operation",
       "name": "tasks.plan"
+    },
+    {
+      "events": [
+        "tasks.task_hold_released"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.release_hold"
     },
     {
       "events": [
@@ -3640,6 +3690,26 @@
       "description": "Understanding images and scanned documents.",
       "enum": "system.ai_role",
       "value": "vision"
+    },
+    {
+      "description": "The calendar: the block moved, removed or put back there.",
+      "enum": "tasks.hold_actor",
+      "value": "calendar"
+    },
+    {
+      "description": "The member.",
+      "enum": "tasks.hold_actor",
+      "value": "member"
+    },
+    {
+      "description": "The member's own Campbooks calendar, which no provider sees.",
+      "enum": "tasks.hold_calendar",
+      "value": "campbooks"
+    },
+    {
+      "description": "A calendar of a connected provider account.",
+      "enum": "tasks.hold_calendar",
+      "value": "provider"
     },
     {
       "description": "A day.",
@@ -18897,6 +18967,429 @@
       "version": 1
     },
     {
+      "action": "held",
+      "actor_types": [
+        "user",
+        "system"
+      ],
+      "added_in": 11,
+      "description": "Time was held for a Do task on its assignee's calendar (a busy block of kind hold), or the held block moved: by the member, from a free slot, or on the calendar (the block moved, or put back by the calendar's undo). Never the task's title or the calendar's name.",
+      "fires_when": "tasks.hold makes the block (moved when it replaces the task's earlier hold), or tasks.follow_hold_changed or tasks.follow_hold_created take a moved or restored block as the hold, in the transaction of the change; a block whose times did not change tracks nothing.",
+      "module": "tasks",
+      "name": "tasks.task_held",
+      "object": "task",
+      "openspec_change": "hold-time-for-a-task",
+      "rust_type": "TaskHeld",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_held:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "Time was held for a Do task on its assignee's calendar (a busy block of kind hold), or the held block moved: by the member, from a free slot, or on the calendar (the block moved, or put back by the calendar's undo). Never the task's title or the calendar's name.",
+        "properties": {
+          "by": {
+            "description": "Who held it: the member, or the calendar (a block moved or put back there).",
+            "enum": [
+              "calendar",
+              "member"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "calendar": {
+            "description": "The kind of calendar the block is on, when the member held it.",
+            "enum": [
+              "campbooks",
+              "provider"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "minutes": {
+            "description": "How long the held time is, in minutes.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "moved": {
+            "description": "Whether it replaced or moved an earlier hold of the task.",
+            "type": "boolean",
+            "x-classification": "operational"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "The task afterwards, planned for the held day.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "by",
+          "minutes",
+          "moved",
+          "task"
+        ],
+        "title": "tasks.task_held",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "hold_released",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 11,
+      "description": "A task's held time was taken off its assignee's calendar: released by the member (or the undo of a hold), freed because the task was done, not needed or handed over before the time came, or removed on the calendar. The task keeps no hold and no plan.",
+      "fires_when": "tasks.release_hold releases it, tasks.done, tasks.not_needed or tasks.hand_off free a hold that has not started, or tasks.follow_hold_cancelled or tasks.follow_hold_changed release the hold whose block was removed or became all-day, in the transaction of the change.",
+      "module": "tasks",
+      "name": "tasks.task_hold_released",
+      "object": "task",
+      "openspec_change": "hold-time-for-a-task",
+      "rust_type": "TaskHoldReleased",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_hold_released:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A task's held time was taken off its assignee's calendar: released by the member (or the undo of a hold), freed because the task was done, not needed or handed over before the time came, or removed on the calendar. The task keeps no hold and no plan.",
+        "properties": {
+          "by": {
+            "description": "Who released it: the member (releasing it, or closing or handing over the task), or the calendar (the block removed there).",
+            "enum": [
+              "calendar",
+              "member"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "minutes": {
+            "description": "How long the released time was, in minutes.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "The task afterwards, with no hold.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "by",
+          "minutes",
+          "task"
+        ],
+        "title": "tasks.task_hold_released",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "not_needed",
       "actor_types": [
         "user",
@@ -21225,7 +21718,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-25",
-  "plan_version": 11,
+  "plan_version": 12,
   "properties": [
     {
       "classification": "operational",
@@ -24650,6 +25143,110 @@
       "classification": "operational",
       "description": "The task afterwards.",
       "event": "tasks.task_edited",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Who held it: the member, or the calendar (a block moved or put back there).",
+      "event": "tasks.task_held",
+      "example": "",
+      "list": false,
+      "of": "tasks.hold_actor",
+      "pattern": "",
+      "property": "by",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The kind of calendar the block is on, when the member held it.",
+      "event": "tasks.task_held",
+      "example": "",
+      "list": false,
+      "of": "tasks.hold_calendar",
+      "pattern": "",
+      "property": "calendar",
+      "required": false,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How long the held time is, in minutes.",
+      "event": "tasks.task_held",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "minutes",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it replaced or moved an earlier hold of the task.",
+      "event": "tasks.task_held",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "moved",
+      "required": true,
+      "type": "bool",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task afterwards, planned for the held day.",
+      "event": "tasks.task_held",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Who released it: the member (releasing it, or closing or handing over the task), or the calendar (the block removed there).",
+      "event": "tasks.task_hold_released",
+      "example": "",
+      "list": false,
+      "of": "tasks.hold_actor",
+      "pattern": "",
+      "property": "by",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How long the released time was, in minutes.",
+      "event": "tasks.task_hold_released",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "minutes",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task afterwards, with no hold.",
+      "event": "tasks.task_hold_released",
       "example": "",
       "list": false,
       "of": "tasks.task",

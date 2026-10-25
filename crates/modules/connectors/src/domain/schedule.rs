@@ -184,6 +184,11 @@ pub fn connection_budget(connection: ConnectionId) -> String {
     format!("zoho:{connection}")
 }
 
+/// The budget key of one Microsoft connection's Graph requests.
+pub fn microsoft_budget(connection: ConnectionId) -> String {
+    format!("microsoft:{connection}")
+}
+
 /// The budget key of one connection's calendar requests.
 pub fn calendar_budget(connection: ConnectionId) -> String {
     format!("calendar:{connection}")

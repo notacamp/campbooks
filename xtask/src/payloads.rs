@@ -588,19 +588,19 @@ pub const JOB_ERROR_VALUES: &[(&str, &str, usize, &str)] = &[
     (
         "crates/modules/connectors/src/features/sync_stream/mod.rs",
         "other.to_string()",
-        3,
+        4,
         READ_ERROR,
     ),
     (
         "crates/modules/connectors/src/features/sync_stream/mod.rs",
         "redact::json(&e)",
-        7,
+        9,
         REDACTED_JSON,
     ),
     (
         "crates/modules/connectors/src/features/sync_stream/mod.rs",
         "target.stream",
-        3,
+        4,
         "the stream's id (a UUID)",
     ),
     (

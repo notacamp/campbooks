@@ -71,6 +71,48 @@ export const GroupWithAction: Story = {
   ),
 };
 
+/** A priority band (campbooks-cloud#358): no dot, Now in the danger tone. */
+export const Band: Story = {
+  args: { signal: undefined, tone: "danger", name: "Now", count: 2 },
+  render: (args) => (
+    <QueueGroup {...args}>
+      <Item
+        eyebrow={{
+          signal: "review",
+          kind: "Review",
+          reason: "Possible scam · check first",
+          danger: true,
+        }}
+        who="it-support@at3lier-sol.example"
+        what="This may be phishing. Don’t use its links."
+        avatar={{ name: "IT Support", kind: "service" }}
+        selected
+      />
+      <Item
+        eyebrow={{ signal: "pay", kind: "Pay", reason: "Overdue · 1 day", danger: true }}
+        who="Luz Energia"
+        what="Pay Luz Energia"
+        avatar={{ name: "Luz Energia", kind: "service" }}
+      />
+    </QueueGroup>
+  ),
+};
+
+/** A calm band: Today. */
+export const BandToday: Story = {
+  args: { signal: undefined, name: "Today", count: 1 },
+  render: (args) => (
+    <QueueGroup {...args}>
+      <Item
+        eyebrow={{ signal: "reply", kind: "Reply", reason: "Pedro has waited 4 days" }}
+        who="Pedro Alves"
+        what="Pedro Alves is waiting for your reply"
+        avatar={{ name: "Pedro Alves" }}
+      />
+    </QueueGroup>
+  ),
+};
+
 export const Hero: Story = {
   render: () => (
     <PageHero

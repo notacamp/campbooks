@@ -27,7 +27,7 @@
   },
   "week": {
     "label": "Semana",
-    "due": "Prazos",
+    "due": "Tarefas",
     "allDay": "Dia todo"
   },
   "month": {
@@ -51,7 +51,8 @@
     "expiry": "Validade",
     "hold": "Reservado",
     "none": "Evento",
-    "due": "Prazo"
+    "due": "Prazo",
+    "planned": "Planeada"
   },
   "from": {
     "email": "De um email"
@@ -99,7 +100,6 @@
   "due": {
     "label": "Prazo",
     "pay": "Pagar · {{title}}",
-    "payAmount": "Pagar · {{title}} · {{amount}}",
     "do": "Fazer · {{title}}",
     "today": "Para hoje",
     "at": "Para as {{time}}",
@@ -108,16 +108,15 @@
     "meta": "Tarefa",
     "wasDue": "Era para {{day}}",
     "dueOn": "Para {{day}}",
-    "note": "Uma tarefa: vive nas suas tarefas e aparece aqui no dia do prazo",
-    "calendar": "Tarefas",
-    "markPaid": "Marque-a como paga na tarefa",
-    "markDone": "Marque-a como feita na tarefa",
+    "note": "Uma tarefa: vive nas suas tarefas e aparece aqui no dia do prazo e no dia em que a planeou",
     "paid": "Paga",
     "done": "Feita",
-    "hold": "Reservar tempo",
-    "later": "Mais tarde",
     "open": "Abrir tarefa",
-    "failed": "Não foi possível. Tente de novo."
+    "planned": "Planeada",
+    "plannedOn": "Era para {{day}}",
+    "metaPlanned": "Planeada",
+    "plannedFact": "Planeada para {{day}}",
+    "hold": "Reservar tempo"
   },
   "form": {
     "newTitle": "Novo evento",

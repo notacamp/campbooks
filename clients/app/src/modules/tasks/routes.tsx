@@ -1,11 +1,14 @@
 import { createRoute, useParams, useSearch, type AnyRoute } from "@tanstack/react-router";
 
 import { TasksPage } from "./components/TasksPage/TasksPage";
+import type { HoldSources } from "./hold";
 import type { UseTaskSources } from "./source";
 
 export interface TasksRouteOptions {
   /** Where tasks made from conversations came from (the conversations module's). */
   useSources: UseTaskSources;
+  /** The member's free time and writable calendars, for Hold time (the schedule module's). */
+  holdSources?: HoldSources | undefined;
 }
 
 /**
@@ -14,7 +17,7 @@ export interface TasksRouteOptions {
  */
 export function buildTasksRoutes<TParent extends AnyRoute>(
   parent: TParent,
-  { useSources }: TasksRouteOptions,
+  { useSources, holdSources }: TasksRouteOptions,
 ) {
   function TasksRoute() {
     const params: { workspaceId?: string; taskId?: string } = useParams({ strict: false });
@@ -26,6 +29,7 @@ export function buildTasksRoutes<TParent extends AnyRoute>(
         taskId={params.taskId}
         creating={params.taskId === undefined && search.new === 1}
         useSources={useSources}
+        holdSources={holdSources}
       />
     );
   }

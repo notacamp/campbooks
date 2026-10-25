@@ -27,7 +27,7 @@
   },
   "week": {
     "label": "Semaine",
-    "due": "Échéances",
+    "due": "Tâches",
     "allDay": "Toute la journée"
   },
   "month": {
@@ -51,7 +51,8 @@
     "expiry": "Expiration",
     "hold": "Réservé",
     "none": "Événement",
-    "due": "Échéance"
+    "due": "Échéance",
+    "planned": "Planifiée"
   },
   "from": {
     "email": "D’un e-mail"
@@ -99,7 +100,6 @@
   "due": {
     "label": "Échéance",
     "pay": "Payer · {{title}}",
-    "payAmount": "Payer · {{title}} · {{amount}}",
     "do": "Faire · {{title}}",
     "today": "Pour aujourd’hui",
     "at": "Pour {{time}}",
@@ -108,16 +108,15 @@
     "meta": "Tâche",
     "wasDue": "Prévu pour {{day}}",
     "dueOn": "Pour {{day}}",
-    "note": "Une tâche : elle vit dans vos tâches et s’affiche ici à son échéance",
-    "calendar": "Tâches",
-    "markPaid": "Marquez-la payée depuis la tâche",
-    "markDone": "Marquez-la faite depuis la tâche",
+    "note": "Une tâche : elle vit dans vos tâches et s’affiche ici à son échéance et le jour où vous l’avez planifiée",
     "paid": "Payée",
     "done": "Faite",
-    "hold": "Réserver du temps",
-    "later": "Plus tard",
     "open": "Ouvrir la tâche",
-    "failed": "Impossible. Réessayez."
+    "planned": "Planifiée",
+    "plannedOn": "Prévue pour {{day}}",
+    "metaPlanned": "Planifiée",
+    "plannedFact": "Planifiée pour {{day}}",
+    "hold": "Réserver du temps"
   },
   "form": {
     "newTitle": "Nouvel événement",

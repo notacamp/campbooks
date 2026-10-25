@@ -8,7 +8,7 @@
 
 ## 2. The gaps
 
-- [ ] 2.1 `tracking/patches/0011-coverage-gaps.yaml` (plan version 11): `connectors.address_check_requested`, `connectors.address_check_send_completed`, their enums, the Coverage rows of `connectors.check_address`, `connectors.send_address_check` and the kernel's maintenance
+- [ ] 2.1 `tracking/patches/0012-coverage-gaps.yaml` (plan version 12): `connectors.address_check_requested`, `connectors.address_check_send_completed`, their enums, the Coverage rows of `connectors.check_address`, `connectors.send_address_check` and the kernel's maintenance
 - [ ] 2.2 `apply`, `generate`, `check`; commit the workbook, the mirror and the generated code
 - [ ] 2.3 Track both events in the transaction of the change
 - [ ] 2.4 Tests that read both back from `kernel.tracked_events`, and that a no-op tracks nothing

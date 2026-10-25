@@ -2458,6 +2458,13 @@
             "format": "date",
             "description": "When it is due, when the message names a date that resolves."
           },
+          "from_person": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether a person sent its message rather than a machine (list,\nautomatic, no-reply or service mail), from the headers alone; absent\nwhen the message could not be read, and from events written before."
+          },
           "lapses_at": {
             "type": [
               "string",
@@ -2477,6 +2484,10 @@
           "urgent": {
             "type": "boolean",
             "description": "Whether it is for today."
+          },
+          "warning": {
+            "type": "boolean",
+            "description": "Whether it is the warning about suspicious mail (campbooks-cloud#358):\nHome puts it first. Absent when false."
           }
         }
       },

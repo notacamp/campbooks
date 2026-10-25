@@ -13,7 +13,6 @@ import {
   dayLong,
   daysBetween,
   daysOf,
-  dueMinutes,
   hoursFor,
   inZone,
   isYmd,
@@ -120,11 +119,6 @@ describe("the member's clock", () => {
     expect(sameMoment("2026-10-30T07:40:00+00:00", "2026-10-30T08:40:00+01:00")).toBe(true);
     expect(sameMoment("2026-10-30T07:40:00+00:00", "2026-10-30T07:40:00+01:00")).toBe(false);
     expect(sameMoment("2026-10-30", "2026-10-30T09:00:00+00:00")).toBe(true);
-  });
-
-  it("knows the time a task is due at, if it is due at one", () => {
-    expect(dueMinutes({ due: "2026-10-30" })).toBeUndefined();
-    expect(dueMinutes({ due: "2026-10-30T17:00:00+00:00" })).toBe(17 * 60);
   });
 });
 

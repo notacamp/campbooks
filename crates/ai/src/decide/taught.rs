@@ -1143,7 +1143,10 @@ pub fn normalise_list_id(value: &str) -> String {
     }
 }
 
-fn contains_words(subject: &str, phrase: &str) -> bool {
+/// Whether `subject` holds `phrase`'s words, in this order, as whole words
+/// (case and accents ignored): the `SubjectContains` test, for code that
+/// counts the mail a member's rule of that shape would match.
+pub fn contains_words(subject: &str, phrase: &str) -> bool {
     let want = subject_words(phrase);
     if want.is_empty() {
         return false;

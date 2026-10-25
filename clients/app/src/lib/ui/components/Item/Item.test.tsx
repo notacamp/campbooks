@@ -12,6 +12,18 @@ const base = {
 };
 
 describe("Item", () => {
+  it("shows its pills in their signal's colour, before the tags", () => {
+    renderUi(
+      <Item
+        {...base}
+        tags={["2 messages"]}
+        pills={[{ text: "Held Wed 10:00–10:30", signal: "do" }]}
+      />,
+    );
+
+    expect(screen.getByText("Held Wed 10:00–10:30")).toHaveAttribute("data-signal", "do");
+  });
+
   it("expands its detail and says so", () => {
     const onToggle = vi.fn();
     renderUi(
@@ -44,6 +56,45 @@ describe("Item", () => {
     expect(row.querySelector("kbd")).toBeNull();
     expect(screen.getByText("Attached the scope.")).toBeInTheDocument();
     expect(screen.getByText("You held Thursday.")).toBeInTheDocument();
+  });
+
+  it("reads its eyebrow first: the kind, then why it is here", () => {
+    renderUi(
+      <Item
+        {...base}
+        eyebrow={{ signal: "pay", kind: "Pay task", reason: "Overdue · 2 days", danger: true }}
+      />,
+    );
+    const row = screen.getByRole("button", { name: /Sofia Pessoa/u });
+
+    expect(row).toHaveAttribute("data-eyebrow");
+    expect(row.textContent).toMatch(/Pay task · Overdue · 2 days Sofia Pessoa/u);
+    expect(screen.getByText("Overdue · 2 days")).toHaveAttribute("data-danger", "true");
+  });
+
+  it("says why it is here under the visor, with its notes", () => {
+    renderUi(
+      <ItemDetail
+        why={{
+          label: "Why it’s here",
+          text: "In Now because overdue · 2 days.",
+          notes: ["Scam warnings and anything overdue."],
+        }}
+        actions={<button type="button">Open</button>}
+      />,
+    );
+    const why = screen.getByRole("region", { name: "Why it’s here" });
+
+    expect(why).toHaveTextContent("In Now because overdue · 2 days.");
+    expect(why).toHaveTextContent("Scam warnings and anything overdue.");
+  });
+
+  it("draws no eyebrow without one", () => {
+    renderUi(<Item {...base} />);
+
+    expect(screen.getByRole("button", { name: /Sofia Pessoa/u })).not.toHaveAttribute(
+      "data-eyebrow",
+    );
   });
 
   it("shows Scout's summary under its heading, before the email, as text only", () => {

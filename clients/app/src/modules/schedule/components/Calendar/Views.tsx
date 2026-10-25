@@ -14,16 +14,17 @@ import {
   type WeekPill,
 } from "~/lib/ui";
 
+import type { TaskSource } from "~/modules/tasks";
+
 import type { CalendarView, EventView } from "../../api/types";
-import type { DueItem } from "../../due";
+import type { TaskRow } from "../../due";
 import {
-  dueKeyOf,
-  dueStandsOn,
+  dueMeta,
   dueTitle,
   dueWhen,
+  dueWhenIsKind,
   eventKey,
   metaLine,
-  overdueDays,
   whenLabel,
   type T,
 } from "../../labels";
@@ -42,7 +43,6 @@ import {
   MONTH_SHOWN,
   monthStart,
   startMinutes,
-  dueMinutes,
   type Ymd,
 } from "../../model";
 
@@ -50,10 +50,13 @@ export interface ViewProps {
   /** The days the view covers, in order. */
   days: readonly Ymd[];
   events: readonly EventView[];
-  due: readonly DueItem[];
+  /** The member's tasks as rows: Due and Planned. */
+  tasks: readonly TaskRow[];
+  /** The email a task came from, when it came from one and the email is known. */
+  sourceOf: (task: TaskRow["task"]) => TaskSource | undefined;
   calendars: readonly CalendarView[];
   today: { day: Ymd; minute: number };
-  /** The key of the event or Due row whose sheet is open. */
+  /** The key of the event or task row whose sheet is open. */
   selected: string | undefined;
   onSelect: (key: string) => void;
   /** Go to a day in the agenda (a month cell's number). */
@@ -82,8 +85,7 @@ interface Row {
 /** Days from today onwards, each with its events in time order; days with nothing are skipped. */
 export function AgendaView(props: ViewProps) {
   const { t, locale } = useLabels();
-  const { days, events, due, calendars, today, selected, onSelect } = props;
-  const dueShown = due.filter((item) => item.held !== true);
+  const { days, events, tasks, sourceOf, calendars, today, selected, onSelect } = props;
 
   const sections = days
     .map((day) => {
@@ -111,32 +113,33 @@ export function AgendaView(props: ViewProps) {
             ),
           };
         }),
-        ...dueShown
-          .filter((item) => dueStandsOn(item, today.day) === day)
-          .map((item): Row => {
-            const key = dueKeyOf(item);
-            const late = overdueDays(item, today.day) > 0;
+        ...tasks
+          .filter((row) => row.stands === day)
+          .map((row): Row => {
+            const late = row.kind === "due" && row.late > 0;
+            const source = sourceOf(row.task);
             return {
-              key,
-              group: late ? 0 : dueMinutes(item) === undefined ? 2 : 3,
-              minute: dueMinutes(item) ?? 0,
+              key: row.key,
+              group: late ? 0 : row.minute === undefined ? 2 : 3,
+              minute: row.minute ?? 0,
               node: (
                 <AgendaRow
-                  key={key}
+                  key={row.key}
                   kind="due"
-                  when={dueWhen(t, locale, item, today.day)}
+                  when={dueWhen(t, locale, row, today.day)}
                   overdue={late}
-                  title={dueTitle(t, locale, item)}
-                  kindLabel={t("kind.due")}
-                  meta={t("due.meta")}
+                  whenInline={!dueWhenIsKind(row, today.day)}
+                  title={dueTitle(t, row)}
+                  kindLabel={t(row.kind === "due" ? "kind.due" : "kind.planned")}
+                  meta={dueMeta(t, locale, row)}
                   from={
-                    item.source === undefined || item.source === null
+                    source === undefined
                       ? undefined
-                      : { label: t("from.email"), sender: item.source.sender }
+                      : { label: t("from.email"), sender: source.name }
                   }
-                  selected={selected === key}
+                  selected={selected === row.key}
                   onSelect={() => {
-                    onSelect(key);
+                    onSelect(row.key);
                   }}
                 />
               ),
@@ -183,11 +186,10 @@ export function AgendaView(props: ViewProps) {
   );
 }
 
-/** The week as a time grid: a Due lane (only with tasks), All day, and a column per day. */
+/** The week as a time grid: a Tasks lane (only with tasks), All day, and a column per day. */
 export function WeekView(props: ViewProps) {
   const { t, locale } = useLabels();
-  const { days, events, due, today, selected, onSelect } = props;
-  const dueShown = due.filter((item) => item.held !== true);
+  const { days, events, tasks, today, selected, onSelect } = props;
   const first = days[0] ?? today.day;
 
   const placed = days.map((day) => blocksOn(events, day));
@@ -227,24 +229,21 @@ export function WeekView(props: ViewProps) {
       },
     };
   });
-  const dueLane: WeekPill[] = dueShown
-    .filter((item) => {
-      const day = dueStandsOn(item, today.day);
-      return day >= first && day <= (days.at(-1) ?? first);
-    })
-    .map((item): WeekPill => {
-      const column = daysBetween(first, dueStandsOn(item, today.day)) + 1;
-      const key = dueKeyOf(item);
+  const lastShown = days.at(-1) ?? first;
+  const dueLane: WeekPill[] = tasks
+    .filter((row) => row.stands >= first && row.stands <= lastShown)
+    .map((row): WeekPill => {
+      const column = daysBetween(first, row.stands) + 1;
       return {
-        id: key,
+        id: row.key,
         kind: "due",
-        title: t(item.verb === "pay" ? "due.pay" : "due.do", { title: item.title }),
+        title: dueTitle(t, row),
         from: column,
         to: column + 1,
-        dashed: true,
-        selected: selected === key,
+        dashed: row.kind === "due",
+        selected: selected === row.key,
         onSelect: () => {
-          onSelect(key);
+          onSelect(row.key);
         },
       };
     });
@@ -272,13 +271,22 @@ export function WeekView(props: ViewProps) {
   );
 }
 
-/** A month: each day's first events and "+N more". */
+/** A month: each day's first events and tasks, and "+N more". */
 export function MonthView(props: ViewProps) {
   const { t, locale } = useLabels();
-  const { days, events, today, selected, onSelect, onOpenDay } = props;
+  const { days, events, tasks, today, selected, onSelect, onOpenDay } = props;
   const anchorMonth = monthStart(days[Math.floor(days.length / 2)] ?? today.day).slice(0, 7);
   const cells: MonthDay[] = days.map((day) => {
-    const list = agendaOn(events, day);
+    const list = [
+      ...agendaOn(events, day).map((event) => ({
+        id: eventKey(event),
+        kind: event.kind,
+        title: event.title,
+      })),
+      ...tasks
+        .filter((row) => row.stands === day)
+        .map((row) => ({ id: row.key, kind: "due" as const, title: dueTitle(t, row) })),
+    ];
     const shown = list.slice(0, MONTH_SHOWN);
     const rest = list.length - shown.length;
     return {
@@ -287,18 +295,13 @@ export function MonthView(props: ViewProps) {
       label: dayLong(locale, day),
       today: day === today.day,
       outside: day.slice(0, 7) !== anchorMonth,
-      events: shown.map((event) => {
-        const key = eventKey(event);
-        return {
-          id: key,
-          kind: event.kind,
-          title: event.title,
-          selected: selected === key,
-          onSelect: () => {
-            onSelect(key);
-          },
-        };
-      }),
+      events: shown.map((entry) => ({
+        ...entry,
+        selected: selected === entry.id,
+        onSelect: () => {
+          onSelect(entry.id);
+        },
+      })),
       more: rest > 0 ? t("month.more", { count: rest }) : undefined,
       onOpen: () => {
         onOpenDay(day);

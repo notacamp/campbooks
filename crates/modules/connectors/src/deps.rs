@@ -126,7 +126,8 @@ impl Deps {
             let centres = base.map_or(Centres::Zoho, Centres::Fake);
             deps.zoho = Some(Arc::new(Zoho::new(client_id, client_secret, centres)?));
         }
-        deps.microsoft = microsoft_client(figment, &deps.config, development, secret.is_some())?;
+        deps.microsoft = microsoft_client(figment, &deps.config, development, secret.is_some())?
+            .map(|client| with_notifications(client, &deps.config, &config.public_url));
         // IMAP is on by default (campbooks-cloud#314) but needs the instance
         // secret to seal passwords: without one it is simply not offered,
         // unless an operator asked for it by name.
@@ -228,6 +229,29 @@ fn microsoft_client(
         client_secret,
         endpoints,
     )?)))
+}
+
+/// `client` posting Graph's change notifications to this instance when
+/// `CAMPBOOKS_CONNECTORS__MICROSOFT__NOTIFICATIONS` asks for them and
+/// `public_url` can take them ([`microsoft::notification_url`]); otherwise
+/// as it is, its mailboxes polled, with a warning when they were asked for.
+/// Never an error: notifications never stop the server.
+fn with_notifications(
+    client: Arc<Microsoft>,
+    settings: &ConnectorsConfig,
+    public_url: &str,
+) -> Arc<Microsoft> {
+    if !settings.microsoft.adapter().notifications {
+        return client;
+    }
+    let Some(url) = microsoft::notification_url(public_url) else {
+        tracing::warn!(
+            "CAMPBOOKS_CONNECTORS__MICROSOFT__NOTIFICATIONS is on but CAMPBOOKS_PUBLIC_URL is not \
+             an https address Microsoft can reach: Microsoft mailboxes are polled instead"
+        );
+        return client;
+    };
+    Arc::new(Microsoft::clone(&client).with_notifications(url))
 }
 
 /// A provider's client id, secret and (development only) fake base, when
@@ -574,6 +598,65 @@ mod tests {
             err.contains("CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT"),
             "{err}"
         );
+    }
+
+    #[test]
+    fn microsoft_notifications_need_a_public_https_url_and_never_stop_the_server() {
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let with = |connectors: serde_json::Value| {
+            Figment::from(Serialized::defaults(serde_json::json!({
+                "microsoft": {"client_id": "m", "client_secret": "s"},
+                "connectors": connectors
+            })))
+        };
+        let poll = serde_json::json!({"min_seconds": 60, "max_seconds": 120});
+        let mut public = kernel_config();
+        public.public_url = "https://campbooks.example.com".to_owned();
+        // Production's settings: no Microsoft mail, subscription or callback
+        // variable. It starts, nothing of Microsoft offered.
+        let production = with(serde_json::json!({"poll": poll}));
+        for config in [kernel_config(), public.clone()] {
+            let deps = Deps::from_figment(&production, &config, key()).unwrap();
+            assert!(deps.microsoft.is_none());
+        }
+        // Off, notifications asked for in any shape: it starts.
+        for asked in [serde_json::json!(true), serde_json::json!("maybe")] {
+            let off =
+                with(serde_json::json!({"poll": poll, "microsoft": {"notifications": asked}}));
+            let deps = Deps::from_figment(&off, &public, key()).unwrap();
+            assert!(deps.microsoft.is_none());
+        }
+        // On without notifications: polled.
+        let on = with(serde_json::json!({"poll": poll, "microsoft": {"enabled": true}}));
+        let deps = Deps::from_figment(&on, &public, key()).unwrap();
+        assert!(deps.microsoft.unwrap().notification_url().is_none());
+        // On with them and a public https URL: posted to this instance.
+        let notify = with(serde_json::json!({
+            "poll": poll, "microsoft": {"enabled": true, "notifications": true}
+        }));
+        let deps = Deps::from_figment(&notify, &public, key()).unwrap();
+        assert_eq!(
+            deps.microsoft
+                .unwrap()
+                .notification_url()
+                .map(url::Url::as_str),
+            Some("https://campbooks.example.com/hooks/microsoft/mail")
+        );
+        // Without a URL Microsoft can reach: polled, and it starts.
+        for unusable in [
+            "http://localhost:8080",
+            "https://localhost",
+            "https://10.0.0.5",
+            "http://campbooks.example.com",
+        ] {
+            let mut config = kernel_config();
+            config.public_url = unusable.to_owned();
+            let deps = Deps::from_figment(&notify, &config, key()).unwrap();
+            assert!(
+                deps.microsoft.unwrap().notification_url().is_none(),
+                "{unusable}"
+            );
+        }
     }
 
     #[test]

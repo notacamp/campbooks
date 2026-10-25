@@ -173,6 +173,7 @@
     "sortedDefault": "Dans {{stream}} : rien ne l’a déplacée",
     "read": "La lecture de Campbooks, sous forme de suggestions : {{list}}.",
     "nothing": "Rien ici ne semble vous demander quoi que ce soit.",
+    "replied": "Vous avez répondu le {{date}} : rien ici ne vous attend.",
     "needsReply": "elle attend une réponse",
     "asksAction": "elle vous demande de faire quelque chose",
     "hasDeadline": "elle mentionne une date à respecter",
@@ -461,6 +462,7 @@
     "likeness": {
       "sender": "Tout ce qui vient de {{address}}",
       "list": "Seulement la liste {{list}}",
+      "phrase": "Seulement les e-mails sur « {{phrase}} » de {{from}}",
       "template": "Seulement « {{template}} » de {{from}}",
       "domain": "Tout ce qui vient de {{domain}}",
       "impersonation": "Les e-mails qui se font passer pour {{domain}}"
@@ -790,9 +792,13 @@
     "position": "{{n}} sur {{total}}",
     "keepOffHome_one": "Vous avez reçu {{n}} e-mail de {{sender}} ces {{days}} derniers jours et en avez ouvert {{opened}}.",
     "keepOffHome_other": "Vous avez reçu {{n}} e-mails de {{sender}} ces {{days}} derniers jours et en avez ouvert {{opened}}.",
+    "keepOffHomeLike_one": "Vous avez reçu {{n}} e-mail comme « {{example}} » de {{sender}} ces {{days}} derniers jours et en avez ouvert {{opened}}.",
+    "keepOffHomeLike_other": "Vous avez reçu {{n}} e-mails comme « {{example}} » de {{sender}} ces {{days}} derniers jours et en avez ouvert {{opened}}.",
     "keepOffHomeAsk": "Les retirer de l’Accueil et les classer dans {{stream}} ?",
     "archived_one": "{{sender}} vous a envoyé {{n}} e-mail ces {{days}} derniers jours, et vous en avez archivé ou supprimé {{archived}} sans les lire.",
     "archived_other": "{{sender}} vous a envoyé {{n}} e-mails ces {{days}} derniers jours, et vous en avez archivé ou supprimé {{archived}} sans les lire.",
+    "archivedLike_one": "{{sender}} vous a envoyé {{n}} e-mail comme « {{example}} » ces {{days}} derniers jours, et vous en avez archivé ou supprimé {{archived}} sans les lire.",
+    "archivedLike_other": "{{sender}} vous a envoyé {{n}} e-mails comme « {{example}} » ces {{days}} derniers jours, et vous en avez archivé ou supprimé {{archived}} sans les lire.",
     "archiveAsk": "Les archiver dès leur arrivée ?",
     "cadence": {
       "daily": "Ils arrivent presque tous les jours.",

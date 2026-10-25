@@ -256,23 +256,68 @@ function flagsOf(decisions: readonly DecisionView[]) {
   });
 }
 
-/** Whether the decide pass thinks the conversation needs a reply (the note then offers Reply). */
-export function suggestsReply(decisions: readonly DecisionView[]): boolean {
-  return flagsOf(decisions).some((flag) => flag.question === "needs_reply");
+/**
+ * When the member last wrote after the newest inbound message, or `null`:
+ * the decide answers are about that inbound message, so a reply since has
+ * answered what they asked of the member, as a reply clears a Reply or Do
+ * need.
+ */
+export function repliedSince(messages: readonly MessageView[]): string | null {
+  const time = (message: MessageView) => new Date(message.sent_at).getTime();
+  const inbound = messages.filter((message) => message.direction === "inbound");
+  if (inbound.length === 0) {
+    return null;
+  }
+  const newestInbound = Math.max(...inbound.map(time));
+  const replies = messages.filter(
+    (message) => message.direction === "outbound" && time(message) > newestInbound,
+  );
+  if (replies.length === 0) {
+    return null;
+  }
+  return replies.reduce((newest, message) => (time(message) > time(newest) ? message : newest))
+    .sent_at;
 }
 
-/** The note's sentence: what the decide pass thinks, said as suggestions. */
+/** The yes answers the note still says once the member replied: only a warning stands. */
+function standing(decisions: readonly DecisionView[], replied: string | null) {
+  const flags = flagsOf(decisions);
+  return replied === null ? flags : flags.filter((flag) => flag.question === "suspicious");
+}
+
+/**
+ * Whether the decide pass thinks the conversation needs a reply (the note
+ * then offers Reply): never once the member `replied` since.
+ */
+export function suggestsReply(
+  decisions: readonly DecisionView[],
+  replied: string | null = null,
+): boolean {
+  return standing(decisions, replied).some((flag) => flag.question === "needs_reply");
+}
+
+/**
+ * The note's sentence: what the decide pass thinks, said as suggestions;
+ * once the member `replied` since the message it read, that they did, and
+ * only a warning of what it thought.
+ */
 export function noteSentence(
   t: Translate,
   decisions: readonly DecisionView[],
   locale: string,
+  replied: string | null = null,
 ): string {
-  const flags = flagsOf(decisions);
-  if (flags.length === 0) {
-    return t("scout.nothing");
-  }
+  const flags = standing(decisions, replied);
   const list = new Intl.ListFormat(locale, { type: "conjunction" });
-  return t("scout.read", { list: list.format(flags.map((flag) => t(flag.phrase))) });
+  const read = t("scout.read", { list: list.format(flags.map((flag) => t(flag.phrase))) });
+  if (replied !== null) {
+    const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(
+      new Date(replied),
+    );
+    const said = t("scout.replied", { date });
+    return flags.length === 0 ? said : `${said} ${read}`;
+  }
+  return flags.length === 0 ? t("scout.nothing") : read;
 }
 
 /** The note's footer line: where the conversation is and who put it there, in words. */

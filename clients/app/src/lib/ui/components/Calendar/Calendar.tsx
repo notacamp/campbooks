@@ -169,6 +169,11 @@ export interface AgendaRowProps {
   when: string;
   /** Drawn in the danger colour (an overdue task). */
   overdue?: boolean | undefined;
+  /**
+   * Whether `when` repeats in the second line on a phone (the default). Off
+   * when it only says the kind again, as a task's plain "Due" does.
+   */
+  whenInline?: boolean | undefined;
   title: string;
   /** The kind's name, in its colour, before the rest of the line. */
   kindLabel: string;
@@ -188,6 +193,7 @@ export function AgendaRow({
   kind,
   when,
   overdue = false,
+  whenInline = true,
   title,
   kindLabel,
   meta,
@@ -213,10 +219,12 @@ export function AgendaRow({
         <span className={styles["meta"]}>
           <span className={styles["metaKind"]}>{kindLabel}</span>
           <span> · </span>
-          <span className={styles["whenInline"]} data-tone={tone}>
-            {when}
-            {" · "}
-          </span>
+          {whenInline ? (
+            <span className={styles["whenInline"]} data-tone={tone}>
+              {when}
+              {" · "}
+            </span>
+          ) : null}
           {meta}
         </span>
       </span>

@@ -205,8 +205,10 @@ fn read_definitions() -> Vec<ToolDefinition> {
                 ),
                 ChatTool::WhatNeedsMe => (
                     "What needs the member now across all their mail (their list on \
-                     Home), or what they are waiting on others for. Up to 20. Not for \
-                     what the chat's own record asks of them: that is under `about`.",
+                     Home), most pressing first: each need's band (now, today, week, \
+                     whenever) and why it is there. Or what they are waiting on others \
+                     for. Up to 20. Not for what the chat's own record asks of them: \
+                     that is under `about`.",
                     object(
                         json!({
                             "waiting": {"type": "boolean",
@@ -626,7 +628,8 @@ impl Toolbox {
         Ok((json!({ "people": people }), Vec::new(), count))
     }
 
-    /// What needs the member, or what they wait on others for, with the
+    /// What needs the member, most pressing first (Home's bands, each need
+    /// with its band and why), or what they wait on others for, with the
     /// conversations it is about.
     async fn what_needs_me(&self, waiting: bool) -> Result<(Value, Vec<RecordRef>, u32), Unread> {
         let list = self
@@ -658,11 +661,15 @@ impl Toolbox {
                     .iter()
                     .find(|c| c["id"] == item["record"]["id"])
                     .map(project::summary);
+                // Home's order and why (campbooks-cloud#358): the band and
+                // its rule, worked out from facts, rather than Scout's own
+                // urgency.
                 json!({
                     "reason": item["reason"],
+                    "band": item["band"],
+                    "band_reason": item["band_reason"],
                     "due_on": item["due_on"],
                     "overdue": item["overdue"],
-                    "urgent": item["urgent"],
                     "since": item["since"],
                     "conversation": about,
                 })
@@ -673,7 +680,11 @@ impl Toolbox {
             .map(|id| RecordRef::new(CONVERSATION, id))
             .collect();
         Ok((
-            json!({ "needs": needs, "counts": list["counts"] }),
+            json!({
+                "needs": needs,
+                "counts": list["counts"],
+                "tasks_elsewhere": list["tasks_elsewhere"],
+            }),
             records,
             count(items.len()),
         ))

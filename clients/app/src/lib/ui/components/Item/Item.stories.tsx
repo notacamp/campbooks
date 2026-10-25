@@ -108,6 +108,18 @@ export const DueSoon: Story = {
   },
 };
 
+/** A task with time held on the calendar: the held time in Do's colour. */
+export const Held: Story = {
+  args: {
+    who: "You wrote this",
+    avatar: { name: "Send the signed lease" },
+    due: "Due Fri 30",
+    what: "Send the signed lease",
+    tags: [],
+    pills: [{ text: "Held Wed 10:00–10:30", signal: "do" }],
+  },
+};
+
 /** Phone: a link to the conversation, with the swipe actions revealed. */
 export const Swiped: Story = {
   args: {
@@ -190,5 +202,104 @@ export const WarningOpen: Story = {
         actions={<Button variant="secondary">It’s safe</Button>}
       />
     ),
+  },
+};
+
+/**
+ * Home's rows (campbooks-cloud#358): the kind and why it is here before the
+ * name; the row's end keeps only how long it has waited.
+ */
+export const WithEyebrow: Story = {
+  args: {
+    eyebrow: { signal: "reply", kind: "Reply", reason: "Pedro has waited 4 days" },
+    who: "Pedro Alves",
+    what: "Pedro Alves is waiting for your reply",
+    excerpt: "Do you want the oak or the walnut worktop before I order?",
+    avatar: { name: "Pedro Alves" },
+    due: undefined,
+    age: {
+      text: "4 days ago",
+      dateTime: "2026-10-21T09:12:00Z",
+      label: "Wednesday 21 October 2026 at 10:12",
+    },
+    tags: [],
+  },
+  play: async ({ canvasElement }) => {
+    const row = within(canvasElement).getByRole("button", { name: /Pedro has waited 4 days/u });
+    await expect(row).toHaveTextContent(/Reply.*Pedro has waited 4 days.*Pedro Alves/u);
+  },
+};
+
+/** A warning or something overdue: the reason in the danger colour, here selected. */
+export const WithEyebrowDanger: Story = {
+  args: {
+    eyebrow: { signal: "pay", kind: "Pay task", reason: "Overdue · 2 days", danger: true },
+    who: "From an email from Fidelidade",
+    what: "Renew the car insurance",
+    avatar: { name: "Fidelidade", kind: "service" },
+    due: undefined,
+    age: {
+      text: "17 days ago",
+      dateTime: "2026-10-08T09:00:00Z",
+      label: "Thursday 8 October 2026 at 10:00",
+    },
+    tags: [],
+    selected: true,
+    actions,
+  },
+};
+
+/** A long reason on a narrow row wraps: the whole sentence is read. */
+export const WithEyebrowLong: Story = {
+  args: {
+    eyebrow: {
+      signal: "review",
+      kind: "Review",
+      reason: "Possible scam · check first, before you open any link",
+      danger: true,
+    },
+    who: "it-support@at3lier-sol.example",
+    what: "This may be phishing. Don’t use its links.",
+    avatar: { name: "IT Support", kind: "service" },
+    due: undefined,
+    tags: [],
+  },
+  decorators: [
+    (Story) => (
+      <div className="flex w-aside flex-col">
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+/** Opened: why it is where it is, under the visor (campbooks-cloud#358). */
+export const WhyItsHere: Story = {
+  args: {
+    eyebrow: { signal: "reply", kind: "Reply", reason: "Pedro has waited 4 days" },
+    who: "Pedro Alves",
+    what: "Pedro Alves is waiting for your reply",
+    avatar: { name: "Pedro Alves" },
+    due: undefined,
+    tags: [],
+    selected: true,
+    expanded: true,
+    detail: (
+      <ItemDetail
+        why={{
+          label: "Why it’s here",
+          text: "In Today: Pedro has waited 4 days.",
+          notes: [
+            "Due today or tomorrow, planned for today, nudges that are due, and people who have waited 3 days or more.",
+          ],
+        }}
+        quote="Do you want the oak or the walnut worktop before I order?"
+        actions={<Button variant="secondary">Open conversation</Button>}
+      />
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const why = within(canvasElement).getByRole("region", { name: "Why it’s here" });
+    await expect(why).toHaveTextContent("In Today: Pedro has waited 4 days.");
   },
 };

@@ -85,6 +85,14 @@ pub struct NeedFacts {
     pub lapses_at: Option<DateTime<Utc>>,
     /// Whether it is for today.
     pub urgent: bool,
+    /// Whether it is the warning about suspicious mail (campbooks-cloud#358);
+    /// false in events written before.
+    #[serde(default)]
+    pub warning: bool,
+    /// Whether a person sent its message rather than a machine, from the
+    /// headers alone; `None` when unknown, and in events written before.
+    #[serde(default)]
+    pub from_person: Option<bool>,
 }
 
 impl DomainEvent for ConversationNeedChanged {
@@ -115,6 +123,9 @@ pub struct TaskChanged {
     pub due_on: Option<NaiveDate>,
     /// The plan: `none`, `date` or `later`.
     pub plan: String,
+    /// The day it is planned for, when its plan is a day.
+    #[serde(default)]
+    pub plan_on: Option<NaiveDate>,
     /// When Later ends.
     #[serde(default)]
     pub later_until: Option<DateTime<Utc>>,

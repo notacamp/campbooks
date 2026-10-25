@@ -1,69 +1,91 @@
-import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTasks, type TaskView } from "~/modules/tasks";
 
-import { useUndoToast } from "~/lib/ui";
+import { daysBetween, nowIn, type Ymd } from "./model";
 
 /**
- * The Due layer (the follow-up of this change that needs the `tasks`
- * contracts): the member's open tasks that have a due date, drawn on their
- * day. Until `tasks` publishes them there is nothing to read, so these hooks
- * answer an empty list and the calendar shows no Due row. The shape below is
- * the one `design.md` documents (`tasks.task_changed.v1` plus the
- * `TaskSource` port for the title); a story seeds it through the query cache.
+ * The tasks on the calendar. They are the member's own open tasks (the tasks
+ * module's list, live through the change feed), drawn on the day each is due
+ * (a Due row) and on the day the member planned it for (a Planned row). A
+ * task with time held has its block on the calendar instead of a Planned
+ * row, and no Due row on the day it is held when that is its due day.
  */
-export interface DueItem {
-  id: string;
-  /** Do something, or pay something. */
-  verb: "do" | "pay";
-  title: string;
-  /** Only when the task has one; never guessed. */
-  amount?: { minor: number; currency: string } | null;
-  /** A date (`2026-10-30`), or a time with an offset when it is due at a time. */
-  due: string;
-  /** The message it came from, when it came from one. */
-  source?: {
-    conversationId: string;
-    stream: string;
-    subject: string;
-    sender: string;
-    sentAt: string | null;
-    quote?: string | null;
-  } | null;
-  /** The member holds time for it on its due day: only the held block shows. */
-  held?: boolean;
+export interface TaskRow {
+  /** `due:<task id>` or `plan:<task id>`: what the address holds for its sheet. */
+  key: string;
+  kind: "due" | "planned";
+  task: TaskView;
+  /** The day it stands on: its own day, or today once that day has passed. */
+  stands: Ymd;
+  /** Whole days its own day is behind today (0 when it is not). */
+  late: number;
+  /** A Due row with a time: minutes after midnight on the member's clock. */
+  minute: number | undefined;
+  /** A Due row whose task is also planned for that same day. */
+  alsoPlanned: boolean;
 }
 
-export type DueAction = "done" | "hold" | "later";
+const dueKeyOf = (taskId: string) => `due:${taskId}`;
+const planKeyOf = (taskId: string) => `plan:${taskId}`;
 
-export const dueKey = (workspaceId: string) => ["schedule.due", workspaceId] as const;
-export const DUE_ACTION_KEY = ["schedule.due_action"] as const;
+const later = (day: Ymd, today: Ymd): Ymd => (day < today ? today : day);
+const behind = (day: Ymd, today: Ymd): number => Math.max(daysBetween(day, today), 0);
 
-/** The open tasks with a due date. Empty until the `tasks` contracts are wired. */
-export function useDueItems(workspaceId: string): readonly DueItem[] {
-  // Nothing to ask yet: the cache is the only source (a story, or the `tasks`
-  // follow-up, fills it), and the query is switched on when there is a server.
-  const query = useQuery<DueItem[]>({ queryKey: dueKey(workspaceId), queryFn: skipToken });
-  return query.data ?? [];
+/** The minutes after midnight a task is due at on the member's clock, when it has a time. */
+function dueMinute(task: TaskView, zone: string): number | undefined {
+  if (task.due_at === null || task.due_at === undefined) {
+    return undefined;
+  }
+  return nowIn(zone, new Date(task.due_at)).minute;
 }
 
 /**
- * Paid / Done, Hold time, Later on a Due row. The mutation itself is the
- * `tasks` follow-up's (`setMutationDefaults(DUE_ACTION_KEY, …)`); each
- * success is offered with Undo like every other action.
+ * The rows of a list of open tasks as of `today`. A task has at most one row
+ * on a day: when its plan and its due date stand on the same day, the Due row
+ * shows alone. A Later plan has no Planned row.
  */
-export function useDueActions(workspaceId: string) {
-  const queryClient = useQueryClient();
-  const undo = useUndoToast();
-  return useMutation<
-    { label: string; undo: () => void } | undefined,
-    Error,
-    { item: DueItem; action: DueAction }
-  >({
-    mutationKey: DUE_ACTION_KEY,
-    onSuccess: (result) => {
-      if (result !== undefined) {
-        undo.push({ label: result.label, undo: result.undo });
-      }
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: dueKey(workspaceId) }),
+export function taskRows(tasks: readonly TaskView[], today: Ymd, zone: string): TaskRow[] {
+  return tasks.flatMap((task): TaskRow[] => {
+    if (task.state !== "open") {
+      return [];
+    }
+    const hold = task.hold ?? undefined;
+    const heldOn = hold === undefined ? undefined : nowIn(zone, new Date(hold.starts)).day;
+    // The held block stands for the plan, and for the due date on its own day.
+    const due =
+      heldOn !== undefined && heldOn === task.due_on ? undefined : (task.due_on ?? undefined);
+    const plan =
+      task.plan === "date" && hold === undefined ? (task.plan_on ?? undefined) : undefined;
+    const dueStands = due === undefined ? undefined : later(due, today);
+    const planStands = plan === undefined ? undefined : later(plan, today);
+    const rows: TaskRow[] = [];
+    if (due !== undefined && dueStands !== undefined) {
+      rows.push({
+        key: dueKeyOf(task.id),
+        kind: "due",
+        task,
+        stands: dueStands,
+        late: behind(due, today),
+        minute: dueMinute(task, zone),
+        alsoPlanned: planStands === dueStands,
+      });
+    }
+    if (plan !== undefined && planStands !== undefined && planStands !== dueStands) {
+      rows.push({
+        key: planKeyOf(task.id),
+        kind: "planned",
+        task,
+        stands: planStands,
+        late: behind(plan, today),
+        minute: undefined,
+        alsoPlanned: false,
+      });
+    }
+    return rows;
   });
+}
+
+/** The member's open tasks as calendar rows. Empty while they load. */
+export function useTaskRows(workspaceId: string, today: Ymd, zone: string): readonly TaskRow[] {
+  const tasks = useTasks(workspaceId);
+  return taskRows(tasks.data ?? [], today, zone);
 }

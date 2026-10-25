@@ -13,6 +13,11 @@
 //! is recorded on it and the run ends normally, with the next run set by
 //! the backoff, rather than failing the job.
 //!
+//! A Microsoft stream (`microsoft::read`) reads each folder's Graph delta,
+//! after making sure of its change-notification subscription where the
+//! instance takes them (`microsoft::subscriptions`); while one is live, its
+//! next poll is the longest interval.
+//!
 //! An IMAP stream (`imap::read`) reads over one session to its server,
 //! holding one of the host's few session slots, and keeps where each
 //! message is (`connectors.imap_locations`) with the index. Its pending
@@ -71,6 +76,7 @@ use crate::{
     },
     mail::{IndexOp, ReadError},
     metrics::{self, SyncOutcome},
+    microsoft,
     provider::ProviderError,
     tracking, zoho,
 };
@@ -115,6 +121,10 @@ impl JobHandler for SyncStream {
     const QUEUE: &'static str = "sync";
     const MAX_ATTEMPTS: u32 = 3;
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one run read top to bottom: load, token, backlog, the provider's read"
+    )]
     async fn run(&self, ctx: &mut JobContext, payload: SyncStreamPayload) -> Result<(), JobError> {
         let workspace: WorkspaceId = ctx
             .workspace()
@@ -139,8 +149,7 @@ impl JobHandler for SyncStream {
             Provider::Zoho => self.deps.zoho.is_some(),
             Provider::Imap if self.deps.imap.config.enabled && self.deps.cipher.is_some() => true,
             Provider::Imap => return self.idle_imap(ctx, workspace, &target, now).await,
-            // No reading until campbooks-cloud#316: the grant is kept alive.
-            Provider::Microsoft => return self.idle_microsoft(ctx, workspace, &target, now).await,
+            Provider::Microsoft => self.deps.microsoft.is_some(),
         };
         let (true, Some(inbox)) = (configured, target.inbox) else {
             // The provider is no longer configured (or the stream has no
@@ -214,7 +223,11 @@ impl JobHandler for SyncStream {
                 self.run_zoho(ctx, workspace, &target, &token, &backlog, now)
                     .await
             }
-            Provider::Imap | Provider::Microsoft => Ok(None),
+            Provider::Microsoft => {
+                self.run_microsoft(ctx, workspace, &target, &token, now)
+                    .await
+            }
+            Provider::Imap => Ok(None),
         }
         .inspect_err(|_| metrics::sync_finished(target.provider, SyncOutcome::Failed))?;
         // Without a page the run waits or has recorded its trouble, and
@@ -252,6 +265,9 @@ struct RunPage {
     /// The connection's address is being checked: the next run is at the
     /// poll's shortest interval (IMAP only).
     checking: bool,
+    /// Graph posts the stream's changes (a live subscription): the next
+    /// poll is the longest interval (Microsoft only).
+    notified: bool,
 }
 
 impl SyncStream {
@@ -474,6 +490,7 @@ impl SyncStream {
             imap: Vec::new(),
             idle: None,
             checking: false,
+            notified: false,
             phase: page.phase,
             more: page.more,
         }))
@@ -623,6 +640,7 @@ impl SyncStream {
             imap: Vec::new(),
             idle: None,
             checking: false,
+            notified: false,
             phase: page.phase,
             more: page.more,
         }))
@@ -657,61 +675,108 @@ impl SyncStream {
         Ok(())
     }
 
-    /// A Microsoft stream until reading lands (campbooks-cloud#316): a valid
-    /// access token is had (the stored one, or a refresh under the
-    /// connection's lock), so a grant Microsoft no longer honours shows as
-    /// `needs_reauth` and throttling as `throttled`, then it waits at the
-    /// slowest interval. Nothing is read or written. On an instance that no
-    /// longer offers Microsoft mail, nothing is asked of Microsoft and the
-    /// leased schedule row brings the stream back later.
-    async fn idle_microsoft(
+    /// A Microsoft run: the connection's budget, its subscription to change
+    /// notifications where this instance takes them, then one page of every
+    /// folder's delta. `None` once the run has ended without a page
+    /// (waiting, trouble recorded). Nothing is written to Microsoft.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one run read top to bottom: budget, subscription, read"
+    )]
+    async fn run_microsoft(
         &self,
         ctx: &mut JobContext,
         workspace: WorkspaceId,
         target: &Target,
+        token: &str,
         now: DateTime<Utc>,
-    ) -> Result<(), JobError> {
-        if self.deps.microsoft.is_none() {
-            tracing::debug!(stream = %target.stream, "Microsoft mail is not offered here");
-            return Ok(());
-        }
-        match credentials::access_token(ctx.pool(), &self.deps, workspace, target.connection).await
-        {
-            Ok(_) => {}
-            Err(TokenError::NeedsReauth(reason)) => {
-                metrics::sync_finished(target.provider, SyncOutcome::Refused);
-                return self.needs_reauth(ctx, workspace, target, reason, now).await;
-            }
-            Err(TokenError::Provider(err)) => {
-                return self.trouble(ctx, workspace, target, &err, now).await;
-            }
-            Err(TokenError::Database(err)) => return Err(err.into()),
+    ) -> Result<Option<RunPage>, JobError> {
+        let Some(client) = self.deps.microsoft.clone() else {
+            return Ok(None);
+        };
+        let cursor: microsoft::state::Cursor = serde_json::from_value(target.cursor.clone())
+            .map_err(|e| {
+                JobError::fatal(format!(
+                    "stream {} has an unreadable cursor: {}",
+                    target.stream,
+                    redact::json(&e)
+                ))
+            })?;
+        let settings = self.deps.config.microsoft.adapter();
+        let cost = microsoft::read::requests_per_run(
+            cursor.folders.len(),
+            microsoft::read::lists_folders(&cursor, now),
+        );
+        let key = schedule::microsoft_budget(target.connection);
+        let rate = Rate::per_minute(settings.requests_per_minute);
+        if let Err(wait) = schedule::take(ctx.pool(), &key, cost, rate).await? {
+            metrics::sync_finished(target.provider, SyncOutcome::Throttled);
+            Self::wait_for_budget(ctx, workspace, target.stream, wait, now).await?;
+            return Ok(None);
         }
         let state = ctx.state().clone();
-        let tx = ctx.tx().await?;
-        health::lock(tx, target.connection).await?;
-        sqlx::query(
-            "UPDATE connectors.streams SET consecutive_failures = 0, throttled_until = NULL
-              WHERE id = $1",
-        )
-        .bind(target.stream)
-        .execute(&mut **tx)
-        .await?;
-        if matches!(target.health, Health::Throttled | Health::Failing) {
-            health::set(
-                tx,
-                &state.tracker,
+        // Before the read: what changes after it is posted. Its calls are
+        // charged to the connection's budget as made.
+        let ensured = microsoft::subscriptions::ensure(
+            ctx.pool(),
+            &state.signer,
+            &client,
+            token,
+            microsoft::subscriptions::For {
                 workspace,
-                target.connection,
-                Health::Ok,
-                None,
-                now,
-            )
-            .await?;
+                connection: target.connection,
+                stream: target.stream,
+            },
+            now,
+        )
+        .await?;
+        if ensured.calls > 0
+            && let Err(err) = schedule::settle(ctx.pool(), &key, 0, ensured.calls, rate).await
+        {
+            tracing::warn!(
+                %workspace,
+                stream = %target.stream,
+                error = %campbooks_kernel::redact::error(&err),
+                "could not charge the Microsoft budget for a subscription"
+            );
         }
-        let idle = now + TimeDelta::seconds(i64::from(self.deps.config.poll.max_seconds));
-        schedule::set_due(tx, workspace, target.stream, idle).await?;
-        Ok(())
+        let notified = ensured.live;
+        let reader = microsoft::read::Reader {
+            microsoft: &client,
+            token,
+            pool: ctx.pool(),
+            blobs: &state.blobs,
+            workspace,
+            stream: target.stream,
+            phase: target.phase,
+            cursor,
+            now,
+            settings,
+        };
+        let page = match reader.read().await {
+            Ok(page) => page,
+            Err(ReadError::Provider(err)) => {
+                self.trouble(ctx, workspace, target, &err, now).await?;
+                return Ok(None);
+            }
+            Err(other) => return Err(JobError::retry(other.to_string())),
+        };
+        Ok(Some(RunPage {
+            cursor: serde_json::to_value(&page.cursor)
+                .map_err(|e| JobError::fatal(format!("encoding a cursor: {}", redact::json(&e))))?,
+            token: page.cursor.token(),
+            read_up_to: None,
+            changes: page.changes,
+            index: page.index,
+            labels: None,
+            zoho_labels: None,
+            imap: Vec::new(),
+            idle: None,
+            checking: false,
+            notified,
+            phase: page.phase,
+            more: page.more,
+        }))
     }
 
     /// An IMAP run: the account and its password, one of its host's
@@ -1097,9 +1162,14 @@ impl SyncStream {
                 )
                 .await?;
         }
-        let least_wait = self
+        let mut least_wait = self
             .offer_idle(tx, workspace, target, page.idle.as_ref(), now)
             .await?;
+        if page.notified {
+            // Graph posts the changes: a safety poll at the longest interval.
+            let longest = i32::try_from(self.deps.config.poll.max_seconds).unwrap_or(i32::MAX);
+            least_wait = least_wait.max(longest);
+        }
         if settle_outbound(
             tx,
             target.stream,
@@ -1729,6 +1799,7 @@ fn imap_page(page: Page) -> Result<RunPage, JobError> {
         imap: page.locations,
         idle: None,
         checking: false,
+        notified: false,
         phase: page.phase,
         more: page.more,
     })

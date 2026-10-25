@@ -393,8 +393,3 @@ export function atWallClock(zone: string, day: Ymd, time: string): string {
 export function timeField(time: string): string {
   return time.length < 16 ? "" : time.slice(11, 16);
 }
-
-/** The time of day a task is due at, in minutes, if it is due at one. */
-export function dueMinutes(item: { due: string }): number | undefined {
-  return item.due.length > 10 ? minutesOf(item.due) : undefined;
-}

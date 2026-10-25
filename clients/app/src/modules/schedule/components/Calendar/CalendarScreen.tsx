@@ -11,11 +11,25 @@ import {
   SkeletonList,
   ViewTabs,
 } from "~/lib/ui";
+import {
+  CONVERSATION,
+  useTaskActions,
+  type TaskSource,
+  type TaskView,
+  type UseTaskSources,
+} from "~/modules/tasks";
 
-import { useCalendars, useEventActions, useEvents, useScheduleSettings } from "../../api/queries";
+import {
+  useCalendars,
+  useEventActions,
+  useEvents,
+  useFreeSlots,
+  useScheduleSettings,
+  useWritableCalendars,
+} from "../../api/queries";
 import type { NewEvent } from "../../api/types";
-import { useDueActions, useDueItems } from "../../due";
-import { dueKeyOf, eventKey, type T } from "../../labels";
+import { useTaskRows } from "../../due";
+import { eventKey, type T } from "../../labels";
 import {
   addDays,
   cityOf,
@@ -34,6 +48,9 @@ import { EventDialog, type EventDraft } from "./EventDialog";
 import { EventPane } from "./EventPane";
 import { AgendaView, MonthView, WeekView } from "./Views";
 
+/** Where the task sheet's Hold time reads free time and calendars: this module's own. */
+const HOLD_SOURCES = { useFreeSlots, useWritableCalendars };
+
 /** What the address holds: the view, the day looked at, the open event. */
 export interface ScheduleSearch {
   view?: View;
@@ -47,6 +64,8 @@ export interface CalendarScreenProps {
   onSearch: (next: ScheduleSearch) => void;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
+  /** Where tasks made from conversations came from (the conversations module's). */
+  useSources: UseTaskSources;
 }
 
 /** Below 48rem the app is a phone (the tab bar, the single-pane reader). */
@@ -90,7 +109,13 @@ function useClock(fixed: Date | undefined): Date {
  * Scout read from their mail, typed and linked to its email, and what their
  * calendars hold), the event's sheet beside it, and the keys for all of it.
  */
-export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarScreenProps) {
+export function CalendarScreen({
+  workspaceId,
+  search,
+  onSearch,
+  now,
+  useSources,
+}: CalendarScreenProps) {
   const { t: typed, i18n } = useTranslation("schedule");
   const t: T = typed;
   const locale = i18n.language;
@@ -105,9 +130,17 @@ export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarS
   const period = windowOf(view, anchor);
   const days = daysOf(period);
   const events = useEvents(workspaceId, period, { enabled: settings.data !== undefined });
-  const due = useDueItems(workspaceId);
+  const tasks = useTaskRows(workspaceId, clock.day, zone);
+  const taskActions = useTaskActions(workspaceId);
   const actions = useEventActions(workspaceId);
-  const dueActions = useDueActions(workspaceId);
+  // The emails behind the tasks that came from one.
+  const sources = useSources(workspaceId, [
+    ...new Set(
+      tasks.flatMap(({ task }) => (task.source?.type === CONVERSATION ? [task.source.id] : [])),
+    ),
+  ]);
+  const sourceOf = (task: TaskView): TaskSource | undefined =>
+    task.source?.type === CONVERSATION ? sources.get(task.source.id) : undefined;
   const [draft, setDraft] = useState<EventDraft | undefined>();
 
   const go = (next: ScheduleSearch) => {
@@ -159,8 +192,8 @@ export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarS
   const calendarList = calendars.data ?? [];
   const selectedEvent =
     search.event === undefined ? undefined : list.find((each) => eventKey(each) === search.event);
-  const selectedDue =
-    search.event === undefined ? undefined : due.find((each) => dueKeyOf(each) === search.event);
+  const selectedTask =
+    search.event === undefined ? undefined : tasks.find((each) => each.key === search.event);
   const select = (key: string) => {
     go({ view, date: anchor, event: key });
   };
@@ -211,7 +244,8 @@ export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarS
     const shared = {
       days,
       events: list,
-      due,
+      tasks,
+      sourceOf,
       calendars: calendarList,
       today: clock,
       selected: search.event,
@@ -309,13 +343,15 @@ export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarS
           }}
         />
       )}
-      {selectedDue === undefined ? null : (
+      {selectedTask === undefined ? null : (
         <DuePane
-          key={dueKeyOf(selectedDue)}
+          key={selectedTask.key}
           workspaceId={workspaceId}
-          item={selectedDue}
+          row={selectedTask}
           today={clock.day}
-          act={dueActions}
+          source={sourceOf(selectedTask.task)}
+          done={taskActions.done}
+          hold={{ sources: HOLD_SOURCES, run: taskActions.hold }}
           onClose={close}
         />
       )}
