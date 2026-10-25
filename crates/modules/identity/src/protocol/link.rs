@@ -98,6 +98,8 @@ pub(super) async fn start(
         adds_way_in: ticket.adds_way_in,
         capabilities: ticket.capabilities,
     };
+    // A connect or reconnect goes to the mail tenant (Microsoft).
+    let upstream = upstream.for_mailbox(flow.purpose.wants_mailbox());
     redirect_to_provider(
         ctx,
         issuer,
@@ -163,6 +165,18 @@ pub(super) async fn finish(
         return hand_over_detached(ctx, flow, identity, tokens, way_in).await;
     }
     if flow.purpose == Purpose::Connect && !flow.adds_way_in {
+        return finish_shared(ctx, upstream, flow, identity, tokens, account, now).await;
+    }
+    // A mailbox whose account sign-in would refuse (a personal Microsoft
+    // account, sign-in being for organizations only) is connected without
+    // becoming a way in: one sign-in refuses would be a dead entry.
+    if flow.purpose == Purpose::Connect
+        && !super::sign_in::configured(issuer, provider).is_ok_and(|u| u.admits(&identity))
+    {
+        tracing::info!(
+            provider = provider.as_str(),
+            "connected a mailbox sign-in does not admit, without adding a way in"
+        );
         return finish_shared(ctx, upstream, flow, identity, tokens, account, now).await;
     }
     // A way in added to an account must be an address the allow-list lets in.

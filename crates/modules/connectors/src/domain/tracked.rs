@@ -28,6 +28,7 @@ pub const fn provider(provider: Provider) -> tracking::Provider {
         Provider::Google => tracking::Provider::Google,
         Provider::Zoho => tracking::Provider::Zoho,
         Provider::Imap => tracking::Provider::Imap,
+        Provider::Microsoft => tracking::Provider::Microsoft,
     }
 }
 

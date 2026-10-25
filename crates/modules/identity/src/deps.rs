@@ -174,6 +174,20 @@ impl Deps {
                 config.public_url
             ));
         }
+        // The tenant a Microsoft mail connection's round trip goes to: the
+        // connectors module's setting (it refreshes the tokens there too);
+        // unset, sign-in's own, so a single-tenant app never widens. Read
+        // leniently: the connectors module refuses a bad one, and only while
+        // Microsoft mail is on.
+        let mail_tenant = match figment.find_value(MAIL_TENANT_KEY) {
+            Err(_) => None,
+            Ok(value) => Some(
+                value
+                    .as_str()
+                    .map(|tenant| tenant.trim().to_owned())
+                    .unwrap_or_default(),
+            ),
+        };
         let mut upstreams = Vec::new();
         for provider in Provider::ALL {
             let key = provider.as_str();
@@ -184,7 +198,13 @@ impl Deps {
             } else {
                 ProviderConfig::default()
             };
-            upstreams.extend(upstream_client(provider, settings, config, &url)?);
+            upstreams.extend(upstream_client(
+                provider,
+                settings,
+                config,
+                &url,
+                mail_tenant.as_deref(),
+            )?);
         }
         let oauth: OAuthConfig = if figment.contains("oauth") {
             figment
@@ -266,17 +286,26 @@ impl<'de> Deserialize<'de> for Switch {
     }
 }
 
+/// Where the Microsoft mail tenant is set: `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT`
+/// (unset: sign-in's tenant).
+const MAIL_TENANT_KEY: &str = "connectors.microsoft.tenant";
+
 /// `CAMPBOOKS_<PROVIDER>__`.
 fn env_prefix(provider: Provider) -> String {
     format!("CAMPBOOKS_{}__", provider.as_str().to_uppercase())
 }
 
-/// `provider`'s client, when its client id and secret are set.
+/// `provider`'s client, when its client id and secret are set. For
+/// Microsoft, with a second client for mail round trips when
+/// `mail_tenant` is set and is not sign-in's tenant (unset, mail round trips
+/// stay on sign-in's client; set to one that is not a tenant, too, with a
+/// warning).
 fn upstream_client(
     provider: Provider,
     settings: ProviderConfig,
     config: &Config,
     issuer: &str,
+    mail_tenant: Option<&str>,
 ) -> Result<Option<Upstream>, String> {
     let prefix = env_prefix(provider);
     let present =
@@ -295,7 +324,8 @@ fn upstream_client(
         return Ok(None);
     };
     let tenant = present(settings.tenant).unwrap_or_else(|| "common".to_owned());
-    let endpoints = match present(settings.base_url) {
+    let base_url = present(settings.base_url);
+    let endpoints = match base_url.as_deref() {
         None => match provider {
             Provider::Google => Endpoints::google(),
             Provider::Microsoft => Endpoints::microsoft(&tenant)?,
@@ -313,11 +343,40 @@ fn upstream_client(
                 provider.as_str()
             ));
         }
-        Some(base) => Endpoints::under(provider, &base, &tenant)
+        Some(base) => Endpoints::under(provider, base, &tenant)
             .map_err(|e| format!("{prefix}BASE_URL={base}: {e}"))?,
     };
     let redirect_uri = redirect_uri(provider, issuer, settings.redirect_path.as_deref())?;
-    Upstream::new(provider, client_id, secret, redirect_uri, endpoints).map(Some)
+    let mail_tenant = mail_tenant.filter(|mail| *mail != tenant);
+    let mail = if let (Provider::Microsoft, Some(mail_tenant)) = (provider, mail_tenant) {
+        let endpoints = match base_url.as_deref() {
+            None => Endpoints::microsoft(mail_tenant),
+            Some(base) => Endpoints::under(provider, base, mail_tenant),
+        };
+        if let Ok(endpoints) = endpoints {
+            Some(Upstream::new(
+                provider,
+                client_id.clone(),
+                secret.clone(),
+                redirect_uri.clone(),
+                endpoints,
+            )?)
+        } else {
+            tracing::warn!(
+                "CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT is not common, organizations, \
+                 consumers or a tenant id: Microsoft mail round trips use sign-in's tenant \
+                 (CAMPBOOKS_MICROSOFT__TENANT)"
+            );
+            None
+        }
+    } else {
+        None
+    };
+    let upstream = Upstream::new(provider, client_id, secret, redirect_uri, endpoints)?;
+    Ok(Some(match mail {
+        Some(mail) => upstream.with_mail(mail),
+        None => upstream,
+    }))
 }
 
 /// `scheme://host[:port]` of the public URL and whether it is `https`. The
@@ -482,6 +541,66 @@ mod tests {
         )
         .unwrap_err();
         assert!(bad_tenant.contains("TENANT"), "{bad_tenant}");
+    }
+
+    #[test]
+    fn a_microsoft_mail_round_trip_goes_to_the_mail_tenant() {
+        let settings = |connectors: serde_json::Value| {
+            serde_json::json!({
+                "microsoft": { "client_id": "m", "client_secret": "s", "tenant": "organizations" },
+                "connectors": connectors,
+            })
+        };
+        let path = |deps: &Deps, mailbox: bool| -> String {
+            let issuer = deps.issuer.as_ref().unwrap();
+            let upstream = issuer
+                .upstreams
+                .iter()
+                .find(|u| u.provider() == Provider::Microsoft)
+                .unwrap();
+            let url = upstream.for_mailbox(mailbox).authorize_url(
+                &crate::upstream::client::AuthorizeRequest {
+                    scopes: &[],
+                    state: "st",
+                    nonce: "no",
+                    code_challenge: "ch",
+                    consent: true,
+                    offline: true,
+                    login_hint: None,
+                },
+            );
+            url::Url::parse(&url).unwrap().path().to_owned()
+        };
+        let config = config("https://app.example.com", None);
+        // Unset: sign-in's tenant, so a single-tenant app never widens.
+        let deps = deps_with(&config, KEY, &settings(serde_json::json!({}))).unwrap();
+        assert_eq!(path(&deps, false), "/organizations/oauth2/v2.0/authorize");
+        assert_eq!(path(&deps, true), "/organizations/oauth2/v2.0/authorize");
+        let deps = deps_with(
+            &config,
+            KEY,
+            &settings(serde_json::json!({ "microsoft": { "tenant": "common" } })),
+        )
+        .unwrap();
+        assert_eq!(path(&deps, false), "/organizations/oauth2/v2.0/authorize");
+        assert_eq!(path(&deps, true), "/common/oauth2/v2.0/authorize");
+        let deps = deps_with(
+            &config,
+            KEY,
+            &settings(serde_json::json!({ "microsoft": { "tenant": "consumers" } })),
+        )
+        .unwrap();
+        assert_eq!(path(&deps, true), "/consumers/oauth2/v2.0/authorize");
+        // An invalid one never stops identity: mail round trips stay on
+        // sign-in's client (the connectors module refuses it while
+        // Microsoft mail is on).
+        for stray in [
+            serde_json::json!({ "microsoft": { "tenant": "not a tenant" } }),
+            serde_json::json!({ "microsoft": { "tenant": 7 } }),
+        ] {
+            let deps = deps_with(&config, KEY, &settings(stray)).unwrap();
+            assert_eq!(path(&deps, true), "/organizations/oauth2/v2.0/authorize");
+        }
     }
 
     #[test]

@@ -238,3 +238,47 @@ async fn discovery_is_limited_per_member(db: PgPool) {
     assert_eq!(limited.status, StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(limited.json["code"], "rate_limited");
 }
+
+#[test]
+fn outlook_goes_to_microsofts_sign_in_only_while_it_is_offered() {
+    use std::sync::Arc;
+
+    use super::{DiscoveredImap, offered};
+    use crate::imap::discover::{Discovery, Native};
+
+    let outlook = || Discovery::NotSupportedYet(Native::Microsoft);
+    // Off (the default, or the client missing): coming soon.
+    let off = crate::Deps::default();
+    assert_eq!(offered(&off, outlook()), outlook());
+    assert_eq!(
+        offered(&off, Discovery::UseProvider(Native::Microsoft)),
+        outlook()
+    );
+    // Offered: Microsoft's own sign-in, like Gmail.
+    let on = crate::Deps {
+        microsoft: Some(Arc::new(
+            crate::Microsoft::new(
+                "microsoft-client-1".into(),
+                crate::ClientSecret::Inline("s3cret".into()),
+                crate::microsoft::Endpoints::microsoft("common").unwrap(),
+            )
+            .unwrap(),
+        )),
+        ..crate::Deps::default()
+    };
+    let routed = offered(&on, outlook());
+    assert_eq!(routed, Discovery::UseProvider(Native::Microsoft));
+    assert_eq!(
+        serde_json::to_value(DiscoveredImap::from(routed)).unwrap(),
+        serde_json::json!({"kind": "use_provider", "provider": "microsoft"})
+    );
+    // Nothing else changes.
+    for other in [
+        Discovery::UseProvider(Native::Google),
+        Discovery::UseProvider(Native::Zoho),
+        Discovery::NotFound,
+    ] {
+        assert_eq!(offered(&on, other.clone()), other);
+        assert_eq!(offered(&off, other.clone()), other);
+    }
+}

@@ -46,6 +46,9 @@ pub enum Provider {
     /// Any mailbox over IMAP and SMTP, with its password (usually an app
     /// password). Never a way to sign in.
     Imap,
+    /// Microsoft: Outlook.com, Hotmail, Live, MSN and Microsoft 365 mail
+    /// (Microsoft Graph), while its flag is on.
+    Microsoft,
 }
 
 impl Provider {
@@ -55,6 +58,7 @@ impl Provider {
             Self::Google => "google",
             Self::Zoho => "zoho",
             Self::Imap => "imap",
+            Self::Microsoft => "microsoft",
         }
     }
 
@@ -64,6 +68,7 @@ impl Provider {
             "google" => Ok(Self::Google),
             "zoho" => Ok(Self::Zoho),
             "imap" => Ok(Self::Imap),
+            "microsoft" => Ok(Self::Microsoft),
             other => Err(Error::internal(format!("unknown provider `{other}`"))),
         }
     }

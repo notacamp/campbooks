@@ -38,7 +38,7 @@ pub struct StartConnection {
     /// The provider.
     pub provider: Provider,
     /// The capabilities to ask for (`messages`, and `calendar` for Google,
-    /// and for Zoho while its flag is on).
+    /// and for Zoho while its flag is on; `messages` only for Microsoft).
     pub capabilities: Vec<Capability>,
     /// An existing connection of yours to re-authorise; the same account
     /// must consent.
@@ -121,6 +121,8 @@ pub async fn execute(
     let configured = match input.provider {
         Provider::Google => deps.google.is_some(),
         Provider::Zoho => deps.zoho.is_some(),
+        // Offered only while its flag is on (`Deps::microsoft`).
+        Provider::Microsoft => deps.microsoft.is_some(),
         // An IMAP mailbox has no consent page: it is connected with its
         // password (`connect_imap`).
         Provider::Imap if deps.imap_enabled() => {
@@ -156,6 +158,7 @@ pub async fn execute(
         let offered = match input.provider {
             Provider::Google => !google::capability_scopes(capability).is_empty(),
             Provider::Zoho => matches!(capability, Capability::Messages | Capability::Calendar),
+            Provider::Microsoft => capability == Capability::Messages,
             Provider::Imap => false,
         };
         if !offered {
@@ -203,5 +206,7 @@ pub fn acting_member(access: &Access) -> Result<UserId> {
         .ok_or_else(|| Error::Denied(MESSAGES.reason("connection_needs_user")))
 }
 
+#[cfg(test)]
+mod microsoft_tests;
 #[cfg(test)]
 mod tests;

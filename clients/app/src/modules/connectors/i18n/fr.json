@@ -180,7 +180,8 @@
     "provider": {
       "google": "Google",
       "zoho": "Zoho",
-      "imap": "IMAP"
+      "imap": "IMAP",
+      "microsoft": "Microsoft"
     },
     "capability": {
       "messages": "E-mails",
@@ -213,6 +214,10 @@
     "outlook": {
       "title": "Outlook arrive bientôt",
       "lead": "{{address}} est une boîte Outlook ou Microsoft 365. Campbooks ne peut pas encore les connecter ; ce sera bientôt possible."
+    },
+    "microsoft": {
+      "name": "Outlook",
+      "lead": "{{address}} est une boîte Outlook ou Microsoft 365. Elle se connecte avec la connexion Microsoft : aucun mot de passe n’est saisi ici."
     },
     "fallback": {
       "title": "Connecter une boîte mail",

@@ -107,7 +107,7 @@ impl SyncStream {
         let offered = match target.provider {
             Provider::Google => google.is_some(),
             Provider::Zoho => zoho.is_some() && self.deps.config.zoho_calendar,
-            Provider::Imap => false,
+            Provider::Imap | Provider::Microsoft => false,
         };
         if !offered {
             // The provider is no longer configured: the leased schedule row
@@ -252,7 +252,7 @@ impl SyncStream {
             provider: match target.provider {
                 Provider::Google => Some("google"),
                 Provider::Zoho => Some("zoho"),
-                Provider::Imap => None,
+                Provider::Imap | Provider::Microsoft => None,
             },
             calendars: listed.clone(),
         };

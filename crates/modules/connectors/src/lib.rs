@@ -27,7 +27,8 @@
 //! `lib.rs` assembles [`module`]; each use case is a slice under
 //! `features/`, shared rules live in `domain/`, what the mail adapters share
 //! in `mail/`, Google's HTTP in `google/`, the Gmail adapter in `gmail/`,
-//! Zoho (HTTP and adapter) in `zoho/`, and the IMAP adapter in `imap/`. The module is composed with its
+//! Zoho (HTTP and adapter) in `zoho/`, Microsoft's HTTP in `microsoft/`, and
+//! the IMAP adapter in `imap/`. The module is composed with its
 //! dependencies ([`Deps`]): handlers reach them as an axum extension, jobs
 //! and consumers own a copy.
 
@@ -49,6 +50,7 @@ mod google;
 pub mod imap;
 mod mail;
 mod metrics;
+mod microsoft;
 mod provider;
 #[cfg(test)]
 mod rls_tests;
@@ -59,6 +61,8 @@ mod testkit;
 mod testkit_imap;
 #[cfg(test)]
 mod testkit_imap_mailbox;
+#[cfg(test)]
+mod testkit_microsoft;
 #[cfg(test)]
 mod testkit_zoho;
 /// The module's tracked events, generated from the tracking plan (ADR 0020).
@@ -77,6 +81,7 @@ pub use domain::model::{
 };
 pub use features::imap_idle::IdlePool;
 pub use google::{Endpoints, Google};
+pub use microsoft::Microsoft;
 pub use provider::ClientSecret;
 pub use zoho::{ACCOUNTS_SERVERS as ZOHO_ACCOUNTS_SERVERS, Centres, Zoho};
 
