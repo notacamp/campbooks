@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -49,6 +49,25 @@ export interface CalendarScreenProps {
   now?: Date | undefined;
 }
 
+/** Below 48rem the app is a phone (the tab bar, the single-pane reader). */
+const PHONE = "(width < 48rem)";
+
+function subscribePhone(change: () => void): () => void {
+  if (typeof globalThis.matchMedia !== "function") {
+    return () => {
+      // Nothing was listened to.
+    };
+  }
+  const query = globalThis.matchMedia(PHONE);
+  query.addEventListener("change", change);
+  return () => {
+    query.removeEventListener("change", change);
+  };
+}
+
+const isPhone = () =>
+  typeof globalThis.matchMedia === "function" && globalThis.matchMedia(PHONE).matches;
+
 /** The time, ticking once a minute (the line in the week, "Today"). */
 function useClock(fixed: Date | undefined): Date {
   const [now, setNow] = useState(() => fixed ?? new Date());
@@ -79,7 +98,9 @@ export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarS
   const calendars = useCalendars(workspaceId);
   const zone = settings.data?.effective_time_zone ?? "UTC";
   const clock = nowIn(zone, useClock(now));
-  const view = search.view ?? "agenda";
+  // No view in the address: Week on a wide screen, Agenda on a phone. A view in it wins.
+  const defaultView: View = useSyncExternalStore(subscribePhone, isPhone) ? "agenda" : "week";
+  const view = search.view ?? defaultView;
   const anchor = search.date ?? clock.day;
   const period = windowOf(view, anchor);
   const days = daysOf(period);
@@ -91,7 +112,7 @@ export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarS
 
   const go = (next: ScheduleSearch) => {
     onSearch({
-      ...(next.view === undefined || next.view === "agenda" ? {} : { view: next.view }),
+      ...(next.view === undefined || next.view === defaultView ? {} : { view: next.view }),
       ...(next.date === undefined || next.date === clock.day ? {} : { date: next.date }),
       ...(next.event === undefined ? {} : { event: next.event }),
     });
@@ -196,7 +217,8 @@ export function CalendarScreen({ workspaceId, search, onSearch, now }: CalendarS
       selected: search.event,
       onSelect: select,
       onOpenDay: (day: Ymd) => {
-        go({ view: "agenda", date: day });
+        // Explicit, so a phone's Agenda and a desktop's both stay in the address.
+        onSearch({ view: "agenda", ...(day === clock.day ? {} : { date: day }) });
       },
     };
     body =

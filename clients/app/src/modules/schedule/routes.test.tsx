@@ -76,11 +76,65 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
 
 const PATH = `/w/${DUARTE.id}/schedule`;
 /** Tuesday 27 October 2026, as the demo week has it. */
-const WEEK = `${PATH}?date=2026-10-27`;
+const WEEK = `${PATH}?view=agenda&date=2026-10-27`;
+
+/** Pretends the screen is a phone (narrower than 48rem) or not; jsdom has no matchMedia. */
+function screenIs(width: "phone" | "wide") {
+  vi.stubGlobal(
+    "matchMedia",
+    (query: string): MediaQueryList =>
+      ({
+        matches: width === "phone" && query === "(width < 48rem)",
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }) as unknown as MediaQueryList,
+  );
+}
 
 describe("the Calendar place", () => {
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("opens on Week on a wide screen, and keeps Agenda in the address when chosen", async () => {
+    screenIs("wide");
+    api();
+    const { router } = renderAt(`${PATH}?date=2026-10-27`);
+
+    expect(await screen.findByRole("region", { name: "Week" })).toBeVisible();
+    expect(router.state.location.search).not.toHaveProperty("view");
+
+    fireEvent.keyDown(document, { key: "1" });
+    expect(await screen.findByRole("heading", { name: /Tuesday/u })).toBeVisible();
+    expect(router.state.location.search).toMatchObject({ view: "agenda" });
+  });
+
+  it("opens on Agenda on a phone, and keeps Week in the address when chosen", async () => {
+    screenIs("phone");
+    api();
+    const { router } = renderAt(`${PATH}?date=2026-10-27`);
+
+    expect(await screen.findByRole("heading", { name: /Tuesday/u })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Week" })).toBeNull();
+
+    fireEvent.keyDown(document, { key: "2" });
+    expect(await screen.findByRole("region", { name: "Week" })).toBeVisible();
+    expect(router.state.location.search).toMatchObject({ view: "week" });
+  });
+
+  it("lets a view in the address win at either width", async () => {
+    screenIs("phone");
+    api();
+    const first = renderAt(`${PATH}?view=week&date=2026-10-27`);
+    expect(await screen.findByRole("region", { name: "Week" })).toBeVisible();
+    first.unmount();
+
+    screenIs("wide");
+    renderAt(`${PATH}?view=agenda&date=2026-10-27`);
+    expect(await screen.findByRole("heading", { name: /Tuesday/u })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Week" })).toBeNull();
   });
 
   it("lists the days from the one looked at, skipping days with nothing", async () => {
@@ -200,7 +254,8 @@ describe("the Calendar place", () => {
 
     fireEvent.keyDown(document, { key: "2" });
     expect(await screen.findByRole("region", { name: "Week" })).toBeVisible();
-    expect(router.state.location.search).toMatchObject({ view: "week" });
+    // Week is the default on a wide screen, so the address says nothing.
+    expect(router.state.location.search).not.toHaveProperty("view");
 
     fireEvent.keyDown(document, { key: "3" });
     expect(await screen.findByRole("group", { name: "Month" })).toBeVisible();

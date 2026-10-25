@@ -1,0 +1,1 @@
+- **The Calendar now opens on the week.** On a wide screen it opens on Week at today; on a phone it still opens on Agenda. A view you pick stays in the address, and 1, 2 and 3 still switch between Agenda, Week and Month.
