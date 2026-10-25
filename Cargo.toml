@@ -37,6 +37,7 @@ campbooks-search = { path = "crates/modules/search" }
 campbooks-assistant = { path = "crates/modules/assistant" }
 campbooks-schedule = { path = "crates/modules/schedule" }
 campbooks-tasks = { path = "crates/modules/tasks" }
+campbooks-pages = { path = "crates/modules/pages" }
 campbooks-tracking-plan = { path = "crates/tracking-plan" }
 
 # HTTP / async
@@ -205,6 +206,11 @@ lapin = { version = "4.12.1", default-features = false, features = ["rustls", "t
 # attestation objects. Signatures are verified with aws-lc-rs.
 coset = "0.4.2"
 ciborium = "0.2.2"
+
+# Pages: the block documents of the pages module (campbooks-cloud#363) are Yjs
+# documents merged on the server, so two people editing one page never
+# overwrite each other. Pinned; MIT, Rust only.
+yrs = "=0.27.4"
 
 # Tests
 wiremock = "0.6.5"

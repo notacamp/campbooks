@@ -21,6 +21,41 @@ export {
   type AttachmentListProps,
   type ImagePreviewProps,
 } from "./components/Attachments/Attachments";
+// The Pages editor's pieces (cloud#363), built on the package's components.
+export { BlockHandle, type BlockHandleProps } from "./components/BlockHandle/BlockHandle";
+export {
+  FormatBar,
+  type FormatBarItem,
+  type FormatBarProps,
+} from "./components/FormatBar/FormatBar";
+export {
+  PageTree,
+  PageTreeGroup,
+  PageTreeRow,
+  type PageTreeGroupProps,
+  type PageTreeProps,
+  type PageTreeRowProps,
+} from "./components/PageTree/PageTree";
+export {
+  DocCard,
+  DocImage,
+  DocToggle,
+  MentionChip,
+  RichDocument,
+  type DocCardProps,
+  type DocImageProps,
+  type DocToggleProps,
+  type MentionChipProps,
+  type MentionKind,
+  type RichDocumentProps,
+} from "./components/RichDocument/RichDocument";
+export {
+  SuggestionMenu,
+  type SuggestionGroup,
+  type SuggestionItem,
+  type SuggestionMenuProps,
+} from "./components/SuggestionMenu/SuggestionMenu";
+export { TitleField, type TitleFieldProps } from "./components/TitleField/TitleField";
 export {
   ChatAbout,
   ChatField,

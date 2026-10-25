@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/pages.page_changed.v1.schema.json",
+  "title": "pages.page_changed v1 (event payload)",
+  "description": "Published by the pages module when a page is made or changed, put in the trash or brought back, moved, shared or deleted for good; the search module re-reads the page from it, and the change feed announces it to the members who may open the page. Ids and enums only, never a title or any text. `revision` grows with every change of one page: apply only newer ones. Body changes are published at most once every 5 seconds per page. Workspace-scoped; also listed in openapi/events.json.",
+  "type": "object",
+  "required": ["workspace", "page", "revision", "place", "trashed", "kinds"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "page": { "$ref": "#/$defs/uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "parent": {
+      "description": "The page it is under, or null at the top level.",
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }]
+    },
+    "place": { "enum": ["private", "workspace"] },
+    "trashed": { "type": "boolean" },
+    "kinds": {
+      "description": "What changed: the title or icon (`meta`), the body, who it is shared with, its parent, place or position, the trash, or its deletion for good.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "enum": ["meta", "body", "share", "move", "trash", "purge"] }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

@@ -11,7 +11,13 @@ feature-depth = 1
 [advisories]
 # Vulnerability and unsoundness advisories always fail (cargo-deny default).
 yanked = "deny"
-ignore = []
+ignore = [
+  # smallstr is unmaintained (an informational advisory: no vulnerability,
+  # no unsoundness). It arrives only through yrs, the Yjs implementation the
+  # pages module merges documents with (campbooks-cloud#363); no other Rust
+  # crate speaks Yjs. Re-check when yrs moves to another small-string crate.
+  { id = "RUSTSEC-2026-0215", reason = "unmaintained only; transitive via yrs (pages), which has no alternative" },
+]
 
 [licenses]
 confidence-threshold = 0.9

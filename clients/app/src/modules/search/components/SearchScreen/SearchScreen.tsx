@@ -406,7 +406,12 @@ export function SearchScreen({ workspaceId, query, sort, conversationId, now }: 
                   selected={id === cursor && id !== conversationId}
                   now={now}
                   onSelect={() => {
-                    open(id);
+                    if (hit.record.type === "pages.page") {
+                      recent.remember(draft);
+                      void navigate({ to: `/w/${workspaceId}/pages/${id}` });
+                    } else {
+                      open(id);
+                    }
                   }}
                 />
               );

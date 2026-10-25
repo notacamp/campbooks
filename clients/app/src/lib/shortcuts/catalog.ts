@@ -40,6 +40,13 @@ export const DEFAULT_SHORTCUTS = [
     label: "shortcuts:nav.tasks",
   },
   {
+    id: "nav.pages",
+    keys: "g p",
+    scope: "global",
+    group: "navigation",
+    label: "shortcuts:nav.pages",
+  },
+  {
     id: "nav.documents",
     keys: "g d",
     scope: "global",
