@@ -100,7 +100,7 @@ pub struct EventRow {
     pub name: String,
     /// From 1; a published version never changes meaning.
     pub version: u16,
-    /// The owning module (a crate under `crates/modules`, or `kernel` or `server`).
+    /// The owning module (a crate under `crates/modules`, or `kernel`, `server` or `bff`).
     pub module: String,
     /// What the event is about (`conversation`).
     pub object: String,

@@ -7,6 +7,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use axum::{
     Json, Router,
     body::Body,
+    extract::State,
     http::{HeaderMap, Method, Request, StatusCode, header},
     routing::any,
 };
@@ -15,7 +16,8 @@ use campbooks_kernel::{
     auth::{ScopeName, Scoped},
     idempotency, operations,
     rate_limit::api::ApiLimits,
-    testing::{self, TestIdp, TestUser, WEB_CLIENT_SECRET},
+    testing::{self, TestIdp, TestUser, TrackedRow, WEB_CLIENT_SECRET},
+    tracking::{TrackedEvent, types::WorkspaceId},
 };
 use secrecy::SecretString;
 use serde_json::{Value, json};
@@ -99,6 +101,47 @@ async fn record(_: Scoped<TestRead>, body: String) -> (StatusCode, Json<Value>) 
     )
 }
 
+/// What a forwarded operation tracks, written by hand for these tests (the
+/// plan check allows that in test code only).
+#[derive(Debug, Clone, serde::Serialize)]
+struct ThingTracked {
+    n: i64,
+}
+
+impl TrackedEvent for ThingTracked {
+    const NAME: &'static str = "test.thing_tracked";
+    const VERSION: u16 = 1;
+    const MODULE: &'static str = "test";
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<WorkspaceId> {
+        None
+    }
+}
+
+/// A catalogued test operation that tracks [`ThingTracked`], as any API
+/// operation tracks its change: in the request's tracking context.
+#[utoipa::path(
+    post,
+    path = "/api/v1/test/track",
+    operation_id = "test.track",
+    security(("bearer" = ["test:read"])),
+    extensions(("x-campbooks" = json!(campbooks_kernel::Operation::command(
+        campbooks_kernel::Risk::Low
+    ).records(["test.note"])))),
+    responses((status = NO_CONTENT)),
+)]
+async fn track_thing(_: Scoped<TestRead>, State(state): State<AppState>) -> StatusCode {
+    let mut tx = state.db.begin().await.unwrap();
+    state
+        .tracker
+        .track(&mut tx, &ThingTracked { n: 1 })
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    StatusCode::NO_CONTENT
+}
+
 /// A session's id, current and previous token hashes, and sealed access,
 /// refresh and ID tokens, as stored.
 type StoredSession = (
@@ -163,29 +206,33 @@ async fn harness_limited(
         panic!("test BFF settings are valid");
     };
     // The app runs as the runtime role, like the server (row-level security
-    // applies); the test's own queries keep the superuser pool.
-    let state = with(crate::with_ports(AppState::new(
+    // applies); the test's own queries keep the superuser pool. Tracked
+    // events go to the outbox, where the tests read them back.
+    let state = testing::tracking_outbox(with(crate::with_ports(AppState::new(
         testing::app_role_pool(&db).await,
         config,
-    )));
+    ))));
     let app = app(state, Some(*settings));
     Harness { app, idp, db }
 }
 
 /// The full application as [`crate::router`] composes it (operations,
-/// idempotency), with the test route in the API.
+/// idempotency, the BFF's operations in the document the tracking context
+/// names them from), with the test routes in the API.
 fn app(state: AppState, settings: Option<config::Settings>) -> Router {
     let operations::Composed {
         routes,
-        spec,
+        mut spec,
         state,
     } = operations::compose(
         crate::api()
             .route("/api/v1/test/whoami", any(whoami))
             .route("/api/v1/test/events", axum::routing::post(events))
-            .routes(utoipa_axum::routes!(record)),
+            .routes(utoipa_axum::routes!(record))
+            .routes(utoipa_axum::routes!(track_thing)),
         state,
     );
+    spec.merge(super::openapi());
     let api_only: Router = routes
         .clone()
         .fallback(|| async { campbooks_kernel::Error::NotFound })
@@ -766,6 +813,11 @@ async fn a_session_missing_newer_scopes_ends_and_signs_in_again(db: PgPool) {
     exec(&h.db, "UPDATE bff.sessions SET scopes = 'openid'").await;
     let reply = browser.get("/bff/api/v1/test/whoami").await;
     reply.assert_problem(StatusCode::UNAUTHORIZED, "session_required");
+    // Tracked in the proxy's own operation (its route is a wildcard).
+    let ended = tracked(&h, "bff.web_session_ended").await;
+    assert_eq!(ended.len(), 1);
+    by_the_bff(&ended[0], "bff.web_session_ended", "bff.api_get");
+    assert_eq!(ended[0].body["cause"], "scopes_outdated");
     assert!(reply.set_cookie(SESSION).unwrap().contains("Max-Age=0"));
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
     let revoked = h.idp.revoked_tokens();
@@ -926,6 +978,7 @@ async fn session_ids_rotate_with_a_short_grace(db: PgPool) {
         false,
         "the session ended everywhere"
     );
+    assert_eq!(end_causes(&h).await, ["copied_cookie"]);
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
     let revoked = h.idp.revoked_tokens();
     assert_eq!(revoked.len(), 1);
@@ -1140,6 +1193,13 @@ async fn a_cookie_rotations_old_still_ends_the_session(db: PgPool) {
     );
     let revoked = h.idp.revoked_tokens();
     assert_eq!(revoked.len(), 1);
+    // Tracked once, as a copied cookie: a retired token names the session
+    // only, not whose it was.
+    let ended = tracked(&h, "bff.web_session_ended").await;
+    assert_eq!(ended.len(), 1);
+    by_the_bff(&ended[0], "bff.web_session_ended", "bff.session");
+    assert_eq!(ended[0].body["cause"], "copied_cookie");
+    assert!(ended[0].body.get("account_id").is_none());
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1195,11 +1255,13 @@ async fn signing_out_everywhere_ends_the_persons_web_sessions(db: PgPool) {
 
     // The worker runs as the runtime role, like the server's: the handler
     // ends the sessions through `bff.end_account_sessions`.
-    let state = AppState::new(
-        testing::app_role_pool(&h.db).await,
-        testing::config("postgres://test@localhost/test"),
-    )
-    .with_registry(crate::registry().unwrap());
+    let state = testing::tracking_outbox(
+        AppState::new(
+            testing::app_role_pool(&h.db).await,
+            testing::config("postgres://test@localhost/test"),
+        )
+        .with_registry(crate::registry().unwrap()),
+    );
     let mut tx = state.db.begin().await.unwrap();
     state
         .events
@@ -1222,6 +1284,18 @@ async fn signing_out_everywhere_ends_the_persons_web_sessions(db: PgPool) {
         true,
         "nobody else's"
     );
+    // One event for the two, by the handler.
+    let ended = tracked(&h, "bff.web_sessions_ended").await;
+    assert_eq!(ended.len(), 1);
+    assert_eq!(
+        ended[0].body,
+        json!({"account_id": account, "cause": "signed_out_everywhere", "sessions_ended": 2})
+    );
+    assert_eq!(
+        ended[0].envelope["actor"],
+        json!({"type": "system", "id": "bff.end_signed_out_sessions"})
+    );
+    nothing_personal(&ended[0]);
 }
 
 /// A workspace writing an account's `identity.signed_out_everywhere` and its
@@ -1952,6 +2026,32 @@ async fn a_refused_refresh_ends_the_session(db: PgPool) {
     reply.assert_problem(StatusCode::UNAUTHORIZED, "session_required");
     assert!(browser.cookie(SESSION).is_none());
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    let ended = tracked(&h, "bff.web_session_ended").await;
+    assert_eq!(ended.len(), 1);
+    by_the_bff(&ended[0], "bff.web_session_ended", "bff.api_get");
+    assert_eq!(ended[0].body["cause"], "refresh_refused");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_expired_access_token_with_no_refresh_token_ends_the_session(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    exec(
+        &h.db,
+        "UPDATE bff.sessions
+            SET refresh_token = NULL, access_expires_at = now() - interval '1 second'",
+    )
+    .await;
+    browser
+        .get("/bff/api/v1/test/whoami")
+        .await
+        .assert_problem(StatusCode::UNAUTHORIZED, "session_required");
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    let ended = tracked(&h, "bff.web_session_ended").await;
+    assert_eq!(ended.len(), 1);
+    by_the_bff(&ended[0], "bff.web_session_ended", "bff.api_get");
+    assert_eq!(ended[0].body["cause"], "access_expired");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1977,7 +2077,7 @@ async fn a_changed_secret_key_ends_sessions_instead_of_failing(db: PgPool) {
         panic!("valid settings");
     };
     browser.app = app(
-        AppState::new(testing::app_role_pool(&db).await, config),
+        testing::tracking_outbox(AppState::new(testing::app_role_pool(&db).await, config)),
         Some(*settings),
     );
     browser
@@ -1985,6 +2085,7 @@ async fn a_changed_secret_key_ends_sessions_instead_of_failing(db: PgPool) {
         .await
         .assert_problem(StatusCode::UNAUTHORIZED, "session_required");
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    assert_eq!(end_causes(&h).await, ["tokens_unreadable"]);
 }
 
 // --- logout --------------------------------------------------------------------
@@ -2256,13 +2357,13 @@ async fn the_functions_never_reach_another_accounts_session(db: PgPool) {
             .unwrap()
     );
     assert!(
-        store::end_session(&runtime, &unknown)
+        store::delete_session(&mut runtime.acquire().await.unwrap(), &unknown)
             .await
             .unwrap()
             .is_none()
     );
     {
-        let mut tx = store::begin_refresh(&runtime).await.unwrap();
+        let mut tx = store::begin(&runtime).await.unwrap();
         assert!(
             store::lock_tokens(&mut tx, &unknown)
                 .await
@@ -2287,13 +2388,17 @@ async fn the_functions_never_reach_another_accounts_session(db: PgPool) {
 
     // One account's sessions end; the other's stay.
     assert_eq!(
-        store::delete_for_logout(&runtime, Some("test-user"), None)
-            .await
-            .unwrap(),
+        store::delete_for_logout(
+            &mut runtime.acquire().await.unwrap(),
+            Some("test-user"),
+            None
+        )
+        .await
+        .unwrap(),
         1
     );
     assert_eq!(
-        store::delete_for_logout(&runtime, None, None)
+        store::delete_for_logout(&mut runtime.acquire().await.unwrap(), None, None)
             .await
             .unwrap(),
         0
@@ -2301,7 +2406,7 @@ async fn the_functions_never_reach_another_accounts_session(db: PgPool) {
     assert_eq!(ana.get("/bff/session").await.json()["authenticated"], false);
     assert_eq!(sam.get("/bff/session").await.json()["authenticated"], true);
     // Ending by a token hash ends that session only.
-    let ended = store::end_session(&runtime, &sam_hash)
+    let ended = store::delete_session(&mut runtime.acquire().await.unwrap(), &sam_hash)
         .await
         .unwrap()
         .unwrap();
@@ -2843,4 +2948,291 @@ async fn api_calls_are_counted_under_the_api_route(db: PgPool) {
     };
     assert!(counted("/api/v1/test/whoami"), "{text}");
     assert!(counted("/bff/api/{*path}"), "the unmatched call: {text}");
+}
+
+// --- tracked events (ADR 0020) --------------------------------------------------
+
+/// The tracked events named `name`, oldest first.
+async fn tracked(h: &Harness, name: &str) -> Vec<TrackedRow> {
+    testing::tracked_events(&h.db, name).await
+}
+
+/// The causes of the web sessions ended one at a time so far.
+async fn end_causes(h: &Harness) -> Vec<Value> {
+    tracked(h, "bff.web_session_ended")
+        .await
+        .into_iter()
+        .map(|event| event.body["cause"].clone())
+        .collect()
+}
+
+/// `event` is version 1 of `name`, instance-wide, by nobody signed in (the
+/// BFF's own routes go by its cookie, not a token: the account is in the
+/// body), in `operation`, and holds no name and no address.
+fn by_the_bff(event: &TrackedRow, name: &str, operation: &str) {
+    assert_eq!(event.name, name);
+    assert_eq!(event.version, 1, "{name}");
+    assert_eq!(event.workspace_id, None, "{name}");
+    assert_eq!(event.envelope["name"], name);
+    assert_eq!(
+        event.envelope["actor"],
+        json!({"type": "anonymous"}),
+        "{name}"
+    );
+    assert_eq!(event.envelope["operation"], operation, "{name}");
+    assert_eq!(
+        event.envelope["plan_version"],
+        campbooks_kernel::tracking::PLAN_VERSION
+    );
+    nothing_personal(event);
+}
+
+/// No address and no name anywhere in the event (the sessions store both).
+fn nothing_personal(event: &TrackedRow) {
+    for text in [event.body.to_string(), event.envelope.to_string()] {
+        assert!(
+            !text.contains('@') && !text.contains("Ana") && !text.contains("Test User"),
+            "{} holds a name or an address: {text}",
+            event.name
+        );
+    }
+}
+
+/// The id of the one web session stored.
+async fn session_id(h: &Harness) -> uuid::Uuid {
+    sqlx::query_scalar("SELECT id FROM bff.sessions")
+        .fetch_one(&h.db)
+        .await
+        .unwrap()
+}
+
+/// A new browser signed in as `account` (its subject a Campbooks account id).
+async fn signed_in_as(h: &Harness, account: uuid::Uuid) -> Browser {
+    h.idp.set_user(TestUser {
+        subject: account.to_string(),
+        name: "Ana Lima".to_owned(),
+        email: "ana@example.com".to_owned(),
+    });
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    browser
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn signing_in_again_and_out_tracks_each_web_session(db: PgPool) {
+    let h = harness(db).await;
+    let account = uuid::Uuid::now_v7();
+    let mut browser = signed_in_as(&h, account).await;
+    let first = session_id(&h).await;
+    let started = tracked(&h, "bff.web_session_started").await;
+    assert_eq!(started.len(), 1);
+    by_the_bff(&started[0], "bff.web_session_started", "bff.callback");
+    assert_eq!(
+        started[0].body,
+        json!({"session_id": first, "account_id": account})
+    );
+
+    // Signing in again in the same browser: the old session ends, a new one
+    // starts.
+    browser.sign_in(&h.idp, "/").await;
+    let second = session_id(&h).await;
+    assert_ne!(first, second);
+    let ended = tracked(&h, "bff.web_session_ended").await;
+    assert_eq!(ended.len(), 1);
+    by_the_bff(&ended[0], "bff.web_session_ended", "bff.callback");
+    assert_eq!(
+        ended[0].body,
+        json!({"session_id": first, "account_id": account, "cause": "replaced"})
+    );
+    let started = tracked(&h, "bff.web_session_started").await;
+    assert_eq!(started.len(), 2);
+    assert_eq!(started[1].body["session_id"], json!(second));
+
+    // Signing out.
+    assert_eq!(browser.post("/bff/logout", "").await.status, StatusCode::OK);
+    let ended = tracked(&h, "bff.web_session_ended").await;
+    assert_eq!(ended.len(), 2);
+    by_the_bff(&ended[1], "bff.web_session_ended", "bff.logout");
+    assert_eq!(
+        ended[1].body,
+        json!({"session_id": second, "account_id": account, "cause": "logout"})
+    );
+
+    // Signing out again changes nothing, and tracks nothing.
+    assert_eq!(browser.post("/bff/logout", "").await.status, StatusCode::OK);
+    assert_eq!(tracked(&h, "bff.web_session_ended").await.len(), 2);
+}
+
+/// Another identity provider's subject is its own identifier, not a
+/// Campbooks account id: it never goes into an event.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_subject_that_is_no_account_id_is_left_out(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await; // `test-user`
+    let id = session_id(&h).await;
+    assert_eq!(
+        tracked(&h, "bff.web_session_started").await[0].body,
+        json!({"session_id": id})
+    );
+    browser.post("/bff/logout", "").await;
+    let ended = tracked(&h, "bff.web_session_ended").await;
+    assert_eq!(ended[0].body, json!({"session_id": id, "cause": "logout"}));
+    assert!(!ended[0].body.to_string().contains("test-user"));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_backchannel_logout_tracks_how_many_web_sessions_ended(db: PgPool) {
+    let h = harness(db).await;
+    let account = uuid::Uuid::now_v7();
+    let subject = account.to_string();
+    for _ in 0..3 {
+        signed_in_as(&h, account).await; // IdP sessions test-sid-1, -2, -3
+    }
+    let logout = |subject: Option<&str>, sid: Option<&str>| {
+        h.idp.logout_token(&h.idp.logout_token_claims(subject, sid))
+    };
+
+    // By IdP session alone: no account named.
+    let reply = backchannel(&h.app, &logout(None, Some("test-sid-1"))).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    // Every session of the account: the other two.
+    assert_eq!(
+        backchannel(&h.app, &logout(Some(&subject), None))
+            .await
+            .status,
+        StatusCode::OK
+    );
+    // None left: nothing ends, nothing is tracked.
+    assert_eq!(
+        backchannel(&h.app, &logout(Some(&subject), None))
+            .await
+            .status,
+        StatusCode::OK
+    );
+
+    let ended = tracked(&h, "bff.web_sessions_ended").await;
+    assert_eq!(ended.len(), 2);
+    for event in &ended {
+        by_the_bff(event, "bff.web_sessions_ended", "bff.backchannel_logout");
+    }
+    assert_eq!(
+        ended[0].body,
+        json!({"cause": "backchannel", "sessions_ended": 1})
+    );
+    assert_eq!(
+        ended[1].body,
+        json!({"account_id": account, "cause": "backchannel", "sessions_ended": 2})
+    );
+}
+
+/// A call through `/bff/api/*` is tracked by the operation it reaches, under
+/// that operation's id, as the person whose session it is, never as the
+/// proxy.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_call_through_the_bff_is_tracked_in_the_operation_it_reaches(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let reply = browser.post("/bff/api/v1/test/track", "").await;
+    assert_eq!(reply.status, StatusCode::NO_CONTENT, "{}", reply.body);
+
+    let events = tracked(&h, "test.thing_tracked").await;
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].envelope["operation"], "test.track");
+    assert_eq!(
+        events[0].envelope["actor"],
+        json!({"type": "user", "id": "test-user"})
+    );
+    assert_eq!(events[0].envelope["on_behalf_of"], Value::Null);
+    assert_eq!(events[0].body, json!({"n": 1}));
+}
+
+/// An administrator suspends an account through `/bff/admin/*`: the
+/// suspension is the administrator's, in the admin operation reached, and
+/// the handler it causes ends the account's web sessions on their behalf,
+/// in the same correlation.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_suspension_through_the_bff_ends_web_sessions_on_the_administrators_behalf(db: PgPool) {
+    use campbooks_kernel::jobs::Worker;
+
+    // With the registry, the suspension's event is delivered to its
+    // handlers, as in the server.
+    let h = harness_limited(
+        db,
+        ORIGIN,
+        |_| {},
+        |state| state.with_registry(crate::registry().unwrap()),
+    )
+    .await;
+    let target = uuid::Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO identity.accounts (id, primary_email_verified, created_at)
+         VALUES ($1, false, now())",
+    )
+    .bind(target)
+    .execute(&h.db)
+    .await
+    .unwrap();
+    signed_in_as(&h, target).await;
+
+    h.idp.set_user(TestUser::default());
+    let mut admin = Browser::new(&h.app);
+    admin.sign_in(&h.idp, "/").await;
+    let mut conn = h.db.acquire().await.unwrap();
+    campbooks_admin::cli::grant(
+        &mut conn,
+        "test-user",
+        &[campbooks_kernel::admin::Permission::Super],
+        None,
+        chrono::Utc::now(),
+    )
+    .await
+    .unwrap();
+    let reply = admin
+        .post(
+            &format!("/bff/admin/v1/identity/accounts/{target}/suspend"),
+            "",
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    let suspended = tracked(&h, "identity.account_suspended").await;
+    assert_eq!(suspended.len(), 1);
+    assert_eq!(
+        suspended[0].envelope["operation"],
+        "identity.admin_suspend_account"
+    );
+    assert_eq!(
+        suspended[0].envelope["actor"],
+        json!({"type": "admin", "id": "test-user"})
+    );
+
+    let state = testing::tracking_outbox(crate::with_ports(
+        AppState::new(
+            testing::app_role_pool(&h.db).await,
+            testing::config("postgres://test@localhost/test"),
+        )
+        .with_registry(crate::registry().unwrap()),
+    ));
+    let stats = Worker::new(state).run_until_idle().await;
+    assert_eq!(stats.failed, 0, "{stats:?}");
+    let ended = tracked(&h, "bff.web_sessions_ended").await;
+    assert_eq!(ended.len(), 1);
+    assert_eq!(
+        ended[0].body,
+        json!({"account_id": target, "cause": "account_suspended", "sessions_ended": 1})
+    );
+    assert_eq!(
+        ended[0].envelope["actor"],
+        json!({"type": "system", "id": "bff.end_suspended_sessions"})
+    );
+    assert_eq!(
+        ended[0].envelope["on_behalf_of"],
+        json!({"type": "admin", "id": "test-user"})
+    );
+    assert_eq!(
+        ended[0].envelope["correlation"],
+        suspended[0].envelope["correlation"]
+    );
+    nothing_personal(&ended[0]);
 }

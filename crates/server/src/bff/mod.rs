@@ -44,6 +44,10 @@ use campbooks_kernel::{
     auth::TokenVerifier,
     jobs::Background,
     rate_limit::{Limit, RateLimits, TrustedProxies},
+    tracking::{
+        Tracker, WebSessionEndCause, WebSessionEnded, WebSessionStarted, WebSessionsEndCause,
+        WebSessionsEnded,
+    },
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
@@ -125,6 +129,8 @@ struct Inner {
     rate_limits: RateLimits,
     /// The proxies whose `X-Forwarded-For` names the client.
     trusted_proxies: TrustedProxies,
+    /// Tracks every session started and ended (ADR 0020).
+    tracker: Tracker,
 }
 
 /// Sign-ins one address may start (each stores a sign-in transaction and
@@ -158,6 +164,7 @@ impl Bff {
                     .collect(),
                 rate_limits: state.rate_limits.clone(),
                 trusted_proxies: state.config.trusted_proxies.clone(),
+                tracker: state.tracker.clone(),
             })
         });
         Self { inner }
@@ -270,8 +277,12 @@ impl EventHandler for EndSignedOutSessions {
     const QUEUE: &'static str = "events";
 
     async fn handle(ctx: &mut JobContext, event: Event<Self::Event>) -> Result<(), JobError> {
-        let subject = event.payload.account.to_string();
-        let ended = store::delete_for_logout(ctx.pool(), Some(&subject), None).await?;
+        let ended = end_account_sessions(
+            ctx,
+            event.payload.account,
+            WebSessionsEndCause::SignedOutEverywhere,
+        )
+        .await?;
         tracing::info!(
             sessions = ended,
             "ended the web sessions of a sign-out everywhere"
@@ -294,11 +305,48 @@ impl EventHandler for EndSuspendedSessions {
     const QUEUE: &'static str = "events";
 
     async fn handle(ctx: &mut JobContext, event: Event<AccountSuspended>) -> Result<(), JobError> {
-        let subject = event.payload.account.to_string();
-        let ended = store::delete_for_logout(ctx.pool(), Some(&subject), None).await?;
+        let ended = end_account_sessions(
+            ctx,
+            event.payload.account,
+            WebSessionsEndCause::AccountSuspended,
+        )
+        .await?;
         tracing::info!(sessions = ended, "ended a suspended account's web sessions");
         Ok(())
     }
+}
+
+/// End every web session of `account` in the job's transaction, tracking
+/// how many ended and why (none tracks nothing); how many.
+async fn end_account_sessions(
+    ctx: &mut JobContext,
+    account: Uuid,
+    cause: WebSessionsEndCause,
+) -> Result<u64, JobError> {
+    let subject = account.to_string();
+    let tx = ctx.tx().await?;
+    let ended = store::delete_for_logout(tx, Some(&subject), None).await?;
+    if ended > 0 {
+        ctx.track(&WebSessionsEnded {
+            account_id: Some(account),
+            cause,
+            sessions_ended: count(ended),
+        })
+        .await?;
+    }
+    Ok(ended)
+}
+
+/// The account id a session's subject names: the Campbooks account (a
+/// UUID, ADR 0014); `None` for another identity provider's subject, which
+/// is that provider's identifier and never goes into a tracked event.
+fn account_id(subject: Option<&str>) -> Option<Uuid> {
+    subject.and_then(|subject| Uuid::parse_str(subject).ok())
+}
+
+/// A number of sessions as a tracked count.
+fn count(sessions: u64) -> i64 {
+    i64::try_from(sessions).unwrap_or(i64::MAX)
 }
 
 /// Delete ended sessions and expired sign-ins. Scheduled every
@@ -395,9 +443,12 @@ impl Inner {
         let token_hash = hash(&token);
         let Some(session) = store::find_session(&self.db, &token_hash).await? else {
             if store::is_retired(&self.db, &token_hash).await? {
-                // A token two or more rotations old: a copied cookie.
+                // A token two or more rotations old: a copied cookie. Its
+                // session is ended by the token; whose it was is not looked
+                // up, so the event names the session only.
                 tracing::warn!("a retired web session token was presented again; the session ends");
-                self.terminate(&token_hash).await?;
+                self.terminate(&token_hash, WebSessionEndCause::CopiedCookie, None)
+                    .await?;
             }
             return Ok(None);
         };
@@ -410,7 +461,12 @@ impl Inner {
                 tracing::warn!(
                     "a rotated-away web session token was presented again; the session ends"
                 );
-                self.terminate(&token_hash).await?;
+                self.terminate(
+                    &token_hash,
+                    WebSessionEndCause::CopiedCookie,
+                    Some(&session.subject),
+                )
+                .await?;
                 return Ok(None);
             }
             // The successor never reached this browser (the response that
@@ -439,7 +495,12 @@ impl Inner {
                     tracing::warn!(
                         "a rotated-away web session token was presented again; the session ends"
                     );
-                    self.terminate(&token_hash).await?;
+                    self.terminate(
+                        &token_hash,
+                        WebSessionEndCause::CopiedCookie,
+                        Some(&session.subject),
+                    )
+                    .await?;
                     return Ok(None);
                 }
                 Reissue::Gone => return Ok(None),
@@ -457,7 +518,12 @@ impl Inner {
             tracing::info!(
                 "a web session predates scopes the BFF now asks for; it ends so the next sign-in asks for them"
             );
-            self.retire(&token_hash).await?;
+            self.retire(
+                &token_hash,
+                WebSessionEndCause::ScopesOutdated,
+                Some(&session.subject),
+            )
+            .await?;
             return Ok(None);
         }
         if let Some(idle_until) = touch_until(
@@ -503,7 +569,7 @@ impl Inner {
     ) -> Result<String, AccessError> {
         let lock = &self.refresh_locks[lock_index(session.id)];
         let _guard = lock.lock().await;
-        let mut tx = store::begin_refresh(&self.db).await?;
+        let mut tx = store::begin(&self.db).await?;
         let Some(tokens) = store::lock_tokens(&mut tx, &session.presented).await? else {
             return Err(AccessError::SessionEnded);
         };
@@ -519,7 +585,7 @@ impl Inner {
                     // connection: this transaction's lock on it goes first
                     // (campbooks-cloud#259).
                     drop(tx);
-                    return self.unreadable(&session.presented).await;
+                    return self.unreadable(session).await;
                 };
                 (held != refused).then_some(held)
             }
@@ -541,7 +607,7 @@ impl Inner {
             return if still_valid {
                 self.open_access(session, &tokens.access_token).await
             } else {
-                self.end(&session.presented).await
+                self.end(session, WebSessionEndCause::AccessExpired).await
             };
         };
         let Ok(refresh_token) = self
@@ -549,7 +615,7 @@ impl Inner {
             .open_checked(sealed_refresh, &sealed_for(session.id, "refresh_token"))
         else {
             drop(tx);
-            return self.unreadable(&session.presented).await;
+            return self.unreadable(session).await;
         };
         match self.oidc.refresh(&refresh_token.value).await {
             Ok(fresh) => {
@@ -578,7 +644,18 @@ impl Inner {
             }
             Err(OidcError::Rejected(reason)) => {
                 tracing::info!(%reason, "the identity provider refused to refresh a web session; it ends");
-                store::delete_session(&mut tx, &session.presented).await?;
+                if let Some(ended) = store::delete_session(&mut tx, &session.presented).await? {
+                    self.tracker
+                        .track(
+                            &mut tx,
+                            &WebSessionEnded {
+                                account_id: account_id(Some(&session.subject)),
+                                cause: WebSessionEndCause::RefreshRefused,
+                                session_id: ended.id,
+                            },
+                        )
+                        .await?;
+                }
                 tx.commit().await?;
                 Err(AccessError::SessionEnded)
             }
@@ -633,32 +710,106 @@ impl Inner {
             .open(sealed, &sealed_for(session.id, "access_token"))
         {
             Ok(token) => Ok(token),
-            Err(_) => self.unreadable(&session.presented).await,
+            Err(_) => self.unreadable(session).await,
         }
     }
 
     /// The session's tokens cannot be decrypted (e.g. `CAMPBOOKS_SECRET_KEY`
     /// changed): it ends, and the user signs in again.
-    async fn unreadable(&self, presented: &[u8]) -> Result<String, AccessError> {
+    async fn unreadable(&self, session: &Session) -> Result<String, AccessError> {
         tracing::warn!(
             "a web session's stored tokens could not be decrypted (was CAMPBOOKS_SECRET_KEY \
              changed?); the session ends"
         );
-        self.end(presented).await
+        self.end(session, WebSessionEndCause::TokensUnreadable)
+            .await
+    }
+
+    /// Store a new session, tracking its start in the same transaction.
+    async fn start(&self, session: &store::NewSession<'_>) -> sqlx::Result<()> {
+        let mut tx = store::begin(&self.db).await?;
+        store::insert_session(&mut tx, session).await?;
+        self.tracker
+            .track(
+                &mut tx,
+                &WebSessionStarted {
+                    account_id: account_id(Some(session.subject)),
+                    session_id: session.id,
+                },
+            )
+            .await?;
+        tx.commit().await
+    }
+
+    /// Delete the session that holds or held the token hashing to
+    /// `presented` (current, previous or retired), tracking that it ended
+    /// for `cause` in the same transaction; what it held, `None` when it was
+    /// already gone (which tracks nothing). `subject` is whose it was, when
+    /// known.
+    async fn delete(
+        &self,
+        presented: &[u8],
+        cause: WebSessionEndCause,
+        subject: Option<&str>,
+    ) -> sqlx::Result<Option<store::Ended>> {
+        let mut tx = store::begin(&self.db).await?;
+        let ended = store::delete_session(&mut tx, presented).await?;
+        if let Some(ended) = &ended {
+            self.tracker
+                .track(
+                    &mut tx,
+                    &WebSessionEnded {
+                        account_id: account_id(subject),
+                        cause,
+                        session_id: ended.id,
+                    },
+                )
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(ended)
+    }
+
+    /// The identity provider's back-channel logout: delete the sessions of
+    /// IdP session `sid` (of `subject` when both are given), or every
+    /// session of `subject`, tracking how many ended; how many.
+    async fn end_for_logout(&self, subject: Option<&str>, sid: Option<&str>) -> sqlx::Result<u64> {
+        let mut tx = store::begin(&self.db).await?;
+        let ended = store::delete_for_logout(&mut tx, subject, sid).await?;
+        if ended > 0 {
+            self.tracker
+                .track(
+                    &mut tx,
+                    &WebSessionsEnded {
+                        account_id: account_id(subject),
+                        cause: WebSessionsEndCause::Backchannel,
+                        sessions_ended: count(ended),
+                    },
+                )
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(ended)
     }
 
     /// End the session that holds or held the token hashing to `presented`
     /// (current, previous or retired) everywhere it reaches: delete it,
     /// revoke its refresh token at the identity provider, and end the
-    /// in-process issuer's session (its ID token is the proof). Whether the
-    /// issuer session was ended here. Failures past the deletion are logged:
-    /// the web session is gone either way.
-    async fn terminate(&self, presented: &[u8]) -> sqlx::Result<bool> {
+    /// in-process issuer's session (its ID token is the proof), tracking
+    /// that it ended for `cause` ([`Self::delete`]). Whether the issuer
+    /// session was ended here. Failures past the deletion are logged: the
+    /// web session is gone either way.
+    async fn terminate(
+        &self,
+        presented: &[u8],
+        cause: WebSessionEndCause,
+        subject: Option<&str>,
+    ) -> sqlx::Result<bool> {
         let Some(store::Ended {
             id,
             refresh_token,
             id_token,
-        }) = store::end_session(&self.db, presented).await?
+        }) = self.delete(presented, cause, subject).await?
         else {
             return Ok(false);
         };
@@ -678,11 +829,16 @@ impl Inner {
         Ok(false)
     }
 
-    /// End the session `presented` names here only: delete it and revoke
-    /// its refresh token, leaving the identity provider's session as it is
-    /// (a new sign-in may go straight through).
-    async fn retire(&self, presented: &[u8]) -> sqlx::Result<()> {
-        if let Some(ended) = store::end_session(&self.db, presented).await? {
+    /// End the session `presented` names here only: delete it (tracked for
+    /// `cause`) and revoke its refresh token, leaving the identity
+    /// provider's session as it is (a new sign-in may go straight through).
+    async fn retire(
+        &self,
+        presented: &[u8],
+        cause: WebSessionEndCause,
+        subject: Option<&str>,
+    ) -> sqlx::Result<()> {
+        if let Some(ended) = self.delete(presented, cause, subject).await? {
             self.revoke_refresh(ended.id, ended.refresh_token).await;
         }
         Ok(())
@@ -706,8 +862,14 @@ impl Inner {
         }
     }
 
-    async fn end(&self, presented: &[u8]) -> Result<String, AccessError> {
-        store::end_session(&self.db, presented).await?;
+    /// End `session` for `cause` (tracked): sign in again.
+    async fn end(
+        &self,
+        session: &Session,
+        cause: WebSessionEndCause,
+    ) -> Result<String, AccessError> {
+        self.delete(&session.presented, cause, Some(&session.subject))
+            .await?;
         Err(AccessError::SessionEnded)
     }
 }

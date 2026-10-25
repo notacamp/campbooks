@@ -100,7 +100,8 @@ pub struct LoginTransaction {
     pub scopes: Option<String>,
 }
 
-pub async fn insert_session(db: &PgPool, s: &NewSession<'_>) -> sqlx::Result<()> {
+/// Store a new session, in the transaction that tracks its start.
+pub async fn insert_session(db: &mut PgConnection, s: &NewSession<'_>) -> sqlx::Result<()> {
     sqlx::query(
         "SELECT bff.create_session($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, \
          $15)",
@@ -241,17 +242,13 @@ pub async fn is_retired(db: &PgPool, hash: &[u8]) -> sqlx::Result<bool> {
     Ok(session.is_some())
 }
 
-/// Begin the transaction a token refresh locks its session row in
-/// ([`lock_tokens`]). Sessions are instance-wide (no workspace), so it sets
-/// none; it is opened here, the one BFF file allowed to open transactions on
-/// the pool (`architecture.toml`).
-pub async fn begin_refresh(db: &PgPool) -> sqlx::Result<Transaction<'static, Postgres>> {
+/// Begin a transaction on the BFF's tables: the one a token refresh locks
+/// its session row in ([`lock_tokens`]), or the one a session starts or ends
+/// in, with its tracked event (ADR 0020). Sessions are instance-wide (no
+/// workspace), so it sets none; it is opened here, the one BFF file allowed
+/// to open transactions on the pool (`architecture.toml`).
+pub async fn begin(db: &PgPool) -> sqlx::Result<Transaction<'static, Postgres>> {
     db.begin().await
-}
-
-/// [`delete_session`] on its own, outside any transaction.
-pub async fn end_session(db: &PgPool, hash: &[u8]) -> sqlx::Result<Option<Ended>> {
-    delete_session(&mut *db.acquire().await?, hash).await
 }
 
 /// The tokens of the session `hash` names, locked until `tx` ends; `None`
@@ -308,9 +305,9 @@ pub async fn delete_session(db: &mut PgConnection, hash: &[u8]) -> sqlx::Result<
 }
 
 /// Back-channel logout: delete the sessions of IdP session `sid` (of user
-/// `subject` when both are given), or every session of `subject`.
+/// `subject` when both are given), or every session of `subject`; how many.
 pub async fn delete_for_logout(
-    db: &PgPool,
+    db: &mut PgConnection,
     subject: Option<&str>,
     sid: Option<&str>,
 ) -> sqlx::Result<u64> {
