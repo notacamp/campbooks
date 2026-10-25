@@ -35,6 +35,7 @@
     "trash": "Mover para a reciclagem",
     "inTrash": "Esta página está na reciclagem.",
     "icon": "Ícone",
+    "iconCurrent": "Ícone da página: {{name}}",
     "titleLabel": "Título da página",
     "edited": "Editada {{when}}",
     "emptyTitle": "Escolha uma página",

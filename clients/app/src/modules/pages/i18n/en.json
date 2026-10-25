@@ -35,6 +35,7 @@
     "trash": "Move to trash",
     "inTrash": "This page is in the trash.",
     "icon": "Icon",
+    "iconCurrent": "Page icon: {{name}}",
     "titleLabel": "Page title",
     "edited": "Edited {{when}}",
     "emptyTitle": "Pick a page",

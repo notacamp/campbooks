@@ -35,6 +35,7 @@
     "trash": "Mettre à la corbeille",
     "inTrash": "Cette page est à la corbeille.",
     "icon": "Icône",
+    "iconCurrent": "Icône de la page : {{name}}",
     "titleLabel": "Titre de la page",
     "edited": "Modifiée {{when}}",
     "emptyTitle": "Choisissez une page",

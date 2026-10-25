@@ -35,6 +35,7 @@
     "trash": "Mover a la papelera",
     "inTrash": "Esta página está en la papelera.",
     "icon": "Icono",
+    "iconCurrent": "Icono de la página: {{name}}",
     "titleLabel": "Título de la página",
     "edited": "Editada {{when}}",
     "emptyTitle": "Elige una página",

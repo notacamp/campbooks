@@ -12,7 +12,6 @@ import {
   Popover,
   PopoverSection,
   ReaderBody,
-  Select,
   SkeletonList,
   Spacer,
   StatusText,
@@ -24,8 +23,9 @@ import { useBacklinks, usePage } from "../api/queries";
 import { PageEditor } from "../editor/PageEditor";
 import type { SaveState } from "../editor/sync";
 import { usePageDocument } from "../editor/use-page-document";
-import { iconOf, PAGE_ICONS, type PageSummary, type PageView } from "../types";
+import { type PageSummary, type PageView } from "../types";
 
+import { IconPicker } from "./IconPicker";
 import { ShareMenu } from "./ShareMenu";
 import type { usePageActions } from "./use-page-actions";
 
@@ -198,13 +198,10 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
       <ReaderBody>
         <article className="mx-auto flex w-full max-w-measure flex-col gap-3 p-4">
           {trashed ? <Text tone="secondary">{t("screen.inTrash")}</Text> : null}
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             {editable ? (
-              <Select
-                label={t("screen.icon")}
-                hideLabel
-                options={PAGE_ICONS.map((name) => ({ value: name, label: t(`icon.${name}`) }))}
-                value={iconOf(icon)}
+              <IconPicker
+                value={icon}
                 onChange={(next) => {
                   setIcon(next);
                   save({ title, icon: next });

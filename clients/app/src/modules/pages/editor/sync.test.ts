@@ -52,6 +52,28 @@ describe("PageSync", () => {
     sync.stop();
   });
 
+  it("says saved after a deletion too, and does not send again (the delete set is always in an update)", async () => {
+    const server = fakeServer();
+    const doc = new Y.Doc();
+    const sync = new PageSync(doc, Y.encodeStateVector(doc), (body) =>
+      Promise.resolve(server.respond(body)),
+    );
+    write(doc, "Hello");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(sync.current).toBe("saved");
+    doc.getText("t").delete(0, 2);
+    expect(sync.current).toBe("saving");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(sync.current).toBe("saved");
+    expect(server.doc.getText("t").toJSON()).toBe("llo");
+    // Nothing more goes out while nothing changes.
+    const sent = server.calls.length;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(server.calls).toHaveLength(sent);
+    expect(sync.current).toBe("saved");
+    sync.stop();
+  });
+
   it("brings in what others wrote without sending it back", async () => {
     const server = fakeServer();
     write(server.doc, "Rui was here. ");

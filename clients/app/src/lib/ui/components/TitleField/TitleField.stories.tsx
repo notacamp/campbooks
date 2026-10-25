@@ -25,8 +25,13 @@ export const ReadOnly: Story = { args: { readOnly: true } };
 export const LongTitle: Story = {
   args: {
     defaultValue:
-      "A page title that is far longer than the line it sits on, so it is cut with an ellipsis",
+      "A page title that is far longer than the line it sits on, so it wraps onto as many lines as it needs",
   },
+};
+
+/** One long word still wraps inside the box. */
+export const LongWord: Story = {
+  args: { defaultValue: "Supercalifragilisticexpialidocious-Supercalifragilisticexpialidocious" },
 };
 
 export const Typing: Story = {

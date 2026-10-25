@@ -155,6 +155,7 @@ export function richDoc(threadId: string, taskId: string): Y.Doc {
       item("Task: ", mention("tasks.task", taskId)),
       item("Budget notes: ", mention("tasks.task", SECRET_TASK_ID)),
     ),
+    block("paragraph", {}, "Notes from the kickoff go below."),
   ]);
   return doc;
 }

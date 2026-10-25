@@ -34,8 +34,21 @@ export interface PageSyncOptions {
 
 const REMOTE = Symbol("remote");
 
-/** An update with nothing in it: no structs, no deletions. */
-const isEmpty = (update: Uint8Array) => update.length <= 2;
+/**
+ * Whether `doc` holds writes (not deletions) beyond `server`'s state vector.
+ * Deletions cannot be told this way, and an update always carries the whole
+ * delete set, so "is the update empty" is no test for "is there anything to
+ * send": the document counts its own edits instead.
+ */
+function writesBeyond(doc: Y.Doc, server: Uint8Array): boolean {
+  const known = Y.decodeStateVector(server);
+  for (const [client, clock] of Y.decodeStateVector(Y.encodeStateVector(doc))) {
+    if (clock > (known.get(client) ?? 0)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Keeps one page's Yjs document in step with the server through
@@ -56,10 +69,14 @@ export class PageSync {
   private again = false;
   private failures = 0;
   private stopped = false;
+  /** Local edits made, and how many of them the server has acknowledged. */
+  private edits = 0;
+  private acknowledged = 0;
   private state: SaveState = "saved";
   private readonly listeners = new Set<(state: SaveState) => void>();
   private readonly onUpdate = (_update: Uint8Array, origin: unknown) => {
     if (origin !== REMOTE && this.state !== "rejected") {
+      this.edits += 1;
       this.schedule();
     }
   };
@@ -77,7 +94,8 @@ export class PageSync {
     this.refused = options.refused ?? (() => false);
     doc.on("update", this.onUpdate);
     // Anything typed before this started is not on the server yet.
-    if (!isEmpty(Y.encodeStateAsUpdate(doc, serverVector))) {
+    if (writesBeyond(doc, serverVector)) {
+      this.edits += 1;
       this.schedule();
     }
   }
@@ -163,19 +181,20 @@ export class PageSync {
   }
 
   private async once(): Promise<void> {
-    const pending = Y.encodeStateAsUpdate(this.doc, this.server);
-    const sending = !isEmpty(pending);
+    const mark = this.edits;
+    const sending = this.edits !== this.acknowledged;
+    const pending = sending ? Y.encodeStateAsUpdate(this.doc, this.server) : undefined;
     try {
       const reply = await this.call({
         state_vector: toBase64(Y.encodeStateVector(this.doc)),
-        ...(sending ? { update: toBase64(pending) } : {}),
+        ...(pending === undefined ? {} : { update: toBase64(pending) }),
       });
       this.failures = 0;
+      this.acknowledged = mark;
       Y.applyUpdate(this.doc, fromBase64(reply.update), REMOTE);
       this.server = fromBase64(reply.state_vector);
       // More was typed while the call was on its way.
-      const left = Y.encodeStateAsUpdate(this.doc, this.server);
-      if (isEmpty(left)) {
+      if (this.edits === mark) {
         this.set("saved");
       } else {
         this.again = true;

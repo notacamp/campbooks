@@ -1,6 +1,7 @@
 .title {
   display: block;
   width: 100%;
+  height: var(--title-height, auto);
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
@@ -11,7 +12,9 @@
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-display);
-  text-overflow: ellipsis;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  resize: none;
 }
 
 .title::placeholder {

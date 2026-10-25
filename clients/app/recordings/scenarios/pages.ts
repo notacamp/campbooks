@@ -16,6 +16,9 @@ type Page = ScenarioContext["page"];
 /** The editor's text box. */
 const editorOf = (page: Page) => page.getByRole("textbox", { name: "Page text" });
 
+/** Wait until the top bar says the page is saved. */
+const savedOf = (page: Page) => page.getByRole("status").filter({ hasText: "Saved" }).first().waitFor();
+
 export default async function pages({ page }: ScenarioContext): Promise<void> {
   const phone = (page.viewportSize()?.width ?? 1440) < 768;
 
@@ -47,9 +50,10 @@ export default async function pages({ page }: ScenarioContext): Promise<void> {
   await editorOf(page).waitFor();
   await caption(page, "Open a page: headings, to-dos, a callout and lists", 2500);
 
-  // Type a line, then make a to-do with `/`.
-  const welcome = editorOf(page).getByText("Welcome to Acme Studio. This is how we work together.");
-  await welcome.click();
+  // Type a line at the end of the document, then make a to-do with `/`.
+  const last = editorOf(page).getByText("Notes from the kickoff go below.");
+  await last.scrollIntoViewIfNeeded();
+  await last.click();
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Pages save as you type.", { delay: 40 });
@@ -58,10 +62,12 @@ export default async function pages({ page }: ScenarioContext): Promise<void> {
   await caption(page, "Type / to pick a block", 2000);
   await page.keyboard.press("Enter");
   await page.keyboard.type("Call the venue", { delay: 50 });
-  await caption(page, "A new to-do, made with /", 2000);
+  await savedOf(page);
+  await caption(page, "A new to-do, made with /. Saved", 2200);
 
   // Tick a to-do.
   await editorOf(page).getByRole("checkbox").nth(1).check();
+  await savedOf(page);
   await caption(page, "Tick a to-do", 2000);
 
   // Mentions.
