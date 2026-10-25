@@ -65,7 +65,7 @@
       "change": "The workspaces module instrumented (campbooks-cloud#328): 16 events for workspaces created, updated, deleted and purged, members joined, role changed, left, suspended and unsuspended, invitations created, signup requests filed, approved and rejected, and signup codes minted, revoked and redeemed; records workspace, member, invitation, signup_request and signup_code; Coverage for every operation, handler and job of the module; the conversations and identity exemptions name workspaces.workspace_deleted.",
       "date": "2026-10-25",
       "plan_version": 5,
-      "pr": ""
+      "pr": "#657"
     }
   ],
   "coverage": [
