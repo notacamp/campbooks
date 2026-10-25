@@ -719,6 +719,126 @@ async fn reusing_a_key_for_another_request_is_422(db: PgPool) {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
+// --- keyed request hashes (campbooks-cloud#335) ------------------------------
+
+/// What the layer hashes of a POST to `path` with `body` (no query): the
+/// input of the keyed hash, and all a plain SHA-256 used to cover.
+fn hashed_input(path: &str, body: &Value) -> Vec<u8> {
+    let body = body.to_string();
+    let parts: [&[u8]; 4] = [b"POST\0", path.as_bytes(), b"\0\0", body.as_bytes()];
+    parts.concat()
+}
+
+/// The stored request hash of `key`, read as the table's owner.
+async fn stored_hash(db: &PgPool, key: &str) -> Vec<u8> {
+    sqlx::query_scalar("SELECT request_hash FROM kernel.idempotency WHERE key = $1")
+        .bind(key)
+        .fetch_one(db)
+        .await
+        .unwrap()
+}
+
+/// The stored hash is the HMAC under the key derived from the instance
+/// secret, never the plain SHA-256 anyone holding the database could test
+/// a body's secret against; an identical retry still replays.
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_stored_hash_is_keyed_not_a_plain_digest(db: PgPool) {
+    use aws_lc_rs::digest;
+
+    let http = http(db.clone()).await;
+    let body = json!({ "reason": "hunter2" });
+    let (status, _, first) = http
+        .send("POST", ARCHIVE, Some("keyed"), Some(body.clone()))
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let stored = stored_hash(&db, "keyed").await;
+    let input = hashed_input(ARCHIVE, &body);
+    let plain = digest::digest(&digest::SHA256, &input);
+    assert_ne!(
+        stored,
+        plain.as_ref(),
+        "never the plain SHA-256 of the request"
+    );
+    assert_eq!(
+        stored,
+        crate::crypto::hmac_sha256(
+            &crate::crypto::derive_bytes(
+                &testing::request_hash_secret(),
+                idempotency::HASH_PURPOSE
+            ),
+            &input
+        ),
+    );
+
+    let (status, headers, again) = http.send("POST", ARCHIVE, Some("keyed"), Some(body)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+    assert_eq!(again, first);
+}
+
+/// Two installs with different instance secrets store different hashes for
+/// one request, and neither matches the other's.
+#[sqlx::test(migrations = "../../migrations")]
+async fn two_installs_hash_one_request_apart(db: PgPool) {
+    let http = http(db.clone()).await;
+    let other = Http {
+        app: app(http
+            .idp
+            .state(db.clone())
+            .with_request_hasher(idempotency::RequestHasher::new(
+                &crate::crypto::SecretKey::from_bytes([0x77; crate::crypto::SECRET_KEY_LEN]),
+            )))
+        .0,
+        token: http.token.clone(),
+        idp: http.idp.clone(),
+    };
+    let body = json!({ "reason": "done" });
+    for (install, key) in [(&http, "one"), (&other, "two")] {
+        let (status, ..) = install
+            .send("POST", ARCHIVE, Some(key), Some(body.clone()))
+            .await;
+        assert_eq!(status, StatusCode::CREATED);
+    }
+    assert_ne!(stored_hash(&db, "one").await, stored_hash(&db, "two").await);
+
+    // A retry through the install that did not hash it is refused, never
+    // run again.
+    let (status, headers, problem) = other.send("POST", ARCHIVE, Some("one"), Some(body)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(problem["code"], "idempotency_key_reused");
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+}
+
+/// A row stored before the hash was keyed (its plain SHA-256), still
+/// unexpired, answers a retry with 422 and is never run again: the row
+/// keeps its answer and is not taken over.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_row_with_an_old_plain_hash_is_refused_never_run_again(db: PgPool) {
+    use aws_lc_rs::digest;
+
+    let http = http(db.clone()).await;
+    let body = json!({ "reason": "done" });
+    let (status, ..) = http
+        .send("POST", ARCHIVE, Some("old"), Some(body.clone()))
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let plain = digest::digest(&digest::SHA256, &hashed_input(ARCHIVE, &body));
+    sqlx::query("UPDATE kernel.idempotency SET request_hash = $1 WHERE key = 'old'")
+        .bind(plain.as_ref())
+        .execute(&db)
+        .await
+        .unwrap();
+    let before = stored(&db).await;
+
+    let (status, headers, problem) = http.send("POST", ARCHIVE, Some("old"), Some(body)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(problem["code"], "idempotency_key_reused");
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+    assert_eq!(stored(&db).await, before, "the row is left as it was");
+    assert_eq!(stored_hash(&db, "old").await, plain.as_ref());
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_key_still_in_flight_is_409(db: PgPool) {
     let http = http(db.clone()).await;

@@ -242,11 +242,15 @@ impl TestIdp {
     }
 
     /// App state over `db` whose token verifier trusts this IdP, binding
-    /// outbound requests with the test key ([`binding`](super::binding)).
+    /// outbound requests with the test key ([`binding`](super::binding))
+    /// and hashing keyed requests with the test hasher
+    /// ([`request_hasher`](super::request_hasher)).
     pub fn state(&self, db: PgPool) -> AppState {
         let mut config = super::config("postgres://test@localhost/test");
         config.auth = self.auth_config();
-        AppState::new(db, config).with_binding(super::binding())
+        AppState::new(db, config)
+            .with_binding(super::binding())
+            .with_request_hasher(super::request_hasher())
     }
 
     /// Claims of a valid user access token granting `scope` (space-separated

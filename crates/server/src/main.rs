@@ -415,6 +415,21 @@ fn binding() -> Result<campbooks_kernel::binding::Binding, String> {
     Ok(campbooks_kernel::binding::Binding::disabled())
 }
 
+/// The key idempotency request hashes are made with (campbooks-cloud#335),
+/// derived from the instance secret so every process of the install agrees;
+/// without one each process keys its own, which is said at startup (a retry
+/// another process serves then answers 422, never runs twice).
+fn request_hasher() -> Result<campbooks_kernel::idempotency::RequestHasher, String> {
+    if let Some(secret) = campbooks_kernel::crypto::SecretKey::from_env()? {
+        return Ok(campbooks_kernel::idempotency::RequestHasher::new(&secret));
+    }
+    tracing::warn!(
+        "CAMPBOOKS_SECRET_KEY is not set: an Idempotency-Key retry is replayed only by the \
+         process that first ran it, until it restarts (others answer 422); set it in production"
+    );
+    Ok(campbooks_kernel::idempotency::RequestHasher::default())
+}
+
 /// Startup checks of the settings `role` uses; the web BFF's settings when
 /// it serves the API with web sign-in.
 fn check(config: &Config, role: Role) -> Result<Option<bff::Settings>, String> {
@@ -477,6 +492,7 @@ async fn run(
             .with_rate_limits(rate_limits()?)
             .with_signer(signer()?)
             .with_binding(binding()?)
+            .with_request_hasher(request_hasher()?)
             .with_metrics(telemetry.metrics())
             .with_registry(registry)
             .with_blobs(blobs)
