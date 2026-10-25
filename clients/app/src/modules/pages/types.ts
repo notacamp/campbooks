@@ -4,7 +4,7 @@ import type { Schema } from "~/lib/api";
 export type PageSummary = Schema<"PageSummary">;
 export type PageView = Schema<"PageView">;
 export type PageList = Schema<"PageList">;
-export type PageRole = Schema<"Role">;
+export type PageRole = Schema<"PageRole">;
 export type PagePlace = Schema<"Place">;
 export type GrantView = Schema<"GrantView">;
 export type Backlinks = Schema<"Backlinks">;

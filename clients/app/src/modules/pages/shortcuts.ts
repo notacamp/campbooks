@@ -7,7 +7,7 @@ import type { ShortcutDefinition } from "~/lib/shortcuts";
 export const PAGES_SHORTCUTS = [
   {
     id: "pages.create",
-    keys: "n p",
+    keys: "n g",
     scope: "global",
     group: "general",
     label: "pages:shortcuts.create",

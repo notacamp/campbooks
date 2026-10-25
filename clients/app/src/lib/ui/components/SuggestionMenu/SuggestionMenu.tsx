@@ -56,7 +56,9 @@ export function SuggestionMenu({
 }: SuggestionMenuProps) {
   const activeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    activeRef.current?.scrollIntoView?.({ block: "nearest" });
+    // jsdom has no scrollIntoView.
+    const node: Partial<HTMLElement> | null = activeRef.current;
+    node?.scrollIntoView?.({ block: "nearest" });
   }, [active]);
   const any = groups.some((group) => group.items.length > 0);
   return (

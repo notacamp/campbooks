@@ -28,10 +28,7 @@ impl EventHandler for ForgetMember {
         let tx = ctx.tx().await?;
         // After any share call that checked the membership before it ended.
         lock_member(tx, workspace, left.user).await?;
-        let back = state
-            .membership
-            .role_held(&mut **tx, workspace, left.user)
-            .await?;
+        let back = state.membership.role_held(tx, workspace, left.user).await?;
         if back.is_some() {
             return Ok(());
         }

@@ -23,9 +23,18 @@ import {
   RUI,
   RUI_DETAIL,
   SOFIA,
+  TIAGO,
+  TIAGO_DETAIL,
   WAITING,
 } from "../../test/demo/attention";
 import { INBOX, STREAM_COUNTS, W } from "../../test/demo/conversations";
+import {
+  HOME_COUNTS,
+  HOME_ITEMS,
+  HOME_NEEDS,
+  HOME_TASKS,
+  HOME_TASKS_ELSEWHERE,
+} from "../../test/demo/home";
 import { DUARTE, SESSION } from "../../test/demo/workspaces";
 
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
@@ -87,7 +96,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Review first, then Reply, Do, Pay; due soonest first; no percentage anywhere. */
+/** By band, Now first; each row says what it is and why first; no percentage anywhere. */
 export const WhatNeedsYou: Story = {
   args: { path: PATH, api: home() },
   play: async ({ canvasElement }) => {
@@ -136,7 +145,8 @@ export const SnoozeDialog: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByText("Marta Ferreira is waiting for your reply");
-    await userEvent.keyboard("j");
+    // Past Luz's bill (Now) to Marta (Today).
+    await userEvent.keyboard("jj");
     await userEvent.keyboard("s");
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole("dialog", { name: "Snooze Marta Ferreira until…" });
@@ -183,7 +193,7 @@ export const ReplyDialog: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByText("Marta Ferreira is waiting for your reply");
-    await userEvent.keyboard("j");
+    await userEvent.keyboard("jj");
     await userEvent.keyboard("r");
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole("dialog", { name: "Reply to Marta" });
@@ -204,7 +214,7 @@ export const ReplyDraft: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByText("Marta Ferreira is waiting for your reply");
-    await userEvent.keyboard("j");
+    await userEvent.keyboard("jj");
     await userEvent.keyboard("r");
     const body = within(canvasElement.ownerDocument.body);
     await body.findByRole("button", { name: /Yes, Thursday works/u });
@@ -230,7 +240,7 @@ export const ReplyUnavailable: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByText("Marta Ferreira is waiting for your reply");
-    await userEvent.keyboard("j");
+    await userEvent.keyboard("jj");
     await userEvent.keyboard("r");
     const body = within(canvasElement.ownerDocument.body);
     // The dialog fades in: wait until its line is shown.
@@ -344,7 +354,9 @@ export const BusyDesktop: Story = { ...busy, ...at("desktop", 1440, 900) };
 
 // Waits and nudges (campbooks-cloud#293): Ana Costa hasn't written since
 // João asked on 7 October, and Scout waits on Rui Matos and Inês Cardoso.
-function waits(open = [...ITEMS, ANA_ITEM]): Record<string, MockRoute> {
+function waits(
+  open = [...ITEMS.slice(0, 2), ANA_ITEM, ...ITEMS.slice(2)],
+): Record<string, MockRoute> {
   return home({
     [`GET ${W}/attention`]: (_body, url) => {
       const state = url.searchParams.get("state");
@@ -371,7 +383,7 @@ function waits(open = [...ITEMS, ANA_ITEM]): Record<string, MockRoute> {
   });
 }
 
-/** Under Nudge, after Pay: Ana hasn't written. Waiting on others sits above Done today. */
+/** In Today: Ana hasn't written. Waiting on others sits above Done today. */
 export const NudgeAndWaiting: Story = {
   args: { path: PATH, api: waits() },
   play: async ({ canvasElement }) => {
@@ -431,5 +443,70 @@ export const NothingNeedsYouWaiting: Story = {
     await expect(
       await canvas.findByText(/Scout is also waiting on 2 people for you\./u),
     ).toBeVisible();
+  },
+};
+
+// A whole morning across the four bands (campbooks-cloud#358): a scam
+// warning and a late bill, a nudge, the lease due today, Marta's
+// walkthrough tomorrow and Tiago waiting four days, a bill on Thursday and
+// two people waiting for an answer, a bill on the 30th and a newsletter a
+// rule keeps; three more tasks in Tasks.
+function morning(): Record<string, MockRoute> {
+  return home({
+    [`GET ${W}/attention`]: (_body, url) =>
+      url.searchParams.get("state") === "cleared"
+        ? { body: { items: CLEARED, counts: [], tasks_elsewhere: 0 } }
+        : {
+            body: {
+              items: HOME_ITEMS,
+              counts: HOME_COUNTS,
+              tasks_elsewhere: HOME_TASKS_ELSEWHERE,
+            },
+          },
+    [`GET ${W}/conversations`]: {
+      body: { conversations: [...HOME_NEEDS, SOFIA], next_cursor: null },
+    },
+    [`GET ${W}/tasks`]: { body: { tasks: HOME_TASKS } },
+    [`GET ${W}/conversations/${TIAGO.id}`]: { body: TIAGO_DETAIL },
+    [`GET ${W}/conversations/${ANA.id}`]: { body: ANA_DETAIL },
+  });
+}
+
+/** Now, Today, This week, Whenever; "3 more in Tasks" ends the list. */
+export const Bands: Story = {
+  args: { path: PATH, api: morning() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole("heading", { level: 1, name: "10 things need you" }),
+    ).toBeVisible();
+    const groups = canvas.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    await expect(groups.slice(0, 4)).toEqual(["Now 2", "Today 4", "This week 3", "Whenever 2"]);
+    await expect(canvas.getByText("Tiago has waited 4 days")).toBeVisible();
+    await expect(canvas.getByText("3 more in Tasks")).toBeVisible();
+  },
+};
+
+/** The same morning on a phone: the eyebrow wraps, nothing scrolls sideways. */
+export const BandsPhone: Story = {
+  args: { path: PATH, api: morning() },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Tiago has waited 4 days");
+    await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
+      globalThis.innerWidth,
+    );
+  },
+};
+
+/** Opened, Tiago's reply says why it is in Today. */
+export const WhyItsHere: Story = {
+  args: { path: PATH, api: morning() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByText("Tiago Nunes is waiting for your reply"));
+    const why = await canvas.findByRole("region", { name: "Why it’s here" });
+    await expect(why).toHaveTextContent("In Today: Tiago has waited 4 days.");
   },
 };

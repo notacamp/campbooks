@@ -32,7 +32,9 @@
 //!   Nudge; mail from them reaching the inbox clears it as `heard_back`; the
 //!   member writing to them re-arms it from the send. Archiving leaves it.
 //! - **Refreshed** ([`refresh`]) wherever those inputs change, publishing
-//!   `conversations.need_changed` with a growing revision when the need did,
+//!   `conversations.need_changed` with a growing revision when the need did
+//!   (or when it was last announced with older facts: whether it is a
+//!   warning, whether a person sent its message, campbooks-cloud#358),
 //!   and writing when it next changes with time alone
 //!   (`conversations.need_clocks`), which `conversations.wake_needs` acts on.
 //!
@@ -86,6 +88,11 @@ const NEWSLETTERS: &str = "newsletters";
 /// The confidence from which the model's `next_move` raises a wait the
 /// policy does not accept yet (campbooks-cloud#293): put as a question.
 const WAIT_FLOOR: f64 = 0.8;
+/// The facts `conversations.need_changed` carries about an open need
+/// (campbooks-cloud#358: whether it is a warning, whether a person sent it).
+/// A need last announced with older facts (`needs.facts_version`) is
+/// announced again by its next refresh, even if it did not change.
+const NEED_FACTS: i16 = 1;
 /// The facts that say a message is list, automatic or no-reply mail: it
 /// waits on nobody.
 const MACHINE_MAIL: [&str; 3] = [facts::LIST_MAIL, facts::AUTOMATIC, facts::NO_REPLY_SENDER];
@@ -1015,6 +1022,7 @@ struct Row {
     awaited_address: Option<String>,
     nudge_at: Option<DateTime<Utc>>,
     nudges: i32,
+    facts_version: i16,
 }
 
 impl Row {
@@ -1052,7 +1060,8 @@ async fn current(conn: &mut PgConnection, conversation: ConversationId) -> Resul
     Ok(sqlx::query_as::<_, Row>(
         "SELECT message_id, reason, trust, basis, question, decision_id, due_on, lapses_at,
                 urgent, state, cleared_because, verdict, verdict_message_id, verdict_by,
-                latest_inbound_id, awaited_name, awaited_address, nudge_at, nudges
+                latest_inbound_id, awaited_name, awaited_address, nudge_at, nudges,
+                facts_version
            FROM conversations.needs WHERE conversation_id = $1 FOR UPDATE",
     )
     .bind(conversation)
@@ -1859,10 +1868,11 @@ async fn refresh_pass(
         "INSERT INTO conversations.needs
              (conversation_id, workspace_id, message_id, reason, trust, basis, question,
               decision_id, due_on, urgent, state, cleared_because, cleared_by, cleared_at,
-              latest_inbound_id, lapses_at, awaited_name, awaited_address, nudge_at, nudges)
+              latest_inbound_id, lapses_at, awaited_name, awaited_address, nudge_at, nudges,
+              facts_version)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
                  CASE WHEN $12::text IS NULL THEN NULL ELSE now() END, $14, $15, $16, $17, $18,
-                 $19)
+                 $19, $20)
          ON CONFLICT (conversation_id) DO UPDATE
             SET message_id = EXCLUDED.message_id, reason = EXCLUDED.reason,
                 trust = EXCLUDED.trust, basis = EXCLUDED.basis, question = EXCLUDED.question,
@@ -1872,7 +1882,7 @@ async fn refresh_pass(
                 cleared_at = EXCLUDED.cleared_at, latest_inbound_id = EXCLUDED.latest_inbound_id,
                 lapses_at = EXCLUDED.lapses_at, awaited_name = EXCLUDED.awaited_name,
                 awaited_address = EXCLUDED.awaited_address, nudge_at = EXCLUDED.nudge_at,
-                nudges = EXCLUDED.nudges,
+                nudges = EXCLUDED.nudges, facts_version = EXCLUDED.facts_version,
                 revision = conversations.needs.revision + 1, updated_at = now()
          RETURNING revision",
     )
@@ -1895,6 +1905,7 @@ async fn refresh_pass(
     .bind(need.awaited.as_ref().map(|a| a.address.as_str()))
     .bind(need.nudge_at)
     .bind(need.nudges)
+    .bind(NEED_FACTS)
     .fetch_one(&mut **tx)
     .await?;
     set_clock(tx, conversation.workspace_id, id, wake).await?;
@@ -1921,6 +1932,14 @@ async fn refresh_pass(
             .await?;
         }
     }
+    // Whether a person sent the need's message, from its headers alone
+    // (campbooks-cloud#358): Home puts people before services.
+    let from_person = match cause {
+        None => people(tx, need.message)
+            .await?
+            .map(|envelope| !facts::is_machine_sender(&envelope)),
+        Some(_) => None,
+    };
     events
         .publish(
             tx,
@@ -1938,6 +1957,8 @@ async fn refresh_pass(
                         due_on: need.due_on,
                         lapses_at: need.lapses_at,
                         urgent: need.urgent,
+                        warning: need.question == NeedQuestion::Suspicious,
+                        from_person,
                     }),
                     Some(_) => None,
                 },
@@ -1968,7 +1989,10 @@ fn worth_announcing(
     // The sender writing again is news even when it raises nothing (it ends
     // a member's Later), as long as the need is still open.
     let newer_message = row.state == "open" && cause.is_none() && row.latest_inbound_id != latest;
-    Ok(newer_message || !unchanged(row, need, cause)?)
+    // An open need announced with older facts than `need_changed` carries
+    // now is announced again with them.
+    let older_facts = row.state == "open" && cause.is_none() && row.facts_version < NEED_FACTS;
+    Ok(newer_message || older_facts || !unchanged(row, need, cause)?)
 }
 
 fn unchanged(row: &Row, need: &Need, cause: Option<ClearCause>) -> Result<bool> {

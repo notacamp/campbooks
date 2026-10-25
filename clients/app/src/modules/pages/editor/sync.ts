@@ -118,6 +118,10 @@ export class PageSync {
     await this.run();
   }
 
+  private wantsAnother(): boolean {
+    return this.again && !this.stopped && this.state !== "rejected";
+  }
+
   private set(state: SaveState): void {
     if (state !== this.state) {
       this.state = state;
@@ -152,7 +156,7 @@ export class PageSync {
       do {
         this.again = false;
         await this.once();
-      } while (this.again && !this.stopped && this.state !== "rejected");
+      } while (this.wantsAnother());
     } finally {
       this.running = false;
     }

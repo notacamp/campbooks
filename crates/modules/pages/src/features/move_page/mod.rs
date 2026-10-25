@@ -13,9 +13,10 @@ use campbooks_kernel::{
     authz::Action,
     db::BeginFor as _,
     extract,
-    tenancy::{Workspace, WorkspaceId},
+    tenancy::{Access, Workspace, WorkspaceId},
 };
 use serde::Deserialize;
+use sqlx::{Postgres, Transaction};
 use utoipa::ToSchema;
 
 use crate::{
@@ -164,21 +165,7 @@ pub async fn handler(
     .await?;
     let mut kinds = vec![PageChangeKind::Move];
     if place != before_place {
-        let inside: Vec<PageId> = below
-            .iter()
-            .map(|(id, _)| *id)
-            .filter(|id| *id != path.page_id)
-            .collect();
-        sqlx::query(
-            "UPDATE pages.pages SET place = $2, revision = revision + 1 WHERE id = ANY($1)",
-        )
-        .bind(&inside)
-        .bind(place.as_str())
-        .execute(&mut *tx)
-        .await?;
-        for id in inside {
-            announce(&state, &mut tx, access, id, vec![PageChangeKind::Move]).await?;
-        }
+        spread_place(&state, &mut tx, access, path.page_id, &below, place).await?;
         kinds.push(PageChangeKind::Share);
     }
     announce(&state, &mut tx, access, path.page_id, kinds).await?;
@@ -198,6 +185,31 @@ pub async fn handler(
     let summary = view::summary_of(&mut tx, access, &row).await?;
     tx.commit().await?;
     Ok(Json(summary))
+}
+
+/// The pages under a moved page follow it into its new place.
+async fn spread_place(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    access: &Access,
+    moved: PageId,
+    below: &[(PageId, i32)],
+    place: Place,
+) -> Result<()> {
+    let inside: Vec<PageId> = below
+        .iter()
+        .map(|(id, _)| *id)
+        .filter(|id| *id != moved)
+        .collect();
+    sqlx::query("UPDATE pages.pages SET place = $2, revision = revision + 1 WHERE id = ANY($1)")
+        .bind(&inside)
+        .bind(place.as_str())
+        .execute(&mut **tx)
+        .await?;
+    for id in inside {
+        announce(state, tx, access, id, vec![PageChangeKind::Move]).await?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

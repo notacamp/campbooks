@@ -18,6 +18,7 @@ import {
   CLEARED,
   COUNTS,
   ITEMS,
+  LUZ,
   MARTA,
   MARTA_DETAIL,
   NEEDS,
@@ -89,7 +90,14 @@ const FORWARD = {
   message_id: MARTA_DETAIL.messages.at(-1)?.id ?? null,
 };
 
-const MARTA_ITEM = ITEMS[1]?.id ?? "";
+/**
+ * Home's list without Luz's bill (Now), so Marta's email (Today) comes right
+ * after the warning, as these tests step through it.
+ */
+const LISTED = ITEMS.filter((item) => item.record.id !== LUZ.id);
+
+const MARTA_LISTED = LISTED.find((item) => item.record.id === MARTA.id);
+const MARTA_ITEM = MARTA_LISTED?.id ?? "";
 
 /** Marta's email with a file of its own. */
 const WITH_FILE: Schema<"ConversationDetail"> = {
@@ -138,13 +146,13 @@ function api(conversations: Summary[], detail = MARTA_DETAIL, options: Options =
     [`GET ${W}/attention`]: (request) =>
       new URL(request.url).searchParams.get("state") === "cleared"
         ? { body: { items: CLEARED, counts: [] } }
-        : { body: { items: ITEMS, counts: COUNTS } },
+        : { body: { items: LISTED, counts: COUNTS } },
     [`GET ${W}/conversations`]: { body: { conversations, next_cursor: null } },
     [`GET ${W}/conversations/${MARTA.id}`]: { body: detail },
     [`GET ${W}/conversations/${PHISH.id}`]: { body: PHISH_DETAIL },
     [`POST ${W}/conversations/${PHISH.id}/need/resolve`]: { body: { ...PHISH, need: null } },
     [`POST ${W}/conversations/${PHISH.id}/need/reopen`]: { body: PHISH },
-    [`POST ${W}/attention/${MARTA_ITEM}/snooze`]: { body: ITEMS[1] },
+    [`POST ${W}/attention/${MARTA_ITEM}/snooze`]: { body: MARTA_LISTED },
     // Found by name: the server matches what is typed.
     // Without `reachable`, the server would list the unsafe senders too.
     [`GET ${W}/senders`]: (request) => {

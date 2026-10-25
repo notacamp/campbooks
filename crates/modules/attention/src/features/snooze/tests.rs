@@ -24,6 +24,8 @@ fn need(revision: i64, message: &str) -> Need {
         sent_at: Utc::now() - TimeDelta::hours(1),
         latest: None,
         lapses_at: None,
+        warning: false,
+        from_person: None,
     }
 }
 

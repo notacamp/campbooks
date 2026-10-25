@@ -35,6 +35,30 @@ function pages(overrides: Record<string, MockRoute> = {}) {
   let live = [...PAGES];
   let trashed = [OLD_NOTES];
   const byId = (id: string) => live.find((page) => page.id === id);
+  const perPage: Record<string, MockRoute> = {};
+  for (const page of [HANDBOOK, ONBOARDING, HOLIDAYS, IDEAS, BUDGET]) {
+    perPage[`GET ${P}/${page.id}`] = () => ({
+      body: viewOf(page, [
+        page === HANDBOOK
+          ? "Welcome to Acme Studio. This is how we work together."
+          : `Notes for ${page.title}.`,
+      ]),
+    });
+    perPage[`POST ${P}/${page.id}/sync`] = {
+      body: { revision: 1, state_vector: "AA==", update: "AAA=" },
+    };
+    perPage[`POST ${P}/${page.id}/trash`] = () => {
+      const gone = byId(page.id);
+      live = live.filter((other) => other.id !== page.id);
+      trashed = gone === undefined ? trashed : [...trashed, gone];
+      return { body: { ...viewOf(page, []), trashed_at: "2026-10-13T09:00:00Z" } };
+    };
+    perPage[`POST ${P}/${page.id}/restore`] = () => {
+      live = [...live, page];
+      trashed = trashed.filter((other) => other.id !== page.id);
+      return { body: viewOf(page, []) };
+    };
+  }
   const routes: Record<string, MockRoute> = {
     "GET /bff/session": { body: SESSION },
     "GET /bff/api/v1/workspaces": { body: { workspaces: [DUARTE] } },
@@ -59,41 +83,7 @@ function pages(overrides: Record<string, MockRoute> = {}) {
       live = [...live, made];
       return { status: 201, body: viewOf(made, []) };
     },
-    ...Object.fromEntries(
-      [HANDBOOK, ONBOARDING, HOLIDAYS, IDEAS, BUDGET].flatMap((page) => [
-        [
-          `GET ${P}/${page.id}`,
-          () => ({
-            body: viewOf(page, [
-              page === HANDBOOK
-                ? "Welcome to Acme Studio. This is how we work together."
-                : `Notes for ${page.title}.`,
-            ]),
-          }),
-        ],
-        [
-          `POST ${P}/${page.id}/sync`,
-          { body: { revision: 1, state_vector: "AA==", update: "AAA=" } },
-        ],
-        [
-          `POST ${P}/${page.id}/trash`,
-          () => {
-            const gone = byId(page.id);
-            live = live.filter((other) => other.id !== page.id);
-            trashed = gone === undefined ? trashed : [...trashed, gone];
-            return { body: { ...viewOf(page, []), trashed_at: "2026-10-13T09:00:00Z" } };
-          },
-        ],
-        [
-          `POST ${P}/${page.id}/restore`,
-          () => {
-            live = [...live, page];
-            trashed = trashed.filter((other) => other.id !== page.id);
-            return { body: viewOf(page, []) };
-          },
-        ],
-      ]),
-    ),
+    ...perPage,
     ...overrides,
   };
   return routes;

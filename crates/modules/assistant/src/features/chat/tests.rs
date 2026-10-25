@@ -456,6 +456,42 @@ async fn the_desktop_gets_the_same_answer_whole(db: PgPool) {
     assert!(called.contains(&"search.query".to_owned()), "{called:?}");
 }
 
+/// campbooks-cloud#358: what needs the member comes in Home's order, each
+/// need with its band and why, never Scout's own urgency.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn what_needs_me_follows_homes_bands(db: PgPool) {
+    let server = MockServer::start().await;
+    once(&server, calling("what_needs_me", &json!({}))).await;
+    once(&server, text(ANSWER)).await;
+    let kit = kit_with(db, Some(gateway(&server.uri()))).await;
+    kit.mail.lock().unwrap().items = vec![json!({
+        "id": "item-1", "reason": "pay", "due_on": "2026-11-01", "overdue": true,
+        "urgent": true, "since": "2026-10-20T09:00:00Z",
+        "band": "now", "band_reason": {"rule": "overdue", "days": 2, "on": null},
+        "record": {"type": "conversations.conversation", "id": CONVERSATION},
+    })];
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let asked = kit
+        .post(
+            &sam,
+            &format!("{}/{id}/questions", chats(workspace)),
+            json!({ "text": "What should I do first?" }),
+        )
+        .await;
+    assert_eq!(asked.status, StatusCode::OK, "{}", asked.json);
+    let told = results(&server).await;
+    let result: Value = serde_json::from_str(&told[0]).unwrap();
+    let need = &result["needs"][0];
+    assert_eq!(need["band"], "now", "{result}");
+    assert_eq!(need["band_reason"]["rule"], "overdue", "{result}");
+    assert_eq!(need["band_reason"]["days"], 2, "{result}");
+    assert!(need.get("urgent").is_none(), "{result}");
+    assert_eq!(result["tasks_elsewhere"], 2, "{result}");
+    only_reads(&kit);
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_tool_that_does_not_exist_is_never_run(db: PgPool) {
     let server = MockServer::start().await;

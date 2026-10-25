@@ -109,6 +109,7 @@ export function PageTreeRow({
 }: PageTreeRowProps) {
   return (
     <div
+      role="presentation"
       className={styles["row"]}
       style={{ "--depth": depth } as CSSProperties}
       data-current={current || undefined}

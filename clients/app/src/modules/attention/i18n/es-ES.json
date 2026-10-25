@@ -11,14 +11,53 @@
     "lookSubline_one": "Nada te pide nada. {{count}} correo de abajo merece un vistazo.",
     "lookSubline_other": "Nada te pide nada. {{count}} correos de abajo merecen un vistazo."
   },
-  "groups": {
+  "kinds": {
     "review": "Revisar",
     "reply": "Responder",
     "decide": "Decidir",
     "do": "Hacer",
     "pay": "Pagar",
     "worth_a_look": "Merece un vistazo",
-    "nudge": "Recordar"
+    "nudge": "Recordar",
+    "doTask": "Tarea por hacer",
+    "payTask": "Tarea por pagar"
+  },
+  "bands": {
+    "now": "Ahora",
+    "today": "Hoy",
+    "week": "Esta semana",
+    "whenever": "Cuando puedas"
+  },
+  "bandNotes": {
+    "now": "Avisos de estafa y todo lo que está vencido.",
+    "today": "Vence hoy o mañana, planeado para hoy, recordatorios que ya tocan y personas que esperan desde hace 3 días o más.",
+    "week": "Con fecha en los próximos 7 días, y personas que esperan tu respuesta.",
+    "whenever": "Sin fecha, de servicios, o aquí por tus reglas."
+  },
+  "reason": {
+    "warning": "Posible estafa · revísalo antes",
+    "overdue_one": "Vencido · {{count}} día",
+    "overdue_other": "Vencido · {{count}} días",
+    "dueToday": "Vence hoy",
+    "dueTomorrow": "Vence mañana",
+    "plannedToday": "Lo planeaste para hoy",
+    "nudgeDue": "La respuesta de {{name}} vencía el {{date}}",
+    "nudgeDueNoName": "Una respuesta vencía el {{date}}",
+    "nudgeDueToday": "La respuesta de {{name}} vencía hoy",
+    "nudgeDueTodayNoName": "Una respuesta vencía hoy",
+    "waited_one": "{{name}} espera desde hace {{count}} día",
+    "waited_other": "{{name}} espera desde hace {{count}} días",
+    "waitedNoName_one": "Esperando desde hace {{count}} día",
+    "waitedNoName_other": "Esperando desde hace {{count}} días",
+    "dueOn": "Vence el {{date}}",
+    "waitingAnswer": "{{name}} espera tu respuesta",
+    "waitingAnswerNoName": "Esperando tu respuesta",
+    "keptByRule": "Aquí por tu regla",
+    "noDate": "Sin fecha"
+  },
+  "why": {
+    "title": "Por qué está aquí",
+    "sentence": "En «{{band}}»: {{reason}}."
   },
   "context": "Hecho hoy",
   "doneTodayTitle": "Hecho hoy",
@@ -89,7 +128,9 @@
   "pay": {
     "allPaid_one": "Ya he pagado {{count}}",
     "allPaid_other": "Ya he pagado las {{count}}",
-    "note": "Campbooks no tiene acceso a tu banco, así que pregunta si cada factura está pagada."
+    "note": "Campbooks no tiene acceso a tu banco, así que pregunta si cada factura está pagada.",
+    "asked_one": "Campbooks pregunta por {{count}} factura.",
+    "asked_other": "Campbooks pregunta por {{count}} facturas."
   },
   "nudge": {
     "note": "Personas que aún no han respondido. Scout redacta el recordatorio y tú lo envías.",
@@ -106,5 +147,8 @@
     "label": "Esperando a {{name}}",
     "fold": "Esperando a otros · {{count}}",
     "ask": "Preguntar a Scout"
-  }
+  },
+  "tasksElsewhere_one": "{{count}} más en Tareas",
+  "tasksElsewhere_other": "{{count}} más en Tareas",
+  "openTasks": "Abrir Tareas"
 }

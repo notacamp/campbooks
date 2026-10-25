@@ -48,10 +48,11 @@ pub const ICONS: &[&str] = &[
 /// A closed set of words kept as text in the database and as `snake_case`
 /// on the wire.
 macro_rules! words {
-    ($(#[$meta:meta])* $name:ident { $($(#[$vmeta:meta])* $variant:ident => $text:literal),+ $(,)? }) => {
+    ($(#[$meta:meta])* $name:ident as $schema:ident { $($(#[$vmeta:meta])* $variant:ident => $text:literal),+ $(,)? }) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema)]
         #[serde(rename_all = "snake_case")]
+        #[schema(as = $schema)]
         pub enum $name {
             $($(#[$vmeta])* $variant),+
         }
@@ -83,7 +84,7 @@ macro_rules! words {
 
 words!(
     /// Where a top-level page lives; sub-pages are always in their parent's.
-    Place {
+    Place as Place {
         /// Its creator's, and whoever it is shared with.
         Private => "private",
         /// Every member's.
@@ -93,7 +94,7 @@ words!(
 
 words!(
     /// What a member can do with a page, lowest first.
-    Role {
+    Role as PageRole {
         /// Read it.
         Reader => "reader",
         /// Also write it, and make and move pages in it.
@@ -105,7 +106,7 @@ words!(
 
 words!(
     /// How a body points at a record.
-    LinkKind {
+    LinkKind as LinkKind {
         /// An inline mention.
         Mention => "mention",
         /// A block that shows a record.

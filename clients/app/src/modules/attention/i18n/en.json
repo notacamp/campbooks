@@ -11,14 +11,53 @@
     "lookSubline_one": "Nothing asks anything of you. {{count}} email below is worth a look.",
     "lookSubline_other": "Nothing asks anything of you. {{count}} emails below are worth a look."
   },
-  "groups": {
+  "kinds": {
     "review": "Review",
     "reply": "Reply",
     "decide": "Decide",
     "do": "Do",
     "pay": "Pay",
     "worth_a_look": "Worth a look",
-    "nudge": "Nudge"
+    "nudge": "Nudge",
+    "doTask": "Do task",
+    "payTask": "Pay task"
+  },
+  "bands": {
+    "now": "Now",
+    "today": "Today",
+    "week": "This week",
+    "whenever": "Whenever"
+  },
+  "bandNotes": {
+    "now": "Scam warnings and anything overdue.",
+    "today": "Due today or tomorrow, planned for today, nudges that are due, and people who have waited 3 days or more.",
+    "week": "Dated in the next 7 days, and people waiting for your answer.",
+    "whenever": "No date, from services, or kept here by your rules."
+  },
+  "reason": {
+    "warning": "Possible scam · check first",
+    "overdue_one": "Overdue · {{count}} day",
+    "overdue_other": "Overdue · {{count}} days",
+    "dueToday": "Due today",
+    "dueTomorrow": "Due tomorrow",
+    "plannedToday": "You planned it for today",
+    "nudgeDue": "{{name}}’s answer was due {{date}}",
+    "nudgeDueNoName": "An answer was due {{date}}",
+    "nudgeDueToday": "{{name}}’s answer was due today",
+    "nudgeDueTodayNoName": "An answer was due today",
+    "waited_one": "{{name}} has waited {{count}} day",
+    "waited_other": "{{name}} has waited {{count}} days",
+    "waitedNoName_one": "Waited {{count}} day",
+    "waitedNoName_other": "Waited {{count}} days",
+    "dueOn": "Due {{date}}",
+    "waitingAnswer": "{{name}} is waiting for your answer",
+    "waitingAnswerNoName": "Waiting for your answer",
+    "keptByRule": "Kept here by your rule",
+    "noDate": "No date"
+  },
+  "why": {
+    "title": "Why it’s here",
+    "sentence": "In {{band}}: {{reason}}."
   },
   "context": "Done today",
   "doneTodayTitle": "Done today",
@@ -89,7 +128,9 @@
   "pay": {
     "allPaid_one": "{{count}} already paid",
     "allPaid_other": "All {{count}} already paid",
-    "note": "Campbooks can’t see your bank, so it asks whether each invoice is paid."
+    "note": "Campbooks can’t see your bank, so it asks whether each invoice is paid.",
+    "asked_one": "Campbooks asks about {{count}} invoice.",
+    "asked_other": "Campbooks asks about {{count}} invoices."
   },
   "nudge": {
     "note": "People who haven’t written back yet. Scout drafts the nudge, you send it.",
@@ -106,5 +147,8 @@
     "label": "Waiting on {{name}}",
     "fold": "Waiting on others · {{count}}",
     "ask": "Ask Scout"
-  }
+  },
+  "tasksElsewhere_one": "{{count}} more in Tasks",
+  "tasksElsewhere_other": "{{count}} more in Tasks",
+  "openTasks": "Open Tasks"
 }

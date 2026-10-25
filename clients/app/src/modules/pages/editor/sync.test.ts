@@ -46,7 +46,7 @@ describe("PageSync", () => {
     expect(sync.current).toBe("saving");
     await vi.advanceTimersByTimeAsync(500);
     expect(server.calls).toEqual([{ update: true }]);
-    expect(server.doc.getText("t").toString()).toBe("Hello");
+    expect(server.doc.getText("t").toJSON()).toBe("Hello");
     expect(sync.current).toBe("saved");
     expect(states).toEqual(["saving", "saved"]);
     sync.stop();
@@ -60,11 +60,11 @@ describe("PageSync", () => {
       Promise.resolve(server.respond(body)),
     );
     await sync.pull();
-    expect(doc.getText("t").toString()).toBe("Rui was here. ");
+    expect(doc.getText("t").toJSON()).toBe("Rui was here. ");
     expect(server.calls).toEqual([{ update: false }]);
     write(doc, "Ana too.");
     await vi.advanceTimersByTimeAsync(500);
-    expect(server.doc.getText("t").toString()).toBe("Rui was here. Ana too.");
+    expect(server.doc.getText("t").toJSON()).toBe("Rui was here. Ana too.");
     sync.stop();
   });
 
@@ -85,7 +85,7 @@ describe("PageSync", () => {
     online = true;
     await vi.advanceTimersByTimeAsync(2000);
     expect(sync.current).toBe("saved");
-    expect(server.doc.getText("t").toString()).toBe("Draft");
+    expect(server.doc.getText("t").toJSON()).toBe("Draft");
     sync.stop();
   });
 
@@ -123,7 +123,7 @@ describe("PageSync", () => {
     await vi.advanceTimersByTimeAsync(500);
     release?.();
     await vi.advanceTimersByTimeAsync(1000);
-    expect(server.doc.getText("t").toString()).toBe("one two");
+    expect(server.doc.getText("t").toJSON()).toBe("one two");
     expect(sync.current).toBe("saved");
     sync.stop();
   });

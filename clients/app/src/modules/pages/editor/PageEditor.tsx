@@ -1,6 +1,7 @@
+import type { Editor } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
@@ -25,6 +26,7 @@ import {
   runSlash,
   SLASH_ITEMS,
   TURN_INTO,
+  type SlashHelpers,
   type SlashId,
   type SlashItem,
 } from "./slash";
@@ -73,7 +75,7 @@ export function PageEditor({
   const [handle, setHandle] = useState<Handle | undefined>();
   const [blockMenu, setBlockMenu] = useState<Handle | undefined>();
 
-  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+  const editorRef = useRef<Editor | null>(null);
   const slash = useMenu<SlashItem>(() => {
     editorRef.current?.commands.focus();
   });
@@ -84,42 +86,46 @@ export function PageEditor({
   const slashName = (id: SlashId) => t(`slash.${id}`);
   const nameRef = useRef(slashName);
   const pagesRef = useRef(pages);
-  const helpersRef = useRef({
-    attach: (_images: boolean) => {
-      // Replaced below.
-    },
-    mention: (_embed: boolean) => {
-      // Replaced below.
-    },
-    subPage: () => {
-      // Replaced below.
-    },
+  const helpersRef = useRef<SlashHelpers>({
+    attach: () => undefined,
+    mention: () => undefined,
+    subPage: () => undefined,
   });
+  // The menus are built once; these read the latest of what they need when
+  // they are called (never while rendering).
+  const getEditor = useCallback(() => editorRef.current, []);
+  const getPages = useCallback(() => pagesRef.current, []);
+  const getHelpers = useCallback(() => helpersRef.current, []);
+  const nameOf = useCallback((id: SlashId) => nameRef.current(id), []);
+  const takeEmbed = useCallback(() => {
+    const embed = embedNext.current;
+    embedNext.current = false;
+    return embed;
+  }, []);
 
   const [extensions] = useState(() => [
     createSlashMenu<SlashItem>(
       slash.bridge,
-      (query) => filterSlash(SLASH_ITEMS, query, (id) => nameRef.current(id)),
+      (query) => filterSlash(SLASH_ITEMS, query, nameOf),
       (item, range) => {
-        const current = editorRef.current;
+        const current = getEditor();
         if (current !== null) {
-          runSlash(current, range, item.id, helpersRef.current);
+          runSlash(current, range, item.id, getHelpers());
         }
       },
     ),
     createMentionMenu<MentionCandidate>(
       mention.bridge,
       async (query, signal) =>
-        (await searchMentions(environment.workspaceId, query, pagesRef.current, signal)).flatMap(
+        (await searchMentions(environment.workspaceId, query, getPages(), signal)).flatMap(
           (group) => group.candidates,
         ),
       (item, range) => {
-        const current = editorRef.current;
+        const current = getEditor();
         if (current === null) {
           return;
         }
-        const embed = embedNext.current;
-        embedNext.current = false;
+        const embed = takeEmbed();
         const node = {
           type: embed ? "embed" : "mention",
           attrs: { ref_type: item.type, ref_id: item.id },
@@ -220,9 +226,9 @@ export function PageEditor({
   const marks = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
-      bold: current?.isActive("bold") ?? false,
-      italic: current?.isActive("italic") ?? false,
-      todo: current?.isActive("taskList") ?? false,
+      bold: current.isActive("bold") ?? false,
+      italic: current.isActive("italic") ?? false,
+      todo: current.isActive("taskList") ?? false,
     }),
   });
 
@@ -236,7 +242,7 @@ export function PageEditor({
 
   const follow = (event: { clientX: number; clientY: number }) => {
     const box = wrapper.current;
-    if (!editable || editor === null || box === null) {
+    if (!editable || box === null) {
       return;
     }
     const content = editor.view.dom.getBoundingClientRect();
@@ -259,12 +265,15 @@ export function PageEditor({
   };
 
   const startDrag = (event: DragEvent<HTMLButtonElement>) => {
-    if (editor === null || handle === undefined) {
+    if (handle === undefined) {
       return;
     }
     const selection = NodeSelection.create(editor.state.doc, handle.pos);
     editor.view.dispatch(editor.state.tr.setSelection(selection));
-    editor.view.dragging = { slice: selection.content(), move: true };
+    const view = editorRef.current?.view;
+    if (view !== undefined) {
+      view.dragging = { slice: selection.content(), move: true };
+    }
     event.dataTransfer.effectAllowed = "copyMove";
     event.dataTransfer.setData("text/plain", "");
     const dom = editor.view.nodeDOM(handle.pos);
@@ -274,7 +283,7 @@ export function PageEditor({
   };
 
   const addBelow = () => {
-    if (editor === null || handle === undefined) {
+    if (handle === undefined) {
       return;
     }
     const node = editor.state.doc.nodeAt(handle.pos);
@@ -289,7 +298,7 @@ export function PageEditor({
   };
 
   const pickBlock = (id: string) => {
-    if (editor === null || blockMenu === undefined) {
+    if (blockMenu === undefined) {
       return;
     }
     const node = editor.state.doc.nodeAt(blockMenu.pos);
@@ -415,7 +424,7 @@ export function PageEditor({
           }}
         />
       )}
-      {blockMenu === undefined || editor === null ? null : (
+      {blockMenu === undefined ? null : (
         <SuggestionMenu
           label={t("block.menu")}
           groups={[
@@ -450,34 +459,34 @@ export function PageEditor({
               id: "block",
               label: t("format.block"),
               glyph: "/",
-              onPress: () => editor?.chain().focus().insertContent("/").run(),
+              onPress: () => editor.chain().focus().insertContent("/").run(),
             },
             {
               id: "mention",
               label: t("format.mention"),
               glyph: "@",
-              onPress: () => editor?.chain().focus().insertContent("@").run(),
+              onPress: () => editor.chain().focus().insertContent("@").run(),
             },
             {
               id: "todo",
               label: t("format.todo"),
               icon: "check",
-              pressed: marks?.todo ?? false,
-              onPress: () => editor?.chain().focus().toggleTaskList().run(),
+              pressed: marks.todo ?? false,
+              onPress: () => editor.chain().focus().toggleTaskList().run(),
             },
             {
               id: "bold",
               label: t("format.bold"),
               icon: "bold",
-              pressed: marks?.bold ?? false,
-              onPress: () => editor?.chain().focus().toggleBold().run(),
+              pressed: marks.bold ?? false,
+              onPress: () => editor.chain().focus().toggleBold().run(),
             },
             {
               id: "italic",
               label: t("format.italic"),
               icon: "italic",
-              pressed: marks?.italic ?? false,
-              onPress: () => editor?.chain().focus().toggleItalic().run(),
+              pressed: marks.italic ?? false,
+              onPress: () => editor.chain().focus().toggleItalic().run(),
             },
           ]}
           end={
@@ -485,7 +494,7 @@ export function PageEditor({
               icon="chevron-down"
               size="lg"
               label={t("format.hide")}
-              onClick={() => editor?.commands.blur()}
+              onClick={() => editor.commands.blur()}
             />
           }
         />

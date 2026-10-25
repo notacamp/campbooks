@@ -34,7 +34,15 @@
               "type": "string",
               "format": "date-time"
             },
-            "urgent": { "type": "boolean" }
+            "urgent": { "type": "boolean" },
+            "warning": {
+              "description": "Whether the need is the warning about suspicious mail. Absent when false, and from events written before it existed.",
+              "type": "boolean"
+            },
+            "from_person": {
+              "description": "Whether a person sent the need's message rather than a machine (list, automatic, no-reply or service mail), from the headers alone. Absent when the message could not be read, and from events written before it existed.",
+              "type": "boolean"
+            }
           }
         }
       ]

@@ -1,6 +1,6 @@
-// Tasks on Home (campbooks-cloud#43): the user's open tasks sit in Do and
-// Pay beside conversations, read through `tasks.list?ids=`, with Done (Paid),
-// Later and Not needed.
+// Tasks on Home (campbooks-cloud#43): the user's open tasks for today sit in
+// their bands beside conversations (campbooks-cloud#358), read through
+// `tasks.list?ids=`, with Done (Paid), Later and Not needed.
 import {
   createMemoryHistory,
   createRootRoute,
@@ -20,7 +20,11 @@ import { mockApi, renderWithProviders } from "../../../../../test/render";
 
 import { WhatNeedsYou } from "./WhatNeedsYou";
 
-const ITEMS = [taskItem(LEASE), taskItem(BILL)];
+/** The bill two days late (Now), then the lease due today (Today). */
+const ITEMS = [
+  taskItem(BILL, { band: "now", band_reason: { rule: "overdue", days: 2 } }),
+  taskItem(LEASE, { band: "today", band_reason: { rule: "due_today" } }),
+];
 
 function renderHome() {
   const root = createRootRoute({ component: Outlet });
@@ -46,7 +50,7 @@ function api() {
   return mockApi({
     [`GET ${W}/attention`]: (request) =>
       new URL(request.url).searchParams.get("state") === "open"
-        ? { body: { items, counts: COUNTS } }
+        ? { body: { items, counts: COUNTS, tasks_elsewhere: 4 } }
         : { body: { items: [], counts: [] } },
     [`GET ${W}/conversations`]: { body: { conversations: [MARTA], next_cursor: null } },
     [`GET ${W}/tasks`]: { body: { tasks: [LEASE, BILL] } },
@@ -66,12 +70,15 @@ function api() {
 }
 
 describe("Tasks on Home", () => {
-  it("lists a task in Do and a bill in Pay, saying where each came from", async () => {
+  it("lists the late bill in Now and the lease in Today, saying what and why first", async () => {
     api();
     renderHome();
     expect(await screen.findByText("Send the signed lease to Marta")).toBeVisible();
     const groups = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(groups.slice(0, 2)).toEqual(["Do 1", "Pay 1"]);
+    expect(groups.slice(0, 2)).toEqual(["Now 1", "Today 1"]);
+    expect(screen.getByText("Overdue · 2 days")).toBeVisible();
+    expect(screen.getByText("Pay task", { exact: false })).toBeVisible();
+    expect(screen.getByText("Due today")).toBeVisible();
     expect(screen.getByText("From Marta Ferreira · email")).toBeVisible();
     expect(screen.getByText("You wrote this")).toBeVisible();
     expect(screen.getByText("EDP electricity bill · €84.20")).toBeVisible();
@@ -81,6 +88,8 @@ describe("Tasks on Home", () => {
     const calls = api();
     renderHome();
     await screen.findByText("Send the signed lease to Marta");
+    // The lease is second: move onto it.
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "e" });
     await waitFor(() => {
       expect(screen.queryByText("Send the signed lease to Marta")).toBeNull();
@@ -100,12 +109,21 @@ describe("Tasks on Home", () => {
   it("marks a task not needed with X", async () => {
     const calls = api();
     renderHome();
+    // The bill is first, selected from the start.
     await screen.findByText("EDP electricity bill · €84.20");
-    // The bill is second: move onto it.
-    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "x" });
     await waitFor(() => {
       expect(calls.calls.map((c) => c.route)).toContain(`POST ${W}/tasks/${BILL.id}/not_needed`);
     });
+  });
+
+  it("says how many more tasks are in Tasks, with the way there", async () => {
+    api();
+    renderHome();
+    expect(await screen.findByText("4 more in Tasks")).toBeVisible();
+    expect(screen.getByRole("link", { name: /^Open Tasks/u })).toHaveAttribute(
+      "href",
+      `/w/${DUARTE.id}/tasks`,
+    );
   });
 });
