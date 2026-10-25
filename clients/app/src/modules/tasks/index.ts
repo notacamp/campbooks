@@ -7,4 +7,3 @@ export { buildTasksRoutes } from "./routes";
 export { useTaskSubject } from "./scout-subjects";
 export { TASKS_SHORTCUTS } from "./shortcuts";
 export { CONVERSATION, type TaskSource, type UseTaskSources } from "./source";
-export { dueText, planText } from "./task-text";

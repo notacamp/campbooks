@@ -117,8 +117,10 @@ struct Written {
     updated: bool,
 }
 
-/// Open (or update) item `id` with `facts`: the row written, if any (an item
-/// a newer revision reached first, in a race, is left as it is).
+/// Open (or update) item `id` with `facts`, keeping the facts its band is
+/// worked out from (whether it is a warning, whether a person sent it): the
+/// row written, if any (an item a newer revision reached first, in a race,
+/// is left as it is).
 async fn open(
     tx: &mut Transaction<'static, Postgres>,
     workspace: WorkspaceId,
@@ -132,15 +134,17 @@ async fn open(
         INSERT INTO attention.items
             (id, workspace_id, record_type, record_id, container_type, container_id,
              cause_type, cause_id, latest_id, reason, trust, due_on, urgent, since,
-             state, producer_revision, lapses_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'open', $15, $16)
+             state, producer_revision, lapses_at, warning, from_person)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'open', $15, $16,
+                $17, $18)
         ON CONFLICT (workspace_id, record_type, record_id) DO UPDATE
            SET container_type = EXCLUDED.container_type,
                container_id = EXCLUDED.container_id,
                cause_type = EXCLUDED.cause_type, cause_id = EXCLUDED.cause_id,
                latest_id = EXCLUDED.latest_id, reason = EXCLUDED.reason,
                trust = EXCLUDED.trust, due_on = EXCLUDED.due_on,
-               lapses_at = EXCLUDED.lapses_at,
+               lapses_at = EXCLUDED.lapses_at, warning = EXCLUDED.warning,
+               from_person = EXCLUDED.from_person,
                urgent = EXCLUDED.urgent, since = EXCLUDED.since, state = 'open',
                cleared_because = NULL, cleared_by = NULL, cleared_at = NULL,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
@@ -164,6 +168,8 @@ async fn open(
     .bind(need.sent_at)
     .bind(need.revision)
     .bind(facts.lapses_at)
+    .bind(facts.warning)
+    .bind(facts.from_person)
     .fetch_optional(&mut **tx)
     .await?;
     Ok(written)

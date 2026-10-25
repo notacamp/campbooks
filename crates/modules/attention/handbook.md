@@ -25,7 +25,18 @@ A need is either sure or a check. A check is a question for the member. A messag
 
 ### Order of the list
 
-Needs are ordered by reason: Review, Reply, Do, Pay, Nudge, Worth a look. Inside a reason they go overdue first, then by due date, then urgent first, then the oldest cause first. Waiting is not in the list. Waiting is never counted in what needs the member.
+Home orders needs by priority, whatever their reason. Each need is in one band, by the first rule it meets:
+
+- Now: a warning about suspicious mail, or anything past its due date.
+- Today: due today or tomorrow, a task planned for today, a nudge, or a person who has waited 3 days or more for a reply.
+- This week: due in the next 7 days, or a person waiting for a reply or a choice.
+- Whenever: no date, from services, or kept on Home by the member's rule (Worth a look).
+
+Inside a band: warnings first, then dated before undated and the soonest date first, then people before services, then the oldest first. Each need says why it is in its band, such as "Overdue · 2 days" or "Marta has waited 4 days". Waiting is not in the list. Waiting is never counted in what needs the member.
+
+### Tasks on Home
+
+Home shows a task only when it is for today: overdue, due today or tomorrow, planned for today, or back from Later. The member's other tasks are in Tasks, and Home says how many.
 
 ### Due dates and overdue
 

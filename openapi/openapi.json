@@ -17414,7 +17414,8 @@
         "description": "The caller's items.",
         "required": [
           "items",
-          "counts"
+          "counts",
+          "tasks_elsewhere"
         ],
         "properties": {
           "counts": {
@@ -17429,7 +17430,13 @@
             "items": {
               "$ref": "#/components/schemas/ItemView"
             },
-            "description": "Open: by reason (review, reply, decide, do, pay, nudge, worth a\nlook), then overdue, by due date, urgent first, oldest first.\nCleared: newest first. Waiting: soonest nudge first."
+            "description": "Open: by band (now, today, week, whenever), then inside a band\nwarnings first, dated before undated and the soonest date first,\npeople before services, oldest first; each with its band and why.\nCleared: newest first. Waiting: soonest nudge first."
+          },
+          "tasks_elsewhere": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Open task items left off the list because they are not for today:\nnot overdue, not due today or tomorrow, not planned for today or a\nday before, not back from Later (campbooks-cloud#358). 0 for cleared\nand waiting.",
+            "minimum": 0
           }
         }
       },
@@ -17549,6 +17556,63 @@
             "description": "The identity provider's signed logout token."
           }
         }
+      },
+      "Band": {
+        "type": "string",
+        "description": "Where an item stands on Home, in the order Home shows the bands.",
+        "enum": [
+          "now",
+          "today",
+          "week",
+          "whenever"
+        ]
+      },
+      "BandReason": {
+        "type": "object",
+        "description": "Why an item is in its band: the rule, with the number of days or the\nday it names.",
+        "required": [
+          "rule"
+        ],
+        "properties": {
+          "days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Days late (`overdue`) or waited (`waited`).",
+            "minimum": 0
+          },
+          "on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The day it names: the due date (`due_on`), or when an answer was\nexpected (`nudge_due`)."
+          },
+          "rule": {
+            "$ref": "#/components/schemas/BandRule",
+            "description": "The rule."
+          }
+        }
+      },
+      "BandRule": {
+        "type": "string",
+        "description": "The rule that put an item in its band.",
+        "enum": [
+          "warning",
+          "overdue",
+          "due_today",
+          "due_tomorrow",
+          "planned_today",
+          "nudge_due",
+          "waited",
+          "due_on",
+          "waiting_answer",
+          "kept_by_rule",
+          "no_date"
+        ]
       },
       "Cadence": {
         "type": "string",
@@ -21247,6 +21311,28 @@
           "state"
         ],
         "properties": {
+          "band": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Band",
+                "description": "Where it stands on Home (campbooks-cloud#358): `now`, `today`,\n`week` or `whenever`. On the open list only."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "band_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BandReason",
+                "description": "Why it is in that band. On the open list only."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "cause": {
             "$ref": "#/components/schemas/RecordRef",
             "description": "The record that raised it."
@@ -23568,7 +23654,7 @@
       },
       "Reason": {
         "type": "string",
-        "description": "Why an item needs someone, in the order Home shows the groups.",
+        "description": "Why an item needs someone (Home orders items by band, not by reason).",
         "enum": [
           "review",
           "reply",

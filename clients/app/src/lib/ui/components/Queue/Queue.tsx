@@ -63,7 +63,10 @@ export function PageHero({
 }
 
 export interface QueueGroupProps {
-  signal: Signal;
+  /** The reason's signal colour, as a dot before the name; none for a band. */
+  signal?: Signal | undefined;
+  /** `danger`: the name in the danger colour (Now). */
+  tone?: "danger" | undefined;
   name: string;
   count: number;
   /** One action for the whole group, at the end of its heading ("All 3 already paid"). */
@@ -75,16 +78,17 @@ export interface QueueGroupProps {
 }
 
 /**
- * One reason group of the queue (Reply, Decide, Pay, ...). Its heading gives
- * the structure; it is deliberately not a landmark (six regions per page
- * would only add noise for screen-reader users).
+ * One group of the queue: a priority band (Now, Today, This week,
+ * Whenever) or a reason (Reply, Pay, ...). Its heading gives the structure;
+ * it is deliberately not a landmark (six regions per page would only add
+ * noise for screen-reader users).
  */
-export function QueueGroup({ signal, name, count, action, note, children }: QueueGroupProps) {
+export function QueueGroup({ signal, tone, name, count, action, note, children }: QueueGroupProps) {
   return (
     <section className={styles["group"]} data-signal={signal}>
       <div className={styles["groupHead"]}>
-        <h2 className={styles["groupTitle"]}>
-          <Dot signal={signal} />
+        <h2 className={styles["groupTitle"]} data-tone={tone}>
+          {signal === undefined ? null : <Dot signal={signal} />}
           {name} <span className={styles["count"]}>{count}</span>
         </h2>
         {action === undefined ? null : <div className={styles["groupAction"]}>{action}</div>}

@@ -40,8 +40,11 @@ const LUZ_ITEM = ITEMS.find((item) => item.record.id === LUZ.id);
 if (MARTA_ITEM === undefined || LUZ_ITEM === undefined) {
   throw new Error("the fixtures lost Marta or Luz");
 }
-/** A reply, a bill and a nudge, in the attention API's order. */
-const OPEN = [MARTA_ITEM, LUZ_ITEM, ANA_ITEM];
+/**
+ * A bill a day late (Now), then the nudge (its answer was due Monday) and a
+ * reply due tomorrow (Today), in the attention API's order.
+ */
+const OPEN = [LUZ_ITEM, ANA_ITEM, MARTA_ITEM];
 
 const TEXT = "Hi Ana,\n\nCould you send me the revised floor plan before Thursday?\n\nThanks,\nSam";
 const NUDGE: Schema<"DraftView"> = {
@@ -118,24 +121,24 @@ function api({ role = "manager" }: { role?: "manager" | "reader" } = {}) {
   });
 }
 
-/** Select Ana's row: Marta's and Luz's come first. */
+/** Select Ana's row: Luz's bill comes first. */
 async function toAna() {
   await screen.findByText("Ana Costa hasn’t written yet");
-  fireEvent.keyDown(document, { key: "j" });
   fireEvent.keyDown(document, { key: "j" });
   return within(await screen.findByRole("group", { name: "Actions for Ana Costa" }));
 }
 
 describe("What needs you: Nudge", () => {
-  it("lists the nudge after the bills, saying who hasn't written and since when", async () => {
+  it("lists the nudge for today, saying who hasn't written, when it was due and since when", async () => {
     api();
     renderHome();
     expect(
       await screen.findByRole("heading", { level: 1, name: "3 things need you" }),
     ).toBeVisible();
     const groups = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(groups.slice(0, 3)).toEqual(["Reply 1", "Pay 1", "Nudge 1"]);
+    expect(groups.slice(0, 2)).toEqual(["Now 1", "Today 2"]);
     expect(screen.getByText("Ana Costa hasn’t written yet")).toBeVisible();
+    expect(screen.getByText("Ana’s answer was due Mon")).toBeVisible();
     // João's line, quoted; asked on 7 October.
     expect(
       screen.getByText(
