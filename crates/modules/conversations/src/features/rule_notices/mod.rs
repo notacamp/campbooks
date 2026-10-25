@@ -65,7 +65,7 @@ use crate::{
         tracked,
     },
     features::{
-        read_message::error_kind,
+        read_message::{error_kind, may_read_mail},
         rules::{PREVIEW_DEADLINE, compute_preview, may_teach, member_only},
     },
     ingest::Headers,
@@ -132,7 +132,9 @@ async fn group(
     inbox: InboxId,
     settings: &NoticeSettings,
 ) -> Result<(), JobError> {
-    if settings.model_senders_per_pass == 0 {
+    // Nothing to ask while the role may not receive mail here: no subject
+    // is even read.
+    if settings.model_senders_per_pass == 0 || !may_read_mail(gateway) {
         return Ok(());
     }
     let Some(workspace) = ctx.workspace().and_then(|w| w.parse::<WorkspaceId>().ok()) else {
@@ -499,7 +501,8 @@ pub async fn scan(
 }
 
 /// Whether `sender`'s mail in `inbox` is all of one kind for what the inbox
-/// does with it, as the pass would read it now: teach once's default is
+/// does with it, as the pass would read it now (the model's kept words for
+/// it counted): teach once's default is
 /// then the whole sender, else only mail like the one acted on. A sender
 /// with little or no mail in the window is.
 pub async fn uniform(
@@ -520,7 +523,9 @@ pub async fn uniform(
     // write to.
     sender.machine = true;
     sender.correspondent = false;
-    Ok(analysis::uniform(&sender, settings, Utc::now()))
+    // The model's words for it, kept from a pass, count as kinds too.
+    let phrases = grouping::of_sender(conn, inbox, &address).await?;
+    Ok(analysis::uniform(&sender, &phrases, settings, Utc::now()))
 }
 
 /// The words the model proposed for `sender`'s mail in `inbox`, kept from a

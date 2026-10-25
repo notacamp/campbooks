@@ -2304,13 +2304,17 @@ split into kinds by equal subject template, a template with at least
 being a kind; each kind SHALL be counted on its own, and a message of it that
 asks for a payment owed, needed a reply or action the member did not
 dismiss, or was replied to SHALL block that kind only. When every kind (and
-the mail left over, when it holds at least `MIN_KIND_MESSAGES`) would be
+the mail left over, and the mail each of the model's phrases for the sender
+matches, when each holds at least `MIN_KIND_MESSAGES`) would be
 offered what all the sender's mail would, and none of it was replied to,
 asked anything or asks for a payment, there SHALL be one suggestion for the
 sender, as before; otherwise one per kind that qualifies, its rule the sender
-and that `subject_template`, and never one for the whole sender. For such a
+and that `subject_template`, and never one for the whole sender. For a
 sender whose mail left over is at least 30% of it and at least
-`MIN_KIND_MESSAGES`, the module SHALL ask the `complete` model, only while it
+`MIN_KIND_MESSAGES`, with at least `MIN_KIND_MESSAGES` of it unread, unless
+the template kinds agree with a suggestion for the whole sender and none of
+the left-over mail was read or mattered (mail all of one kind is never sent),
+the module SHALL ask the `complete` model, only while it
 may receive mail on this server, for at most `MODEL_SENDERS_PER_PASS` (3, 0
 never) senders per inbox and pass, the most frequent first, with that
 sender's most recent distinct subjects only (`MODEL_SUBJECTS`, 40, never a

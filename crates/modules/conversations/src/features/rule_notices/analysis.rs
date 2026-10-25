@@ -438,14 +438,28 @@ fn example(sender: &Sender, ids: &BTreeSet<usize>) -> Option<String> {
     Some(newest.subject.trim().chars().take(EXAMPLE_CHARS).collect())
 }
 
-/// Whether every kind of the sender's mail (and what is left, when there is
-/// enough of it) would get what the whole of it gets, and none of it was
+/// The conversations of `sender` whose subject holds `phrase`, as the rule
+/// engine matches it.
+fn matching(sender: &Sender, phrase: &str) -> BTreeSet<usize> {
+    sender
+        .mail
+        .iter()
+        .enumerate()
+        .filter(|(_, mail)| contains_words(&mail.subject, phrase))
+        .map(|(i, _)| i)
+        .collect()
+}
+
+/// Whether every kind of the sender's mail (each template kind, the mail
+/// each of the model's `phrases` matches, and what is left, when there is
+/// enough of each) would get what the whole of it gets, and none of it was
 /// answered, asked anything or asks for a payment: then one rule for the
 /// sender says it all.
 fn all_one(
     sender: &Sender,
     whole: &SenderStats,
     (kinds, rest): (&[(String, BTreeSet<usize>)], &BTreeSet<usize>),
+    phrases: &[String],
     settings: &NoticeSettings,
     now: DateTime<Utc>,
 ) -> bool {
@@ -453,24 +467,57 @@ fn all_one(
         return false;
     }
     let want = verdict(whole, settings).map(|(kind, _)| kind);
+    let big = |ids: &BTreeSet<usize>| count(ids.len()) >= settings.min_kind_messages;
     let same = |ids: &BTreeSet<usize>| {
         verdict(&SenderStats::of(sender, ids, now), settings).map(|(kind, _)| kind) == want
     };
     kinds.iter().all(|(_, ids)| same(ids))
-        && (count(rest.len()) < settings.min_kind_messages || same(rest))
+        && (!big(rest) || same(rest))
+        && phrases.iter().all(|phrase| {
+            let ids = matching(sender, phrase);
+            !big(&ids) || same(&ids)
+        })
+}
+
+/// Whether the mail left over is worth the model's grouping: enough of it,
+/// a large enough share of the sender's, enough of it unread to make a kind,
+/// and not plainly one with the rest (`one_offer`: the template kinds agree
+/// with the whole sender, which would be offered a rule) while none of it
+/// was read or mattered. Mail that is all one kind needs no grouping.
+fn worth_grouping(
+    sender: &Sender,
+    rest: &BTreeSet<usize>,
+    one_offer: bool,
+    settings: &NoticeSettings,
+) -> bool {
+    let mail: Vec<&Mail> = rest.iter().filter_map(|&i| sender.mail.get(i)).collect();
+    let unread = mail.iter().filter(|m| !m.opened).count();
+    let mattered = mail
+        .iter()
+        .any(|m| m.opened || m.replied || m.asked || m.owed);
+    count(rest.len()) >= settings.min_kind_messages
+        && rest.len() * 100 >= sender.mail.len() * UNSORTED_PERCENT_MIN
+        && count(unread) >= settings.min_kind_messages
+        && (!one_offer || mattered)
 }
 
 /// Whether `sender`'s mail is all of one kind for what the inbox does with
 /// it (teach once's default: the whole sender, or only mail like the one
-/// acted on). A sender with no mail in the window is.
-pub fn uniform(sender: &Sender, settings: &NoticeSettings, now: DateTime<Utc>) -> bool {
+/// acted on), its template kinds and the model's `phrases` for it counted.
+/// A sender with no mail in the window is.
+pub fn uniform(
+    sender: &Sender,
+    phrases: &[String],
+    settings: &NoticeSettings,
+    now: DateTime<Utc>,
+) -> bool {
     if sender.mail.is_empty() {
         return true;
     }
     let all: BTreeSet<usize> = (0..sender.mail.len()).collect();
     let whole = SenderStats::of(sender, &all, now);
     let (kinds, rest) = templates(sender, settings);
-    all_one(sender, &whole, (&kinds, &rest), settings, now)
+    all_one(sender, &whole, (&kinds, &rest), phrases, settings, now)
 }
 
 /// What to offer for `sender`'s mail under `settings`, as of `now`, with
@@ -505,10 +552,20 @@ pub fn read(
         return Reading::default();
     }
     let (kinds, rest) = templates(sender, settings);
-    if all_one(sender, &whole, (&kinds, &rest), settings, now) {
+    // Decided before the model's words are counted, so a pass knows whom to
+    // ask about without them.
+    let one_offer = notice(&whole, settings).is_some()
+        && all_one(sender, &whole, (&kinds, &rest), &[], settings, now);
+    let to_group = worth_grouping(sender, &rest, one_offer, settings);
+    // One rule for all of it, when all of it is one kind and would be
+    // offered; one kind that would be offered nothing still leaves the mail
+    // left over to the model's words.
+    if all_one(sender, &whole, (&kinds, &rest), phrases, settings, now)
+        && let Some(noticed) = notice(&whole, settings)
+    {
         return Reading {
-            notices: notice(&whole, settings).into_iter().collect(),
-            to_group: false,
+            notices: vec![noticed],
+            to_group,
         };
     }
     let mut notices = Vec::new();
@@ -521,19 +578,11 @@ pub fn read(
             notices.push(kind);
         }
     }
-    let to_group = count(rest.len()) >= settings.min_kind_messages
-        && rest.len() * 100 >= sender.mail.len() * UNSORTED_PERCENT_MIN;
     if to_group {
         for phrase in phrases {
             // All the mail the rule would match, the template kinds' too:
             // what it covers is what is counted.
-            let ids: BTreeSet<usize> = sender
-                .mail
-                .iter()
-                .enumerate()
-                .filter(|(_, mail)| contains_words(&mail.subject, phrase))
-                .map(|(i, _)| i)
-                .collect();
+            let ids = matching(sender, phrase);
             if ids.is_empty() || ids.intersection(&offered).count() * 2 >= ids.len() {
                 continue;
             }
@@ -823,7 +872,7 @@ mod tests {
             [RuleCondition::SenderAddress(SHOP.into())]
         );
         assert_eq!(noticed.evidence.received, 20);
-        assert!(uniform(&builds, &settings, now()));
+        assert!(uniform(&builds, &[], &settings, now()));
     }
 
     #[test]
@@ -848,7 +897,7 @@ mod tests {
         assert_eq!(deals.example.as_deref(), Some("Deals of the week 40"));
         assert_eq!(deals.evidence.received, 12);
         assert_eq!(deals.evidence.opened, 0);
-        assert!(!uniform(&sender, &settings, now()));
+        assert!(!uniform(&sender, &[], &settings, now()));
         // Nothing left over: no reason to ask the model.
         assert!(!reading.to_group);
     }
@@ -905,7 +954,7 @@ mod tests {
         let reading = read(&sender, &[], &settings, now());
         // Never a rule for the whole sender instead.
         assert!(reading.notices.is_empty(), "{reading:?}");
-        assert!(!uniform(&sender, &settings, now()));
+        assert!(!uniform(&sender, &[], &settings, now()));
     }
 
     /// Ten promotions, each with a subject of its own, none opened.
@@ -968,6 +1017,84 @@ mod tests {
                 &Pattern::Template("deals of the week #".into()),
             ]
         );
+    }
+
+    /// A newsletter: `promos` promotions none opened, `articles` stories
+    /// all opened, every subject its own.
+    fn newsletter(promos: usize, articles: usize) -> Vec<Mail> {
+        let topics = [
+            "spring", "summer", "autumn", "winter", "travel", "cooking", "gardens", "music",
+            "cinema", "design", "science", "history",
+        ];
+        let mut mail: Vec<Mail> = topics
+            .iter()
+            .take(promos)
+            .zip(0..)
+            .map(|(topic, i)| mail(&format!("Exclusive offer on {topic} picks"), 2 * i, false))
+            .collect();
+        mail.extend(
+            topics
+                .iter()
+                .rev()
+                .take(articles)
+                .zip(0..)
+                .map(|(topic, i)| mail(&format!("This week in {topic}"), 2 * i + 1, true)),
+        );
+        mail
+    }
+
+    #[test]
+    fn a_mixed_sender_whose_subjects_all_differ_is_left_to_the_models_words() {
+        let settings = NoticeSettings::default();
+        let sender = shop(newsletter(8, 6));
+        // Opened 6 of 14: nothing for the whole sender, no template to split
+        // it by, so the model is asked.
+        let reading = read(&sender, &[], &settings, now());
+        assert!(reading.to_group);
+        assert!(reading.notices.is_empty(), "{reading:?}");
+        let phrases = ["exclusive offer".to_owned(), "this week in".to_owned()];
+        let reading = read(&sender, &phrases, &settings, now());
+        assert_eq!(reading.notices.len(), 1, "{reading:?}");
+        assert_eq!(
+            reading.notices[0].pattern,
+            Pattern::Phrase("exclusive offer".into())
+        );
+        assert!(!uniform(&sender, &phrases, &settings, now()));
+    }
+
+    #[test]
+    fn mail_all_of_one_kind_is_never_sent_to_the_model() {
+        let settings = NoticeSettings::default();
+        // Every subject its own, none opened: one rule for all of it.
+        let sender = shop(newsletter(12, 0));
+        let reading = read(&sender, &[], &settings, now());
+        assert!(!reading.to_group);
+        assert_eq!(reading.notices.len(), 1, "{reading:?}");
+        assert_eq!(reading.notices[0].pattern, Pattern::Sender);
+        // Mail all read neither: nothing in it to offer.
+        let read_all: Vec<Mail> = newsletter(12, 0)
+            .into_iter()
+            .map(|m| Mail { opened: true, ..m })
+            .collect();
+        assert!(!read(&shop(read_all), &[], &settings, now()).to_group);
+    }
+
+    #[test]
+    fn a_kind_the_model_found_and_the_member_reads_keeps_the_whole_sender_unoffered() {
+        let settings = NoticeSettings::default();
+        // 12 promotions unopened and 4 stories read: a quarter opened, so
+        // the whole sender alone would be kept off Home.
+        let sender = shop(newsletter(12, 4));
+        let reading = read(&sender, &[], &settings, now());
+        assert_eq!(reading.notices[0].pattern, Pattern::Sender);
+        assert!(reading.to_group);
+        // The model's words tell the stories apart: only the promotions.
+        let phrases = ["exclusive offer".to_owned(), "this week in".to_owned()];
+        let reading = read(&sender, &phrases, &settings, now());
+        let patterns: Vec<&Pattern> = reading.notices.iter().map(|n| &n.pattern).collect();
+        assert_eq!(patterns, [&Pattern::Phrase("exclusive offer".into())]);
+        assert!(uniform(&sender, &[], &settings, now()));
+        assert!(!uniform(&sender, &phrases, &settings, now()));
     }
 
     #[test]

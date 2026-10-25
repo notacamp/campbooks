@@ -42,9 +42,15 @@ replied, suspicious, owed, asked, stream, headers). Then, in pure Rust
    the sender is one kind: one rule for all of it, as before. Otherwise one
    suggestion per kind that qualifies: the sender and the template, with the
    kind's newest subject as the example.
-4. **Kinds from the model**: for a sender that is not one kind and whose
-   left-over mail is at least 30% of it and at least `MIN_KIND_MESSAGES`, the
-   model's phrases (cached) are kinds of the mail whose subject holds them, as
+4. **Kinds from the model**: for a sender whose left-over mail is at least
+   30% of it and at least `MIN_KIND_MESSAGES`, with at least
+   `MIN_KIND_MESSAGES` of it unread, the model is asked, unless the sender is
+   plainly one kind (its templates agree with a rule for the whole sender and
+   none of the left-over mail was read or mattered). A newsletter whose
+   subjects all differ and whose mail is half read is asked about; build
+   notifications all left unread are not. The model's phrases also count in
+   step 3: a kind they find that the member reads keeps the whole sender from
+   being offered. The phrases (cached) are kinds of the mail whose subject holds them, as
    the engine's `subject_contains` matches them, counted over all the
    sender's mail the rule would match; dropped when too small or when half of
    it is already in a kind offered.
