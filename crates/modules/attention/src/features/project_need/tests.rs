@@ -23,6 +23,8 @@ fn need(revision: i64, reason: Reason) -> Need {
         sent_at: Utc::now() - TimeDelta::hours(2),
         latest: None,
         lapses_at: None,
+        warning: false,
+        from_person: None,
     }
 }
 
@@ -106,6 +108,8 @@ fn changed(workspace: WorkspaceId, need: &Need, open: bool) -> ConversationNeedC
             due_on: None,
             lapses_at: None,
             urgent: false,
+            warning: false,
+            from_person: None,
         }),
         cleared_because: (!open).then(|| "done".to_owned()),
         cleared_by: None,

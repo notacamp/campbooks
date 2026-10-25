@@ -78,6 +78,23 @@ async fn the_model_raises_one_need_per_conversation(db: PgPool) {
         };
         assert_eq!(event["need"]["trust"], want, "{event}");
     }
+
+    // The facts Home bands needs by (campbooks-cloud#358): the warning says
+    // so, and whether a person sent the mail comes from its headers.
+    let event_of = |id: &str| {
+        events
+            .iter()
+            .find(|e| e["conversation"] == id)
+            .cloned()
+            .unwrap()
+    };
+    let phish = event_of(&kit.conversation_of("needs-4").await);
+    assert_eq!(phish["need"]["warning"], true, "{phish}");
+    let marta = event_of(&kit.conversation_of("needs-1").await);
+    assert_eq!(marta["need"].get("warning"), None, "{marta}");
+    assert_eq!(marta["need"]["from_person"], true, "{marta}");
+    let bill = event_of(&kit.conversation_of("needs-3").await);
+    assert_eq!(bill["need"]["from_person"], false, "{bill}");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

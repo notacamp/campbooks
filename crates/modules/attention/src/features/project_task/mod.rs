@@ -7,7 +7,8 @@
 //! item belongs to the assignee's container (`tasks.assignee:<member>`, seen
 //! by that member only), so a hand-off moves it to the new assignee. A task
 //! planned Later keeps its item hidden until `later_until`; the list leaves
-//! it out until then and shows it again by itself.
+//! it out until then and shows it again by itself. Its plan and planned day
+//! are kept too: Home shows a task only when it is for today.
 
 use campbooks_kernel::{
     Event, EventHandler, JobContext, JobError, RecordRef, tenancy::WorkspaceId,
@@ -101,8 +102,10 @@ fn cause(task: &TaskChanged) -> (String, String) {
     )
 }
 
-/// Open (or update) item `id` for an open task: the item written, if any (an
-/// item a newer revision reached first, in a race, is left as it is).
+/// Open (or update) item `id` for an open task, keeping its plan and planned
+/// day (Home shows a task only on its day, campbooks-cloud#358): the item
+/// written, if any (an item a newer revision reached first, in a race, is
+/// left as it is).
 async fn open(
     tx: &mut Transaction<'static, Postgres>,
     workspace: WorkspaceId,
@@ -125,14 +128,16 @@ async fn open(
         INSERT INTO attention.items
             (id, workspace_id, record_type, record_id, container_type, container_id,
              cause_type, cause_id, reason, trust, due_on, urgent, since, state,
-             producer_revision, hidden_until)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'sure', $10, false, $11, 'open', $12, $13)
+             producer_revision, hidden_until, plan, plan_on)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'sure', $10, false, $11, 'open', $12, $13,
+                $14, $15)
         ON CONFLICT (workspace_id, record_type, record_id) DO UPDATE
            SET container_type = EXCLUDED.container_type,
                container_id = EXCLUDED.container_id,
                cause_type = EXCLUDED.cause_type, cause_id = EXCLUDED.cause_id,
                reason = EXCLUDED.reason, trust = EXCLUDED.trust, due_on = EXCLUDED.due_on,
-               hidden_until = EXCLUDED.hidden_until, state = 'open',
+               hidden_until = EXCLUDED.hidden_until, plan = EXCLUDED.plan,
+               plan_on = EXCLUDED.plan_on, state = 'open',
                cleared_because = NULL, cleared_by = NULL, cleared_at = NULL,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
          WHERE attention.items.producer_revision < EXCLUDED.producer_revision
@@ -152,6 +157,8 @@ async fn open(
     .bind(since)
     .bind(task.revision)
     .bind(hidden_until)
+    .bind(&task.plan)
+    .bind(task.plan_on)
     .fetch_optional(&mut **tx)
     .await?;
     Ok(written.map(|(id,)| id))

@@ -250,3 +250,70 @@ async fn the_dispatcher_reads_only_due_clocks_in_the_maintenance_scope(db: PgPoo
     assert_eq!(seen, 0);
     tx.rollback().await.unwrap();
 }
+
+/// The seed of the migration that added the facts `need_changed` carries
+/// (campbooks-cloud#358), run again (as the migration's login).
+async fn seed_need_facts(db: &PgPool) {
+    let migration = std::fs::read_to_string(format!(
+        "{}/../../../migrations/20261107000100_conversations__need_facts.sql",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let start = migration.find("-- seed begin").unwrap();
+    let end = migration.find("-- seed end").unwrap();
+    // The migration's own text, from the repository.
+    sqlx::raw_sql(sqlx::AssertSqlSafe(migration[start..end].to_owned()))
+        .execute(db)
+        .await
+        .unwrap();
+}
+
+/// campbooks-cloud#358: every open need announced before `need_changed`
+/// carried whether it is a warning and whether a person sent it is
+/// announced again with them, once, with no model asked.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn open_needs_are_announced_again_with_the_new_facts(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, _) = sams_needs(&kit).await;
+    // As if announced before the facts existed.
+    sqlx::query("UPDATE conversations.needs SET facts_version = 0 WHERE workspace_id = $1")
+        .bind(workspace.as_uuid())
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    let open: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.needs WHERE workspace_id = $1 AND state = 'open'",
+    )
+    .bind(workspace.as_uuid())
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert!(open > 0);
+    let before = kit.events("conversations.need_changed").await.len();
+
+    seed_need_facts(&kit.db).await;
+    tick(&kit).await;
+    let events = kit.events("conversations.need_changed").await;
+    let again = &events[before..];
+    assert_eq!(i64::try_from(again.len()).unwrap(), open, "{again:?}");
+    assert!(
+        again.iter().all(|e| e["need"]["from_person"].is_boolean()),
+        "{again:?}"
+    );
+    assert_eq!(
+        again
+            .iter()
+            .filter(|e| e["need"]["warning"] == true)
+            .count(),
+        1,
+        "the phishing mail's warning"
+    );
+
+    // Run again: nothing more to say.
+    seed_need_facts(&kit.db).await;
+    tick(&kit).await;
+    assert_eq!(
+        kit.events("conversations.need_changed").await.len(),
+        events.len()
+    );
+}
