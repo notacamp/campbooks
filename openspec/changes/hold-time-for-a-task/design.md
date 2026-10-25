@@ -19,8 +19,9 @@
 
 ## Data ownership
 
-`tasks.tasks` (schema `tasks`) gains three nullable columns, set together or
-not at all (a CHECK): `hold_event uuid`, `held_from timestamptz`,
+`tasks.tasks` (schema `tasks`) gains four nullable columns, set together or
+not at all (a CHECK): `hold_event uuid`, `hold_calendar uuid` (so a release's
+Undo can hold on the same calendar again), `held_from timestamptz`,
 `held_to timestamptz`, and a partial unique index on
 `(workspace_id, hold_event) WHERE hold_event IS NOT NULL`. The event itself is
 `schedule`'s (kind `hold`, `busy = true`, `origin = member`,
@@ -37,20 +38,25 @@ pub struct HoldRequest<'a> {
     pub ends: DateTime<Utc>,
     pub calendar: Option<Uuid>,   // None: the member's Campbooks calendar
 }
-pub struct Held { pub event: Uuid, pub calendar: Uuid }
+pub struct Held { pub event: Uuid, pub calendar: Uuid, pub at_provider: bool }
 
 pub trait Holds {
-    fn hold(&self, conn, workspace, request: HoldRequest) -> HoldFuture;      // Result<Held>
-    fn release(&self, conn, workspace, member, event: Uuid) -> ReleaseFuture; // Result<()>
+    fn hold(&self, state, tx, workspace, request: HoldRequest) -> HoldFuture;      // Result<Held>
+    fn release(&self, state, tx, workspace, member, event: Uuid) -> ReleaseFuture; // Result<()>
 }
 ```
 
-`NoHolds` (the default) answers `Error::Unavailable`. `schedule` implements it
+Both take the `AppState` and the caller's `Transaction` (publishing and the
+outbound request need them). `NoHolds` (the default) answers
+`Error::Unavailable` (`holds_unsupported`). `schedule` implements it
 with the same code as `create_event` and `delete_event` (calendar must be the
 member's and writable, else `calendar_read_only` / 404; provider calendars get
 their outbound request; `publish::created` / `publish::cancelled` in the same
 transaction). `release` of an event already gone or not a hold of that member
-is a no-op.
+is a no-op; a block whose create is still on its way to the provider is
+deleted here at once and at the provider when the create lands
+(`apply_outcome`); one with another change of the member's still waiting is
+refused (`change_pending`), and closing a task then keeps its hold.
 
 ## Endpoints (all `tasks:write`, caller = assignee, task open)
 
@@ -77,14 +83,17 @@ is a no-op.
 - Scope stays `tasks:write`; the app token already has it. Scout's tools do not
   get hold (non-goal), so `.assistant()` is not declared on these two.
 
-`TaskView` gains `hold: { event_id, starts, ends } | null`. The contract
+`TaskView` gains `hold: { event_id, calendar_id, starts, ends } | null`. The contract
 `tasks.task_changed.v1` does not change (`change = planned`, `plan`/`plan_on`
 already say it); attention keeps reading it unchanged.
 
 ## Following the calendar (tasks consumes schedule events)
 
-A job handler in `tasks` for `schedule.event_created`, `schedule.event_changed`
-and `schedule.event_cancelled`, acting only when `source.type == "tasks.task"`:
+Three handlers in `tasks` (one per event type: `tasks.follow_hold_created`,
+`tasks.follow_hold_changed`, `tasks.follow_hold_cancelled`) for
+`schedule.event_created`, `schedule.event_changed` and
+`schedule.event_cancelled`, acting only when `source.type == "tasks.task"` and
+the kind is `hold`:
 
 - **cancelled**: the task whose `hold_event` is this event clears its hold and
   sets `plan = none` (actor `calendar`, history `released`).
@@ -102,7 +111,8 @@ consumer (their "nothing consumes it yet" reasons go).
 
 ## Client
 
-- `tasks` exports a `HoldTime` panel and `useHoldSlots`: it calls
+- `tasks` exports a `HoldTime` panel (its slot choice is `holdSlots` in
+  `hold.ts`): it calls
   `schedule.free_slots` (`from` = now, `to` = end of the due day or now + 7
   days, `minutes` = the length) and offers the first three starts (the start
   of each free stretch, then later starts within a stretch at the length's
@@ -126,9 +136,12 @@ consumer (their "nothing consumes it yet" reasons go).
 
 Two new operations (`tasks.hold`, `tasks.release_hold`) and one new job
 handler (`tasks` on `schedule.event_*`) need Coverage rows and tracked events
-in the tracking plan (ADR 0020, `docs/tracking.md`): `task_held` and
-`task_hold_released` (ids and enums only: task, calendar kind, length in
-minutes, actor `member`/`calendar`). Regenerate the plan with the xtask.
+in the tracking plan (ADR 0020, `docs/tracking.md`): `task_held` (task, `minutes`, `moved`, `by` member/calendar, `calendar`
+campbooks/provider when the member held it) and `task_hold_released` (task,
+`minutes`, `by`); plan version 11, `tracking/patches/0011-tasks-holds.yaml`.
+`tasks.done`, `tasks.not_needed` and `tasks.hand_off` also track
+`task_hold_released` when they free a hold. A hold or release tracks no
+`task_planned`.
 
 ## Risks
 
