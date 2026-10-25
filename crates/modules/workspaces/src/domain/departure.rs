@@ -12,9 +12,12 @@ use campbooks_kernel::{
 use super::{
     access::{keep_an_owner, lock_workspace, role_of},
     security::{self, SecurityKind},
-    suspension,
+    suspension, tracked,
 };
-use crate::events::{MailChoice, MemberLeft};
+use crate::{
+    events::{MailChoice, MemberLeft},
+    tracking,
+};
 
 /// Who is acting on a departure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,6 +83,9 @@ pub async fn depart(
     )
     .fetch_optional(&mut *tx)
     .await?;
+    // The membership as it stands, for the tracked event: afterwards there
+    // is no row.
+    let snapshot = tracked::present_member(&mut tx, workspace, member).await?;
     sqlx::query!(
         "DELETE FROM workspaces.members WHERE workspace_id = $1 AND user_id = $2",
         workspace as WorkspaceId,
@@ -114,6 +120,20 @@ pub async fn depart(
             },
         )
         .await?;
+    let left = tracking::MemberLeft {
+        workspace,
+        member: snapshot,
+        how: if removed_by.is_some() {
+            tracking::Departure::Removed
+        } else {
+            tracking::Departure::Left
+        },
+        mail: match mail {
+            MailChoice::Delete => tracking::MailChoice::Delete,
+            MailChoice::Keep => tracking::MailChoice::Keep,
+        },
+    };
+    state.tracker.track(&mut tx, &left).await?;
     tx.commit().await?;
     Ok(())
 }

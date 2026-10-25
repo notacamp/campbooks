@@ -527,13 +527,17 @@ Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF
 ## Rotating the instance secret key
 
 `CAMPBOOKS_SECRET_KEY` seals the web sessions' tokens, connected accounts' credentials and
-the sign-in signing keys, and signs sends and changes at mail providers. To replace it
+the sign-in signing keys, signs sends and changes at mail providers, and keys the hashes
+the API keeps of `Idempotency-Key` requests (so a body's password is never stored as a
+plain digest). To replace it
 without signing anyone out or disconnecting any mailbox, run the old key beside the new
 one for a while as `CAMPBOOKS_SECRET_KEY_PREVIOUS_FILE` (or `CAMPBOOKS_SECRET_KEY_PREVIOUS`).
 
 - **What the previous key does:**
   - it only opens and verifies what was sealed or signed before the rotation;
   - everything new is sealed, signed and derived with the new key;
+  - an `Idempotency-Key` request sent before the rotation still replays when retried
+    (keys last 24 hours);
   - what it opens is sealed again with the new key as it is used: signing keys at once,
     connected accounts within the hour, web sessions (all their tokens) at their next
     token refresh (minutes of use);

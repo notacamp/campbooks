@@ -21,8 +21,9 @@ use super::{
     db::{begin_as_user, set_user},
     model::SignupCodeId,
     security::{self, SecurityKind},
+    tracked,
 };
-use crate::MESSAGES;
+use crate::{MESSAGES, tracking};
 
 /// Where a user's signup request stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -148,6 +149,11 @@ pub async fn admit(state: &AppState, user: UserId, code: Option<&str>) -> Result
                         serde_json::json!({}),
                     )
                     .await?;
+                    let signup_request = tracked::signup_request(&mut tx, user).await?;
+                    state
+                        .tracker
+                        .track(&mut tx, &tracking::SignupRequestFiled { signup_request })
+                        .await?;
                 }
                 tx.commit().await?;
                 Err(Error::Denied(MESSAGES.reason("signup_requires_approval")))
@@ -274,6 +280,27 @@ pub enum CodeState {
     Revoked,
 }
 
+impl CodeState {
+    /// The state of a code (`revoked`, its uses and expiry) at `now`.
+    pub fn of(
+        revoked: bool,
+        uses: i32,
+        max_uses: i32,
+        expires_at: Option<DateTime<Utc>>,
+        now: DateTime<Utc>,
+    ) -> Self {
+        if revoked {
+            Self::Revoked
+        } else if uses >= max_uses {
+            Self::UsedUp
+        } else if expires_at.is_some_and(|at| at <= now) {
+            Self::Expired
+        } else {
+            Self::Active
+        }
+    }
+}
+
 /// One minted signup code. The code itself is never here: only its
 /// administrators saw it, once, when it was minted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -301,15 +328,13 @@ pub struct SignupCodeView {
 impl SignupCodeView {
     /// The view of a stored code, judged at `now`.
     pub fn at(row: &CodeRow, now: DateTime<Utc>) -> Self {
-        let state = if row.revoked_at.is_some() {
-            CodeState::Revoked
-        } else if row.uses >= row.max_uses {
-            CodeState::UsedUp
-        } else if row.expires_at.is_some_and(|at| at <= now) {
-            CodeState::Expired
-        } else {
-            CodeState::Active
-        };
+        let state = CodeState::of(
+            row.revoked_at.is_some(),
+            row.uses,
+            row.max_uses,
+            row.expires_at,
+            now,
+        );
         Self {
             id: row.id,
             label: row.label.clone(),
@@ -408,7 +433,8 @@ pub async fn decide(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(Error::NotFound)?;
-    if current != to.as_str() {
+    let before = RequestStatus::parse(&current)?;
+    if before != to {
         sqlx::query!(
             "UPDATE workspaces.signup_requests
                 SET status = $2, decided_at = now(), decided_by = $3, reason = $4
@@ -434,6 +460,31 @@ pub async fn decide(
             serde_json::json!({ "decided_by": grant.account() }),
         )
         .await?;
+        let signup_request = tracked::signup_request(&mut tx, user).await?;
+        let before = tracked::request_status(before);
+        if to == RequestStatus::Rejected {
+            state
+                .tracker
+                .track(
+                    &mut tx,
+                    &tracking::SignupRequestRejected {
+                        signup_request,
+                        before,
+                    },
+                )
+                .await?;
+        } else {
+            state
+                .tracker
+                .track(
+                    &mut tx,
+                    &tracking::SignupRequestApproved {
+                        signup_request,
+                        before,
+                    },
+                )
+                .await?;
+        }
     }
     let view = request_view(&mut tx, user).await?.ok_or(Error::NotFound)?;
     tx.commit().await?;

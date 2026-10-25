@@ -37,6 +37,11 @@ pub mod operator;
 pub mod scopes;
 #[cfg(test)]
 mod testkit;
+/// The module's tracked events, generated from the tracking plan (ADR 0020).
+#[path = "tracking.gen.rs"]
+pub mod tracking;
+#[cfg(test)]
+mod tracking_tests;
 
 pub use domain::model::{Accent, Kind};
 pub use features::delete_workspace::PurgeWorkspace;

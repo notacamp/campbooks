@@ -24,9 +24,11 @@ use crate::{
     domain::{
         access::{acting_user, authorize, lock_workspace, workspace_resource},
         security::{self, SecurityKind},
+        tracked,
     },
     events::WorkspaceDeleting,
     scopes::WorkspacesAdmin,
+    tracking,
 };
 
 mod purge_again;
@@ -116,6 +118,17 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDelet
             },
         )
         .await?;
+    let workspace_snapshot = tracked::workspace(&mut tx, id).await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::WorkspaceDeleted {
+                workspace: id,
+                workspace_snapshot,
+            },
+        )
+        .await?;
     jobs::enqueue(
         &mut tx,
         &PurgeWorkspace { workspace: id },
@@ -192,6 +205,8 @@ impl Job for PurgeWorkspace {
         // modules' purges, stay to run; what they leave is swept later).
         campbooks_kernel::purge::purge_workspace(ctx.pool(), &workspace).await?;
         let tx = ctx.tx().await?;
+        // As it stood, read before its row (and its members) go.
+        let workspace_snapshot = tracked::workspace(tx, id).await?;
         sqlx::query!(
             "DELETE FROM workspaces.workspaces WHERE id = $1",
             id as WorkspaceId
@@ -199,6 +214,11 @@ impl Job for PurgeWorkspace {
         .execute(&mut **tx)
         .await?;
         campbooks_kernel::purge::tombstone(tx, &workspace).await?;
+        ctx.track(&tracking::WorkspacePurged {
+            workspace: id,
+            workspace_snapshot,
+        })
+        .await?;
         log_purged(id, Utc::now());
         Ok(())
     }

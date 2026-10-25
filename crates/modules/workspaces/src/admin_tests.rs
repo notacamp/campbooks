@@ -51,18 +51,22 @@ struct World {
 
 impl World {
     async fn new(db: PgPool, policy: SignupPolicy, env_codes: Option<&str>) -> Self {
-        let kit = Kit::with_signup(db, policy, env_codes).await;
+        Self::of(Kit::with_signup(db, policy, env_codes).await)
+    }
+
+    /// [`World::new`], writing tracked events to the outbox.
+    async fn tracking(db: PgPool, policy: SignupPolicy) -> Self {
+        Self::of(Kit::with_signup(db, policy, None).await.tracking())
+    }
+
+    fn of(kit: Kit) -> Self {
         let trail = Arc::new(Trail::default());
         let profiles = Profiles(HashMap::from([
             ("ada", vec!["super"]),
             ("sam", vec!["signups.review"]),
             ("ops", vec!["jobs.read"]),
         ]));
-        let state = kit
-            .state
-            .clone()
-            .with_admin(Arc::new(profiles), trail.clone());
-        let admin = testing::admin_app(crate::module(), state);
+        let admin = crate::testkit::admin_app_with(&kit.state, Arc::new(profiles), trail.clone());
         Self { kit, admin, trail }
     }
 
@@ -547,4 +551,151 @@ async fn a_user_cannot_read_or_decide_requests_through_the_member_api(db: PgPool
         .await
         .unwrap();
     assert_eq!(count, 0, "no user, no admin setting: no rows");
+}
+
+// --- Tracked events (ADR 0020, campbooks-cloud#328) ---------------------------
+
+/// `event` is version 1 of `name`, instance-wide, from Sam's (the
+/// administrator's) request to `operation`, with nothing personal.
+fn by_sam(event: &testing::TrackedRow, name: &str, operation: &str) {
+    assert_eq!(event.name, name);
+    assert_eq!(event.version, 1, "{name}");
+    assert_eq!(event.workspace_id, None, "{name}");
+    assert_eq!(
+        event.envelope["actor"],
+        json!({"type": "admin", "id": "sam"}),
+        "{name}"
+    );
+    assert_eq!(event.envelope["operation"], operation, "{name}");
+    crate::tracking_tests::nothing_personal(event);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn signup_requests_are_tracked_once_per_change(db: PgPool) {
+    let world = World::tracking(db, SignupPolicy::Approval).await;
+    let (bea, id) = world.requester("bea").await;
+    // Asking again files nothing new.
+    assert_eq!(
+        world.try_create(&bea, None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    let filed = testing::tracked_events(&world.kit.db, "workspaces.signup_request_filed").await;
+    assert_eq!(filed.len(), 1);
+    crate::tracking_tests::by_user(
+        &filed[0],
+        "workspaces.signup_request_filed",
+        None,
+        "bea",
+        "workspaces.create",
+    );
+    assert_eq!(filed[0].body["signup_request"]["user_id"], id);
+    assert_eq!(filed[0].body["signup_request"]["status"], "pending");
+    assert_eq!(filed[0].body["signup_request"]["with_reason"], false);
+
+    // Rejected with a reason (twice: the retry tracks nothing), then
+    // approved.
+    let reject = format!("{REQUESTS}/{id}/reject");
+    for _ in 0..2 {
+        let rejected = world
+            .post(&world.sam(), &reject, json!({ "reason": "Not a customer" }))
+            .await;
+        assert_eq!(rejected.status, StatusCode::OK, "{:?}", rejected.json);
+    }
+    let approved = world
+        .post(&world.sam(), &format!("{REQUESTS}/{id}/approve"), json!({}))
+        .await;
+    assert_eq!(approved.status, StatusCode::OK, "{:?}", approved.json);
+
+    let rejected =
+        testing::tracked_events(&world.kit.db, "workspaces.signup_request_rejected").await;
+    assert_eq!(rejected.len(), 1);
+    by_sam(
+        &rejected[0],
+        "workspaces.signup_request_rejected",
+        "workspaces.admin_reject_signup_request",
+    );
+    assert_eq!(rejected[0].body["before"], "pending");
+    assert_eq!(rejected[0].body["signup_request"]["status"], "rejected");
+    assert_eq!(rejected[0].body["signup_request"]["with_reason"], true);
+    assert!(!rejected[0].body.to_string().contains("customer"));
+    assert!(rejected[0].body["signup_request"]["decided_at"].is_string());
+
+    let approved =
+        testing::tracked_events(&world.kit.db, "workspaces.signup_request_approved").await;
+    assert_eq!(approved.len(), 1);
+    by_sam(
+        &approved[0],
+        "workspaces.signup_request_approved",
+        "workspaces.admin_approve_signup_request",
+    );
+    assert_eq!(approved[0].body["before"], "rejected");
+    assert_eq!(approved[0].body["signup_request"]["status"], "approved");
+    assert_eq!(approved[0].body["signup_request"]["with_reason"], false);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn signup_codes_are_tracked_without_the_code_or_its_label(db: PgPool) {
+    let world = World::tracking(db, SignupPolicy::Code).await;
+    let first = world.kit.user("first");
+    world.kit.create_workspace(&first, "Ops").await;
+
+    let minted = world
+        .post(
+            &world.sam(),
+            CODES,
+            json!({ "label": "Beta, Ana", "max_uses": 2 }),
+        )
+        .await;
+    assert_eq!(minted.status, StatusCode::CREATED, "{:?}", minted.json);
+    let code = minted.json["code"].as_str().unwrap().to_owned();
+    let code_id = minted.json["entry"]["id"].as_str().unwrap().to_owned();
+    let events = testing::tracked_events(&world.kit.db, "workspaces.signup_code_minted").await;
+    assert_eq!(events.len(), 1);
+    by_sam(
+        &events[0],
+        "workspaces.signup_code_minted",
+        "workspaces.admin_mint_signup_code",
+    );
+    let snapshot = &events[0].body["signup_code"];
+    assert_eq!(snapshot["id"], code_id);
+    assert_eq!(snapshot["state"], "active");
+    assert_eq!(snapshot["max_uses"], 2);
+    assert_eq!(snapshot["uses"], 0);
+    let body = events[0].body.to_string();
+    assert!(!body.contains(&code) && !body.contains("Beta") && !body.contains("label"));
+
+    // Redeemed, in the workspace it opens.
+    let ana = world.kit.user("ana");
+    let ok = world.try_create(&ana, Some(&code)).await;
+    assert_eq!(ok.status, StatusCode::CREATED, "{:?}", ok.json);
+    let workspace: campbooks_kernel::tenancy::WorkspaceId =
+        ok.json["id"].as_str().unwrap().parse().unwrap();
+    let redeemed = testing::tracked_events(&world.kit.db, "workspaces.signup_code_redeemed").await;
+    assert_eq!(redeemed.len(), 1);
+    crate::tracking_tests::by_user(
+        &redeemed[0],
+        "workspaces.signup_code_redeemed",
+        Some(workspace),
+        "ana",
+        "workspaces.create",
+    );
+    assert_eq!(redeemed[0].body["signup_code"]["id"], code_id);
+    assert_eq!(redeemed[0].body["signup_code"]["uses"], 1);
+    assert_eq!(redeemed[0].body["signup_code"]["state"], "active");
+
+    // Revoked, then again: the retry tracks nothing.
+    let revoke = format!("{CODES}/{code_id}/revoke");
+    for _ in 0..2 {
+        let revoked = world.post(&world.sam(), &revoke, json!({})).await;
+        assert_eq!(revoked.status, StatusCode::OK, "{:?}", revoked.json);
+    }
+    let revoked = testing::tracked_events(&world.kit.db, "workspaces.signup_code_revoked").await;
+    assert_eq!(revoked.len(), 1);
+    by_sam(
+        &revoked[0],
+        "workspaces.signup_code_revoked",
+        "workspaces.admin_revoke_signup_code",
+    );
+    assert_eq!(revoked[0].body["signup_code"]["state"], "revoked");
+    assert!(revoked[0].body["signup_code"]["revoked_at"].is_string());
 }

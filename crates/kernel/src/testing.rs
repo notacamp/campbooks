@@ -234,13 +234,28 @@ pub async fn drop_runtime_login(db: &PgPool) {
 }
 
 /// App state over `db` (e.g. the pool `#[sqlx::test]` hands you), storing
-/// blobs in memory and binding outbound requests with [`binding`].
+/// blobs in memory, binding outbound requests with [`binding`] and hashing
+/// keyed requests with [`request_hasher`].
 pub fn state(db: PgPool) -> AppState {
     let config = config("postgres://test@localhost/test");
     let blobs = BlobStore::memory(&config.blobs, db.clone());
     AppState::new(db, config)
         .with_blobs(blobs)
         .with_binding(binding())
+        .with_request_hasher(request_hasher())
+}
+
+/// The key tests hash idempotency requests with: a fixed test key, as the
+/// server's is derived from the instance secret, so two states over one
+/// database agree (a retry through either replays).
+pub fn request_hasher() -> crate::idempotency::RequestHasher {
+    crate::idempotency::RequestHasher::new(&request_hash_secret())
+}
+
+/// The instance secret behind [`request_hasher`], for tests that recompute
+/// a stored hash.
+pub const fn request_hash_secret() -> crate::crypto::SecretKey {
+    crate::crypto::SecretKey::from_bytes([0x3c; crate::crypto::SECRET_KEY_LEN])
 }
 
 /// The binding tests sign and verify sends and provider changes with: a

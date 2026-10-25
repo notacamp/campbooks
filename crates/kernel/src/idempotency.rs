@@ -59,6 +59,15 @@
 //! transaction sees and writes none. The prune reads and deletes expired
 //! keys in the kernel scope, and nothing else.
 //!
+//! **A request's hash is keyed** (campbooks-cloud#335). What tells an
+//! identical retry from a reused key is an HMAC-SHA256 of the method, path,
+//! query and body under a key derived from the instance secret
+//! ([`RequestHasher`]), never a plain digest: a body may carry a secret (a
+//! mailbox password, a signup code, a token), and the database alone must
+//! not let anyone test a guess of it. It is compared in constant time. A
+//! row hashed any other way (before the change) no longer matches: a retry
+//! with its key answers 422 and does not run again, until the row expires.
+//!
 //! **A workspace's keys go with it** (campbooks-cloud#65). A key records the
 //! workspace of the route it was first used on: the matched route's
 //! `{workspace_id}` segment, never a value from the body or the query
@@ -67,7 +76,7 @@
 
 use std::{borrow::Cow, time::Duration};
 
-use aws_lc_rs::digest;
+use aws_lc_rs::hmac;
 use axum::{
     body::{Body, Bytes, to_bytes},
     extract::{MatchedPath, Request, State},
@@ -84,6 +93,7 @@ use crate::{
     AppState,
     auth::{AuthenticatedPrincipal, Principal, PrincipalKind, TokenVerifier, bearer_token},
     changes::VisibilityPort,
+    crypto::{SecretKey, derive_bytes, random_token, same_hash},
     error::LocalizableProblem,
     i18n::MESSAGES,
     jobs::{Job, JobContext, JobError},
@@ -141,12 +151,105 @@ pub const MAX_STORED_RESPONSE_BYTES: usize = 1024 * 1024;
 /// learns that its outcome is unknown (campbooks-cloud#63).
 pub(crate) const ABANDONED_AFTER: Duration = Duration::from_mins(2);
 
-/// What the middleware needs: the database, the token verifier and the
-/// catalogue telling it which operations mutate.
+/// The purpose label of the request hashes' key (HKDF-SHA256 `info` over
+/// the instance secret). Never change it: every key within its retention
+/// would stop matching (a retry then answers 422 rather than replaying).
+pub const HASH_PURPOSE: &[u8] = b"campbooks idempotency request v1";
+
+/// Hashes keyed requests under a key derived from the instance secret
+/// ([`HASH_PURPOSE`]), so the database never holds a digest anyone can
+/// test a guess of a body's secret against (campbooks-cloud#335). During a
+/// rotation the previous secret's key still matches what it hashed, and
+/// hashes nothing new. Cheap to clone.
+#[derive(Clone)]
+pub struct RequestHasher {
+    key: Arc<hmac::Key>,
+    /// The previous instance secret's key, during a rotation: it matches
+    /// what was hashed before, and hashes nothing new.
+    previous: Option<Arc<hmac::Key>>,
+}
+
+impl std::fmt::Debug for RequestHasher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RequestHasher(<key>)")
+    }
+}
+
+impl Default for RequestHasher {
+    /// A hasher with a random key: hashes match in this process only (a
+    /// retry reaching another process, or this one after a restart, answers
+    /// 422 and never runs twice). The server installs [`RequestHasher::new`]
+    /// instead.
+    fn default() -> Self {
+        Self {
+            key: Arc::new(hmac::Key::new(hmac::HMAC_SHA256, random_token().as_bytes())),
+            previous: None,
+        }
+    }
+}
+
+impl RequestHasher {
+    /// The hasher keyed by `secret` (the instance secret): every process of
+    /// the install agrees. A previous key set on `secret` matches what it
+    /// hashed too.
+    pub fn new(secret: &SecretKey) -> Self {
+        let key = |secret: &SecretKey| {
+            Arc::new(hmac::Key::new(
+                hmac::HMAC_SHA256,
+                &derive_bytes(secret, HASH_PURPOSE),
+            ))
+        };
+        Self {
+            key: key(secret),
+            previous: secret.previous_key().map(|previous| key(&previous)),
+        }
+    }
+
+    /// The hash of a request to `parts` with `body`: under the current key,
+    /// and under the previous one during a rotation.
+    fn hash(&self, parts: &Parts, body: &[u8]) -> RequestHash {
+        RequestHash {
+            current: request_hash(&self.key, parts, body),
+            previous: self
+                .previous
+                .as_deref()
+                .map(|previous| request_hash(previous, parts, body)),
+        }
+    }
+}
+
+/// A request's hash under the current key (the one stored) and, during a
+/// rotation, the previous one.
+struct RequestHash {
+    current: Vec<u8>,
+    previous: Option<Vec<u8>>,
+}
+
+impl RequestHash {
+    /// What a new key stores.
+    fn stored(&self) -> &[u8] {
+        &self.current
+    }
+
+    /// Whether `stored` is this request's hash, under either key, compared
+    /// in constant time (both are compared, whichever matches).
+    fn matches(&self, stored: &[u8]) -> bool {
+        let current = same_hash(&self.current, stored);
+        let previous = self
+            .previous
+            .as_deref()
+            .is_some_and(|previous| same_hash(previous, stored));
+        current || previous
+    }
+}
+
+/// What the middleware needs: the database, the token verifier, the
+/// request hasher and the catalogue telling it which operations mutate.
 #[derive(Debug, Clone)]
 pub struct Idempotency {
     db: PgPool,
     auth: TokenVerifier,
+    hasher: RequestHasher,
     catalogue: Arc<Catalogue>,
     membership: MembershipPort,
     clients: ClientDirectoryPort,
@@ -154,13 +257,14 @@ pub struct Idempotency {
 }
 
 impl Idempotency {
-    /// The middleware state for `catalogue`, over `state`'s database and
-    /// token verifier. Install it with
+    /// The middleware state for `catalogue`, over `state`'s database, token
+    /// verifier and request hasher. Install it with
     /// `router.route_layer(axum::middleware::from_fn_with_state(it, idempotency::middleware))`.
     pub fn new(state: &AppState, catalogue: Arc<Catalogue>) -> Self {
         Self {
             db: state.db.clone(),
             auth: state.auth.clone(),
+            hasher: state.request_hasher.clone(),
             catalogue,
             membership: Arc::clone(&state.membership),
             clients: Arc::clone(&state.clients),
@@ -279,7 +383,7 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
         .extensions
         .insert(AuthenticatedPrincipal(principal.clone()));
     let owner = owner(&principal);
-    let hash = request_hash(&parts, &body);
+    let hash = idem.hasher.hash(&parts, &body);
     // The workspace the key belongs to, for its purge: the matched route's
     // `{workspace_id}` segment alone, never anything the body or the query
     // says (campbooks-cloud#65).
@@ -417,8 +521,10 @@ fn owner(principal: &Principal) -> String {
     }
 }
 
-fn request_hash(parts: &Parts, body: &Bytes) -> Vec<u8> {
-    let mut context = digest::Context::new(&digest::SHA256);
+/// HMAC-SHA256 under `key` of the method, path, query and body of a
+/// request, each ended by a zero byte but the body.
+fn request_hash(key: &hmac::Key, parts: &Parts, body: &[u8]) -> Vec<u8> {
+    let mut context = hmac::Context::with_key(key);
     context.update(parts.method.as_str().as_bytes());
     context.update(b"\0");
     context.update(parts.uri.path().as_bytes());
@@ -426,7 +532,7 @@ fn request_hash(parts: &Parts, body: &Bytes) -> Vec<u8> {
     context.update(parts.uri.query().unwrap_or_default().as_bytes());
     context.update(b"\0");
     context.update(body);
-    context.finish().as_ref().to_vec()
+    context.sign().as_ref().to_vec()
 }
 
 enum Claim {
@@ -478,7 +584,7 @@ async fn claim(
     owner: &str,
     key: &str,
     operation_id: &str,
-    hash: &[u8],
+    hash: &RequestHash,
     workspace: Option<&str>,
 ) -> Result<Claim, sqlx::Error> {
     let mut tx = crate::db::begin_as_idempotency_caller(db, owner).await?;
@@ -501,7 +607,7 @@ async fn claim_in(
     owner: &str,
     key: &str,
     operation_id: &str,
-    hash: &[u8],
+    hash: &RequestHash,
     workspace: Option<&str>,
 ) -> Result<Claim, sqlx::Error> {
     let retention = seconds(RETENTION);
@@ -531,7 +637,7 @@ async fn claim_in(
             owner,
             key,
             operation_id,
-            hash,
+            hash.stored(),
             retention,
             workspace,
         )
@@ -558,7 +664,10 @@ async fn claim_in(
         let Some(row) = existing else {
             continue;
         };
-        if row.operation_id != operation_id || row.request_hash != hash {
+        // A hash made any other way (a plain digest, from before
+        // campbooks-cloud#335) never matches: the retry is refused, never
+        // run again, and the row is left as it is until it expires.
+        if row.operation_id != operation_id || !hash.matches(&row.request_hash) {
             return Ok(Claim::Mismatch);
         }
         // Unreadable means "checked something": refuse the replay rather
@@ -885,6 +994,104 @@ mod owner_tests {
                 Some("ana-agent")
             )),
             "client:ana-agent"
+        );
+    }
+}
+
+#[cfg(test)]
+mod hash_tests {
+    use aws_lc_rs::digest;
+    use axum::http::Request;
+
+    use super::{HASH_PURPOSE, RequestHasher};
+    use crate::crypto::{SECRET_KEY_LEN, SecretKey, derive_bytes, hmac_sha256};
+
+    fn secret(byte: u8) -> SecretKey {
+        SecretKey::from_bytes([byte; SECRET_KEY_LEN])
+    }
+
+    fn parts() -> axum::http::request::Parts {
+        Request::builder()
+            .method("POST")
+            .uri("/api/v1/connectors/imap?x=1")
+            .body(())
+            .unwrap()
+            .into_parts()
+            .0
+    }
+
+    const BODY: &[u8] = br#"{"address":"ana@example.com","password":"hunter2"}"#;
+
+    /// What the layer hashed before campbooks-cloud#335, and what it hashes
+    /// (under a key) now.
+    fn input() -> Vec<u8> {
+        let parts: [&[u8]; 4] = [b"POST\0", b"/api/v1/connectors/imap\0", b"x=1\0", BODY];
+        parts.concat()
+    }
+
+    /// The hash is HMAC-SHA256 of the request under the key derived for
+    /// [`HASH_PURPOSE`]: never the plain SHA-256 anyone holding the
+    /// database could test a password guess against (campbooks-cloud#335).
+    #[test]
+    fn the_hash_is_keyed_by_the_instance_secret() {
+        let hash = RequestHasher::new(&secret(7)).hash(&parts(), BODY);
+        assert_eq!(
+            hash.stored(),
+            hmac_sha256(&derive_bytes(&secret(7), HASH_PURPOSE), &input()).as_slice()
+        );
+        let plain = digest::digest(&digest::SHA256, &input());
+        assert_ne!(hash.stored(), plain.as_ref());
+        assert!(
+            !hash.matches(plain.as_ref()),
+            "an old plain hash never matches"
+        );
+        assert_eq!(hash.stored().len(), plain.as_ref().len());
+    }
+
+    #[test]
+    fn each_install_and_each_request_hashes_apart() {
+        let one = RequestHasher::new(&secret(7));
+        let same = RequestHasher::new(&secret(7)).hash(&parts(), BODY);
+        assert!(one.hash(&parts(), BODY).matches(same.stored()));
+        let other = RequestHasher::new(&secret(8)).hash(&parts(), BODY);
+        assert_ne!(other.stored(), same.stored());
+        assert!(!one.hash(&parts(), BODY).matches(other.stored()));
+        assert!(!one.hash(&parts(), b"{}").matches(same.stored()));
+        // A per-process key matches only its own.
+        let random = RequestHasher::default();
+        assert!(
+            random
+                .hash(&parts(), BODY)
+                .matches(random.hash(&parts(), BODY).stored())
+        );
+        assert!(!random.hash(&parts(), BODY).matches(same.stored()));
+    }
+
+    /// During a rotation the previous secret's hashes still match, and new
+    /// ones are made with the current secret; once it is removed they no
+    /// longer match (a retry answers 422, never runs twice).
+    #[test]
+    fn a_rotation_matches_what_the_previous_secret_hashed() {
+        let before = RequestHasher::new(&secret(7)).hash(&parts(), BODY);
+        let rotating = RequestHasher::new(&secret(8).with_previous(&secret(7)));
+        let during = rotating.hash(&parts(), BODY);
+        assert!(during.matches(before.stored()));
+        assert_eq!(
+            during.stored(),
+            RequestHasher::new(&secret(8)).hash(&parts(), BODY).stored()
+        );
+        assert!(
+            !RequestHasher::new(&secret(8))
+                .hash(&parts(), BODY)
+                .matches(before.stored())
+        );
+    }
+
+    #[test]
+    fn the_key_is_never_printed() {
+        assert_eq!(
+            format!("{:?}", RequestHasher::new(&secret(7))),
+            "RequestHasher(<key>)"
         );
     }
 }
