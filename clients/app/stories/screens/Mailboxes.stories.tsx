@@ -71,11 +71,10 @@ function addMailbox({
   let reads = 0;
   let outcome = ends;
   let connected: typeof IMAP_CONNECTION | undefined;
-  const now = () => {
+  const view = () => {
     if (connected === undefined) {
       return IMAP_CONNECTION;
     }
-    reads += 1;
     if (reads <= checks) {
       return connected;
     }
@@ -83,7 +82,17 @@ function addMailbox({
       ? { ...connected, address_verified: true, address_check: null }
       : { ...connected, address_check: "failed" as const };
   };
+  const now = () => {
+    if (connected !== undefined) {
+      reads += 1;
+    }
+    return view();
+  };
   return {
+    // The page's list, with the new mailbox once it is connected.
+    [`GET ${W}/connections`]: () => ({
+      body: { connections: connected === undefined ? [CONNECTION] : [CONNECTION, view()] },
+    }),
     [`POST ${W}/connections/imap/discover`]: (body: unknown) => discovery(body),
     [`POST ${W}/connections/imap`]: (body: unknown) => {
       if (refuse !== undefined) {
