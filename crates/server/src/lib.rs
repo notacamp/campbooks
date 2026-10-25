@@ -151,6 +151,9 @@ pub struct Composition {
     /// members' sentences into rules to check and answers in Scout's chat).
     /// Its handbook is always the one [`handbook`] composes.
     pub assistant: campbooks_assistant::AssistantDeps,
+    /// The pages module's switch (`CAMPBOOKS_PAGES__ENABLED`, off unless
+    /// asked for). `Default` composes it on, for the catalogues and tests.
+    pub pages: campbooks_pages::Deps,
 }
 
 impl Composition {
@@ -185,6 +188,7 @@ impl Composition {
             ),
             system,
             assistant,
+            pages: campbooks_pages::Deps::from_env(),
         })
     }
 }
@@ -269,6 +273,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         }),
         campbooks_tasks::module(),
         campbooks_schedule::module(),
+        campbooks_pages::module(composition.pages),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -317,6 +322,7 @@ pub fn with_ports(state: AppState) -> AppState {
             vec![
                 campbooks_conversations::visibility(),
                 campbooks_tasks::visibility(),
+                campbooks_pages::visibility(),
             ],
         )))
         .with_open_tasks(campbooks_tasks::open_tasks())
@@ -329,6 +335,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_availability(campbooks_schedule::availability())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
+            campbooks_pages::search_source(),
         ]))
 }
 
@@ -491,6 +498,12 @@ fn security_scheme() -> SecurityScheme {
         (name = "tasks", description = "What you have to do: your tasks, with a due date, a \
             plan (a day, or Later), a hand-off to one teammate and an undo for every change. \
             Personal: a task is seen by who it is with, and by who handed it off."),
+        (name = "pages", description = "What you and your team write: pages in a tree, each a \
+            block document that several people edit at once and the server merges, with \
+            mentions of people, threads, tasks and events, backlinks, files, sharing by member \
+            and role, and a trash that keeps what you delete for 30 days. Off unless the \
+            instance turns it on (`CAMPBOOKS_PAGES__ENABLED`); while off, every operation \
+            answers 404."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \

@@ -1,0 +1,34 @@
+[package]
+name = "campbooks-pages"
+description = "Campbooks pages module: what members write for themselves and their team, as block documents merged on the server."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum.workspace = true
+base64.workspace = true
+bytes.workspace = true
+campbooks-kernel.workspace = true
+chrono.workspace = true
+figment.workspace = true
+futures-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+yrs.workspace = true
+
+[dev-dependencies]
+campbooks-kernel = { workspace = true, features = ["test-util"] }
+http-body-util.workspace = true
+tokio.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

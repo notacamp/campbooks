@@ -1,0 +1,25 @@
+{
+  "errors": {
+    "page_forbidden": "Vous pouvez lire cette page, mais pas faire cela avec elle.",
+    "invalid_title": "Le titre d'une page compte au plus 200 caractères.",
+    "invalid_icon": "Ce n'est pas l'une des icônes de page.",
+    "invalid_position": "Cette position n'est pas valide.",
+    "place_mismatch": "Une sous-page se trouve toujours au même endroit que la page où elle est.",
+    "page_changed": "Cette page a changé depuis que vous l'avez vue. Rechargez-la et réessayez.",
+    "page_trashed": "Cette page est dans la corbeille. Restaurez-la d'abord.",
+    "page_not_trashed": "Seule une page qui est dans la corbeille peut être supprimée définitivement.",
+    "page_not_trash_root": "Cette page a été supprimée avec une autre. Utilisez cette autre page.",
+    "page_too_deep": "Les pages peuvent être imbriquées sur 12 niveaux au plus.",
+    "page_cycle": "Une page ne peut pas être déplacée dans elle-même ni dans l'une de ses sous-pages.",
+    "invalid_update": "Cette modification de la page n'est pas valide.",
+    "update_too_large": "Une modification d'une page peut faire 256 Kio au plus.",
+    "document_too_large": "La page serait trop grande : 4 Mio, 20 000 blocs et 32 niveaux au plus.",
+    "unknown_block": "La modification utilise un bloc ou un réglage qu'une page ne peut pas contenir.",
+    "link_scheme": "Les liens ne peuvent commencer que par https, http ou mailto.",
+    "foreign_blob": "La modification désigne un fichier qui n'a pas été envoyé sur cette page.",
+    "not_a_member": "Vous ne pouvez partager une page qu'avec un membre de cet espace de travail.",
+    "share_yourself": "Choisissez quelqu'un d'autre pour le partage.",
+    "invalid_ref": "Une page ne peut pas faire de lien vers ce type d'enregistrement.",
+    "file_empty": "Le fichier est vide."
+  }
+}
