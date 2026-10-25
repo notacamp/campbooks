@@ -1,13 +1,15 @@
 //! The other modules' events this module consumes, and the blob document it
 //! points at, as their published contracts describe them (modules never
-//! import each other): `contracts/conversations.message_read.v1` and
-//! `contracts/read-texts.v1`.
+//! import each other): `contracts/conversations.message_read.v1`,
+//! `contracts/read-texts.v1` and `contracts/schedule.event_created.v1` with
+//! its two siblings (`event_changed`, `event_cancelled`).
 //!
 //! Each type reads only the fields this module uses; what the contract adds
 //! later is ignored.
 
-use campbooks_kernel::{DomainEvent, blobs::BlobRef, tenancy::UserId};
+use campbooks_kernel::{DomainEvent, RecordRef, blobs::BlobRef, tenancy::UserId};
 use serde::{Deserialize, Serialize};
+use sqlx::types::Uuid;
 
 /// An ask of a read, as `conversations.message_read` carries it: no title,
 /// quote or amount.
@@ -87,3 +89,61 @@ pub struct AskAmount {
     /// ISO 4217 code.
     pub currency: String,
 }
+
+/// One of the schedule module's events about an event of a member's
+/// calendar, as this module reads it: the same facts for a creation, a
+/// change and a cancellation. No title.
+macro_rules! calendar_event {
+    ($(#[$meta:meta])* $name:ident => $wire:literal) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+        pub struct $name {
+            /// The workspace.
+            pub workspace: String,
+            /// The event (the schedule module's id).
+            pub event: Uuid,
+            /// Its calendar.
+            pub calendar: Uuid,
+            /// The member whose calendar it is.
+            pub owner: UserId,
+            /// Its kind (`hold` for time held for a task).
+            pub kind: String,
+            /// When it starts: an RFC 3339 time, or a date when all-day.
+            pub starts: String,
+            /// When it ends, in the same form.
+            #[serde(default)]
+            pub ends: Option<String>,
+            /// Whether it lasts whole days.
+            pub all_day: bool,
+            /// The record it was made for or read from (`tasks.task` for a hold).
+            #[serde(default)]
+            pub source: Option<RecordRef>,
+        }
+
+        impl DomainEvent for $name {
+            const NAME: &'static str = $wire;
+            const VERSION: u16 = 1;
+
+            fn workspace(&self) -> Option<&str> {
+                Some(&self.workspace)
+            }
+        }
+    };
+}
+
+calendar_event!(
+    /// `schedule.event_created` v1: an event was added to a calendar (made,
+    /// read from an email, synced, or put back by an undo).
+    CalendarEventCreated => "schedule.event_created"
+);
+
+calendar_event!(
+    /// `schedule.event_changed` v1: an event changed (moved, in Campbooks or
+    /// at the provider).
+    CalendarEventChanged => "schedule.event_changed"
+);
+
+calendar_event!(
+    /// `schedule.event_cancelled` v1: an event was removed or cancelled.
+    CalendarEventCancelled => "schedule.event_cancelled"
+);
