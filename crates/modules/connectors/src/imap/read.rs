@@ -1622,7 +1622,11 @@ impl Reader<'_> {
     }
 
     /// Indexed messages of the stream with no stored location (at most
-    /// [`MAX_UNLOCATED`]), not already settled by this run.
+    /// [`MAX_UNLOCATED`]), not already settled by this run. A message
+    /// Campbooks sent whose copy in Sent is still to be made, or could not
+    /// be (`connectors.sends.sent_copy`), is not one: the member's own mail
+    /// never leaves its conversation because the server would not take the
+    /// copy.
     async fn unlocated(&self, run: &Run) -> Result<Vec<String>, Stop> {
         let mut tx = self.pool.begin_for(self.workspace).await?;
         let keys: Vec<String> = sqlx::query_scalar(
@@ -1631,6 +1635,10 @@ impl Reader<'_> {
                 AND NOT EXISTS (SELECT 1 FROM connectors.imap_locations l
                                  WHERE l.stream_id = m.stream_id
                                    AND l.message_key = m.provider_message_id)
+                AND NOT EXISTS (SELECT 1 FROM connectors.sends s
+                                 WHERE s.stream_id = m.stream_id
+                                   AND s.provider_message_id = m.provider_message_id
+                                   AND s.sent_copy IN ('pending', 'skipped', 'failed'))
               ORDER BY m.internal_date DESC
               LIMIT $2",
         )
@@ -1889,6 +1897,13 @@ fn header_fields(bytes: &[u8]) -> HashMap<String, String> {
     out
 }
 
+/// The key the reader gives a message whose `Message-ID` header is `value`
+/// (with or without its angle brackets): what a message Campbooks sent is
+/// indexed under, so the read that finds its copy knows it.
+pub(crate) fn message_key(value: &str) -> Option<String> {
+    message_id(value).map(|id| format!("mid:{}", hex(&id)))
+}
+
 /// A `Message-ID` value normalised: what is inside its angle brackets,
 /// without white space. `None` when there is nothing usable.
 fn message_id(value: &str) -> Option<String> {
@@ -1942,6 +1957,10 @@ mod tests {
         let a = Header::of(&fetch(b"Message-ID: <a@example.com>\r\n\r\n"), None);
         let moved = Header::of(&fetch(b"Message-Id:   <a@example.com>\r\n\r\n"), None);
         assert_eq!(a.key(), moved.key());
+        // A message Campbooks sent is indexed under the key its copy gets.
+        assert_eq!(message_key("a@example.com"), Some(a.key()));
+        assert_eq!(message_key("<a@example.com>"), Some(a.key()));
+        assert_eq!(message_key(" "), None);
         assert!(a.key().starts_with("mid:") && !a.key().contains("example"));
         let anonymous = Header::of(
             &fetch(b"From: Ana <ana@example.com>\r\n\r\n"),

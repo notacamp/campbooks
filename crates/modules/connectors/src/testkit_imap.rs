@@ -6,7 +6,9 @@
 //! until 2126, made with `openssl`; no real host has them). A fake resolver
 //! names the fakes; fake DNS and a fake web serve discovery. The IMAP fake
 //! holds a mailbox (`testkit_imap_mailbox`) the tests change as another mail
-//! app would.
+//! app would. The SMTP fake takes mail as a submission server does
+//! (`MAIL`, `RCPT`, `DATA`), keeps what it received, and can be busy, refuse,
+//! announce a `SIZE`, hang up after the message or never stop talking.
 //!
 //! No test talks to a real mail server, resolver or web server.
 
@@ -26,7 +28,10 @@ use campbooks_kernel::net::guard::{Resolve, ResolveFuture};
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use tokio::{
-    io::{AsyncBufReadExt as _, AsyncRead, AsyncWrite, AsyncWriteExt as _, BufReader},
+    io::{
+        AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _,
+        BufReader,
+    },
     net::{TcpListener, TcpStream},
 };
 use tokio_rustls::{
@@ -87,6 +92,38 @@ pub struct Script {
     pub hostile_sign_in: bool,
     /// IMAP, signed in: what it offers, and how it misbehaves.
     pub offers: Offers,
+    /// SMTP: how it takes mail.
+    pub smtp: SmtpScript,
+}
+
+/// How the SMTP fake takes mail.
+#[derive(Debug, Clone, Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each is one independent behaviour a test turns on"
+)]
+pub struct SmtpScript {
+    /// The `SIZE` its EHLO announces.
+    pub size: Option<u64>,
+    /// `RCPT TO` commands answered 451 (busy) before it takes any, across
+    /// sessions.
+    pub busy_rcpts: usize,
+    /// Messages answered 451 (busy) after their final dot before it takes
+    /// one, across sessions.
+    pub busy_messages: usize,
+    /// Every message is answered 554 after its final dot.
+    pub refuse_messages: bool,
+    /// `AUTH` is answered 454 (busy).
+    pub busy_auth: bool,
+    /// `RCPT TO` this address is answered 550.
+    pub refuse_rcpt: Option<String>,
+    /// The connection is closed once a message arrived, before any answer.
+    pub hang_up_after_message: bool,
+    /// EHLO is answered with bytes and no line ending, without end.
+    pub endless_ehlo: bool,
+    /// At `DATA`, before its go-ahead: say so on the first, then wait for
+    /// the second (a test acts in between).
+    pub hold_data: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
 }
 
 impl Script {
@@ -107,6 +144,7 @@ impl Script {
                 condstore: true,
                 ..Offers::default()
             },
+            smtp: SmtpScript::default(),
         }
     }
 }
@@ -147,6 +185,20 @@ pub struct Seen {
     /// its whole line past the tag, in order.
     pub commands: Vec<String>,
     pub lines: Vec<String>,
+    /// IMAP: the messages appended (`APPEND`), by folder.
+    pub appended: Vec<(String, Vec<u8>)>,
+    /// SMTP: each `MAIL FROM` and `RCPT TO` address, `DATA` commands, every
+    /// message received (whatever the answer), and those taken (250).
+    pub mail_froms: Vec<String>,
+    pub rcpts: Vec<String>,
+    pub datas: usize,
+    pub received: Vec<Vec<u8>>,
+    pub delivered: Vec<Vec<u8>>,
+    /// SMTP: what arrived after `DATA` of a message that never ended (the
+    /// connection closed before its final dot).
+    pub unfinished: Vec<Vec<u8>>,
+    /// SMTP: whether each `MAIL FROM` came after STARTTLS or over TLS.
+    pub mail_in_clear: bool,
 }
 
 impl Seen {
@@ -432,6 +484,13 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                 if script.login_disabled || !encrypted {
                     caps.push("LOGINDISABLED");
                 }
+                let limit = script
+                    .offers
+                    .append_limit
+                    .map(|limit| format!("APPENDLIMIT={limit}"));
+                if let (true, Some(limit)) = (encrypted, limit.as_deref()) {
+                    caps.push(limit);
+                }
                 if encrypted {
                     let offers = script.offers;
                     caps.push("ENABLE");
@@ -531,6 +590,10 @@ async fn imap_session<S: AsyncRead + AsyncWrite + Unpin>(
                 shared.see(|seen| seen.noops += 1);
                 format!("{tag} OK done\r\n")
             }
+            "APPEND" if encrypted => match append(conn, shared, &script, &tag, args).await {
+                Some(reply) => reply,
+                None => break,
+            },
             _ if encrypted => {
                 let answer = signed_in(shared, &script, &tag, verb, args, &mut selected);
                 if !write_bytes(conn.get_mut(), &answer).await {
@@ -680,6 +743,72 @@ fn signed_in(
     answer
 }
 
+/// `APPEND <folder> [(<flags>)] {n}` (its arguments `args`): the
+/// go-ahead, the literal, then the answer, as the script has it. `None` when
+/// the connection is to end.
+async fn append<S: AsyncRead + AsyncWrite + Unpin>(
+    conn: &mut BufReader<S>,
+    shared: &Shared,
+    script: &Script,
+    tag: &str,
+    args: &str,
+) -> Option<String> {
+    let offers = script.offers;
+    let (folder, rest) = argument(args);
+    let size: usize = rest
+        .trim()
+        .rsplit_once('{')?
+        .1
+        .trim_end_matches('}')
+        .trim_end_matches('+')
+        .parse()
+        .ok()?;
+    let read_flag = rest.to_ascii_uppercase().contains("\\SEEN");
+    shared.see(|seen| {
+        seen.commands.push("APPEND".to_owned());
+        seen.lines.push(format!("APPEND {args}"));
+    });
+    if offers.append_busy {
+        return Some(format!("{tag} NO [UNAVAILABLE] try again later\r\n"));
+    }
+    if offers.append_drop {
+        // Hangs up on the command, as a server going away would.
+        return None;
+    }
+    if offers
+        .append_limit
+        .is_some_and(|limit| u64::try_from(size).unwrap_or(u64::MAX) > limit)
+    {
+        return Some(format!("{tag} NO [TOOBIG] too big\r\n"));
+    }
+    if !write(conn.get_mut(), "+ go on\r\n").await {
+        return None;
+    }
+    let mut raw = vec![0; size];
+    conn.read_exact(&mut raw).await.ok()?;
+    read(conn).await?;
+    shared.see(|seen| seen.appended.push((folder.clone(), raw.clone())));
+    if offers.append_hang {
+        tokio::time::sleep(Duration::from_hours(1)).await;
+        return None;
+    }
+    if offers.append_refused {
+        return Some(format!("{tag} NO [OVERQUOTA] the mailbox is full\r\n"));
+    }
+    let appended = shared
+        .store
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .append_mail(&folder, raw, Utc::now(), read_flag);
+    Some(match appended {
+        None => format!("{tag} NO [TRYCREATE] no such folder\r\n"),
+        Some((uidvalidity, uid)) if offers.uidplus => {
+            format!("{tag} OK [APPENDUID {uidvalidity} {uid}] APPEND completed\r\n")
+        }
+        Some(_) => format!("{tag} OK APPEND completed\r\n"),
+    })
+}
+
 async fn write_bytes<S: AsyncWrite + Unpin>(stream: &mut S, bytes: &[u8]) -> bool {
     stream.write_all(bytes).await.is_ok() && stream.flush().await.is_ok()
 }
@@ -740,6 +869,10 @@ async fn serve_smtp(tcp: TcpStream, security: Security, shared: &Shared) {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "one session of the fake, command by command"
+)]
 async fn smtp_session<S: AsyncRead + AsyncWrite + Unpin>(
     conn: &mut BufReader<S>,
     encrypted: bool,
@@ -757,18 +890,33 @@ async fn smtp_session<S: AsyncRead + AsyncWrite + Unpin>(
             return Next::Done;
         }
     }
+    let mut signed_in = false;
     while let Some(line) = read(conn).await {
         let (verb, args) = line.split_once(' ').unwrap_or((line.as_str(), ""));
         let reply = match verb.to_ascii_uppercase().as_str() {
+            "EHLO" | "HELO" if script.smtp.endless_ehlo => {
+                // Bytes without a line ending, until the client stops reading.
+                let chunk = "x".repeat(64 * 1024);
+                write(conn.get_mut(), "250-").await;
+                for _ in 0..64 {
+                    if !write(conn.get_mut(), &chunk).await {
+                        break;
+                    }
+                }
+                return Next::Done;
+            }
             "EHLO" | "HELO" => {
-                let mut lines = vec!["smtp.example.com"];
+                let mut lines = vec!["smtp.example.com".to_owned()];
                 if !encrypted && script.starttls {
-                    lines.push("STARTTLS");
+                    lines.push("STARTTLS".to_owned());
                 }
                 if encrypted && script.auth {
-                    lines.push("AUTH PLAIN LOGIN");
+                    lines.push("AUTH PLAIN LOGIN".to_owned());
                 }
-                lines.push("8BITMIME");
+                lines.push("8BITMIME".to_owned());
+                if let Some(size) = script.smtp.size {
+                    lines.push(format!("SIZE {size}"));
+                }
                 let last = lines.len() - 1;
                 let mut reply = String::new();
                 for (i, line) in lines.iter().enumerate() {
@@ -793,16 +941,77 @@ async fn smtp_session<S: AsyncRead + AsyncWrite + Unpin>(
                     && plain(response).is_some_and(|(username, password)| {
                         username == script.username && password == script.password
                     });
-                if accepted {
+                if script.smtp.busy_auth {
+                    "454 4.7.0 try again later\r\n".to_owned()
+                } else if accepted {
+                    signed_in = true;
                     "235 2.7.0 accepted\r\n".to_owned()
                 } else {
                     "535 5.7.8 credentials refused\r\n".to_owned()
                 }
             }
             "MAIL" => {
-                shared.see(|seen| seen.mail_from = true);
-                "250 ok\r\n".to_owned()
+                let address = envelope_address(args);
+                shared.see(|seen| {
+                    seen.mail_from = true;
+                    seen.mail_in_clear |= !encrypted;
+                    seen.mail_froms.push(address);
+                });
+                if signed_in {
+                    "250 ok\r\n".to_owned()
+                } else {
+                    "530 5.7.0 sign in first\r\n".to_owned()
+                }
             }
+            "RCPT" => {
+                let address = envelope_address(args);
+                let mut busy = false;
+                shared.see(|seen| {
+                    busy = seen.rcpts.len() < script.smtp.busy_rcpts;
+                    seen.rcpts.push(address.clone());
+                });
+                if busy {
+                    "451 4.3.0 try again later\r\n".to_owned()
+                } else if script.smtp.refuse_rcpt.as_deref() == Some(address.as_str()) {
+                    "550 5.1.1 no such mailbox\r\n".to_owned()
+                } else {
+                    "250 ok\r\n".to_owned()
+                }
+            }
+            "DATA" => {
+                shared.see(|seen| seen.datas += 1);
+                if let Some((arrived, release)) = &script.smtp.hold_data {
+                    arrived.notify_one();
+                    release.notified().await;
+                }
+                if !write(conn.get_mut(), "354 end with a dot\r\n").await {
+                    break;
+                }
+                let message = match smtp_message(conn).await {
+                    Ok(message) => message,
+                    Err(unfinished) => {
+                        shared.see(|seen| seen.unfinished.push(unfinished));
+                        break;
+                    }
+                };
+                let mut busy = false;
+                shared.see(|seen| {
+                    busy = seen.received.len() < script.smtp.busy_messages;
+                    seen.received.push(message.clone());
+                });
+                if script.smtp.hang_up_after_message {
+                    return Next::Done;
+                }
+                if busy {
+                    "451 4.3.0 try again later\r\n".to_owned()
+                } else if script.smtp.refuse_messages {
+                    "554 5.6.0 refused\r\n".to_owned()
+                } else {
+                    shared.see(|seen| seen.delivered.push(message));
+                    "250 2.0.0 queued\r\n".to_owned()
+                }
+            }
+            "RSET" | "NOOP" => "250 ok\r\n".to_owned(),
             "QUIT" => {
                 write(conn.get_mut(), "221 bye\r\n").await;
                 return Next::Done;
@@ -814,6 +1023,30 @@ async fn smtp_session<S: AsyncRead + AsyncWrite + Unpin>(
         }
     }
     Next::Done
+}
+
+/// The address in `MAIL FROM:<a> …` or `RCPT TO:<a> …`.
+fn envelope_address(args: &str) -> String {
+    args.split_once('<')
+        .and_then(|(_, rest)| rest.split_once('>'))
+        .map_or_else(String::new, |(address, _)| address.to_owned())
+}
+
+/// A message after `DATA`, up to its final dot, dot-stuffing undone; what
+/// came of it when the connection closed first.
+async fn smtp_message<S: AsyncRead + Unpin>(conn: &mut BufReader<S>) -> Result<Vec<u8>, Vec<u8>> {
+    let mut message = Vec::new();
+    loop {
+        let mut line = Vec::new();
+        if conn.read_until(b'\n', &mut line).await.unwrap_or(0) == 0 {
+            return Err(message);
+        }
+        if line == b".\r\n" || line == b".\n" {
+            return Ok(message);
+        }
+        let line = line.strip_prefix(b".").unwrap_or(&line);
+        message.extend_from_slice(line);
+    }
 }
 
 /// A resolver that knows the names it was told, and nothing else.
@@ -998,6 +1231,7 @@ pub fn adapter(fakes: &Fakes) -> Imap {
         dns: fakes.dns.clone(),
         web: fakes.web.clone(),
         trust: Trust::Roots(vec![CertificateDer::from(ROOT.to_vec())]),
+        sent_keepers: Vec::new(),
     }
 }
 
@@ -1008,13 +1242,19 @@ pub async fn kit(db: PgPool) -> (Kit, Fakes) {
 
 /// [`kit`], its IMAP settings changed by `change`.
 pub async fn kit_with(db: PgPool, change: impl FnOnce(&mut ImapConfig)) -> (Kit, Fakes) {
+    kit_with_adapter(db, |imap| change(&mut imap.config)).await
+}
+
+/// [`kit`], its IMAP adapter changed by `change` (its settings, the SMTP
+/// hosts known to keep a copy of what they send).
+pub async fn kit_with_adapter(db: PgPool, change: impl FnOnce(&mut Imap)) -> (Kit, Fakes) {
     let fakes = Fakes {
         resolver: Arc::new(FakeResolver::default()),
         dns: Arc::new(FakeDns::default()),
         web: Arc::new(FakeWeb::default()),
     };
     let mut imap = adapter(&fakes);
-    change(&mut imap.config);
+    change(&mut imap);
     let kit = Kit::with_imap(db, imap).await;
     (kit, fakes)
 }

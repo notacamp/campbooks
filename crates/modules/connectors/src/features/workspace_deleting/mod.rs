@@ -22,7 +22,7 @@ use crate::{
         removal,
     },
     events::WorkspaceDeleting,
-    features::send_message::SEND_OWNER,
+    features::send_message::{SEND_OWNER, SENT_COPY_OWNER},
 };
 
 /// Revokes and deletes a deleted workspace's connections.
@@ -88,6 +88,10 @@ impl EventConsumer for RevokeWorkspaceGrants {
             state
                 .blobs
                 .detach_owner(tx, &key, &BlobOwner::new(SEND_OWNER, send))
+                .await?;
+            state
+                .blobs
+                .detach_owner(tx, &key, &BlobOwner::new(SENT_COPY_OWNER, send))
                 .await?;
         }
         tracing::info!(%workspace, "connections of a deleted workspace revoked");

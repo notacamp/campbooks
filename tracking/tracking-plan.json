@@ -54,9 +54,31 @@
       "date": "2026-10-24",
       "plan_version": 3,
       "pr": "#654"
+    },
+    {
+      "change": "The web BFF instrumented (campbooks-cloud#327): 3 events for web sessions started, ended one at a time (logging out, signing in again, a copied cookie, outdated scopes, a refused refresh, unreadable tokens, an expired access token) and ended at once (back-channel logout, signing out everywhere, a suspension); the enums of how they end; Coverage for every operation, handler and schedule of the BFF. bff is a platform module, generated into the kernel and tracked from the server.",
+      "date": "2026-10-24",
+      "plan_version": 4,
+      "pr": "#655"
     }
   ],
   "coverage": [
+    {
+      "events": [
+        "bff.web_sessions_ended"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "bff.end_signed_out_sessions"
+    },
+    {
+      "events": [
+        "bff.web_sessions_ended"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "bff.end_suspended_sessions"
+    },
     {
       "events": [
         "conversations.inbox_created"
@@ -259,6 +281,125 @@
       "exemption": "derived state: a need worked out again from stored messages and answers (conversations.need_changed); no action of anyone",
       "kind": "job",
       "name": "conversations.wake_needs"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.admin_delete"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.admin_get"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.admin_patch"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.admin_post"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.admin_put"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.api_delete"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.api_get"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.api_patch"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.api_post"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.api_put"
+    },
+    {
+      "events": [
+        "bff.web_sessions_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.backchannel_logout"
+    },
+    {
+      "events": [
+        "bff.web_session_started",
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.callback"
+    },
+    {
+      "events": [],
+      "exemption": "only starts a sign-in round trip (a short-lived sign-in transaction); bff.callback tracks its outcome",
+      "kind": "operation",
+      "name": "bff.login"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.logout"
+    },
+    {
+      "events": [
+        "bff.web_session_ended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "bff.session"
     },
     {
       "events": [
@@ -790,6 +931,12 @@
     },
     {
       "events": [],
+      "exemption": "maintenance: deletes web sessions already past their idle or absolute end and sign-ins never finished; no action of anyone",
+      "kind": "schedule",
+      "name": "bff.prune_sessions"
+    },
+    {
+      "events": [],
       "exemption": "maintenance, no action of anyone: only enqueues the jobs that do the work",
       "kind": "schedule",
       "name": "conversations.dispatch_need_clocks"
@@ -817,6 +964,56 @@
   ],
   "description": "The tracking plan (ADR 0020), generated from tracking/tracking-plan.xlsx by campbooks-tracking-plan. Do not edit: change the workbook and regenerate. Every event's `schema` is the JSON Schema of its body; `envelope` is the schema of what the kernel adds around it.",
   "enums": [
+    {
+      "description": "Its access token expired and it holds no refresh token.",
+      "enum": "bff.web_session_end_cause",
+      "value": "access_expired"
+    },
+    {
+      "description": "A token rotated away was presented again after its successor was used, or a retired one at all: the cookie was copied.",
+      "enum": "bff.web_session_end_cause",
+      "value": "copied_cookie"
+    },
+    {
+      "description": "The person signed out (bff.logout).",
+      "enum": "bff.web_session_end_cause",
+      "value": "logout"
+    },
+    {
+      "description": "The identity provider refused to refresh its tokens.",
+      "enum": "bff.web_session_end_cause",
+      "value": "refresh_refused"
+    },
+    {
+      "description": "The browser signed in again; its previous session ended (bff.callback).",
+      "enum": "bff.web_session_end_cause",
+      "value": "replaced"
+    },
+    {
+      "description": "It signed in before the BFF asked for scopes it asks for now.",
+      "enum": "bff.web_session_end_cause",
+      "value": "scopes_outdated"
+    },
+    {
+      "description": "Its stored tokens no longer decrypt (the instance's secret key changed).",
+      "enum": "bff.web_session_end_cause",
+      "value": "tokens_unreadable"
+    },
+    {
+      "description": "An administrator suspended the account (identity.account_suspended).",
+      "enum": "bff.web_sessions_end_cause",
+      "value": "account_suspended"
+    },
+    {
+      "description": "The identity provider's back-channel logout named them (bff.backchannel_logout).",
+      "enum": "bff.web_sessions_end_cause",
+      "value": "backchannel"
+    },
+    {
+      "description": "The person signed out everywhere (identity.signed_out_everywhere).",
+      "enum": "bff.web_sessions_end_cause",
+      "value": "signed_out_everywhere"
+    },
     {
       "description": "It was archived.",
       "enum": "conversations.clear_cause",
@@ -1694,6 +1891,158 @@
     "type": "object"
   },
   "events": [
+    {
+      "action": "ended",
+      "actor_types": [
+        "anonymous"
+      ],
+      "added_in": 4,
+      "description": "One web session ended; the cause says why. A session already gone tracks nothing.",
+      "fires_when": "bff.logout ends it (logout); bff.callback ends the browser's previous one (replaced); a lookup (bff.session, a proxy, bff.logout) finds its cookie copied (copied_cookie) or its scopes outdated (scopes_outdated); a proxy's refresh is refused (refresh_refused), its tokens do not decrypt (tokens_unreadable), or its access token expired with no refresh token (access_expired); in the transaction that deletes the session.",
+      "module": "bff",
+      "name": "bff.web_session_ended",
+      "object": "web_session",
+      "openspec_change": "track-bff-events",
+      "rust_type": "WebSessionEnded",
+      "schema": {
+        "$id": "urn:campbooks:tracking:bff.web_session_ended:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "One web session ended; the cause says why. A session already gone tracks nothing.",
+        "properties": {
+          "account_id": {
+            "description": "The account it was signed in to, when known and a Campbooks account id (a retired cookie names only the session).",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "pseudonymous"
+          },
+          "cause": {
+            "description": "Why it ended.",
+            "enum": [
+              "access_expired",
+              "copied_cookie",
+              "logout",
+              "refresh_refused",
+              "replaced",
+              "scopes_outdated",
+              "tokens_unreadable"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "session_id": {
+            "description": "The web session's id.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "id"
+          }
+        },
+        "required": [
+          "cause",
+          "session_id"
+        ],
+        "title": "bff.web_session_ended",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "started",
+      "actor_types": [
+        "anonymous"
+      ],
+      "added_in": 4,
+      "description": "A person signed in on the web: the BFF stored a new web session for the browser.",
+      "fires_when": "bff.callback finishes a sign-in (code exchanged, ID token verified), in the transaction that stores the session.",
+      "module": "bff",
+      "name": "bff.web_session_started",
+      "object": "web_session",
+      "openspec_change": "track-bff-events",
+      "rust_type": "WebSessionStarted",
+      "schema": {
+        "$id": "urn:campbooks:tracking:bff.web_session_started:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A person signed in on the web: the BFF stored a new web session for the browser.",
+        "properties": {
+          "account_id": {
+            "description": "The account signed in: the ID token's subject when it is a Campbooks account id (left out for another identity provider's subject).",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "pseudonymous"
+          },
+          "session_id": {
+            "description": "The web session's id.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "id"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "bff.web_session_started",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "ended",
+      "actor_types": [
+        "anonymous",
+        "system"
+      ],
+      "added_in": 4,
+      "description": "The web sessions of an account, or of one identity provider session, ended at once; the cause says why. None ended tracks nothing.",
+      "fires_when": "bff.backchannel_logout ends the sessions a logout token names (backchannel); bff.end_signed_out_sessions on identity.signed_out_everywhere (signed_out_everywhere) or bff.end_suspended_sessions on identity.account_suspended (account_suspended) ends the account's; in the transaction that deletes them.",
+      "module": "bff",
+      "name": "bff.web_sessions_ended",
+      "object": "web_sessions",
+      "openspec_change": "track-bff-events",
+      "rust_type": "WebSessionsEnded",
+      "schema": {
+        "$id": "urn:campbooks:tracking:bff.web_sessions_ended:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The web sessions of an account, or of one identity provider session, ended at once; the cause says why. None ended tracks nothing.",
+        "properties": {
+          "account_id": {
+            "description": "The account whose sessions ended, when named and a Campbooks account id (a logout token may name only an identity provider session).",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "pseudonymous"
+          },
+          "cause": {
+            "description": "Why they ended.",
+            "enum": [
+              "account_suspended",
+              "backchannel",
+              "signed_out_everywhere"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "sessions_ended": {
+            "description": "How many web sessions ended (at least 1).",
+            "type": "integer",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "cause",
+          "sessions_ended"
+        ],
+        "title": "bff.web_sessions_ended",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
     {
       "action": "archived",
       "actor_types": [
@@ -8987,8 +9336,112 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-24",
-  "plan_version": 3,
+  "plan_version": 4,
   "properties": [
+    {
+      "classification": "pseudonymous",
+      "description": "The account it was signed in to, when known and a Campbooks account id (a retired cookie names only the session).",
+      "event": "bff.web_session_ended",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "account_id",
+      "required": false,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Why it ended.",
+      "event": "bff.web_session_ended",
+      "example": "",
+      "list": false,
+      "of": "bff.web_session_end_cause",
+      "pattern": "",
+      "property": "cause",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The web session's id.",
+      "event": "bff.web_session_ended",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "session_id",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The account signed in: the ID token's subject when it is a Campbooks account id (left out for another identity provider's subject).",
+      "event": "bff.web_session_started",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "account_id",
+      "required": false,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The web session's id.",
+      "event": "bff.web_session_started",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "session_id",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The account whose sessions ended, when named and a Campbooks account id (a logout token may name only an identity provider session).",
+      "event": "bff.web_sessions_ended",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "account_id",
+      "required": false,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Why they ended.",
+      "event": "bff.web_sessions_ended",
+      "example": "",
+      "list": false,
+      "of": "bff.web_sessions_end_cause",
+      "pattern": "",
+      "property": "cause",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many web sessions ended (at least 1).",
+      "event": "bff.web_sessions_ended",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "sessions_ended",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
     {
       "classification": "operational",
       "description": "The conversation after archiving.",

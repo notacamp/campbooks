@@ -27,6 +27,10 @@ pub const MESSAGE_OWNER: &str = "connectors.gmail_message";
 /// The blob owner type of a batch row.
 pub const BATCH_OWNER: &str = "connectors.batch";
 
+/// The blob owner type of a sent IMAP message's copy still to be appended
+/// to Sent (`connectors.sends.sent_copy_raw`).
+pub const SENT_COPY_OWNER: &str = "connectors.sent_copy";
+
 /// Revoke connection `id`'s grant at its provider. Best effort: a failure
 /// is logged (never with the token) and the disconnect goes on, because the
 /// member asked for the link to be cut and the credentials are deleted
@@ -140,6 +144,23 @@ pub async fn delete(
         state
             .blobs
             .detach_owner(tx, &workspace_key, &BlobOwner::new(kind, owner.id))
+            .await?;
+    }
+    // Sent copies still to be appended through its streams never will be.
+    let copies: Vec<Uuid> = sqlx::query_scalar(
+        "UPDATE connectors.sends s
+            SET sent_copy = 'skipped', sent_copy_reason = 'disconnected', sent_copy_raw = NULL
+           FROM connectors.streams st
+          WHERE st.connection_id = $1 AND s.stream_id = st.id AND s.sent_copy = 'pending'
+         RETURNING s.id",
+    )
+    .bind(id)
+    .fetch_all(&mut **tx)
+    .await?;
+    for send in copies {
+        state
+            .blobs
+            .detach_owner(tx, &workspace_key, &BlobOwner::new(SENT_COPY_OWNER, send))
             .await?;
     }
     state

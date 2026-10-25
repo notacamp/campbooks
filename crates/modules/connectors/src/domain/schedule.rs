@@ -222,6 +222,14 @@ impl Rate {
             burst_seconds: 3600.0,
         }
     }
+
+    /// A per-day allowance, a day's worth at once.
+    pub fn per_day(units: u32) -> Self {
+        Self {
+            per_second: f64::from(units) / 86_400.0,
+            burst_seconds: 86_400.0,
+        }
+    }
 }
 
 /// Take `cost` units of `provider`'s budget (a token bucket refilled at
