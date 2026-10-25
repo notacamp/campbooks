@@ -1,0 +1,82 @@
+# Time held for a task (campbooks-cloud#362, OpenSpec change
+# hold-time-for-a-task): a task held on its assignee's calendar (how long,
+# whether it moved an earlier hold, by the member or the calendar, and on
+# which kind of calendar) and its held time released (by the member, by
+# closing or handing the task over before the time came, or on the
+# calendar). Coverage for tasks.hold, tasks.release_hold, the three handlers
+# that follow the calendar's blocks, and the closing operations that free a
+# hold. Never the task's title or the calendar's name. Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0011-tasks-holds.yaml`.
+changelog:
+  - date: "2026-10-25"
+    plan_version: 11
+    change: "Time held for a task (campbooks-cloud#362): tasks.task_held (minutes, moved, by the member or the calendar, the kind of calendar) and tasks.task_hold_released (minutes, by); enums hold_actor and hold_calendar; Coverage for tasks.hold, tasks.release_hold and the follow_hold handlers, and the hold released by tasks.done, tasks.not_needed and tasks.hand_off."
+    pr: "#674"
+
+events:
+  - name: "tasks.task_held"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "held"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, system]
+    description: "Time was held for a Do task on its assignee's calendar (a busy block of kind hold), or the held block moved: by the member, from a free slot, or on the calendar (the block moved, or put back by the calendar's undo). Never the task's title or the calendar's name."
+    fires_when: "tasks.hold makes the block (moved when it replaces the task's earlier hold), or tasks.follow_hold_changed or tasks.follow_hold_created take a moved or restored block as the hold, in the transaction of the change; a block whose times did not change tracks nothing."
+    added_in: 11
+    openspec_change: "hold-time-for-a-task"
+  - name: "tasks.task_hold_released"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "hold_released"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation, system]
+    description: "A task's held time was taken off its assignee's calendar: released by the member (or the undo of a hold), freed because the task was done, not needed or handed over before the time came, or removed on the calendar. The task keeps no hold and no plan."
+    fires_when: "tasks.release_hold releases it, tasks.done, tasks.not_needed or tasks.hand_off free a hold that has not started, or tasks.follow_hold_cancelled or tasks.follow_hold_changed release the hold whose block was removed or became all-day, in the transaction of the change."
+    added_in: 11
+    openspec_change: "hold-time-for-a-task"
+
+properties:
+  - { event: "tasks.task_held", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task afterwards, planned for the held day." }
+  - { event: "tasks.task_held", version: 1, property: "minutes", type: "int", required: true, classification: "operational", description: "How long the held time is, in minutes." }
+  - { event: "tasks.task_held", version: 1, property: "moved", type: "bool", required: true, classification: "operational", description: "Whether it replaced or moved an earlier hold of the task." }
+  - { event: "tasks.task_held", version: 1, property: "by", type: "enum", of: "tasks.hold_actor", required: true, classification: "operational", description: "Who held it: the member, or the calendar (a block moved or put back there)." }
+  - { event: "tasks.task_held", version: 1, property: "calendar", type: "enum", of: "tasks.hold_calendar", required: false, classification: "operational", description: "The kind of calendar the block is on, when the member held it." }
+  - { event: "tasks.task_hold_released", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task afterwards, with no hold." }
+  - { event: "tasks.task_hold_released", version: 1, property: "minutes", type: "int", required: true, classification: "operational", description: "How long the released time was, in minutes." }
+  - { event: "tasks.task_hold_released", version: 1, property: "by", type: "enum", of: "tasks.hold_actor", required: true, classification: "operational", description: "Who released it: the member (releasing it, or closing or handing over the task), or the calendar (the block removed there)." }
+
+enums:
+  - { enum: "tasks.hold_actor", value: "member", description: "The member." }
+  - { enum: "tasks.hold_actor", value: "calendar", description: "The calendar: the block moved, removed or put back there." }
+  - { enum: "tasks.hold_calendar", value: "campbooks", description: "The member's own Campbooks calendar, which no provider sees." }
+  - { enum: "tasks.hold_calendar", value: "provider", description: "A calendar of a connected provider account." }
+
+coverage:
+  - kind: "operation"
+    name: "tasks.hold"
+    events: [tasks.task_held]
+  - kind: "operation"
+    name: "tasks.release_hold"
+    events: [tasks.task_hold_released]
+  - kind: "operation"
+    name: "tasks.done"
+    events: [tasks.task_done, tasks.task_hold_released]
+  - kind: "operation"
+    name: "tasks.not_needed"
+    events: [tasks.task_not_needed, tasks.task_hold_released]
+  - kind: "operation"
+    name: "tasks.hand_off"
+    events: [tasks.task_reassigned, tasks.task_hold_released]
+  - kind: "handler"
+    name: "tasks.follow_hold_created"
+    events: [tasks.task_held]
+  - kind: "handler"
+    name: "tasks.follow_hold_changed"
+    events: [tasks.task_held, tasks.task_hold_released]
+  - kind: "handler"
+    name: "tasks.follow_hold_cancelled"
+    events: [tasks.task_hold_released]

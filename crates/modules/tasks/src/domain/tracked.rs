@@ -9,7 +9,7 @@ use campbooks_kernel::{AppState, RecordRef, Result, tenancy::WorkspaceId};
 use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{PgConnection, Postgres, Transaction, types::Uuid};
 
-use super::{TaskChange, TaskId, TaskRow};
+use super::{Outcome, TaskChange, TaskHistoryWhat, TaskId, TaskRow};
 use crate::tracking;
 
 fn verb_of(verb: &str) -> tracking::TaskVerb {
@@ -152,17 +152,26 @@ fn reassigned(
     }
 }
 
-/// Track, in `tx`, the change `change` of the task that was `before` (none
+/// Track, in `tx`, the change `outcome` of the task that was `before` (none
 /// for a new one) and is `after` now. What did not change tracks nothing: a
 /// plan set again to the one the task had, an update whose values it had.
+/// Time held or released is tracked by the feature that knows where and by
+/// whom ([`held`], [`hold_released`]).
 pub async fn track(
     state: &AppState,
     tx: &mut Transaction<'_, Postgres>,
     workspace: WorkspaceId,
-    change: TaskChange,
+    outcome: &Outcome,
     before: Option<&TaskRow>,
     after: &TaskRow,
 ) -> Result<()> {
+    let change = outcome.change;
+    if matches!(
+        outcome.history,
+        Some(TaskHistoryWhat::Held | TaskHistoryWhat::Released)
+    ) {
+        return Ok(());
+    }
     // Every change but a new task's has the row before.
     if before.is_none() && change != TaskChange::Created {
         return Ok(());
@@ -254,5 +263,69 @@ pub async fn track(
         // Handled above.
         TaskChange::Created => {}
     }
+    Ok(())
+}
+
+/// What a tracked hold says besides the task.
+#[derive(Debug, Clone, Copy)]
+pub struct HoldFacts {
+    /// How long the held time is, in minutes.
+    pub minutes: i64,
+    /// Whether it replaced or moved an earlier hold.
+    pub moved: bool,
+    /// The member, or the calendar.
+    pub by: tracking::HoldActor,
+    /// Where the block is, when the member held it.
+    pub calendar: Option<tracking::HoldCalendar>,
+}
+
+/// The length of a hold from `from` to `to`, in minutes.
+pub fn minutes(from: DateTime<Utc>, to: DateTime<Utc>) -> i64 {
+    (to - from).num_minutes()
+}
+
+/// Track `tasks.task_held` for task `id`, in `tx`, after the change.
+pub async fn held(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    id: TaskId,
+    facts: HoldFacts,
+) -> Result<()> {
+    let Some(task) = snapshot(tx, id).await? else {
+        return Ok(());
+    };
+    let held = tracking::TaskHeld {
+        workspace,
+        by: facts.by,
+        calendar: facts.calendar,
+        minutes: facts.minutes,
+        moved: facts.moved,
+        task,
+    };
+    state.tracker.track(tx, &held).await?;
+    Ok(())
+}
+
+/// Track `tasks.task_hold_released` for task `id`, in `tx`, after the
+/// change: a hold of `minutes`, released by `by`.
+pub async fn hold_released(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    id: TaskId,
+    minutes: i64,
+    by: tracking::HoldActor,
+) -> Result<()> {
+    let Some(task) = snapshot(tx, id).await? else {
+        return Ok(());
+    };
+    let released = tracking::TaskHoldReleased {
+        workspace,
+        by,
+        minutes,
+        task,
+    };
+    state.tracker.track(tx, &released).await?;
     Ok(())
 }

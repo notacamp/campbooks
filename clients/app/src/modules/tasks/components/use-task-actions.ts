@@ -9,11 +9,13 @@ import {
   patchTask,
   useRefreshTasks,
   useTaskCalls,
+  type HoldChange,
   type NewTask,
   type PlanChange,
   type TaskView,
 } from "../api/queries";
-import { isLater, whenLabel } from "../model";
+import { heldLabel, type HoldPick } from "../hold";
+import { isLater, isoDay, whenLabel } from "../model";
 
 /** `t` for keys only known at runtime. */
 type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -47,6 +49,14 @@ const planned = (change: PlanChange) => (task: TaskView) =>
     plan_on: change.plan === "date" ? change.plan_on : null,
     later_until: change.plan === "later" ? change.later_until : null,
   }) satisfies TaskView;
+
+/** The call that holds `task`'s time again as it is now (its undo of a release or a move). */
+function holdOf(task: TaskView): HoldChange | undefined {
+  const hold = task.hold ?? undefined;
+  return hold === undefined
+    ? undefined
+    : { starts: hold.starts, ends: hold.ends, calendarId: hold.calendar_id };
+}
 
 /** The calls waiting on one task, and the task as the last one answered it. */
 interface TaskLine {
@@ -234,6 +244,58 @@ export function useTaskActions(
         optimistic: planned(change),
         forward: (seen) => calls.plan(seen, change),
         backward: (seen) => calls.plan(seen, planOf(task, clock())),
+      });
+    },
+    /**
+     * Hold time on the member's calendar: the task is planned for that day
+     * and shows Held at once. Undo puts back the hold it had, or none.
+     */
+    hold: (task: TaskView, pick: HoldPick) => {
+      const before = holdOf(task);
+      const change: HoldChange = {
+        starts: pick.starts,
+        ends: pick.ends,
+        calendarId: pick.calendarId,
+      };
+      act(task, {
+        label: t("toast.held", {
+          title: task.title,
+          when: heldLabel(pick, i18n.language),
+        }),
+        optimistic: (current) => ({
+          ...current,
+          plan: "date",
+          plan_on: isoDay(new Date(pick.starts)),
+          later_until: null,
+          hold: {
+            event_id: current.hold?.event_id ?? "",
+            calendar_id: pick.calendarId ?? current.hold?.calendar_id ?? "",
+            starts: pick.starts,
+            ends: pick.ends,
+          },
+        }),
+        forward: (seen) => calls.hold(seen, change),
+        backward: (seen) =>
+          before === undefined ? calls.releaseHold(seen) : calls.hold(seen, before),
+      });
+    },
+    /** Release the held time: the block goes, and the task has no plan. Undo holds it again. */
+    release: (task: TaskView) => {
+      const before = holdOf(task);
+      if (before === undefined) {
+        return;
+      }
+      act(task, {
+        label: t("toast.released", { title: task.title }),
+        optimistic: (current) => ({
+          ...current,
+          plan: "none",
+          plan_on: null,
+          later_until: null,
+          hold: null,
+        }),
+        forward: calls.releaseHold,
+        backward: (seen) => calls.hold(seen, before),
       });
     },
     /** Change the due day (`null` clears it). */

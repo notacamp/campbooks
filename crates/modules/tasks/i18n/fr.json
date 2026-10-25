@@ -13,6 +13,9 @@
     "invalid_later": "Choisissez une heure postérieure à maintenant et à moins d’un an.",
     "not_a_member": "Vous ne pouvez confier une tâche qu’à un membre de cet espace de travail.",
     "hand_off_yourself": "Choisissez quelqu’un d’autre à qui la confier.",
-    "not_handed_off": "Cette tâche n’a été confiée à personne."
+    "not_handed_off": "Cette tâche n’a été confiée à personne.",
+    "invalid_hold": "Réservez de 15 à 240 minutes qui n’ont pas encore commencé.",
+    "pay_not_held": "Une facture se paie, on n’y travaille pas : il n’y a pas de temps à réserver.",
+    "not_held": "Aucun temps n’est réservé pour cette tâche."
   }
 }

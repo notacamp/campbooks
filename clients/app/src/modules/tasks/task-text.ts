@@ -1,4 +1,5 @@
 import type { TaskView } from "./api/queries";
+import { heldLabel } from "./hold";
 import { dayLabel, daysBetween, daysOverdue, isLater, isoDay, whenLabel } from "./model";
 
 /** `t` for keys only known at runtime. */
@@ -30,13 +31,17 @@ export function dueText(
     : { text: t("due.on", { date: dayLabel(task.due_on, locale) }), late: false };
 }
 
-/** Its plan, in words: "Planned Wed 28", "Later · Mon 2 Nov"; nothing for no plan. */
+/** Its plan, in words: "Planned Wed 28", "Later · Mon 2 Nov"; nothing for no plan (or a hold). */
 export function planText(
   task: TaskView,
   t: TaskTranslate,
   locale: string,
   now: Date,
 ): string | undefined {
+  // Held time says the day itself.
+  if (task.hold !== null && task.hold !== undefined) {
+    return undefined;
+  }
   if (task.plan === "date" && task.plan_on !== null && task.plan_on !== undefined) {
     return t("plan.planned", { date: dayLabel(task.plan_on, locale) });
   }
@@ -44,4 +49,10 @@ export function planText(
     return t("plan.later", { date: whenLabel(task.later_until, locale) });
   }
   return undefined;
+}
+
+/** Its held time, in words: "Held Wed 10:00–10:30"; nothing when none is held. */
+export function heldText(task: TaskView, t: TaskTranslate, locale: string): string | undefined {
+  const hold = task.hold ?? undefined;
+  return hold === undefined ? undefined : t("hold.held", { when: heldLabel(hold, locale) });
 }

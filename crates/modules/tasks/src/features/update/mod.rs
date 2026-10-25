@@ -132,6 +132,7 @@ pub async fn handler(
         &Outcome {
             actor: actor_of(workspace.invoked_by),
             change,
+            history: None,
             detail: TaskHistoryDetail {
                 fields,
                 due_on: body.due_on,

@@ -963,8 +963,7 @@ every app, so disconnecting deletes its tokens and the member removes the app at
 A connected Outlook mailbox is read through Graph: its Inbox, Sent Items, Junk Email,
 Deleted Items, Archive and the member's own folders (never Drafts or Outbox), each followed
 by its own change log, first the last 90 days (`CAMPBOOKS_CONNECTORS__MICROSOFT__BACKFILL_DAYS`),
-then what changes. Reading never changes, moves or deletes anything in the mailbox; writing
-back (read, archive, move) and sending come in a later release. A message larger than
+then what changes. Reading never changes, moves or deletes anything in the mailbox. A message larger than
 `CAMPBOOKS_CONNECTORS__MICROSOFT__MAX_MESSAGE_BYTES` (50 MiB, at most 64 MiB) is skipped; a run
 holds about `…__RUN_BUDGET_BYTES` (64 MiB) plus the four messages it downloads at once. At most
 `…__MAX_FOLDERS` folders are read (100): the well-known ones always, then the member's own, those
@@ -972,6 +971,22 @@ already read first. Graph lists at most 5000 messages of a folder's window at on
 in a bigger folder the oldest are left out, and none of a folder's messages is ever taken for
 deleted only because a listing left it out. Microsoft's own throttling (`Retry-After`, honoured
 for up to an hour) shows the mailbox as throttled.
+
+**Writing back and sending.** What a member does in Campbooks is made in the mailbox by its next
+run, before it reads: read and flag as Graph patches, checked against the message's version
+(`If-Match` its `changeKey`; a change made in Outlook since the last read wins); archive,
+delete, restore and spam as moves between Archive, Deleted Items, Junk Email, the Inbox and the
+folder a deleted message came from. "Delete" is a move to Deleted Items: Campbooks never deletes
+a message for good, never empties or deletes a folder. A move to a stream goes to the mailbox's
+own `Campbooks/<Stream>` folder (under any parent) where it has one, else keeps the message in
+the Inbox with an Outlook category `Campbooks/<Stream>`; no folder or master category is created.
+A run makes at most 50 messages' changes, charged to `…__REQUESTS_PER_MINUTE`. Sending uses
+Graph's `sendMail` with the message as MIME (its `Message-ID`, `In-Reply-To` and `References`
+kept, so replies thread), and Outlook files it in Sent Items itself. A message whose MIME is over
+Microsoft's 4 MB request limit (about 3 MB of attachments) is not sent (`too_large`). A send goes
+out only from the mailbox's own address and only once that address is verified, which needs the
+optional ID-token claim `xms_edov` described under Sign in with Microsoft: without it, a
+Microsoft mailbox reads and writes back but cannot send. Nothing here adds a setting.
 
 **New mail as it arrives** (optional): with
 `CAMPBOOKS_CONNECTORS__MICROSOFT__NOTIFICATIONS=true`, each mailbox subscribes to Graph's

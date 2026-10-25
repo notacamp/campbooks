@@ -1,7 +1,8 @@
 //! Test fixtures: the module over a database whose connections run as the
 //! runtime role (row-level security applies), a test identity provider,
-//! stand-ins for the membership port and for the conversations module's
-//! access facts (a conversation lives in an inbox that some members see).
+//! stand-ins for the membership port, for the conversations module's
+//! access facts (a conversation lives in an inbox that some members see) and
+//! for the schedule module's `Holds` port (blocks kept in memory).
 
 use std::{
     collections::{HashMap, HashSet},
@@ -14,7 +15,7 @@ use axum::{
     http::{Method, Request, header},
 };
 use campbooks_kernel::{
-    AppState, Error, RecordRef,
+    AppState, DomainEvent, Error, RecordRef,
     auth::{Principal, PrincipalKind, Scope},
     authz::{
         Catalogue, Facts, FactsFuture, Owner, OwnerFact, ResourceFacts, ResourceType, Resources,
@@ -26,10 +27,12 @@ use campbooks_kernel::{
     db::BeginFor as _,
     jobs::{Registry, Worker, WorkerStats},
     operations,
+    schedule::{Held, HoldFuture, HoldRequest, Holds, ReleaseFuture},
     tenancy::{Access, Membership, MembershipFuture, Role, RoleFuture, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
 };
-use sqlx::{PgConnection, PgPool};
+use chrono::{DateTime, Utc};
+use sqlx::{PgConnection, PgPool, Postgres, Transaction, types::Uuid};
 
 /// Every scope of this module.
 pub const ALL_SCOPES: &str = "tasks:read tasks:write";
@@ -147,12 +150,102 @@ impl ResourceFacts for ConversationFacts {
     }
 }
 
+/// A block the stand-in holds port made.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Block {
+    /// Its event id.
+    pub event: Uuid,
+    /// Whose calendar.
+    pub member: UserId,
+    /// The calendar (`None`: the member's Campbooks calendar).
+    pub calendar: Option<Uuid>,
+    /// The task it is for.
+    pub task: RecordRef,
+    /// What it is called.
+    pub title: String,
+    /// When.
+    pub starts: DateTime<Utc>,
+    /// Until.
+    pub ends: DateTime<Utc>,
+    /// Whether it was taken off.
+    pub released: bool,
+}
+
+/// The calendar id the stand-in answers for a member's Campbooks calendar.
+pub const CAMPBOOKS_CALENDAR: Uuid = Uuid::from_u128(0x0192_f0c4_7d4e_7b39_a7f1_3a8f_0e2b_9e01);
+
+/// A calendar of another member: holding there is not found.
+pub const SOMEONE_ELSES_CALENDAR: Uuid = Uuid::from_u128(0x0192_f0c4_7d4e_7b39_a7f1_3a8f_0e2b_9e02);
+
+/// The schedule module's `Holds` port, in memory.
+#[derive(Debug, Default)]
+pub struct TestHolds {
+    blocks: Mutex<Vec<Block>>,
+}
+
+impl TestHolds {
+    /// Every block made, oldest first.
+    pub fn blocks(&self) -> Vec<Block> {
+        self.blocks.lock().unwrap().clone()
+    }
+}
+
+impl Holds for TestHolds {
+    fn hold<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _tx: &'a mut Transaction<'static, Postgres>,
+        _workspace: WorkspaceId,
+        request: HoldRequest<'a>,
+    ) -> HoldFuture<'a> {
+        let answer = if request.calendar == Some(SOMEONE_ELSES_CALENDAR) {
+            Err(Error::NotFound)
+        } else {
+            let event = Uuid::now_v7();
+            self.blocks.lock().unwrap().push(Block {
+                event,
+                member: request.member,
+                calendar: request.calendar,
+                task: request.task.clone(),
+                title: request.title.to_owned(),
+                starts: request.starts,
+                ends: request.ends,
+                released: false,
+            });
+            Ok(Held {
+                event,
+                calendar: request.calendar.unwrap_or(CAMPBOOKS_CALENDAR),
+                at_provider: request.calendar.is_some(),
+            })
+        };
+        Box::pin(async move { answer })
+    }
+
+    fn release<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _tx: &'a mut Transaction<'static, Postgres>,
+        _workspace: WorkspaceId,
+        member: UserId,
+        event: Uuid,
+    ) -> ReleaseFuture<'a> {
+        for block in self.blocks.lock().unwrap().iter_mut() {
+            if block.event == event && block.member == member {
+                block.released = true;
+            }
+        }
+        Box::pin(async { Ok(()) })
+    }
+}
+
 /// The module over a fresh database.
 pub struct Kit {
     /// The test database as its owner (no row-level security).
     pub db: PgPool,
     /// The state jobs and handlers run with (runtime role).
     pub state: AppState,
+    /// The blocks held on members' calendars.
+    pub holds: Arc<TestHolds>,
     app: Router,
     idp: TestIdp,
     membership: Arc<TestMembership>,
@@ -173,9 +266,11 @@ impl Kit {
         ])
         .unwrap();
         let blobs = BlobStore::memory(&BlobsConfig::default(), pool.clone());
+        let holds = Arc::new(TestHolds::default());
         let state = idp
             .state(pool)
             .with_blobs(blobs)
+            .with_holds(holds.clone())
             .with_membership(membership.clone())
             .with_visibility(Arc::new(Visibilities::new(vec![
                 inboxes.clone(),
@@ -187,6 +282,7 @@ impl Kit {
         Self {
             db,
             state,
+            holds,
             app,
             idp,
             membership,
@@ -270,6 +366,15 @@ impl Kit {
             .lock()
             .unwrap()
             .insert((inbox.to_owned(), user));
+    }
+
+    /// Publish `event` in `workspace` (as its module would) and run the jobs
+    /// it causes.
+    pub async fn publish<E: DomainEvent>(&self, workspace: WorkspaceId, event: &E) -> WorkerStats {
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        self.state.events.publish(&mut tx, event).await.unwrap();
+        tx.commit().await.unwrap();
+        self.run_jobs().await
     }
 
     /// Run every pending job until none is left.

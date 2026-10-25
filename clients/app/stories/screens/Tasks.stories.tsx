@@ -6,6 +6,8 @@ import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { UndoProvider } from "~/lib/ui";
 
+import type { TaskView } from "~/modules/tasks";
+
 import { createAppRouter } from "../../src/app/router";
 import { addDays, isoDay } from "../../src/modules/tasks/model";
 import { COUNTS, LUZ, MARTA } from "../../test/demo/attention";
@@ -31,6 +33,7 @@ import {
   TEAM,
   VENUE,
 } from "../../test/demo/tasks";
+import { CALENDARS } from "../../test/demo/schedule";
 import { ANA, DUARTE, SESSION } from "../../test/demo/workspaces";
 
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
@@ -56,6 +59,38 @@ function week() {
   return { bill, lease, accountant, proposal, inspection, venue };
 }
 
+/** Ana's free time: tomorrow morning and the afternoon after, on her clock. */
+function freeTime() {
+  const at = (days: number, hours: number) => {
+    const day = addDays(new Date(), days);
+    day.setHours(hours, 0, 0, 0);
+    return day.toISOString();
+  };
+  return [
+    { starts: at(1, 9), ends: at(1, 12) },
+    { starts: at(2, 14), ends: at(2, 15) },
+  ];
+}
+
+/** The task as `tasks.hold` answers it: held, and planned for that day. */
+function held<T extends TaskView>(
+  task: T,
+  body: { starts: string; ends: string; calendar_id?: string },
+) {
+  return {
+    ...task,
+    plan: "date" as const,
+    plan_on: isoDay(new Date(body.starts)),
+    hold: {
+      event_id: "0192f1a0-0000-7000-8000-0000000004e1",
+      calendar_id: body.calendar_id ?? CALENDARS[0]?.id ?? "",
+      starts: body.starts,
+      ends: body.ends,
+    },
+    revision: task.revision + 1,
+  };
+}
+
 /** The tasks API over a list the calls change, as the server would. */
 function tasks(overrides: Record<string, MockRoute> = {}, start?: ReturnType<typeof week>) {
   const mine = start ?? week();
@@ -68,10 +103,16 @@ function tasks(overrides: Record<string, MockRoute> = {}, start?: ReturnType<typ
     [`GET ${W}/streams`]: { body: { streams: STREAM_COUNTS } },
     [`GET ${W}/members`]: { body: { members: TEAM } },
     [`GET ${W}/conversations`]: { body: { conversations: [MARTA], next_cursor: null } },
-    [`GET ${W}/tasks`]: (_body, url) =>
-      url.searchParams.get("whose") === "handed_off"
-        ? { body: { tasks: handedOff } }
-        : { body: { tasks: open } },
+    [`GET ${W}/tasks`]: (_body, url) => {
+      if (url.searchParams.get("whose") === "handed_off") {
+        return { body: { tasks: handedOff } };
+      }
+      // Home's batch read of the tasks its items point at.
+      const ids = url.searchParams.get("ids");
+      return ids === null
+        ? { body: { tasks: open } }
+        : { body: { tasks: open.filter((task) => ids.split(",").includes(task.id)) } };
+    },
     [`POST ${W}/tasks`]: (body) => {
       const made = { ...PHOTOS, id: "0192f1a0-0000-7000-8000-0000000007ee", ...(body as object) };
       open = [...open, made];
@@ -87,6 +128,21 @@ function tasks(overrides: Record<string, MockRoute> = {}, start?: ReturnType<typ
     },
     [`POST ${W}/tasks/${mine.lease.id}/plan`]: {
       body: { ...mine.lease, plan: "later", revision: 2 },
+    },
+    // Hold time: Ana's free time and calendars (the schedule module's), and the hold.
+    [`GET ${W}/schedule/free-slots`]: () => ({
+      body: { slots: freeTime(), calendars: [], time_zone: "Europe/Lisbon" },
+    }),
+    [`GET ${W}/schedule/calendars`]: { body: { calendars: CALENDARS } },
+    [`POST ${W}/tasks/${mine.lease.id}/hold`]: (body) => {
+      const after = held(mine.lease, body as { starts: string; ends: string });
+      open = open.map((task) => (task.id === after.id ? after : task));
+      return { body: after };
+    },
+    [`POST ${W}/tasks/${mine.lease.id}/release`]: () => {
+      const after = { ...mine.lease, plan: "none" as const, hold: null, revision: 3 };
+      open = open.map((task) => (task.id === after.id ? after : task));
+      return { body: after };
     },
     [`POST ${W}/tasks/${mine.venue.id}/take_back`]: () => {
       const back = { ...mine.venue, handed_by: null, assignee: ANA.user_id, revision: 2 };
@@ -293,8 +349,85 @@ export const MakeItATask: Story = {
   },
 };
 
+/**
+ * H offers Hold time: three free slots, Length and Calendar (her primary Google
+ * calendar first); picking one holds it, with an Undo.
+ */
+export const HoldTime: Story = {
+  args: { path: `${PATH}/${LEASE.id}`, api: tasks() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("When will you do it?");
+    await userEvent.keyboard("h");
+    const slots = await canvas.findByRole("group", { name: "Free time" });
+    const choices = await within(slots).findAllByRole("button");
+    await expect(choices).toHaveLength(3);
+    await expect(canvas.getByRole("button", { name: "30 min", pressed: true })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Personal", pressed: true })).toBeVisible();
+    await userEvent.click(choices[0] ?? slots);
+    await expect((await canvas.findAllByText(/^Held /u)).length).toBeGreaterThan(0);
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByText(/· Send the signed lease to Marta$/u)).toBeVisible();
+  },
+};
+
+/** A held task: the chip in Do's colour on its row and in its detail, and Release. */
+export const Held: Story = {
+  args: (() => {
+    const mine = week();
+    const [first] = freeTime();
+    const lease = held(mine.lease, first ?? { starts: "", ends: "" });
+    return { path: `${PATH}/${LEASE.id}`, api: tasks({}, { ...mine, lease }) };
+  })(),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect((await canvas.findAllByText(/^Held /u)).length).toBe(2);
+    await expect(canvas.getByRole("button", { name: "Release" })).toBeVisible();
+  },
+};
+
+/** Home with the lease in Do, over the tasks API the calls change. */
+function homeWithTasks() {
+  const mine = week();
+  return tasks(
+    {
+      [`GET ${W}/attention`]: (_body, url) =>
+        url.searchParams.get("state") === "open"
+          ? { body: { items: [taskItem(mine.lease)], counts: COUNTS } }
+          : { body: { items: [], counts: [] } },
+    },
+    mine,
+  );
+}
+
+/** Home: H on a Do task opens Hold time in a dialog; the row then shows Held. */
+export const HoldFromHome: Story = {
+  args: { path: `/w/${DUARTE.id}`, api: homeWithTasks() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Send the signed lease to Marta");
+    await userEvent.keyboard("j");
+    await userEvent.keyboard("h");
+    const body = within(canvasElement.ownerDocument.body);
+    const dialog = await body.findByRole("dialog", { name: "Hold time" });
+    const slots = await within(dialog).findByRole("group", { name: "Free time" });
+    const [first] = await within(slots).findAllByRole("button");
+    await userEvent.click(first ?? slots);
+    await expect((await canvas.findAllByText(/^Held /u)).length).toBeGreaterThan(0);
+  },
+};
+
 // Twins without a `play`, for the screen recordings: a story's play runs on
 // load and would act before the recording starts.
+
+/** A task open beside the list, ready for H, idle. */
+export const HoldTimeIdle: Story = { args: HoldTime.args };
+
+/** A held task, idle. */
+export const HeldIdle: Story = { args: Held.args };
+
+/** Home before H on the lease, idle. */
+export const HoldFromHomeIdle: Story = { args: HoldFromHome.args };
 
 /** The list, idle. */
 export const ListIdle: Story = { args: { path: PATH, api: tasks() } };

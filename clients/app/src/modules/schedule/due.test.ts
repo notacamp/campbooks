@@ -87,4 +87,35 @@ describe("the calendar's task rows", () => {
     ).map((row) => row.key);
     expect(new Set(keys).size).toBe(2);
   });
+
+  it("draws no Planned row for a held task, and no Due row on its held due day", () => {
+    const hold = (starts: string) => ({
+      event_id: "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9e10",
+      calendar_id: "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9e11",
+      starts,
+      ends: starts.replace("T09:00", "T09:30"),
+    });
+    // Held Wednesday 09:00 in Lisbon, due Thursday: the Due row only.
+    expect(
+      rows(
+        task({
+          due_on: "2026-10-29",
+          plan: "date",
+          plan_on: "2026-10-28",
+          hold: hold("2026-10-28T09:00:00Z"),
+        }),
+      ),
+    ).toEqual([["due", "2026-10-29", 0]]);
+    // Held on its due day: the block stands for both.
+    expect(
+      rows(
+        task({
+          due_on: "2026-10-29",
+          plan: "date",
+          plan_on: "2026-10-29",
+          hold: hold("2026-10-29T09:00:00Z"),
+        }),
+      ),
+    ).toEqual([]);
+  });
 });

@@ -294,15 +294,3 @@ reason = "Connected-app notices to come (campbooks-cloud#117 batch 3)."
 [[access.unconsumed_events]]
 name = "attention.item_changed"
 reason = "The change feed: Home and the inbox's need chips refresh from it."
-
-[[access.unconsumed_events]]
-name = "schedule.event_created"
-reason = "Nothing consumes it in-process yet: the change feed and the tasks module's holds follow (campbooks-cloud#42)."
-
-[[access.unconsumed_events]]
-name = "schedule.event_changed"
-reason = "Nothing consumes it in-process yet: the change feed and the tasks module's holds follow (campbooks-cloud#42)."
-
-[[access.unconsumed_events]]
-name = "schedule.event_cancelled"
-reason = "Nothing consumes it in-process yet: the change feed and the tasks module's holds follow (campbooks-cloud#42)."

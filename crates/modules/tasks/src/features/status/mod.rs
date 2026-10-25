@@ -1,13 +1,15 @@
 //! `POST …/tasks/{task_id}/done`, `/not_needed` and `/reopen` — close a task
 //! (done, or paid for a bill; or not needed after all) and open it again.
+//! Closing frees the time held for it when that time has not started yet.
 
 use crate::{
     domain::{
         OffsetQuery, Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskState,
-        TaskView, access, actor_of, finish,
+        TaskView, access, actor_of, finish, holds, tracked,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
+    tracking,
 };
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -17,7 +19,7 @@ use campbooks_kernel::{
     extract,
     tenancy::{Workspace, WorkspaceId},
 };
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 
 /// Mark a task done (paid, for a bill).
 #[utoipa::path(
@@ -188,6 +190,13 @@ async fn set_state(
     } else {
         access::expect_open(&row)?;
     }
+    // Time held ahead goes from the calendar with the task.
+    let freed = to != TaskState::Open
+        && holds::free_ahead(state, &mut tx, access.workspace, &row, Utc::now()).await?;
+    let held_minutes = row
+        .held_from
+        .zip(row.held_to)
+        .map(|(from, to)| tracked::minutes(from, to));
     sqlx::query(
         "UPDATE tasks.tasks SET state = $2,
                 closed_at = CASE WHEN $2 = 'open' THEN NULL ELSE now() END,
@@ -211,6 +220,7 @@ async fn set_state(
         &Outcome {
             actor: actor_of(workspace.invoked_by),
             change,
+            history: None,
             detail: TaskHistoryDetail::default(),
             previous_assignee: None,
             previous_handed_by: None,
@@ -219,6 +229,17 @@ async fn set_state(
         today,
     )
     .await?;
+    if freed && let Some(minutes) = held_minutes {
+        tracked::hold_released(
+            state,
+            &mut tx,
+            access.workspace,
+            id,
+            minutes,
+            tracking::HoldActor::Member,
+        )
+        .await?;
+    }
     tx.commit().await?;
     Ok(view)
 }

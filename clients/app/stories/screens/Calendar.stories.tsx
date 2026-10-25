@@ -98,8 +98,8 @@ type Story = StoryObj<typeof meta>;
  * list (and Undo puts it back), so the next read of the list is true; and the
  * emails they came from, for the source in a row and its sheet.
  */
-function tasksApi(): Record<string, MockRoute> {
-  let open = [...TASKS];
+function tasksApi(list: readonly (typeof TASKS)[number][] = TASKS): Record<string, MockRoute> {
+  let open = [...list];
   const routes: Record<string, MockRoute> = {
     [`GET ${W}/tasks`]: () => ({ body: { tasks: open } }),
     [`GET ${W}/conversations`]: (_body, url) => {
@@ -112,7 +112,7 @@ function tasksApi(): Record<string, MockRoute> {
       };
     },
   };
-  for (const each of TASKS) {
+  for (const each of list) {
     routes[`POST ${W}/tasks/${each.id}/done`] = () => {
       open = open.filter((other) => other.id !== each.id);
       return { body: { ...each, state: "done", revision: each.revision + 1 } };
@@ -125,14 +125,23 @@ function tasksApi(): Record<string, MockRoute> {
   return routes;
 }
 
-/** The week's schedule API, with the demo events (or `events`) and Ana's tasks. */
+/** Ana's free time after now, for a task sheet's Hold time. */
+const FREE_TIME = [
+  { starts: "2026-10-28T09:00:00+00:00", ends: "2026-10-28T12:00:00+00:00" },
+  { starts: "2026-10-29T14:00:00+00:00", ends: "2026-10-29T15:00:00+00:00" },
+];
+
+/** The week's schedule API, with the demo events (or `events`) and Ana's tasks (or `tasks`). */
 const calendarApi =
-  (events = WEEK_EVENTS) =>
+  (events = WEEK_EVENTS, tasks = TASKS) =>
   () => {
     const mock = scheduleApi(events);
     return {
       ...mock.routes,
-      ...tasksApi(),
+      ...tasksApi(tasks),
+      [`GET ${W}/schedule/free-slots`]: {
+        body: { slots: FREE_TIME, calendars: [], time_zone: "Europe/Lisbon" },
+      },
       // What the model read from the dentist's email: the sentence in its sheet.
       [`GET ${W}/conversations/${conversationId(1)}/messages/${messageId(1)}/read`]: {
         body: DENTIST_READ,
@@ -337,6 +346,67 @@ export const TaskSheetOverdue: Story = {
     await waitFor(() =>
       expect(canvas.queryByRole("button", { name: /Pay · EDP bill/u })).toBeNull(),
     );
+  },
+};
+
+/** A Do task's sheet offers Hold time (H): three free slots, Length and Calendar. */
+export const TaskSheetHoldTime: Story = {
+  args: {
+    path: `${SCHEDULE}?view=agenda&date=2026-10-28&event=plan:${LEASE_TASK?.id ?? ""}`,
+    api: calendarApi(),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const sheet = await canvas.findByRole("complementary", { name: /Do · Send the lease/u });
+    await userEvent.click(within(sheet).getByRole("button", { name: /Hold time/u }));
+    const slots = await within(sheet).findByRole("group", { name: "Free time" });
+    await expect(await within(slots).findAllByRole("button")).toHaveLength(3);
+  },
+};
+
+/** "Send the lease" held Wednesday 10:00–10:30, due Thursday: the held block, no Planned row. */
+const HELD_BLOCK = {
+  ...(WEEK_EVENTS.find((event) => event.kind === "hold") ?? REVIEW),
+  id: "0192f1a0-0000-7000-8000-0000000042e1",
+  title: "Send the lease",
+  starts: "2026-10-28T10:00:00+00:00",
+  ends: "2026-10-28T10:30:00+00:00",
+  calendar_id: CAMPBOOKS.id,
+  on_provider: false,
+  source: { type: "tasks.task", id: LEASE_TASK?.id ?? "" },
+};
+const HELD_TASKS = TASKS.map((task) =>
+  task.id === LEASE_TASK?.id
+    ? {
+        ...task,
+        hold: {
+          event_id: HELD_BLOCK.id,
+          calendar_id: CAMPBOOKS.id,
+          starts: HELD_BLOCK.starts,
+          ends: HELD_BLOCK.ends,
+        },
+      }
+    : task,
+);
+
+/** The week with a held task: its Held block on Wednesday opens the task, and Thursday its Due row. */
+export const WeekWithHeldTask: Story = {
+  args: {
+    path: `${SCHEDULE}?view=agenda&date=2026-10-28&event=${HELD_BLOCK.id}`,
+    api: calendarApi([...WEEK_EVENTS, HELD_BLOCK], HELD_TASKS),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const sheet = await canvas.findByRole("complementary", { name: "Send the lease" });
+    await expect(within(sheet).getByRole("button", { name: /Open task/u })).toBeVisible();
+  },
+};
+
+/** The same week, idle (for the recording). */
+export const WeekWithHeldTaskIdle: Story = {
+  args: {
+    path: `${SCHEDULE}?view=week`,
+    api: calendarApi([...WEEK_EVENTS, HELD_BLOCK], HELD_TASKS),
   },
 };
 

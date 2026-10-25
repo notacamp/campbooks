@@ -269,6 +269,7 @@ async fn add_ask(
         &Outcome {
             actor: TaskActor::Scout,
             change: TaskChange::Created,
+            history: None,
             detail: TaskHistoryDetail {
                 due_on: due.map(|(day, _)| day),
                 ..TaskHistoryDetail::default()
@@ -326,6 +327,7 @@ async fn fill_due(
             &Outcome {
                 actor: TaskActor::Scout,
                 change: TaskChange::DueChanged,
+                history: None,
                 detail: TaskHistoryDetail {
                     due_on: Some(day),
                     ..TaskHistoryDetail::default()

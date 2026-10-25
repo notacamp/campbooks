@@ -18,8 +18,13 @@
 //!   delta (410, `syncStateNotFound`) or a folder vanishes: every folder's
 //!   round again, then the indexed messages of the window the pass did not
 //!   list are removed.
+//! - **A member's changes** (campbooks-cloud#317). An emission shows a
+//!   change still waiting to be made as the member left it; a message whose
+//!   change was refused, overtaken or given up (`reemit`) is emitted again
+//!   with Graph's state, at most [`MAX_LOOKUPS`] a run.
 //!
-//! Nothing here changes anything at Microsoft.
+//! Nothing here changes anything at Microsoft: the push (`write.rs`) does,
+//! before the read.
 
 use std::collections::{HashMap, HashSet};
 
@@ -41,11 +46,19 @@ use super::{
 use crate::{
     config::MicrosoftAdapter,
     contract::{MessageChange, NormalizedMessage},
-    domain::{marks, model::Phase, model::StreamId},
+    domain::{
+        marks,
+        model::Phase,
+        model::StreamId,
+        outbound::{self, LabelChange},
+    },
     imap::folders::Role,
     mail::{self, Fetched, IndexOp, ReadError, Receiver, apply_flags},
     provider::ProviderError,
 };
+
+/// A member's changes still waiting, per message (`outbound::overlay`).
+type Waiting = HashMap<String, Vec<LabelChange>>;
 
 /// How often the folders are listed again outside a pass.
 pub const FOLDERS_EVERY: TimeDelta = TimeDelta::hours(6);
@@ -155,6 +168,10 @@ struct Out {
     present: HashSet<String>,
     /// Messages a page showed leaving a folder this run.
     removed: Vec<String>,
+    /// Messages to emit again whatever they show (`reemit`).
+    forced: HashSet<String>,
+    /// Messages emitted again or removed this run.
+    handled: HashSet<String>,
 }
 
 impl Reader<'_> {
@@ -193,7 +210,11 @@ impl Reader<'_> {
             cursor.window_start.get_or_insert_with(|| self.floor());
         }
         let window = cursor.window_start.unwrap_or_else(|| self.floor());
-        let mut out = Out::default();
+        let reemits = self.reemits().await?;
+        let mut out = Out {
+            forced: reemits.keys().cloned().collect(),
+            ..Out::default()
+        };
         let mut more = false;
         let mut dropped: Vec<String> = Vec::new();
         for n in 0..cursor.folders.len() {
@@ -300,6 +321,9 @@ impl Reader<'_> {
         self.look_up(&mut cursor, &mut out).await?;
         if !cursor.lookups.is_empty() {
             more = true;
+        }
+        if phase == Phase::Incremental {
+            self.reemit_rest(&cursor, reemits, &mut out).await?;
         }
         if phase != Phase::Incremental && !more && cursor.folders.iter().all(Folder::round_done) {
             if cursor.generation > 0 {
@@ -471,6 +495,8 @@ impl Reader<'_> {
         let ids: Vec<String> = items.iter().map(|item| item.id.clone()).collect();
         let indexed = self.indexed(&ids).await?;
         let oversized = self.oversized(&ids).await?;
+        let known_ids: Vec<String> = indexed.keys().cloned().collect();
+        let waiting = outbound::overlay(self.pool, self.workspace, self.stream, &known_ids).await?;
         let mut new = Vec::new();
         for DeltaItem { id, state } in items {
             let Some(state) = state else {
@@ -486,7 +512,10 @@ impl Reader<'_> {
             let place = state.folder.clone().unwrap_or_else(|| folder.id.clone());
             let tokens = state::tokens(cursor, &place, &state);
             match indexed.get(&id) {
-                Some(known) => self.compare(cursor, &id, known, tokens, out).await?,
+                Some(known) => {
+                    self.compare(cursor, &id, known, tokens, &waiting, out)
+                        .await?;
+                }
                 None if oversized.contains(&id) || out.stored.contains(&id) => {}
                 // Older than the window: never carried, stays out.
                 None if state.received.is_some_and(|at| at < self.floor()) => {}
@@ -497,21 +526,28 @@ impl Reader<'_> {
     }
 
     /// A known message as Graph shows it now (`tokens`): emitted again from
-    /// its stored document when that changed, and listed by this pass.
+    /// its stored document when that changed (or it is to be emitted again
+    /// whatever it shows), a member's changes still `waiting` over it, and
+    /// listed by this pass.
     async fn compare(
         &self,
         cursor: &Cursor,
         id: &str,
         known: &Indexed,
         tokens: Vec<String>,
+        waiting: &Waiting,
         out: &mut Out,
     ) -> Result<(), ReadError> {
-        if tokens != known.tokens {
-            let mut message = self.document(&known.document).await?;
-            apply_flags(&mut message, &state::flags(&tokens, cursor));
-            out.changes.push(MessageChange::Upsert {
-                message: Box::new(message),
-            });
+        if tokens != known.tokens || out.forced.contains(id) {
+            self.emit(
+                cursor,
+                known,
+                &tokens,
+                waiting.get(id).map(Vec::as_slice),
+                out,
+            )
+            .await?;
+            out.handled.insert(id.to_owned());
         }
         out.index.push(IndexOp::Update {
             row: known.row,
@@ -590,12 +626,102 @@ impl Reader<'_> {
         Ok(next >= new.len())
     }
 
+    /// Emit the known message `known` with state `tokens` from its stored
+    /// document, `waiting` (a member's changes still to be made) over it.
+    async fn emit(
+        &self,
+        cursor: &Cursor,
+        known: &Indexed,
+        tokens: &[String],
+        waiting: Option<&[LabelChange]>,
+        out: &mut Out,
+    ) -> Result<(), ReadError> {
+        let mut message = self.document(&known.document).await?;
+        let mut flags = state::flags(tokens, cursor);
+        if let Some(changes) = waiting {
+            crate::imap::state::overlay(&mut flags, changes);
+        }
+        apply_flags(&mut message, &flags);
+        out.changes.push(MessageChange::Upsert {
+            message: Box::new(message),
+        });
+        Ok(())
+    }
+
+    /// Emit again, from the index, the messages flagged for it (`reemits`)
+    /// that this run neither emitted nor removed.
+    async fn reemit_rest(
+        &self,
+        cursor: &Cursor,
+        reemits: HashMap<String, Indexed>,
+        out: &mut Out,
+    ) -> Result<(), ReadError> {
+        let rest: Vec<(String, Indexed)> = reemits
+            .into_iter()
+            .filter(|(id, _)| !out.handled.contains(id))
+            .collect();
+        if rest.is_empty() {
+            return Ok(());
+        }
+        let ids: Vec<String> = rest.iter().map(|(id, _)| id.clone()).collect();
+        let waiting = outbound::overlay(self.pool, self.workspace, self.stream, &ids).await?;
+        for (id, known) in rest {
+            self.emit(
+                cursor,
+                &known,
+                &known.tokens,
+                waiting.get(&id).map(Vec::as_slice),
+                out,
+            )
+            .await?;
+            out.index.push(IndexOp::Update {
+                row: known.row,
+                label_ids: known.tokens.clone(),
+                generation: cursor.generation,
+            });
+            out.handled.insert(id);
+        }
+        Ok(())
+    }
+
+    /// Messages flagged to be emitted again (a member's change was refused,
+    /// overtaken, not movable or given up), at most [`MAX_LOOKUPS`].
+    async fn reemits(&self) -> Result<HashMap<String, Indexed>, ReadError> {
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        let rows: Vec<(Uuid, String, Vec<String>, String, i64)> = sqlx::query_as(
+            "SELECT id, provider_message_id, label_ids, document_hash, document_size
+               FROM connectors.messages
+              WHERE stream_id = $1 AND reemit
+              ORDER BY internal_date LIMIT $2",
+        )
+        .bind(self.stream)
+        .bind(i64::try_from(MAX_LOOKUPS).unwrap_or(20))
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        rows.into_iter()
+            .map(|(row, id, mut tokens, hash, size)| {
+                tokens.sort();
+                Ok((
+                    id,
+                    Indexed {
+                        row,
+                        tokens,
+                        document: mail::document_ref(&hash, size)?,
+                    },
+                ))
+            })
+            .collect()
+    }
+
     /// Look up at most [`MAX_LOOKUPS`] of the messages that left a folder:
     /// gone is a removal; elsewhere is where it now is.
     async fn look_up(&self, cursor: &mut Cursor, out: &mut Out) -> Result<(), ReadError> {
         let take = cursor.lookups.len().min(MAX_LOOKUPS);
         let ids: Vec<String> = cursor.lookups.drain(..take).collect();
         let indexed = self.indexed(&ids).await?;
+        let known_ids: Vec<String> = indexed.keys().cloned().collect();
+        let waiting = outbound::overlay(self.pool, self.workspace, self.stream, &known_ids).await?;
         for id in ids {
             let Some(known) = indexed.get(&id) else {
                 continue;
@@ -608,7 +734,8 @@ impl Reader<'_> {
                         cursor.listed_at = None;
                     }
                     let tokens = state::tokens(cursor, &place, &state);
-                    self.compare(cursor, &id, known, tokens, out).await?;
+                    self.compare(cursor, &id, known, tokens, &waiting, out)
+                        .await?;
                 }
                 // Gone, or a draft again: out of Campbooks.
                 Ok(_) => {
@@ -616,6 +743,7 @@ impl Reader<'_> {
                         provider_message_id: id.clone(),
                     });
                     out.index.push(IndexOp::Remove { row: known.row });
+                    out.handled.insert(id.clone());
                 }
                 Err(other) => return Err(other.into()),
             }

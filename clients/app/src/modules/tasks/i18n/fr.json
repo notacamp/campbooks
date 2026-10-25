@@ -93,7 +93,9 @@
     "done": "Faite",
     "paid": "Payée",
     "notNeeded": "Plus nécessaire",
-    "payNote": "Campbooks ne paie jamais à votre place. Cela la marque seulement comme payée."
+    "payNote": "Campbooks ne paie jamais à votre place. Cela la marque seulement comme payée.",
+    "holdTime": "Réserver du temps",
+    "release": "Libérer"
   },
   "toast": {
     "done": "Faite · {{title}}",
@@ -107,7 +109,9 @@
     "handedOff": "Confiée à {{name}} · {{title}}",
     "takenBack": "Reprise · {{title}}",
     "failed": "Impossible de modifier {{title}}. Elle reste comme avant.",
-    "changed": "{{title}} a changé entre-temps. Regardez à nouveau."
+    "changed": "{{title}} a changé entre-temps. Regardez à nouveau.",
+    "held": "Réservé {{when}} · {{title}}",
+    "released": "Libéré · {{title}}"
   },
   "make": {
     "button": "En faire une tâche",
@@ -121,5 +125,21 @@
     "title": "Reporter jusqu’à…",
     "description": "Elle quitte l’accueil jusque-là, puis revient d’elle-même.",
     "choices": "Quand"
+  },
+  "hold": {
+    "length": "Durée",
+    "minutes": "{{minutes}} min",
+    "calendar": "Agenda",
+    "campbooks": "Campbooks",
+    "slots": "Temps libre",
+    "looking": "Recherche de temps libre…",
+    "failed": "Impossible de lire votre temps libre. Réessayez dans un instant.",
+    "noneBeforeDue": "Aucun temps libre avant l’échéance. Essayez une autre durée.",
+    "noneThisWeek": "Aucun temps libre dans les 7 prochains jours. Essayez une autre durée.",
+    "held": "Réservé {{when}}"
+  },
+  "holdDialog": {
+    "title": "Réserver du temps",
+    "description": "Un créneau occupé dans votre agenda, sur votre temps libre."
   }
 }

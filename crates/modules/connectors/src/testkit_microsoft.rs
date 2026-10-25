@@ -14,6 +14,14 @@
 //! left it (`@removed`). Its links point at `graph.microsoft.com`, which the
 //! client never calls: it keeps only their token.
 //!
+//! Writes (campbooks-cloud#317): a message's version is its `@odata.etag`
+//! (`W/"ck-<version>"`); a patch must carry `If-Match` and answers 412 when
+//! the message changed since; a move keeps the id (immutable ids) unless
+//! told to give it another; `sendMail` takes base64 MIME (413 over 4 MB)
+//! and files the message in Sent Items with its `Message-ID`, which a
+//! `$filter` on `internetMessageId` finds. A `DELETE` of anything is refused
+//! and recorded ([`FakeMicrosoft::deletes`]).
+//!
 //! No test talks to Microsoft.
 
 use std::{
@@ -21,6 +29,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard, PoisonError},
 };
 
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use chrono::{DateTime, SecondsFormat, Utc};
 use url::Url;
 use wiremock::{Mock, MockServer, Respond, ResponseTemplate, matchers::any};
@@ -77,8 +86,26 @@ pub struct FakeGraphMessage {
     pub draft: bool,
     pub categories: Vec<String>,
     pub conversation: String,
+    /// Its `Message-ID`, without angle brackets (a sent message's).
+    pub internet_id: Option<String>,
     /// Bumped by every change.
     version: u64,
+}
+
+/// An Outlook change the fake makes to a message as a patch of it arrives,
+/// after the client read it (a concurrent change).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Interference {
+    /// A category is added.
+    Category(String),
+}
+
+/// A patch the fake received: the message, its body, its `If-Match`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReceivedPatch {
+    pub id: String,
+    pub body: serde_json::Value,
+    pub if_match: Option<String>,
 }
 
 /// A subscription the fake holds.
@@ -120,6 +147,29 @@ struct State {
     hidden_well_known: Vec<String>,
     /// The most messages a first round lists.
     filter_limit: Option<usize>,
+    /// Changed as the next patch of a message arrives.
+    interference: Option<Interference>,
+    /// The patches received.
+    patches: Vec<ReceivedPatch>,
+    /// A move gives the message a new id (as without immutable ids).
+    rename_on_move: bool,
+    /// The MIME of every `sendMail` received.
+    sent_mime: Vec<Vec<u8>>,
+    /// Sent messages not filed in Sent Items yet (Graph files them later).
+    unfiled: Vec<FakeGraphMessage>,
+    /// File sent messages only when told ([`FakeMicrosoft::file_sent`]).
+    delay_filing: bool,
+    /// What the next `sendMail` meets.
+    send_fault: Option<SendFault>,
+}
+
+/// What a `sendMail` meets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SendFault {
+    /// Taken, but answered 504 (the answer lost).
+    Lost,
+    /// Answered with this status, and not taken.
+    Refused(u16),
 }
 
 /// Microsoft's token endpoint and Graph, faked.
@@ -168,6 +218,13 @@ impl FakeMicrosoft {
             refuse_subscriptions: false,
             hidden_well_known: Vec::new(),
             filter_limit: None,
+            interference: None,
+            patches: Vec::new(),
+            rename_on_move: false,
+            sent_mime: Vec::new(),
+            unfiled: Vec::new(),
+            delay_filing: false,
+            send_fault: None,
         }));
         Mock::given(any())
             .respond_with(Responder(state.clone()))
@@ -330,6 +387,7 @@ impl FakeMicrosoft {
             draft: false,
             categories: Vec::new(),
             conversation: format!("conv-{id}"),
+            internet_id: None,
             version,
         });
         id
@@ -397,6 +455,95 @@ impl FakeMicrosoft {
     pub fn drop_subscriptions(&self) {
         self.lock().subscriptions.clear();
     }
+
+    /// Make `interference` to the message the next patch is for, as it
+    /// arrives (after the client read the message).
+    pub fn interfere_on_next_patch(&self, interference: Interference) {
+        self.lock().interference = Some(interference);
+    }
+
+    /// The patches received, oldest first.
+    pub fn patches(&self) -> Vec<ReceivedPatch> {
+        self.lock().patches.clone()
+    }
+
+    /// Moves give messages a new id from now on (or keep it again).
+    pub fn rename_on_move(&self, rename: bool) {
+        self.lock().rename_on_move = rename;
+    }
+
+    /// The MIME of every `sendMail` received, oldest first.
+    pub fn sent_mime(&self) -> Vec<Vec<u8>> {
+        self.lock().sent_mime.clone()
+    }
+
+    /// How many `sendMail` calls were received.
+    pub fn send_calls(&self) -> usize {
+        self.lock()
+            .calls
+            .iter()
+            .filter(|c| *c == "POST /v1.0/me/sendMail")
+            .count()
+    }
+
+    /// Sent messages are filed in Sent Items only by [`Self::file_sent`]
+    /// from now on, or at once again.
+    pub fn delay_filing(&self, delay: bool) {
+        self.lock().delay_filing = delay;
+    }
+
+    /// File the sent messages not filed yet in Sent Items.
+    pub fn file_sent(&self) {
+        let mut state = self.lock();
+        let unfiled = std::mem::take(&mut state.unfiled);
+        for mut message in unfiled {
+            state.version += 1;
+            message.version = state.version;
+            state.messages.push(message);
+        }
+    }
+
+    /// The next `sendMail` is taken (sent and filed) but its answer is lost
+    /// (504).
+    pub fn lose_next_send(&self) {
+        self.lock().send_fault = Some(SendFault::Lost);
+    }
+
+    /// The next `sendMail` is answered `status` and not taken.
+    pub fn refuse_next_send(&self, status: u16) {
+        self.lock().send_fault = Some(SendFault::Refused(status));
+    }
+
+    /// The messages in Sent Items.
+    pub fn sent_items(&self) -> Vec<FakeGraphMessage> {
+        self.lock()
+            .messages
+            .iter()
+            .filter(|m| m.folder == "fld-sent")
+            .cloned()
+            .collect()
+    }
+
+    /// How many `DELETE` requests were received (refused): none, ever, is
+    /// what every write test expects.
+    pub fn deletes(&self) -> usize {
+        self.lock()
+            .calls
+            .iter()
+            .filter(|c| c.starts_with("DELETE "))
+            .count()
+    }
+
+    /// The requests that changed something at Graph, as `METHOD path`
+    /// (subscriptions and token refreshes left out).
+    pub fn writes(&self) -> Vec<String> {
+        self.lock()
+            .calls
+            .iter()
+            .filter(|c| !c.starts_with("GET ") && c.contains(" /v1.0/me"))
+            .cloned()
+            .collect()
+    }
 }
 
 /// Delete message `id` from `state`: it leaves its folder.
@@ -443,6 +590,10 @@ impl Respond for Responder {
         if !known {
             return graph_error(401, "InvalidAuthenticationToken");
         }
+        if request.method.as_str() == "DELETE" {
+            // Campbooks never deletes anything at Microsoft.
+            return graph_error(405, "DeleteNeverAllowed");
+        }
         if let Some(seconds) = state.throttle_next.take() {
             return graph_error(429, "ApplicationThrottled")
                 .insert_header("retry-after", seconds.to_string().as_str());
@@ -483,6 +634,10 @@ impl Respond for Responder {
                     None => graph_error(404, "ErrorItemNotFound"),
                 }
             }
+            ("PATCH", ["me", "messages", id]) => patch(&mut state, id, request),
+            ("POST", ["me", "messages", id, "move"]) => move_message(&mut state, id, request),
+            ("POST", ["me", "sendMail"]) => send_mail(&mut state, request),
+            ("GET", ["me", "mailFolders", "sentitems", "messages"]) => sent_lookup(&state, &query),
             ("POST", ["subscriptions"]) => subscribe(&mut state, &request.body),
             ("PATCH", ["subscriptions", id]) => renew(&mut state, id, &request.body),
             _ => graph_error(404, "ResourceNotFound"),
@@ -543,6 +698,8 @@ fn folder_json(state: &State, folder: &FakeFolder) -> serde_json::Value {
 /// A message as a delta page or a GET lists it.
 fn item(message: &FakeGraphMessage) -> serde_json::Value {
     serde_json::json!({
+        "@odata.etag": etag(message),
+        "changeKey": format!("ck-{}", message.version),
         "id": message.id,
         "parentFolderId": message.folder,
         "conversationId": message.conversation,
@@ -673,6 +830,201 @@ fn delta(
         answer["@odata.deltaLink"] = format!("{base}?$deltatoken=v{}", state.version).into();
     }
     json(200, &answer)
+}
+
+/// A message's version, as `@odata.etag`.
+fn etag(message: &FakeGraphMessage) -> String {
+    format!("W/\"ck-{}\"", message.version)
+}
+
+/// Whether `request` asks for immutable ids.
+fn immutable(request: &wiremock::Request) -> bool {
+    request
+        .headers
+        .get("prefer")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|p| p.contains("IdType=\"ImmutableId\""))
+}
+
+/// `PATCH /me/messages/{id}`: `If-Match` required, 412 when the message
+/// changed since that version.
+fn patch(state: &mut State, id: &str, request: &wiremock::Request) -> ResponseTemplate {
+    let if_match = request
+        .headers
+        .get("if-match")
+        .and_then(|v| v.to_str().ok())
+        .map(ToOwned::to_owned);
+    let Ok(body) = serde_json::from_slice::<serde_json::Value>(&request.body) else {
+        return graph_error(400, "BadRequest");
+    };
+    state.patches.push(ReceivedPatch {
+        id: id.to_owned(),
+        body: body.clone(),
+        if_match: if_match.clone(),
+    });
+    if !state.messages.iter().any(|m| m.id == id) {
+        return graph_error(404, "ErrorItemNotFound");
+    }
+    if let Some(interference) = state.interference.take() {
+        state.version += 1;
+        let version = state.version;
+        if let Some(message) = state.messages.iter_mut().find(|m| m.id == id) {
+            let Interference::Category(name) = interference;
+            message.categories.push(name);
+            message.version = version;
+        }
+    }
+    state.version += 1;
+    let version = state.version;
+    let Some(message) = state.messages.iter_mut().find(|m| m.id == id) else {
+        return graph_error(404, "ErrorItemNotFound");
+    };
+    let Some(if_match) = if_match else {
+        return graph_error(400, "IfMatchRequired");
+    };
+    if if_match != etag(message) {
+        return graph_error(412, "ErrorIrresolvableConflict");
+    }
+    if let Some(read) = body["isRead"].as_bool() {
+        message.read = read;
+    }
+    if let Some(status) = body["flag"]["flagStatus"].as_str() {
+        message.flagged = status == "flagged";
+    }
+    if let Some(categories) = body["categories"].as_array() {
+        message.categories = categories
+            .iter()
+            .filter_map(|c| c.as_str().map(ToOwned::to_owned))
+            .collect();
+    }
+    message.version = version;
+    json(200, &item(message))
+}
+
+/// `POST /me/messages/{id}/move`: immutable ids required; the id is kept
+/// unless the fake is told to rename.
+fn move_message(state: &mut State, id: &str, request: &wiremock::Request) -> ResponseTemplate {
+    if !immutable(request) {
+        return graph_error(400, "ImmutableIdRequired");
+    }
+    let Ok(body) = serde_json::from_slice::<serde_json::Value>(&request.body) else {
+        return graph_error(400, "BadRequest");
+    };
+    let Some(destination) = body["destinationId"].as_str().map(ToOwned::to_owned) else {
+        return graph_error(400, "BadRequest");
+    };
+    if !state.folders.iter().any(|f| f.id == destination) {
+        return graph_error(404, "ErrorItemNotFound");
+    }
+    let Some(at) = state.messages.iter().position(|m| m.id == id) else {
+        return graph_error(404, "ErrorItemNotFound");
+    };
+    state.version += 1;
+    let version = state.version;
+    let before = state.messages[at].folder.clone();
+    if state.rename_on_move {
+        let mut moved = state.messages.remove(at);
+        state.departures.push((before, id.to_owned(), version));
+        let n = state.next_id;
+        state.next_id += 1;
+        moved.id = format!("msg-{n}");
+        moved.folder = destination;
+        moved.version = version;
+        let answer = item(&moved);
+        state.messages.push(moved);
+        return json(201, &answer);
+    }
+    let message = &mut state.messages[at];
+    message.folder.clone_from(&destination);
+    message.version = version;
+    let answer = item(message);
+    if before != destination {
+        state.departures.push((before, id.to_owned(), version));
+    }
+    json(201, &answer)
+}
+
+/// `POST /me/sendMail` with base64 MIME: the message goes out and is filed
+/// in Sent Items, read.
+fn send_mail(state: &mut State, request: &wiremock::Request) -> ResponseTemplate {
+    let fault = state.send_fault.take();
+    if let Some(SendFault::Refused(status)) = fault {
+        return graph_error(status, "ErrorMessageSubmissionBlocked");
+    }
+    if request.body.len() > 4_000_000 {
+        return graph_error(413, "RequestEntityTooLarge");
+    }
+    let plain = request
+        .headers
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|t| t.starts_with("text/plain"));
+    let Some(raw) = plain
+        .then(|| STANDARD.decode(request.body.trim_ascii()).ok())
+        .flatten()
+    else {
+        return graph_error(400, "ErrorMimeContentInvalidBase64String");
+    };
+    let internet_id = String::from_utf8_lossy(&raw)
+        .lines()
+        .take_while(|line| !line.is_empty())
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.trim()
+                .eq_ignore_ascii_case("message-id")
+                .then(|| value.trim().trim_matches(['<', '>']).to_owned())
+        });
+    state.sent_mime.push(raw.clone());
+    let n = state.next_id;
+    state.next_id += 1;
+    state.version += 1;
+    let id = format!("msg-{n}");
+    let message = FakeGraphMessage {
+        id: id.clone(),
+        folder: "fld-sent".to_owned(),
+        raw,
+        received: Utc::now(),
+        read: true,
+        flagged: false,
+        draft: false,
+        categories: Vec::new(),
+        conversation: format!("conv-{id}"),
+        internet_id,
+        version: state.version,
+    };
+    if state.delay_filing {
+        state.unfiled.push(message);
+    } else {
+        state.messages.push(message);
+    }
+    if fault == Some(SendFault::Lost) {
+        return graph_error(504, "GatewayTimeout");
+    }
+    ResponseTemplate::new(202)
+}
+
+/// Sent Items' messages whose `internetMessageId` the `$filter` names.
+fn sent_lookup(state: &State, query: &HashMap<String, String>) -> ResponseTemplate {
+    let Some(wanted) = query
+        .get("$filter")
+        .and_then(|f| f.strip_prefix("internetMessageId eq '"))
+        .and_then(|f| f.strip_suffix('\''))
+        .and_then(|f| f.strip_prefix('<'))
+        .and_then(|f| f.strip_suffix('>'))
+    else {
+        return graph_error(400, "BadFilter");
+    };
+    let value: Vec<serde_json::Value> = state
+        .messages
+        .iter()
+        .filter(|m| m.folder == "fld-sent" && m.internet_id.as_deref() == Some(wanted))
+        .map(|m| {
+            serde_json::json!({
+                "id": m.id, "parentFolderId": m.folder, "conversationId": m.conversation
+            })
+        })
+        .collect();
+    json(200, &serde_json::json!({ "value": value }))
 }
 
 fn subscribe(state: &mut State, body: &[u8]) -> ResponseTemplate {

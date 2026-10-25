@@ -13,6 +13,9 @@
     "invalid_later": "Escolha uma hora posterior a agora e a menos de um ano.",
     "not_a_member": "Só pode passar uma tarefa a um membro deste espaço de trabalho.",
     "hand_off_yourself": "Escolha outra pessoa para lhe passar a tarefa.",
-    "not_handed_off": "Esta tarefa não foi passada a ninguém."
+    "not_handed_off": "Esta tarefa não foi passada a ninguém.",
+    "invalid_hold": "Reserve entre 15 e 240 minutos que ainda não tenham começado.",
+    "pay_not_held": "Uma conta paga-se, não se trabalha nela: não há tempo a reservar.",
+    "not_held": "Não há tempo reservado para esta tarefa."
   }
 }

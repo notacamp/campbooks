@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from "react";
 
 import { FoundInMessage } from "./components/Found/FoundInMessage";
 
+export { useFreeSlots, useWritableCalendars } from "./api/queries";
 export { buildScheduleRoutes } from "./routes";
 export { SCHEDULE_SHORTCUTS } from "./shortcuts";
 

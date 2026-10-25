@@ -123,6 +123,7 @@ pub async fn handler(
         &Outcome {
             actor: actor_of(workspace.invoked_by),
             change: TaskChange::Planned,
+            history: None,
             detail: TaskHistoryDetail {
                 plan: Some(body.plan),
                 plan_on,

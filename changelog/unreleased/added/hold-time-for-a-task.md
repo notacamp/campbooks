@@ -1,0 +1,1 @@
+- **Hold time for a task** (H). On a task, on Home or in the calendar, pick one of three free slots of your working hours, a length and a calendar: the block goes on your calendar, the task shows "Held Wed 10:00–10:30", and Release or Undo takes it off. Moving or removing the block on the calendar moves or releases the hold.
