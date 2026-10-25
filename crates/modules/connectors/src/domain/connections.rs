@@ -112,11 +112,17 @@ pub async fn view(
             })
         })
         .collect::<Result<Vec<_>>>()?;
+    let address_check = if connection.provider == Provider::Imap {
+        super::address_checks::view(&mut *conn, connection.id, connection.address_verified).await?
+    } else {
+        None
+    };
     Ok(ConnectionView {
         id: connection.id,
         provider: connection.provider,
         address: connection.address,
         address_verified: connection.address_verified,
+        address_check,
         display_name: connection.display_name,
         granted_by: connection.granted_by,
         granted_by_you: caller == Some(connection.granted_by),

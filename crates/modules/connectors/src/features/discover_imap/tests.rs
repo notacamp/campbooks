@@ -214,7 +214,7 @@ async fn only_a_recently_signed_in_member_on_an_instance_with_imap(db: PgPool) {
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
     assert_eq!(refused.json["code"], "connection_needs_user");
 
-    // Off (the default): not offered.
+    // Turned off (`Kit::new`): not offered.
     let off = Kit::new(db).await;
     let bea = off.user_signed_in("bea", 2);
     off.join(&bea, ws, Role::Member);

@@ -119,7 +119,22 @@ impl Deps {
             let centres = base.map_or(Centres::Zoho, Centres::Fake);
             deps.zoho = Some(Arc::new(Zoho::new(client_id, client_secret, centres)?));
         }
-        if deps.google.is_none() && deps.zoho.is_none() && !deps.config.imap.enabled {
+        // IMAP is on by default (campbooks-cloud#314) but needs the instance
+        // secret to seal passwords: without one it is simply not offered,
+        // unless an operator asked for it by name.
+        let imap_asked =
+            deps.config.imap.enabled && figment.find_value("connectors.imap.enabled").is_ok();
+        if deps.google.is_none() && deps.zoho.is_none() && !imap_asked {
+            if deps.config.imap.enabled && secret.is_none() {
+                tracing::warn!(
+                    "CAMPBOOKS_SECRET_KEY is not set: IMAP mailboxes cannot be connected \
+                     (their passwords are sealed with it); set it to offer them"
+                );
+            }
+            let Some(secret) = secret else {
+                return Ok(deps);
+            };
+            deps.cipher = Some(Arc::new(Cipher::new(&secret, CREDENTIALS_PURPOSE)));
             return Ok(deps);
         }
         let Some(secret) = secret else {
@@ -252,9 +267,33 @@ mod tests {
     }
 
     #[test]
-    fn imap_is_offered_when_enabled_with_the_instance_secret() {
+    fn imap_is_offered_by_default_with_the_instance_secret() {
+        // On by default: offered once the instance can seal passwords.
+        let deps = Deps::from_figment(
+            &Figment::new(),
+            &kernel_config(),
+            Some(SecretKey::from_bytes([1; 32])),
+        )
+        .unwrap();
+        assert!(deps.imap_enabled());
+        // Without the secret, the server still starts; IMAP is not offered.
         let off = Deps::from_figment(&Figment::new(), &kernel_config(), None).unwrap();
-        assert!(!off.imap_enabled());
+        assert!(!off.imap_enabled() && off.cipher.is_none());
+        // Turned off by name: not offered, even with the secret.
+        let figment = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {"imap": {"enabled": false}}
+        })));
+        let deps = Deps::from_figment(
+            &figment,
+            &kernel_config(),
+            Some(SecretKey::from_bytes([1; 32])),
+        )
+        .unwrap();
+        assert!(!deps.imap_enabled());
+    }
+
+    #[test]
+    fn imap_asked_for_by_name_needs_the_instance_secret() {
         let figment = Figment::from(Serialized::defaults(serde_json::json!({
             "connectors": {"imap": {"enabled": true}}
         })));
@@ -279,7 +318,8 @@ mod tests {
         let off = Figment::from(Serialized::defaults(serde_json::json!({
             "connectors": {
                 "poll": {"min_seconds": 60, "max_seconds": 120},
-                "imap": {"send_per_hour": 0, "send_timeout_seconds": 1, "send_max_message_bytes": 1}
+                "imap": {"enabled": false, "send_per_hour": 0, "send_timeout_seconds": 1,
+                         "send_max_message_bytes": 1}
             }
         })));
         let deps = Deps::from_figment(&off, &kernel_config(), None).unwrap();
@@ -299,6 +339,47 @@ mod tests {
         })));
         let err = Deps::from_figment(&broken, &kernel_config(), key()).unwrap_err();
         assert!(err.contains("SEND_PER_HOUR"), "{err}");
+    }
+
+    #[test]
+    fn the_module_starts_with_production_settings_and_imap_on_by_default() {
+        // Production's settings exactly (campbooks-cloud#314): its poll
+        // bounds, the instance secret, Google, and no IMAP variable
+        // at all. IMAP is on with its defaults, IDLE off.
+        let figment = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}},
+            "google": {"client_id": "client-1", "client_secret": "s3cret"}
+        })));
+        let deps = Deps::from_figment(
+            &figment,
+            &kernel_config(),
+            Some(SecretKey::from_bytes([1; 32])),
+        )
+        .unwrap();
+        assert!(deps.imap_enabled());
+        assert!(!deps.imap.config.idle_enabled);
+        assert_eq!(
+            (deps.config.poll.min_seconds, deps.config.poll.max_seconds),
+            (60, 120)
+        );
+        // The same bounds with nothing else set, with or without the secret.
+        let bare = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}}
+        })));
+        assert!(
+            Deps::from_figment(
+                &bare,
+                &kernel_config(),
+                Some(SecretKey::from_bytes([1; 32]))
+            )
+            .unwrap()
+            .imap_enabled()
+        );
+        assert!(
+            !Deps::from_figment(&bare, &kernel_config(), None)
+                .unwrap()
+                .imap_enabled()
+        );
     }
 
     #[test]

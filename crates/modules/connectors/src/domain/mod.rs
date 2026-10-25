@@ -1,5 +1,6 @@
 //! Types and rules shared by several features.
 
+pub mod address_checks;
 pub mod connections;
 pub mod credentials;
 pub mod destinations;

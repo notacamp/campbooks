@@ -33,6 +33,13 @@
     "smtp_tls_failed": "Le certificat du serveur d’envoi n’est pas valide pour son nom : Campbooks ne s’est donc pas connecté. Vérifiez le nom du serveur.",
     "imap_not_an_imap_server": "Le serveur à cette adresse et sur ce port n’est pas un serveur de messagerie IMAP. Vérifiez le serveur et le port.",
     "host_refused": "Campbooks ne peut pas se connecter à ce serveur : il se trouve sur un réseau privé, ou ce port n’est pas un port de messagerie (993, 143, 465 ou 587).",
-    "starttls_missing": "Le serveur ne propose pas de connexion chiffrée : Campbooks n’a donc pas envoyé votre mot de passe. Utilisez le port chiffré du serveur (993 pour IMAP, 465 pour SMTP)."
+    "starttls_missing": "Le serveur ne propose pas de connexion chiffrée : Campbooks n’a donc pas envoyé votre mot de passe. Utilisez le port chiffré du serveur (993 pour IMAP, 465 pour SMTP).",
+    "address_check_not_needed": "L’adresse de cette boîte mail n’a pas besoin d’être vérifiée : elle l’est déjà, ou ce n’est pas une boîte IMAP."
+  },
+  "address_check": {
+    "subject": "Campbooks vérifie votre adresse",
+    "why": "Campbooks a envoyé ce message pour vérifier que la boîte mail que vous y avez connectée reçoit le courrier de {{address}}. Il le retrouve tout seul ; vous n’avez rien à faire.",
+    "nothing_to_do": "Campbooks supprime ce message dès qu’il l’a retrouvé. S’il reste, vous pouvez le supprimer.",
+    "not_you": "Si vous n’avez pas connecté cette boîte mail à Campbooks, quelqu’un a peut-être saisi votre adresse par erreur : vous pouvez ignorer ce message. Inutile d’y répondre."
   }
 }

@@ -868,19 +868,26 @@ at first and they turn the others on; changes sync both ways.
 redirect URI (`/auth/callback/zoho`, or `CAMPBOOKS_ZOHO__REDIRECT_PATH` behind a proxy
 that rewrites it). Signing in with Zoho then also asks for the mailbox, and members can
 connect more Zoho logins. The app must allow the scopes `openid`, `email`, `profile`,
-`ZohoMail.accounts.READ`, `ZohoMail.folders.READ` and `ZohoMail.messages.ALL` (a
-server-based Zoho app takes its scopes with each request, so there is nothing more to
-register). Each mail account of a Zoho login becomes its own
-inbox. Campbooks reads and writes each account's mail at its own data centre
-(`accounts.zoho.eu` → `mail.zoho.eu`), polls it (Zoho has no push), and keeps to
-`CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` per Zoho login. Zoho labels are not
-synced yet.
+`ZohoMail.accounts.READ`, `ZohoMail.folders.READ`, `ZohoMail.messages.ALL` and
+`ZohoMail.tags.ALL` (labels), and, while `CAMPBOOKS_CONNECTORS__ZOHO_CALENDAR=true`,
+`ZohoCalendar.calendar.READ` and `ZohoCalendar.event.ALL` (a server-based Zoho app takes its
+scopes with each request, so there is nothing more to register). Each mail account of a Zoho
+login becomes its own inbox. Campbooks reads and writes each account's mail at its own data
+centre (`accounts.zoho.eu` → `mail.zoho.eu`), polls it (Zoho has no push), and keeps to
+`CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` per Zoho login. Zoho labels are synced
+both ways: the member's labels are read and changed, and streams are mirrored as
+`Campbooks/<Stream>` labels. A Zoho mailbox connected before labels were asked for keeps
+syncing without them until its member connects it again.
 
-**Any other mailbox over IMAP** (Yahoo, iCloud, Fastmail, GMX, a custom domain at a hosting
-company) is connected with its password, usually an app password made in the account's
-security settings. It is off until reading these mailboxes lands: set
-`CAMPBOOKS_CONNECTORS__IMAP__ENABLED=true` to offer it (it needs the instance secret key,
-like any connection). Campbooks finds the servers from the address (a copy of Thunderbird's
+**Any other mailbox over IMAP** (Yahoo, AOL, iCloud, Fastmail, GMX, web.de, Yandex, a custom
+domain at a hosting company) is connected with its password, usually an app password made in
+the account's security settings: Settings → Mailboxes → Add a mailbox asks for the address
+first, sends Gmail and Zoho addresses to their own sign-in, and shows the provider's
+app-password steps for the rest. It is on by default and needs the instance secret key (it
+seals the passwords): without the key IMAP is simply not offered, and setting
+`CAMPBOOKS_CONNECTORS__IMAP__ENABLED=true` without it stops the server, naming the key. Set
+`CAMPBOOKS_CONNECTORS__IMAP__ENABLED=false` to turn it off. Push with IDLE stays off unless
+`CAMPBOOKS_CONNECTORS__IMAP__IDLE_ENABLED=true`. Campbooks finds the servers from the address (a copy of Thunderbird's
 provider database bundled with it, then the domain's own autoconfig document, its SRV
 records and its MX host; the address is never sent to a third party), signs in to the IMAP
 server and authenticates to the SMTP server before it keeps anything, over TLS or STARTTLS
@@ -897,6 +904,16 @@ addresses; never link-local or cloud metadata addresses) and
 `CAMPBOOKS_CONNECTORS__IMAP__ALLOW_ANY_PORT=true`. Connect attempts are limited to 10 per
 member and 30 per workspace an hour, and 5 failed sign-ins an hour per mailbox login
 (its username on its IMAP server) across the instance, so the endpoint cannot be used to guess passwords.
+
+A mailbox that signs in with a username other than its address cannot send until its address
+is checked: Campbooks sends one plain-text message with a one-time code, from and to the
+address, through the mailbox's own SMTP server, finds it in that mailbox's Inbox over IMAP
+(within 15 minutes), marks the address verified and removes the message by its UID (or moves
+it to Trash, or leaves it where the server offers neither safely). The member types nothing;
+Settings → Mailboxes shows the check and offers to try again (at most 5 checks a day per
+mailbox). A server run by the person connecting it can always pass this check, since it sees
+the code it relays; the check stops a shared server that lets any sender through from making
+someone else's address sendable.
 
 Connecting needs the built-in sign-in: an install that sets `CAMPBOOKS_AUTH__ISSUER` to an
 outside issuer cannot connect mail. `connectors.start_connection` answers with the

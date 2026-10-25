@@ -89,8 +89,9 @@ pub struct CalendarConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ImapConfig {
-    /// Offer IMAP connections and read them (default false, until the
-    /// connect screen lands).
+    /// Offer IMAP connections and read them (default true). Needs the
+    /// instance secret key: without one IMAP is not offered, and setting
+    /// this to true explicitly stops the server (`Deps::from_figment`).
     pub enabled: bool,
     /// Also reach mail servers on private, loopback and CGNAT addresses: a
     /// self-hosted instance's own network (default false). Never link-local
@@ -253,7 +254,7 @@ impl Default for CalendarConfig {
 impl Default for ImapConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             allow_private_hosts: false,
             allow_any_port: false,
             connect_timeout_seconds: 10,
@@ -620,9 +621,11 @@ mod tests {
     }
 
     #[test]
-    fn imap_is_off_by_default_and_its_settings_are_checked() {
+    fn imap_is_on_by_default_and_its_settings_are_checked() {
         let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
-        assert!(!config.imap.enabled);
+        assert!(config.imap.enabled);
+        // IDLE stays off.
+        assert!(!config.imap.idle_enabled);
         assert!(!config.imap.allow_private_hosts && !config.imap.allow_any_port);
         assert_eq!(
             (
@@ -764,9 +767,14 @@ mod tests {
             assert!(refused.contains("MAX_CREATED_FOLDERS"), "{refused}");
             // IMAP off: it starts, whatever the value.
             ConnectorsConfig::from_figment(&figment(serde_json::json!({
-                "connectors": {"imap": {"max_created_folders": bad}}
+                "connectors": {"imap": {"enabled": false, "max_created_folders": bad}}
             })))
             .unwrap();
+            // On by default: the value is checked.
+            ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"imap": {"max_created_folders": bad}}
+            })))
+            .unwrap_err();
         }
         // The defaults start with prod's narrowed poll bounds, IMAP on or off.
         for enabled in [false, true] {
@@ -839,8 +847,10 @@ mod tests {
             .unwrap_err();
             assert!(refused.contains(setting), "{refused}");
             // IMAP off: it starts, whatever the value (the 2026-10-23 outage).
+            let mut off = bad.clone();
+            off["enabled"] = false.into();
             ConnectorsConfig::from_figment(&figment(
-                serde_json::json!({"connectors": {"imap": bad}}),
+                serde_json::json!({"connectors": {"imap": off}}),
             ))
             .unwrap();
         }
@@ -864,6 +874,24 @@ mod tests {
     }
 
     #[test]
+    fn production_settings_start_with_imap_on_by_default() {
+        // Production sets only its poll bounds (60 to 120 seconds) and no
+        // IMAP variable (campbooks-cloud#314, the 2026-10-23 outage): IMAP
+        // is on with every default, IDLE off, and the settings pass.
+        let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}}
+        })))
+        .unwrap();
+        assert!(config.imap.enabled);
+        assert!(!config.imap.idle_enabled);
+        assert_eq!(
+            (config.poll.min_seconds, config.poll.max_seconds),
+            (60, 120)
+        );
+        assert_eq!(config.imap, ImapConfig::default());
+    }
+
+    #[test]
     fn narrowed_poll_bounds_start_while_idle_is_off() {
         // An instance whose poll bounds leave out the IDLE safety poll's
         // default still starts with IDLE off (the 2026-10-23 outage), and is
@@ -874,6 +902,7 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(config.poll.max_seconds, 600);
+        assert!(config.imap.enabled && !config.imap.idle_enabled);
         let mut on = narrowed;
         on["imap"] = serde_json::json!({"enabled": true, "idle_enabled": true});
         let refused =

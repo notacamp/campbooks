@@ -97,6 +97,7 @@ pub fn module(deps: Deps) -> Module {
                 features::disconnect::handler
             ))
             .routes(routes!(features::sync_now::handler))
+            .routes(routes!(features::check_address::handler))
             .layer(Extension(deps.clone())),
         admin_router: Some(
             OpenApiRouter::new().routes(routes!(features::admin_list_connections::handler)),
@@ -112,6 +113,9 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::SendCompleted>()
             .handler(features::sync_stream::SyncStream::new(deps.clone()))
             .handler(features::send_message::SendMessage::new(deps.clone()))
+            .handler(features::send_address_check::SendAddressCheck::new(
+                deps.clone(),
+            ))
             .consumer(features::queue_send::QueueSend)
             .schedule::<features::dispatch_due::DispatchDue>(features::dispatch_due::EVERY)
             .rekey::<features::retag_bindings::RetagBindings>()

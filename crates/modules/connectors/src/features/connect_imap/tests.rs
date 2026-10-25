@@ -83,6 +83,9 @@ async fn an_app_password_connects_a_mailbox(db: PgPool) {
     assert_eq!(connection["provider"], "imap");
     assert_eq!(connection["address"], "ana@yahoo.com");
     assert_eq!(connection["address_verified"], true);
+    // The login proves the address: nothing to check.
+    assert!(connection["address_check"].is_null());
+    assert_eq!(kit.pending("connectors.send_address_check").await, 0);
     assert_eq!(connection["capabilities"], serde_json::json!(["messages"]));
     assert_eq!(connection["health"], "ok");
     let stream = &connection["streams"][0];
@@ -253,8 +256,10 @@ async fn a_starttls_imap_server_and_a_tls_smtp_server_connect(db: PgPool) {
         "{:?}",
         connected.json
     );
-    // A login proves the username, not the address.
+    // A login proves the username, not the address: it is checked.
     assert_eq!(connected.json["address_verified"], false);
+    assert_eq!(connected.json["address_check"], "checking");
+    assert_eq!(kit.pending("connectors.send_address_check").await, 1);
     assert!(!imap.seen().password_in_clear && !smtp.seen().password_in_clear);
 }
 
@@ -372,7 +377,7 @@ async fn only_a_recently_signed_in_member_on_an_instance_with_imap(db: PgPool) {
     assert_eq!(refused.json["code"], "connection_needs_user");
     assert_eq!(imap.seen().connections, 0);
 
-    // Off (the default): neither IMAP operation, and no consent for `imap`.
+    // Turned off (`Kit::new`): neither IMAP operation, and no consent for `imap`.
     let off = Kit::new(db).await;
     let bea = off.user_signed_in("bea", 2);
     off.join(&bea, ws, Role::Member);

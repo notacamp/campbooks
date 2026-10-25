@@ -691,6 +691,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/connections/{connection_id}/address-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a mailbox's address again. */
+        post: operations["connectors.check_address"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/connections/{connection_id}/sync": {
         parameters: {
             query?: never;
@@ -2645,6 +2662,11 @@ export interface components {
              */
             name?: string | null;
         };
+        /**
+         * @description Where the check of an IMAP mailbox's address is.
+         * @enum {string}
+         */
+        AddressCheck: "checking" | "failed";
         /** @description The connection the mailbox became. */
         Adopted: {
             /** @description The connection's id (a `connectors.connection`). */
@@ -3290,7 +3312,11 @@ export interface components {
         ConnectionView: {
             /** @description The account's email address. */
             address: string;
-            /** @description Whether the provider verified it. */
+            address_check?: components["schemas"]["AddressCheck"] | null;
+            /**
+             * @description Whether the provider verified it (for an IMAP mailbox: its username
+             *     is the address, or its address check found the code).
+             */
             address_verified: boolean;
             /** @description What it lets Campbooks do. */
             capabilities: components["schemas"]["Capability"][];
@@ -9570,6 +9596,76 @@ export interface operations {
             };
             /** @description No such connection, or you may not see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.check_address": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The connection. */
+                connection_id: components["schemas"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A new check is on its way (or the one under way goes on): the connection, its `address_check` `checking`. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such connection, or you may not see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an IMAP mailbox, or its address is verified (`address_check_not_needed`), it must be connected again first (`needs_reauth`), or IMAP is not turned on on this instance (`provider_not_configured`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Its address was checked 5 times today (`rate_limited`). */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

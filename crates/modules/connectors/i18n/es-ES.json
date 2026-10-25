@@ -33,6 +33,13 @@
     "smtp_tls_failed": "El certificado del servidor de envío no es válido para su nombre, así que Campbooks no se ha conectado. Comprueba el nombre del servidor.",
     "imap_not_an_imap_server": "El servidor de esta dirección y puerto no es un servidor de correo IMAP. Comprueba el servidor y el puerto.",
     "host_refused": "Campbooks no puede conectarse a este servidor: está en una red privada o el puerto no es de correo (993, 143, 465 o 587).",
-    "starttls_missing": "El servidor no ofrece una conexión cifrada, así que Campbooks no ha enviado tu contraseña. Usa el puerto cifrado del servidor (993 para IMAP, 465 para SMTP)."
+    "starttls_missing": "El servidor no ofrece una conexión cifrada, así que Campbooks no ha enviado tu contraseña. Usa el puerto cifrado del servidor (993 para IMAP, 465 para SMTP).",
+    "address_check_not_needed": "La dirección de este buzón no necesita verificación: ya está verificada o no es un buzón IMAP."
+  },
+  "address_check": {
+    "subject": "Campbooks está verificando tu dirección",
+    "why": "Campbooks ha enviado este mensaje para comprobar que el buzón que conectaste recibe el correo de {{address}}. Lo encuentra por sí solo; no tienes que hacer nada.",
+    "nothing_to_do": "Campbooks elimina este mensaje cuando lo encuentra. Si se queda, puedes borrarlo.",
+    "not_you": "Si no conectaste este buzón a Campbooks, puede que alguien escribiera tu dirección por error: puedes ignorar este mensaje. No hace falta responder."
   }
 }
