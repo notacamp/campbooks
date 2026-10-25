@@ -265,3 +265,78 @@ export const HOME_DUE: Task = {
   due_on: "2026-10-16",
   source: null,
 };
+
+/* Invitations awaiting Sam's answer (campbooks-cloud#360). */
+
+/** Beatriz asks Sam to the offsite planning on Thursday: Sam is free then. */
+export const HOME_OFFSITE = event(10, {
+  kind: "meeting",
+  title: "Offsite planning",
+  starts: "2026-10-15T14:00:00-04:00",
+  ends: "2026-10-15T15:00:00-04:00",
+  place: "Office, 3rd floor",
+  response: "needs_action",
+  organizer: { name: "Beatriz Lemos", address: "beatriz@atelier-lume.example", person: true },
+});
+
+/** A webinar tomorrow, from a service, while the furniture is delivered. */
+export const HOME_WEBINAR = event(11, {
+  kind: "meeting",
+  title: "Cash flow basics webinar",
+  starts: "2026-10-14T10:00:00-04:00",
+  ends: "2026-10-14T11:00:00-04:00",
+  place: "https://webinars.ledgerly.example/cash-flow",
+  response: "needs_action",
+  organizer: { name: "Ledgerly Webinars", address: "no-reply@ledgerly.example", person: false },
+});
+
+/** The invitations' events, beside the week's (`schedule.list_events`). */
+export const HOME_INVITATION_EVENTS: Event[] = [HOME_WEBINAR, HOME_OFFSITE];
+
+const invitation = (n: number, invited: Event, extra: Partial<Item>): Item => ({
+  id: `0192f1a0-0000-7000-9000-0000000048${String(n).padStart(2, "0")}`,
+  record: { type: "schedule.event", id: invited.id },
+  container: { type: "schedule.member", id: "0192f1a0-0000-7000-8000-000000000501" },
+  cause: { type: "schedule.event", id: invited.id },
+  reason: "decide",
+  trust: "sure",
+  due_on: invited.starts.slice(0, 10),
+  overdue: false,
+  urgent: false,
+  since: "2026-10-12T16:20:00Z",
+  state: "open",
+  cleared_because: null,
+  cleared_by: null,
+  cleared_at: null,
+  snoozed_until: null,
+  ...extra,
+});
+
+/** The webinar tomorrow (Today) and the offsite on Thursday (This week), as `attention.list` has them. */
+export const HOME_WEBINAR_ITEM = invitation(1, HOME_WEBINAR, {
+  since: "2026-10-13T08:05:00Z",
+  band: "today",
+  band_reason: { rule: "event_tomorrow" },
+});
+export const HOME_OFFSITE_ITEM = invitation(2, HOME_OFFSITE, {
+  band: "week",
+  band_reason: { rule: "event_on", on: "2026-10-15" },
+});
+
+/** The morning with both invitations, in the server's order. */
+export const HOME_ITEMS_INVITED: Item[] = HOME_ITEMS.flatMap((each) => {
+  if (each.record.id === MARTA.id) {
+    return [each, HOME_WEBINAR_ITEM];
+  }
+  if (each.record.id === WATER.id) {
+    return [HOME_OFFSITE_ITEM, each];
+  }
+  return [each];
+});
+
+export const HOME_COUNTS_INVITED = (
+  ["review", "reply", "decide", "do", "pay", "nudge", "worth_a_look"] as const
+).map((reason) => ({
+  reason,
+  count: HOME_ITEMS_INVITED.filter((i) => i.reason === reason).length,
+}));

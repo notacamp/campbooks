@@ -1,28 +1,36 @@
 //! `POST /api/v1/w/{workspace_id}/schedule/events/{event_id}/response` —
 //! answer an invitation (accept, tentative, decline). The answer is stored at
-//! once; for an event on a provider calendar it is asked of connectors in the
-//! same transaction. The answer before is `previous_response`, so the same
-//! operation undoes it.
+//! once. For an event on a provider calendar it reaches the provider only when
+//! the undo window has passed (`schedule.release_response`, as a delete does),
+//! so an answer taken back in time (`previous_response`, sent back to the
+//! same operation) never reaches it: within the window a new answer replaces
+//! the one waiting, and "not answered" withdraws it. Once the provider has an
+//! answer it is never told "not answered" (no provider takes it back).
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk,
+    AppState, Error, Job, JobContext, JobError, Operation, Problem, Result, Risk,
     authz::Action,
     db::BeginFor as _,
     extract,
+    jobs::EnqueueOptions,
     tenancy::{Workspace, WorkspaceId},
 };
+use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::PgConnection;
 use utoipa::ToSchema;
 
 use crate::{
     domain::{
+        invitations,
         ops::{self, EventPath},
         outbound,
-        rows::{calendar_of, event_of},
+        rows::{calendar_by_id, calendar_of, event_by_id, event_of},
         settings, tracked,
         views::{EventView, event_view},
     },
+    features::delete_event::UNDO_WINDOW_SECONDS,
     model::{CalendarChange, EventId, Response},
     scopes::ScheduleWrite,
     tracking,
@@ -90,7 +98,12 @@ pub async fn handler(
     if row.deleted_at.is_some() || row.pushed_to.is_some() {
         return Err(Error::NotFound);
     }
-    if row.is_pending() {
+    // An answer still in its undo window is replaced; any other change
+    // waiting for the provider (an answer already asked of it among them)
+    // has to finish first.
+    let in_window = row.outbound_pending.as_deref() == Some(CalendarChange::Respond.as_str())
+        && !asked_of_provider(&mut tx, row.id).await?;
+    if row.is_pending() && !in_window {
         return Err(Error::Conflict(crate::MESSAGES.reason("change_pending")));
     }
     let calendar = calendar_of(&mut tx, member, row.calendar_id).await?;
@@ -99,40 +112,34 @@ pub async fn handler(
         .as_deref()
         .and_then(|r| r.parse().ok())
         .unwrap_or(Response::NeedsAction);
+    // To the provider after the undo window: an answer, never "not
+    // answered" (which withdraws one still waiting).
+    let to_provider = !calendar.is_campbooks()
+        && row.provider_event_id.is_some()
+        && answer.response != Response::NeedsAction;
     sqlx::query(
-        "UPDATE schedule.events SET response = $2, notice = NULL, updated_at = now()
+        "UPDATE schedule.events
+            SET response = $2, notice = NULL,
+                outbound_pending = CASE WHEN $3 THEN 'respond'
+                                        WHEN $4 THEN NULL
+                                        ELSE outbound_pending END,
+                updated_at = now()
           WHERE id = $1",
     )
     .bind(row.id)
     .bind(answer.response.as_str())
+    .bind(to_provider)
+    .bind(in_window)
     .execute(&mut *tx)
     .await?;
-    let updated = event_of(&mut tx, member, row.id).await?;
-    if !calendar.is_campbooks()
-        && updated.provider_event_id.is_some()
-        && answer.response != Response::NeedsAction
-    {
-        let document = outbound::document(
-            CalendarChange::Respond,
-            &calendar,
-            &updated,
-            None,
-            Some(answer.response.as_str()),
-        )?;
-        outbound::request(
-            &state,
-            &mut tx,
-            outbound::Asked {
-                workspace: access.workspace,
-                member,
-                calendar: &calendar,
-                event: &updated,
-                change: CalendarChange::Respond,
-                document,
-            },
-        )
-        .await?;
+    if to_provider {
+        let options = EnqueueOptions::for_workspace(access.workspace.to_string())
+            .unique(format!("schedule.release_response:{}", row.id))
+            .run_at(Utc::now() + TimeDelta::seconds(UNDO_WINDOW_SECONDS));
+        campbooks_kernel::jobs::enqueue(&mut tx, &ReleaseResponse { event: row.id }, options)
+            .await?;
     }
+    invitations::announce(&state, &mut tx, access.workspace, row.id).await?;
     // Another answer than the one it had: the same again tracks nothing.
     if answer.response != previous
         && let Some(calendar_event) = tracked::calendar_event(&mut tx, row.id).await?
@@ -157,4 +164,82 @@ pub async fn handler(
         event,
         previous_response: previous,
     }))
+}
+
+/// Whether a change of event `id` was already asked of the provider and has
+/// not finished.
+async fn asked_of_provider(conn: &mut PgConnection, id: EventId) -> Result<bool> {
+    let asked: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM schedule.change_requests
+                         WHERE event_id = $1 AND state = 'waiting')",
+    )
+    .bind(id)
+    .fetch_one(conn)
+    .await?;
+    Ok(asked)
+}
+
+/// Asks connectors to give an event's answer to the provider once its undo
+/// window has passed, if the answer still waits (it was not taken back).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ReleaseResponse {
+    /// The event.
+    pub event: EventId,
+}
+
+impl Job for ReleaseResponse {
+    const NAME: &'static str = "schedule.release_response";
+    const QUEUE: &'static str = "default";
+
+    async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
+        let workspace: WorkspaceId = ctx
+            .workspace()
+            .and_then(|w| w.parse().ok())
+            .ok_or_else(|| JobError::fatal("release_response enqueued outside a workspace"))?;
+        let state = ctx.state().clone();
+        let tx = ctx.tx().await?;
+        let Some(row) = event_by_id(tx, self.event).await? else {
+            return Ok(());
+        };
+        // Taken back meanwhile, or already asked.
+        if row.outbound_pending.as_deref() != Some(CalendarChange::Respond.as_str())
+            || asked_of_provider(tx, row.id).await?
+        {
+            return Ok(());
+        }
+        let calendar = calendar_by_id(tx, row.calendar_id).await?;
+        let answer = row
+            .response
+            .as_deref()
+            .filter(|answer| *answer != Response::NeedsAction.as_str());
+        let Some(answer) = answer.filter(|_| {
+            !calendar.is_campbooks() && row.provider_event_id.is_some() && row.deleted_at.is_none()
+        }) else {
+            // Nothing to give the provider any more.
+            sqlx::query(
+                "UPDATE schedule.events SET outbound_pending = NULL, updated_at = now()
+                  WHERE id = $1",
+            )
+            .bind(row.id)
+            .execute(&mut **tx)
+            .await?;
+            return Ok(());
+        };
+        let document =
+            outbound::document(CalendarChange::Respond, &calendar, &row, None, Some(answer))?;
+        outbound::request(
+            &state,
+            tx,
+            outbound::Asked {
+                workspace,
+                member: calendar.member_id,
+                calendar: &calendar,
+                event: &row,
+                change: CalendarChange::Respond,
+                document,
+            },
+        )
+        .await?;
+        Ok(())
+    }
 }

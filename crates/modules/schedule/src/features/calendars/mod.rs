@@ -20,6 +20,7 @@ use utoipa::ToSchema;
 use crate::{
     domain::{
         blobs::{CALENDAR_REF_CONTENT_TYPE, CALENDAR_REF_OWNER},
+        invitations,
         ops::{self, CalendarPath},
         rows::{CalendarRow, calendar_of, calendars_of},
         tracked,
@@ -192,6 +193,14 @@ pub async fn update(
                 },
             )
             .await?;
+    }
+    // Its invitations show on Home only while it syncs (campbooks-cloud#360).
+    if syncing != calendar.syncing {
+        let now = CalendarRow {
+            syncing,
+            ..calendar.clone()
+        };
+        invitations::announce_calendar(&state, &mut tx, access.workspace, &now).await?;
     }
     let recoloured = color != calendar.color;
     track_change(

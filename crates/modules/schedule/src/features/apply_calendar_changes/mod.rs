@@ -18,6 +18,7 @@ use sqlx::{PgConnection, Postgres, Transaction};
 use crate::{
     domain::{
         blobs::{MAX_DOCUMENT_BYTES, read_json},
+        invitations,
         provider::{self, Parsed, Snapshot},
         publish,
         rows::{CALENDAR_COLUMNS, CalendarRow, EVENT_COLUMNS, EventRow},
@@ -243,6 +244,37 @@ async fn adopt(
     Ok(None)
 }
 
+/// Who organises a provider event, as stored with it.
+struct Organizer {
+    name: Option<String>,
+    address: Option<String>,
+    is_self: bool,
+    /// A person rather than a machine, from the address alone.
+    person: Option<bool>,
+}
+
+impl Organizer {
+    fn of(upsert: &BatchEvent) -> Self {
+        let given = upsert.organizer.as_ref();
+        let name = given
+            .and_then(|o| o.name.as_deref())
+            .map(str::trim)
+            .filter(|n| !n.is_empty())
+            .map(str::to_owned);
+        let address = given
+            .and_then(|o| o.email.as_deref())
+            .map(str::trim)
+            .filter(|a| !a.is_empty())
+            .map(str::to_owned);
+        Self {
+            person: invitations::organizer_is_person(address.as_deref()),
+            name,
+            address,
+            is_self: given.is_some_and(|o| o.is_self),
+        }
+    }
+}
+
 /// The record a provider event says it was made from, if the line is one.
 fn source_of(upsert: &BatchEvent) -> Option<(String, String)> {
     let text = upsert.private.as_ref()?.campbooks_source.as_deref()?;
@@ -272,6 +304,7 @@ async fn upsert_event(
         tracing::warn!("an event of a calendar batch has times that do not read; skipped");
         return Ok(());
     };
+    let organizer = Organizer::of(upsert);
     // An exception names its series.
     let series = match &upsert.series {
         Some(provider_id) => {
@@ -307,9 +340,10 @@ async fn upsert_event(
                  (id, workspace_id, calendar_id, kind, title, starts_at, ends_at, starts_on,
                   ends_on, all_day, time_zone, place, notes, status, provider_event_id, etag,
                   recurrence, series_id, original_start, source_type, source_id, origin,
-                  ical_uid, response, provider_version)
+                  ical_uid, response, provider_version, organizer_name, organizer_address,
+                  organizer_self, organizer_person)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-                     $18, $19, $20, $21, 'provider', $22, $23, $24)",
+                     $18, $19, $20, $21, 'provider', $22, $23, $24, $25, $26, $27, $28)",
         )
         .bind(id)
         .bind(workspace)
@@ -335,6 +369,10 @@ async fn upsert_event(
         .bind(&upsert.ical_uid)
         .bind(&upsert.response)
         .bind(snapshot.to_json())
+        .bind(&organizer.name)
+        .bind(&organizer.address)
+        .bind(organizer.is_self)
+        .bind(organizer.person)
         .execute(&mut **tx)
         .await?;
         let row = crate::domain::rows::event_by_id(tx, id).await?;
@@ -374,7 +412,11 @@ async fn upsert_event(
     sqlx::query(
         "UPDATE schedule.events
             SET etag = $2, ical_uid = coalesce($3, ical_uid), response = coalesce($4, response),
-                kind = $5, provider_version = $6, notice = NULL, updated_at = now()
+                kind = $5, provider_version = $6, notice = NULL,
+                organizer_name = coalesce($7, organizer_name),
+                organizer_address = coalesce($8, organizer_address),
+                organizer_self = coalesce($9, organizer_self),
+                organizer_person = coalesce($10, organizer_person), updated_at = now()
           WHERE id = $1",
     )
     .bind(row.id)
@@ -383,9 +425,14 @@ async fn upsert_event(
     .bind(&upsert.response)
     .bind(kind)
     .bind(snapshot.to_json())
+    .bind(&organizer.name)
+    .bind(&organizer.address)
+    .bind(upsert.organizer.as_ref().map(|_| organizer.is_self))
+    .bind(organizer.person)
     .execute(&mut **tx)
     .await?;
-    if before != snapshot || kind != row.kind {
+    let published = before != snapshot || kind != row.kind;
+    if published {
         let now = crate::domain::rows::event_by_id(tx, row.id).await?;
         if let Some(now) = now {
             if snapshot.is_cancelled() && !before.is_cancelled() {
@@ -396,6 +443,14 @@ async fn upsert_event(
                 applied.changed += 1;
             }
         }
+    }
+    // Only its answer or its organiser changed (nothing was published, which
+    // would have announced it): whether it awaits the member's answer is
+    // announced again (campbooks-cloud#360).
+    if !published
+        && (invitations::concerns(&row) || upsert.response.as_deref() == Some("needs_action"))
+    {
+        invitations::announce(state, tx, workspace, row.id).await?;
     }
     Ok(())
 }

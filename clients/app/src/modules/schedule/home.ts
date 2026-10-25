@@ -84,6 +84,11 @@ interface HomeDayOptions {
   now?: Date | undefined;
   /** The event row Home has selected (`DayEvent.id`): its email is looked up. */
   selected?: string | undefined;
+  /**
+   * Events Home shows as something else (invitations awaiting an answer, as
+   * Decide rows, campbooks-cloud#360): never also a calendar row.
+   */
+  hide?: ReadonlySet<string> | undefined;
 }
 
 /** "In 20 min", "In 1 h 10 min", "Now", "Started 5 min ago". */
@@ -110,7 +115,10 @@ function countdown(t: T, minutes: number): string {
  * the member's zone, their shown calendars only (the server leaves out a
  * calendar they turned off), the tasks of the Due layer.
  */
-export function useHomeDay(workspaceId: string, { now, selected }: HomeDayOptions = {}): HomeDay {
+export function useHomeDay(
+  workspaceId: string,
+  { now, selected, hide }: HomeDayOptions = {},
+): HomeDay {
   const { t: typed, i18n } = useTranslation("schedule");
   const t: T = typed;
   const locale = i18n.language;
@@ -130,7 +138,8 @@ export function useHomeDay(workspaceId: string, { now, selected }: HomeDayOption
 
   const calendarList = calendars.data ?? [];
   // Nothing from a calendar that has not answered, or failed: Home as without one.
-  const list = events.isError || settings.isError ? [] : (events.data?.events ?? []);
+  const listed = events.isError || settings.isError ? [] : (events.data?.events ?? []);
+  const list = hide === undefined ? listed : listed.filter((event) => !hide.has(event.id));
   const next = nextUp(list, clock);
   const rest = laterToday(list, clock, next);
   const chosen = [...(next === undefined ? [] : [next]), ...rest].find(
