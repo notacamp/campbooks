@@ -215,6 +215,8 @@ const ANSWER_UNDO_MS = 10_000;
 interface AnswerCallbacks {
   /** The answer was taken back: the row comes back. */
   onUndo?: ((eventId: string) => void) | undefined;
+  /** The server has the answer, or the answer taken back: what lists it may read again. */
+  onChanged?: (() => void) | undefined;
   /** The answer failed: the row comes back. */
   onFailed?: ((eventId: string) => void) | undefined;
 }
@@ -245,6 +247,7 @@ export function useInvitationAnswers(workspaceId: string, callbacks: AnswerCallb
       answered: await respond(event.id, answer),
     }),
     onSuccess: ({ event, answer, answered }) => {
+      callbacks.onChanged?.();
       undo.push({
         label: answeredLabel(t, answer, event.title),
         durationMs: ANSWER_UNDO_MS,
@@ -256,6 +259,7 @@ export function useInvitationAnswers(workspaceId: string, callbacks: AnswerCallb
             })
             .finally(() => {
               void refresh();
+              callbacks.onChanged?.();
             });
         },
       });

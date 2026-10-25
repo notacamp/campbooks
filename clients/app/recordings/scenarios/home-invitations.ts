@@ -118,7 +118,7 @@ const OFFSITE = "Invitation: Offsite planning";
 const WEBINAR = "Invitation: Cash flow basics webinar";
 
 /** Select the row holding `text` with the keys, from wherever the selection is. */
-async function walkTo(page: Page, text: string, key: "ArrowDown" | "ArrowUp"): Promise<void> {
+async function walkTo(page: Page, text: string, key: "ArrowDown"): Promise<void> {
   const row = page.locator("button[data-selected]", { hasText: text });
   for (let step = 0; step < 16 && (await row.count()) === 0; step += 1) {
     await page.keyboard.press(key);
@@ -177,7 +177,11 @@ export default async function homeInvitations({ page }: ScenarioContext): Promis
     await offsite.waitFor();
     await caption(page, "Z takes it back: unanswered again", 2200);
 
-    await walkTo(page, WEBINAR, "ArrowUp");
+    await pause(800);
+    const webinar = page.getByText(WEBINAR, { exact: true }).first();
+    await webinar.scrollIntoViewIfNeeded();
+    await webinar.click();
+    await page.locator("button[data-selected]", { hasText: WEBINAR }).waitFor();
     await caption(page, "Tomorrow's webinar: you have the delivery then", 2600);
     await page.keyboard.press("2");
   }

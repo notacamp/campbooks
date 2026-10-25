@@ -647,8 +647,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       if (entry !== undefined) {
         show(entry);
       }
-      refresh();
     },
+    onChanged: refresh,
     onFailed: (eventId) => {
       const entry = entryOfInvite(eventId);
       if (entry !== undefined) {
