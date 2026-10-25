@@ -149,6 +149,12 @@ export function likenessTitle(t: Translate, suggestion: RuleSuggestion): string 
     case "list": {
       return t("rules.likeness.list", { list: listName(value("list_id")) });
     }
+    case "sender_phrase": {
+      return t("rules.likeness.phrase", {
+        phrase: value("subject_contains"),
+        from: value("sender_address"),
+      });
+    }
     case "sender_template": {
       return t("rules.likeness.template", {
         template: value("subject_template"),

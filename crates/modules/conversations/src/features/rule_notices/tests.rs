@@ -2,10 +2,15 @@
 //! mail, answered per member, accepted through a confirmed smart rule.
 
 use axum::http::StatusCode;
+use campbooks_ai::{AiConfig, ExternalContent, Gateway, ProviderConfig, Role};
 use campbooks_kernel::tenancy::WorkspaceId;
 use chrono::{TimeDelta, Utc};
 use serde_json::{Value, json};
 use sqlx::PgPool;
+use wiremock::{
+    Mock, MockServer, ResponseTemplate,
+    matchers::{method, path},
+};
 
 use crate::{
     ConversationsDeps,
@@ -719,4 +724,297 @@ async fn mail_that_matters_is_not_noticed(db: PgPool) {
     .await
     .unwrap();
     assert!(noticed(&kit, &sam, workspace).await.is_empty());
+}
+
+// --- Kinds within a sender's mail (campbooks-cloud#356) ---------------------
+
+const SHOP: &str = "orders@shop.example";
+
+/// One subject, how many days ago it came, and whether it was read.
+type Item = (String, i64, bool);
+
+/// The shop's mail of `items`, automatic, one conversation each.
+fn shop_mail(prefix: &str, items: &[Item]) -> Value {
+    let now = Utc::now();
+    let changes: Vec<Value> = items
+        .iter()
+        .enumerate()
+        .map(|(i, (subject, days, read))| {
+            json!({
+                "op": "upsert",
+                "message": {
+                    "provider_message_id": format!("{prefix}-{i}"),
+                    "thread_key": format!("thr-{prefix}-{i}"),
+                    "from": {"name": "Northwind", "address": SHOP},
+                    "to": [{"name": "Sam Rivers", "address": "sam@example.com"}],
+                    "subject": subject,
+                    "sent_at": (now - TimeDelta::days(*days) - TimeDelta::hours(1)).to_rfc3339(),
+                    "direction": "inbound",
+                    "headers": {"auto_submitted": "auto-generated"},
+                    "text": "Thanks for shopping with us.",
+                    "mailbox": {"in_inbox": true},
+                    "read": read, "starred": false
+                }
+            })
+        })
+        .collect();
+    json!({"changes": changes})
+}
+
+/// `n` weekly deals, a day apart, never opened.
+fn deals(n: i64) -> Vec<Item> {
+    (0..n)
+        .map(|i| (format!("Deals of the week {}", 40 - i), i + 1, false))
+        .collect()
+}
+
+/// `n` digests, every other day, never opened.
+fn digests(n: i64) -> Vec<Item> {
+    (0..n)
+        .map(|i| (format!("Your weekly digest {}", 20 - i), 2 * i + 1, false))
+        .collect()
+}
+
+/// `n` shipping notices, every other day, all read.
+fn parcels(n: i64) -> Vec<Item> {
+    (0..n)
+        .map(|i| {
+            (
+                format!("Your order {} has shipped", 5100 + i),
+                2 * i + 2,
+                true,
+            )
+        })
+        .collect()
+}
+
+/// Ten promotions with subjects of their own, never opened.
+fn sales() -> Vec<Item> {
+    [
+        "boots", "scarves", "coats", "gloves", "hats", "jackets", "socks", "shirts", "belts",
+        "bags",
+    ]
+    .iter()
+    .zip(1..)
+    .map(|(item, day)| (format!("Our {item} sale starts now"), day, false))
+    .collect()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_shops_mail_is_noticed_kind_by_kind_and_each_kind_is_answered_alone(db: PgPool) {
+    let kit = Kit::with_deps(db, ConversationsDeps::offline()).await;
+    let (workspace, inbox, sam) = sams_inbox(&kit).await;
+    let items: Vec<Item> = [deals(12), digests(6), parcels(6)].concat();
+    kit.ingest_value(workspace, inbox, &shop_mail("shop", &items))
+        .await;
+
+    // The deals and the digests, never the shipping notices Sam reads, and
+    // no rule for the whole shop.
+    let notices = noticed(&kit, &sam, workspace).await;
+    assert_eq!(notices.len(), 2, "{notices:?}");
+    let deals = &notices[0];
+    assert_eq!(deals["kind"], "keep_off_home");
+    assert_eq!(
+        deals["conditions"],
+        json!([
+            {"field": "sender_address", "value": SHOP},
+            {"field": "subject_template", "value": "deals of the week #"},
+        ])
+    );
+    assert_eq!(
+        deals["pattern"],
+        json!({
+            "source": "template",
+            "example": "Deals of the week 40",
+            "search": "subject:\"deals of the week\"",
+        })
+    );
+    assert_eq!(deals["evidence"]["received"], 12);
+    assert_eq!(deals["evidence"]["opened"], 0);
+    assert_eq!(
+        notices[1]["conditions"][1],
+        json!({"field": "subject_template", "value": "your weekly digest #"})
+    );
+    assert_eq!(notices[1]["evidence"]["received"], 6);
+
+    // "Don't suggest this" hides the deals only, for good.
+    let id = deals["id"].as_str().unwrap();
+    let answered = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/rule-notices/{id}/answer"),
+            Some(json!({"answer": "never"})),
+        )
+        .await;
+    assert_eq!(answered.status, StatusCode::NO_CONTENT);
+    sqlx::query(
+        "UPDATE conversations.rule_notice_scans SET scanned_at = now() - interval '2 days'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let left = noticed(&kit, &sam, workspace).await;
+    assert_eq!(left.len(), 1, "{left:?}");
+    assert_eq!(left[0]["pattern"]["example"], "Your weekly digest 20");
+
+    // A rule Sam taught for the digests: that kind is no longer offered.
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(json!({
+                "conditions": left[0]["conditions"],
+                "actions": left[0]["actions"],
+                "origin": "suggestion",
+                "notice_id": left[0]["id"],
+            })),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    assert!(noticed(&kit, &sam, workspace).await.is_empty());
+}
+
+/// An instruct model grouping subjects with `kinds`.
+async fn grouping_model(kinds: &Value) -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "model": "group-test",
+            "choices": [{"message": {"role": "assistant",
+                                     "content": json!({"kinds": kinds}).to_string()},
+                         "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 200, "completion_tokens": 40}
+        })))
+        .mount(&server)
+        .await;
+    server
+}
+
+fn with_complete(provider: ProviderConfig) -> ConversationsDeps {
+    ConversationsDeps {
+        ai: Some(
+            Gateway::new(AiConfig {
+                roles: [(Role::Complete, provider)].into(),
+                ..AiConfig::default()
+            })
+            .unwrap(),
+        ),
+        ..ConversationsDeps::offline()
+    }
+}
+
+/// The grouping calls `server` received, as their bodies.
+async fn grouping_calls(server: &MockServer) -> Vec<String> {
+    server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| String::from_utf8_lossy(&r.body).into_owned())
+        .filter(|body| body.contains("subject_kinds"))
+        .collect()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_models_words_find_kinds_no_template_shows_and_are_kept_for_days(db: PgPool) {
+    let server = grouping_model(&json!([
+        {"phrase": "Sale starts now"},
+        {"phrase": "has shipped"},
+        {"phrase": "boots"},
+    ]))
+    .await;
+    let provider = ProviderConfig::new(format!("{}/v1", server.uri()).parse().unwrap(), "test");
+    let kit = Kit::with_deps(db, with_complete(provider)).await;
+    let (workspace, inbox, sam) = sams_inbox(&kit).await;
+    let items: Vec<Item> = [sales(), parcels(6)].concat();
+    kit.ingest_value(workspace, inbox, &shop_mail("shop", &items))
+        .await;
+
+    let notices = noticed(&kit, &sam, workspace).await;
+    // The promotions, by the model's words, checked against the mail: the
+    // shipping notices are read, and "boots" fits one email.
+    assert_eq!(notices.len(), 1, "{notices:?}");
+    let sales = &notices[0];
+    assert_eq!(
+        sales["conditions"],
+        json!([
+            {"field": "sender_address", "value": SHOP},
+            {"field": "subject_contains", "value": "sale starts now"},
+        ])
+    );
+    assert_eq!(sales["pattern"]["source"], "phrase");
+    assert_eq!(sales["pattern"]["search"], "subject:\"sale starts now\"");
+    assert_eq!(sales["pattern"]["example"], "Our boots sale starts now");
+    assert_eq!(sales["evidence"]["received"], 10);
+
+    // The model saw the subjects and nothing else of the mail.
+    let calls = grouping_calls(&server).await;
+    assert_eq!(calls.len(), 1);
+    assert!(calls[0].contains("Our boots sale starts now"));
+    for private in [SHOP, "Northwind", "Thanks for shopping", "sam@example.com"] {
+        assert!(!calls[0].contains(private), "{private}");
+    }
+
+    // A later pass reuses the grouping: the model is not asked again.
+    sqlx::query(
+        "UPDATE conversations.rule_notice_scans SET scanned_at = now() - interval '2 days'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(noticed(&kit, &sam, workspace).await.len(), 1);
+    assert_eq!(grouping_calls(&server).await.len(), 1);
+
+    // Once it is a week old, it is asked again.
+    sqlx::query(
+        "UPDATE conversations.rule_notice_groupings SET grouped_at = now() - interval '8 days'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE conversations.rule_notice_scans SET scanned_at = now() - interval '2 days'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    noticed(&kit, &sam, workspace).await;
+    assert_eq!(grouping_calls(&server).await.len(), 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn without_a_model_that_may_read_mail_templates_alone_find_kinds(db: PgPool) {
+    // A model off the instance, with no opt-in to send it mail.
+    let provider = ProviderConfig::new("https://ai.example.com/v1".parse().unwrap(), "m")
+        .with_external_content(ExternalContent::Deny);
+    let kit = Kit::with_deps(db, with_complete(provider)).await;
+    let (workspace, inbox, sam) = sams_inbox(&kit).await;
+    let items: Vec<Item> = [deals(12), sales(), parcels(6)].concat();
+    kit.ingest_value(workspace, inbox, &shop_mail("shop", &items))
+        .await;
+
+    let notices = noticed(&kit, &sam, workspace).await;
+    assert_eq!(notices.len(), 1, "{notices:?}");
+    assert_eq!(notices[0]["pattern"]["source"], "template");
+    assert_eq!(notices[0]["pattern"]["example"], "Deals of the week 40");
+    let grouped: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM conversations.rule_notice_groupings")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(grouped, 0);
+}
+
+#[test]
+fn a_template_narrows_the_search_by_its_longest_run_of_words() {
+    assert_eq!(
+        super::template_search("your order # has shipped from our store"),
+        "subject:\"has shipped from our store\""
+    );
+    assert_eq!(
+        super::template_search("deals of the week #"),
+        "subject:\"deals of the week\""
+    );
+    assert_eq!(super::template_search("# * #"), "");
 }

@@ -799,7 +799,7 @@ fn retryable(error: &campbooks_ai::Error) -> bool {
 }
 
 /// What kind of failure, for the log: never the provider's words.
-fn error_kind(error: &campbooks_ai::Error) -> &'static str {
+pub(crate) fn error_kind(error: &campbooks_ai::Error) -> &'static str {
     match error {
         campbooks_ai::Error::RoleNotConfigured(_) => "role_not_configured",
         campbooks_ai::Error::ExternalContentRefused { .. } => "external_content_refused",

@@ -461,6 +461,7 @@
     "likeness": {
       "sender": "Todo de {{address}}",
       "list": "Solo la lista {{list}}",
+      "phrase": "Solo correos sobre «{{phrase}}» de {{from}}",
       "template": "Solo «{{template}}» de {{from}}",
       "domain": "Todo de {{domain}}",
       "impersonation": "Correos que fingen ser de {{domain}}"
@@ -790,9 +791,13 @@
     "position": "{{n}} de {{total}}",
     "keepOffHome_one": "Recibiste {{n}} correo de {{sender}} en los últimos {{days}} días y abriste {{opened}}.",
     "keepOffHome_other": "Recibiste {{n}} correos de {{sender}} en los últimos {{days}} días y abriste {{opened}}.",
+    "keepOffHomeLike_one": "Recibiste {{n}} correo como «{{example}}» de {{sender}} en los últimos {{days}} días y abriste {{opened}}.",
+    "keepOffHomeLike_other": "Recibiste {{n}} correos como «{{example}}» de {{sender}} en los últimos {{days}} días y abriste {{opened}}.",
     "keepOffHomeAsk": "¿Sacarlos de Inicio y guardarlos en {{stream}}?",
     "archived_one": "{{sender}} te envió {{n}} correo en los últimos {{days}} días y archivaste o borraste {{archived}} sin leer.",
     "archived_other": "{{sender}} te envió {{n}} correos en los últimos {{days}} días y archivaste o borraste {{archived}} sin leer.",
+    "archivedLike_one": "{{sender}} te envió {{n}} correo como «{{example}}» en los últimos {{days}} días y archivaste o borraste {{archived}} sin leer.",
+    "archivedLike_other": "{{sender}} te envió {{n}} correos como «{{example}}» en los últimos {{days}} días y archivaste o borraste {{archived}} sin leer.",
     "archiveAsk": "¿Archivarlos al llegar?",
     "cadence": {
       "daily": "Llegan casi todos los días.",

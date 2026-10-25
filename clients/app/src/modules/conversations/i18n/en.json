@@ -461,6 +461,7 @@
     "likeness": {
       "sender": "Everything from {{address}}",
       "list": "Only the {{list}} list",
+      "phrase": "Only mail about “{{phrase}}” from {{from}}",
       "template": "Only “{{template}}” from {{from}}",
       "domain": "Everything from {{domain}}",
       "impersonation": "Mail pretending to be {{domain}}"
@@ -790,9 +791,13 @@
     "position": "{{n}} of {{total}}",
     "keepOffHome_one": "You got {{n}} email from {{sender}} in the last {{days}} days and opened {{opened}}.",
     "keepOffHome_other": "You got {{n}} emails from {{sender}} in the last {{days}} days and opened {{opened}}.",
+    "keepOffHomeLike_one": "You got {{n}} email like “{{example}}” from {{sender}} in the last {{days}} days and opened {{opened}}.",
+    "keepOffHomeLike_other": "You got {{n}} emails like “{{example}}” from {{sender}} in the last {{days}} days and opened {{opened}}.",
     "keepOffHomeAsk": "Keep them off Home and file them under {{stream}}?",
     "archived_one": "{{sender}} sent you {{n}} email in the last {{days}} days, and you archived or deleted {{archived}} of them unread.",
     "archived_other": "{{sender}} sent you {{n}} emails in the last {{days}} days, and you archived or deleted {{archived}} of them unread.",
+    "archivedLike_one": "{{sender}} sent you {{n}} email like “{{example}}” in the last {{days}} days, and you archived or deleted {{archived}} of them unread.",
+    "archivedLike_other": "{{sender}} sent you {{n}} emails like “{{example}}” in the last {{days}} days, and you archived or deleted {{archived}} of them unread.",
     "archiveAsk": "Archive them as they arrive?",
     "cadence": {
       "daily": "They come most days.",

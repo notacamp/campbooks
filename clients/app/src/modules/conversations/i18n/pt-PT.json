@@ -461,6 +461,7 @@
     "likeness": {
       "sender": "Tudo de {{address}}",
       "list": "Só a lista {{list}}",
+      "phrase": "Só emails sobre «{{phrase}}» de {{from}}",
       "template": "Só «{{template}}» de {{from}}",
       "domain": "Tudo de {{domain}}",
       "impersonation": "Emails que fingem ser de {{domain}}"
@@ -790,9 +791,13 @@
     "position": "{{n}} de {{total}}",
     "keepOffHome_one": "Recebeu {{n}} email de {{sender}} nos últimos {{days}} dias e abriu {{opened}}.",
     "keepOffHome_other": "Recebeu {{n}} emails de {{sender}} nos últimos {{days}} dias e abriu {{opened}}.",
+    "keepOffHomeLike_one": "Recebeu {{n}} email como «{{example}}» de {{sender}} nos últimos {{days}} dias e abriu {{opened}}.",
+    "keepOffHomeLike_other": "Recebeu {{n}} emails como «{{example}}» de {{sender}} nos últimos {{days}} dias e abriu {{opened}}.",
     "keepOffHomeAsk": "Tirá-los da Página inicial e arquivá-los em {{stream}}?",
     "archived_one": "{{sender}} enviou-lhe {{n}} email nos últimos {{days}} dias e arquivou ou apagou {{archived}} sem ler.",
     "archived_other": "{{sender}} enviou-lhe {{n}} emails nos últimos {{days}} dias e arquivou ou apagou {{archived}} sem ler.",
+    "archivedLike_one": "{{sender}} enviou-lhe {{n}} email como «{{example}}» nos últimos {{days}} dias e arquivou ou apagou {{archived}} sem ler.",
+    "archivedLike_other": "{{sender}} enviou-lhe {{n}} emails como «{{example}}» nos últimos {{days}} dias e arquivou ou apagou {{archived}} sem ler.",
     "archiveAsk": "Arquivá-los à chegada?",
     "cadence": {
       "daily": "Chegam quase todos os dias.",
