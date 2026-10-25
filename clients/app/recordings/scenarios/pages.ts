@@ -55,6 +55,9 @@ export default async function pages({ page }: ScenarioContext): Promise<void> {
   const last = editorOf(page).getByText("Notes from the kickoff go below.");
   await last.scrollIntoViewIfNeeded();
   await last.click();
+  // As a person does: the editor takes a click's position on the next
+  // selection change, so keys sent within a few ms land at the old caret.
+  await pause(300);
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Pages save as you type.", { delay: 40 });

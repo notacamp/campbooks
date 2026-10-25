@@ -46,6 +46,6 @@
 - [x] 6.2 OpenAPI regenerated (`cargo xtask openapi`, events), from CI's `generated-openapi` artifact
 - [x] 6.3 Client types regenerated (`pnpm --dir clients api:generate`), from CI's `generated-api-types` artifact
 - [x] 6.4 Changelog entry `changelog/unreleased/added/363-pages.md`
-- [ ] 6.5 Gates green in CI
-- [ ] 6.6 UI verified and recorded at 375 px and desktop (Storybook screen stories)
+- [x] 6.5 Gates green in CI
+- [x] 6.6 UI verified and recorded at 375 px and desktop (Storybook screen stories)
 - [ ] 6.7 `openspec archive add-pages-module --yes` before merge
