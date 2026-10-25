@@ -161,7 +161,7 @@ async fn a_change_runs_that_connections_stream_only(db: PgPool) {
         .hook(HOOK, &posted(&mine.id, &mine.client_state, None))
         .await;
     assert_eq!(answered.status, StatusCode::ACCEPTED);
-    assert_eq!(pending_streams(&kit).await, [ours.clone()]);
+    assert_eq!(pending_streams(&kit).await, std::slice::from_ref(&ours));
     // Again while it is pending: absorbed.
     kit.hook(HOOK, &posted(&mine.id, &mine.client_state, None))
         .await;
