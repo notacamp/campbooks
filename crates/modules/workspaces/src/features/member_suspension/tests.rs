@@ -256,14 +256,14 @@ async fn fan_out_around<F: Future<Output = R>, R>(
     go: F,
 ) -> (Vec<WorkspaceId>, R) {
     let mut tx = kit.state.db.begin().await.unwrap();
-    let (user, workspaces) = record(&mut tx, &account.to_string(), change)
+    let (user, workspaces, fresh) = record(&mut tx, &account.to_string(), change)
         .await
         .unwrap()
         .unwrap();
     let fan_out = async {
         until_one_waits_for_a_lock(&kit.db).await;
         for workspace in &workspaces {
-            super::publish(&kit.state, *workspace, user, change)
+            super::publish(&kit.state, *workspace, user, change, fresh)
                 .await
                 .unwrap();
         }

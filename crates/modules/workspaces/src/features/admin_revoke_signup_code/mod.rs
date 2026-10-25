@@ -13,9 +13,13 @@ use campbooks_kernel::{
 use chrono::Utc;
 use serde::Deserialize;
 
-use crate::domain::{
-    model::SignupCodeId,
-    signup::{CodeRow, SignupCodeView},
+use crate::{
+    domain::{
+        model::SignupCodeId,
+        signup::{CodeRow, SignupCodeView},
+        tracked,
+    },
+    tracking,
 };
 
 /// The path of one code.
@@ -48,6 +52,15 @@ pub async fn handler(
     State(state): State<AppState>,
     extract::Path(path): extract::Path<CodePath>,
 ) -> Result<Json<SignupCodeView>> {
+    let mut tx = state.db.begin().await?;
+    // Whether it was revoked already: a retry changes nothing, and tracks
+    // nothing.
+    let revoked_before: Option<bool> = sqlx::query_scalar(
+        "SELECT revoked_at IS NOT NULL FROM workspaces.signup_codes WHERE id = $1 FOR UPDATE",
+    )
+    .bind(path.code_id)
+    .fetch_optional(&mut *tx)
+    .await?;
     let row = sqlx::query_as!(
         CodeRow,
         r#"UPDATE workspaces.signup_codes
@@ -57,8 +70,17 @@ pub async fn handler(
                   created_by, created_at, revoked_at"#,
         path.code_id as SignupCodeId,
     )
-    .fetch_optional(&state.db)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or(Error::NotFound)?;
-    Ok(Json(SignupCodeView::at(&row, Utc::now())))
+    let now = Utc::now();
+    if revoked_before == Some(false) {
+        let signup_code = tracked::signup_code(&mut tx, path.code_id, now).await?;
+        state
+            .tracker
+            .track(&mut tx, &tracking::SignupCodeRevoked { signup_code })
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(Json(SignupCodeView::at(&row, now)))
 }

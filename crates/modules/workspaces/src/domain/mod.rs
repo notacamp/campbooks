@@ -11,4 +11,5 @@ pub mod resources;
 pub mod security;
 pub mod signup;
 pub mod suspension;
+pub mod tracked;
 pub mod users;

@@ -18,10 +18,12 @@ use crate::{
         access::{acting_user, authorize, keep_an_owner, lock_workspace, member_resource, role_of},
         model::{MemberPath, MemberView},
         security::{self, SecurityKind},
+        tracked,
     },
     events::MemberRoleChanged,
     features::list_members,
     scopes::WorkspacesAdmin,
+    tracking,
 };
 
 /// The new role.
@@ -125,6 +127,18 @@ pub async fn execute(
                     from,
                     to,
                     changed_by: actor,
+                },
+            )
+            .await?;
+        let snapshot = tracked::present_member(&mut tx, id, member).await?;
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::MemberRoleChanged {
+                    workspace: id,
+                    member: snapshot,
+                    before: tracked::role(from),
                 },
             )
             .await?;

@@ -19,7 +19,9 @@ use crate::{
     domain::{
         model::SignupCodeId,
         signup::{CodeRow, SignupCodeView, new_code},
+        tracked,
     },
+    tracking,
 };
 
 /// Longest label.
@@ -97,6 +99,7 @@ pub async fn handler(
     }
     let (code, digest) = new_code()?;
     let id = SignupCodeId::new();
+    let mut tx = state.db.begin().await?;
     let row = sqlx::query_as!(
         CodeRow,
         r#"INSERT INTO workspaces.signup_codes
@@ -111,8 +114,14 @@ pub async fn handler(
         input.expires_at,
         admin.grant.account(),
     )
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await?;
+    let signup_code = tracked::signup_code(&mut tx, id, now).await?;
+    state
+        .tracker
+        .track(&mut tx, &tracking::SignupCodeMinted { signup_code })
+        .await?;
+    tx.commit().await?;
     tracing::info!(code = %id, "signup code minted");
     Ok((
         StatusCode::CREATED,
