@@ -48,8 +48,9 @@ CREATE POLICY workspace_isolation ON schedule.invitation_backfills USING
 CREATE POLICY maintenance_reads_invitation_backfills ON schedule.invitation_backfills
     FOR SELECT USING (current_setting('campbooks.maintenance_scope', true) = 'on');
 
--- The workspace's job reads its row and removes it once announced.
-GRANT SELECT, DELETE ON schedule.invitation_backfills TO campbooks_app;
+-- The workspace's job reads its row and removes it once announced; the
+-- runtime role holds every table privilege, as on the module's other tables.
+GRANT SELECT, INSERT, UPDATE, DELETE ON schedule.invitation_backfills TO campbooks_app;
 
 -- seed begin
 -- Both tables force row-level security even for their owner, and no
