@@ -15,11 +15,11 @@
 
 - [x] 3.1 The test kit writes the outbox on demand (`Kit::tracking`) and invokes an operation as the assistant
 - [x] 3.2 A test per live event reading it back from `kernel.tracked_events` (name, version, actor, workspace, operation, snapshot), that a no-op tracks nothing, and that no event holds a title, an address or an amount
-- [ ] 3.3 The server's coverage test lists nothing of `tasks`
+- [x] 3.3 The server's coverage test lists nothing of `tasks`
 
 ## 4. Last
 
-- [ ] 4.1 OpenAPI regenerated (unchanged), client types unchanged
+- [x] 4.1 OpenAPI regenerated (unchanged), client types unchanged
 - [x] 4.2 Tracking plan regenerated
 - [x] 4.3 Changelog entry file (`changelog/unreleased/added/340-track-tasks.md`)
-- [ ] 4.4 Gates green in CI
+- [x] 4.4 Gates green in CI
