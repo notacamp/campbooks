@@ -12,7 +12,7 @@ use sqlx::{PgConnection, Postgres, Transaction, types::Uuid};
 use super::{TaskChange, TaskId, TaskRow};
 use crate::tracking;
 
-fn verb(verb: &str) -> tracking::TaskVerb {
+fn verb_of(verb: &str) -> tracking::TaskVerb {
     if verb == "pay" {
         tracking::TaskVerb::Pay
     } else {
@@ -20,7 +20,7 @@ fn verb(verb: &str) -> tracking::TaskVerb {
     }
 }
 
-fn origin(origin: &str) -> tracking::TaskOrigin {
+fn origin_of(origin: &str) -> tracking::TaskOrigin {
     match origin {
         "ask" => tracking::TaskOrigin::Ask,
         "deadline" => tracking::TaskOrigin::Deadline,
@@ -28,7 +28,7 @@ fn origin(origin: &str) -> tracking::TaskOrigin {
     }
 }
 
-fn state(state: &str) -> tracking::TaskState {
+fn state_of(state: &str) -> tracking::TaskState {
     match state {
         "done" => tracking::TaskState::Done,
         "not_needed" => tracking::TaskState::NotNeeded,
@@ -36,7 +36,7 @@ fn state(state: &str) -> tracking::TaskState {
     }
 }
 
-fn plan(plan: &str) -> tracking::PlanKind {
+fn plan_of(plan: &str) -> tracking::PlanKind {
     match plan {
         "date" => tracking::PlanKind::Date,
         "later" => tracking::PlanKind::Later,
@@ -84,12 +84,12 @@ async fn snapshot(conn: &mut PgConnection, id: TaskId) -> Result<Option<tracking
     .await?;
     Ok(facts.map(|row| tracking::TaskSnapshot {
         id: row.id,
-        verb: verb(&row.verb),
-        origin: origin(&row.origin),
-        state: state(&row.state),
+        verb: verb_of(&row.verb),
+        origin: origin_of(&row.origin),
+        state: state_of(&row.state),
         due_on: row.due_on,
         due_at: row.due_at,
-        plan: plan(&row.plan),
+        plan: plan_of(&row.plan),
         plan_on: row.plan_on,
         later_until: row.later_until,
         assignee: row.assignee,
@@ -173,7 +173,7 @@ pub async fn track(
             if !fields.is_empty() {
                 let before_verb = fields
                     .contains(&tracking::TaskField::Verb)
-                    .then(|| verb(&before.verb));
+                    .then(|| verb_of(&before.verb));
                 let edited = tracking::TaskEdited {
                     workspace,
                     task: task.clone(),
@@ -197,7 +197,7 @@ pub async fn track(
         }
         TaskChange::Planned => {
             let before = tracking::TaskPlanSnapshot {
-                plan: plan(&before.plan),
+                plan: plan_of(&before.plan),
                 plan_on: before.plan_on,
                 later_until: before.later_until,
             };
@@ -222,7 +222,7 @@ pub async fn track(
             let reopened = tracking::TaskReopened {
                 workspace,
                 task,
-                before: state(&before.state),
+                before: state_of(&before.state),
             };
             tracker.track(tx, &reopened).await?;
         }
