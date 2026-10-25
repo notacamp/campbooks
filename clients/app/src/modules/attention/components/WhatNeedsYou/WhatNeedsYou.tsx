@@ -580,7 +580,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     // Now it waits: the nudge to that person is a dialog away (it is optional).
     onWaiting: (conversation) => {
       const waiting = conversation.need;
-      if (waiting?.reason === "waiting" && waiting.waiting_on !== null) {
+      if (waiting?.reason === "waiting" && (waiting.waiting_on ?? null) !== null) {
         nudge({ conversation, need: waiting, name: displayName(waiting.waiting_on) });
       }
     },
@@ -840,7 +840,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     const ranked = rowChoices(kind, row.need.actions);
     // Nudge needs someone it is natural to nudge: with nobody obvious, it is not offered.
     const all =
-      kind === "unsure" && unsure?.party == null
+      kind === "unsure" && (unsure?.party ?? null) === null
         ? { ...ranked, own: ranked.own.filter((choice) => choice.id !== "wait") }
         : ranked;
     // An inbox the member may only read: nothing that writes there (Reply,

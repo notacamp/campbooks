@@ -150,7 +150,7 @@ export function ConversationReader({
   const needActions = useNeedActions(workspaceId, {
     onWaiting: (summary) => {
       const waiting = summary.need;
-      if (waiting?.reason === "waiting" && waiting.waiting_on !== null) {
+      if (waiting?.reason === "waiting" && (waiting.waiting_on ?? null) !== null) {
         setNudging((current) => ({ need: waiting, opened: (current?.opened ?? 0) + 1 }));
       }
     },
