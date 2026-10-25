@@ -68,17 +68,25 @@ the member typing anything, that mail to the address reaches that mailbox:
 it SHALL send one message to the address, from the address, through the
 connection's own SMTP server (the submission, guard, TLS, budgets and session
 slot of IMAP sending), carrying a code of at least 128 bits derived from the
-instance's key, the connection and a fresh nonce, in its `Message-ID`. The
+instance's key, the connection, a fresh nonce and the address, in its
+`Message-ID`. The check SHALL keep the address it checks, and SHALL only
+ever verify that address: connecting the mailbox again with its address not
+verified SHALL end every check under way (`address_changed`), whatever the
+daily budget, and verifying SHALL require, in its transaction, that the
+connection's address is still the checked one. The
 message SHALL be plain text, say it comes from Campbooks and why, be written
 in the member's locale, and carry `Auto-Submitted: auto-generated`. The
 stream's runs SHALL then look for it in that connection's Inbox only, over
 the run's own session after its pending changes and before its read, with a
 `UID SEARCH` of the header and a fetch of each candidate's `Message-ID`, and
 SHALL count only a message whose `Message-ID` is exactly the expected one.
-Found, the connection's `address_verified` SHALL become true in the
-transaction that ends the check. Not found 15 minutes after the send (or
-after 30 searches), the check SHALL end `failed` and sending SHALL stay
-refused. While a check waits, the stream SHALL run at most the poll's
+Found within 15 minutes of the send, the connection's `address_verified`
+SHALL become true in the transaction that ends the check. Past 15 minutes
+(whether or not a run looked) or after 30 searches, the check SHALL end
+`failed`, a code found later SHALL verify nothing, and sending SHALL stay
+refused. The check holds only while the member cannot read the code: the
+module SHALL not claim more (the member holds the IMAP password and can add
+messages to the Inbox). While a check waits, the stream SHALL run at most the poll's
 minimum interval apart. The code SHALL never be logged, put in a job
 payload, an event or a job error. Each connection SHALL have at most 5
 checks a day.
@@ -98,6 +106,18 @@ checks a day.
 #### Scenario: The code of another check
 - **WHEN** the Inbox holds a check message of an earlier check of the same connection, or of another connection
 - **THEN** it does not verify the address
+
+#### Scenario: The address changed after the checks were spent
+- **WHEN** a member read the code of a connection's fifth check of the day, then connects the same mailbox again under another address and files that message in its Inbox
+- **THEN** the check is `failed` (`address_changed`) and the new address is not verified
+
+#### Scenario: A code for one address
+- **WHEN** a check's message for `ana@bakery.example` is found after the connection's address became `billing@bakery.example`
+- **THEN** nothing is verified
+
+#### Scenario: Found too late
+- **WHEN** no run looked for 16 minutes after the send and the message is then in the Inbox
+- **THEN** the check is `failed` (`not_found`) and the address is not verified
 
 #### Scenario: The server will not send as the address
 - **WHEN** the SMTP server answers the check's `MAIL FROM` or `RCPT TO` with 550

@@ -6,7 +6,7 @@
 - [ ] 1.3 Tests: the defaults start with production's settings (poll 60–120, no IMAP variable) with and without the key; an explicit `ENABLED=true` without the key stops the server
 
 ## 2. The address check
-- [ ] 2.1 `domain/address_checks.rs`: request (nonce, locale, daily budget), the code and its `Message-ID`, the waiting check of a connection, recording found / not found, the view's state (stale after 30 minutes)
+- [ ] 2.1 `domain/address_checks.rs`: request (nonce, locale, the checked address, daily budget), the code (bound to the address) and its `Message-ID`, ending checks when the address changes, the window on every path, the waiting check of a connection, recording found / not found, the view's state (stale after 30 minutes)
 - [ ] 2.2 `features/send_address_check`: the job: the message (plain text, the member's locale, `Auto-Submitted`), the SMTP submission with the sending budgets and session slot, the outcomes
 - [ ] 2.3 `imap/check.rs`: search the Inbox, fetch and compare the `Message-ID`, remove exactly that UID (UIDPLUS-guarded expunge, else MOVE to Trash, else leave), deselect
 - [ ] 2.4 `sync_stream`: the waiting check found over the run's session after the push and before the read; the stream due at the poll's minimum while a check waits

@@ -155,8 +155,10 @@ export function useConnection(workspaceId: string, connectionId: string) {
           signal,
         }),
       ),
+    // Not after a failed read: the page says so instead of asking for ever.
     refetchInterval: (query) =>
-      query.state.data === undefined || query.state.data.address_check === "checking"
+      query.state.status !== "error" &&
+      (query.state.data === undefined || query.state.data.address_check === "checking")
         ? 3000
         : false,
   });

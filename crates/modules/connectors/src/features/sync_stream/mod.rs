@@ -673,15 +673,22 @@ impl SyncStream {
                 .flatten();
         let opened = credentials::password(&mut tx, &cipher, target.connection).await;
         let copies = pending_copies(&mut tx, target.stream).await?;
-        let waiting = address_checks::waiting(&mut tx, target.connection).await?;
+        let waiting = address_checks::waiting(&mut tx, target.connection, now).await?;
         tx.commit().await?;
+        // The code is the one made for the connection's own address now
+        // (`waiting` gives it only while it is the checked one).
         let check = waiting.and_then(|waiting| {
-            let domain = address.as_deref()?.rsplit_once('@')?.1.to_owned();
-            let code = address_checks::code(&ctx.state().signer, target.connection, waiting.nonce);
+            let domain = waiting.address.rsplit_once('@')?.1.to_owned();
+            let code = address_checks::code(
+                &ctx.state().signer,
+                target.connection,
+                waiting.nonce,
+                &waiting.address,
+            );
             Some(CheckRun {
-                waiting,
                 search: format!("{}{code}", address_checks::PREFIX),
                 message_id: address_checks::message_id(&code, &domain),
+                waiting,
             })
         });
         let checking = check.is_some();
@@ -1546,7 +1553,7 @@ async fn check_imap(
         run.pool,
         run.workspace,
         run.connection,
-        check.waiting,
+        &check.waiting,
         looked,
         run.now,
     )

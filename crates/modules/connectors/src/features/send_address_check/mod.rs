@@ -94,13 +94,13 @@ impl JobHandler for SendAddressCheck {
             return Ok(()); // Sent, ended or replaced meanwhile.
         };
         tx.commit().await?;
+        let nonce = check.nonce;
         match self.attempt(ctx, workspace, connection, check).await {
             Ok(()) => Ok(()),
             // Out of attempts: the check ends, rather than wait for ever.
             Err(JobError::Retry { .. }) if ctx.is_last_attempt() => {
                 tracing::info!(%workspace, %connection, "an address check could not be sent");
-                self.end(ctx, connection, check.nonce, "smtp_unavailable")
-                    .await
+                self.end(ctx, connection, nonce, "smtp_unavailable").await
             }
             Err(err) => Err(err),
         }
@@ -139,6 +139,12 @@ impl SendAddressCheck {
         let Some(found) = found else {
             return Ok(()); // Disconnected meanwhile.
         };
+        // A check proves the address it was started for, and no other.
+        if address_checks::normalized(&found.address) != check.address {
+            return self
+                .end(ctx, connection, check.nonce, "address_changed")
+                .await;
+        }
         if found.verified {
             let tx = ctx.tx().await?;
             address_checks::verified(tx, connection, check.nonce, now).await?;
@@ -173,7 +179,8 @@ impl SendAddressCheck {
                 .end(ctx, connection, check.nonce, "address_invalid")
                 .await;
         };
-        let code = address_checks::code(&ctx.state().signer, connection, check.nonce);
+        let code =
+            address_checks::code(&ctx.state().signer, connection, check.nonce, &found.address);
         let message = message(
             check.locale,
             AsRef::<str>::as_ref(&address),

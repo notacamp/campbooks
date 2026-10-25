@@ -7,9 +7,13 @@
 //!
 //! One row per connection (`connectors.address_checks`): `sending` until the
 //! message went out, `waiting` while the runs look for it, then `verified`
-//! or `failed`. The code is never stored: it is derived from the instance
-//! key, the connection and the row's nonce ([`code`]), and travels only in
-//! the check message's `Message-ID`.
+//! or `failed`. The row keeps the address it checks: a check proves that
+//! address only, and ends as soon as the connection's address is another
+//! ([`abandon`], and [`verified`] compares them in its transaction). The
+//! code is never stored: it is derived from the instance key, the
+//! connection, the row's nonce and the address ([`code`]), and travels only
+//! in the check message's `Message-ID`. A check whose message went out more
+//! than [`WINDOW`] ago is over, whether or not a run looked for it.
 
 use campbooks_kernel::{
     Result, crypto::Signer, i18n::Locale, jobs::EnqueueOptions, tenancy::WorkspaceId,
@@ -43,14 +47,21 @@ pub const STALE_MINUTES: i32 = 30;
 /// The prefix of the code in the check message's `Message-ID`.
 pub const PREFIX: &str = "cb-check-";
 
-/// The code of a check of `connection` with `nonce`: 128 bits of the
-/// instance's keyed digest, as 32 hex characters. Only the instance can
-/// make it; the nonce alone proves nothing.
-pub fn code(signer: &Signer, connection: ConnectionId, nonce: Uuid) -> String {
+/// An address as checks compare it: trimmed and lower-cased (the database
+/// side uses `lower(btrim(…))`; addresses are stored lower-cased).
+pub fn normalized(address: &str) -> String {
+    address.trim().to_lowercase()
+}
+
+/// The code of a check of `connection` with `nonce` for `address`: 128
+/// bits of the instance's keyed digest, as 32 hex characters. Only the
+/// instance can make it; the nonce alone proves nothing, and a code made
+/// for one address is never another's.
+pub fn code(signer: &Signer, connection: ConnectionId, nonce: Uuid, address: &str) -> String {
     lease::keyed(
         signer,
         b"connectors.address_check",
-        &format!("{connection}:{nonce}"),
+        &format!("{connection}:{nonce}:{}", normalized(address)),
     )
 }
 
@@ -72,9 +83,10 @@ pub async fn take_budget(pool: &PgPool, connection: ConnectionId) -> Result<bool
     .is_ok())
 }
 
-/// Start a check of `connection` in `tx` (its workspace's): a new nonce,
-/// written in `locale`, `sending`, and its message's job enqueued. A check
-/// already under way is replaced (its message, if it went, never counts).
+/// Start a check of `connection` in `tx` (its workspace's), of the address
+/// the connection has now: a new nonce, written in `locale`, `sending`, and
+/// its message's job enqueued. A check already under way is replaced (its
+/// message, if it went, never counts).
 pub async fn start(
     tx: &mut Transaction<'_, Postgres>,
     workspace: WorkspaceId,
@@ -84,11 +96,12 @@ pub async fn start(
 ) -> Result<()> {
     sqlx::query(
         "INSERT INTO connectors.address_checks
-             (connection_id, workspace_id, state, nonce, locale, updated_at)
-         VALUES ($1, $2, 'sending', $3, $4, $5)
+             (connection_id, workspace_id, state, nonce, locale, address, updated_at)
+         SELECT c.id, $2, 'sending', $3, $4, lower(btrim(c.address)), $5
+           FROM connectors.connections c WHERE c.id = $1
          ON CONFLICT (connection_id) DO UPDATE
             SET state = 'sending', reason = NULL, nonce = $3, locale = $4, searches = 0,
-                sent_at = NULL, updated_at = $5",
+                address = EXCLUDED.address, sent_at = NULL, updated_at = $5",
     )
     .bind(connection)
     .bind(workspace)
@@ -109,50 +122,98 @@ pub async fn start(
     Ok(())
 }
 
-/// A check whose message is still to be sent: its nonce and locale.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A check whose message is still to be sent: its nonce, locale and the
+/// address it checks.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sending {
     pub nonce: Uuid,
     pub locale: Locale,
+    pub address: String,
 }
 
 /// `connection`'s check, when its message is still to be sent.
 pub async fn sending(conn: &mut PgConnection, connection: ConnectionId) -> Result<Option<Sending>> {
-    let row: Option<(Uuid, String)> = sqlx::query_as(
-        "SELECT nonce, locale FROM connectors.address_checks
+    let row: Option<(Uuid, String, String)> = sqlx::query_as(
+        "SELECT nonce, locale, address FROM connectors.address_checks
           WHERE connection_id = $1 AND state = 'sending'",
     )
     .bind(connection)
     .fetch_optional(conn)
     .await?;
-    Ok(row.map(|(nonce, locale)| Sending {
+    Ok(row.map(|(nonce, locale, address)| Sending {
         nonce,
         locale: locale.parse().unwrap_or_default(),
+        address,
     }))
 }
 
-/// A check whose message went out, while the runs look for it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A check whose message went out, while the runs look for it, and the
+/// connection's address (still the one it checks).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Waiting {
     pub nonce: Uuid,
     pub sent_at: DateTime<Utc>,
+    pub address: String,
 }
 
-/// `connection`'s check, while its code is looked for.
-pub async fn waiting(conn: &mut PgConnection, connection: ConnectionId) -> Result<Option<Waiting>> {
-    let row: Option<(Uuid, Option<DateTime<Utc>>)> = sqlx::query_as(
-        "SELECT nonce, sent_at FROM connectors.address_checks
-          WHERE connection_id = $1 AND state = 'waiting'",
+/// `connection`'s check while its code may still be looked for: waiting,
+/// its message sent less than [`WINDOW`] before `now`, for the address the
+/// connection has now. One past the window ends `failed` (`not_found`)
+/// here, whether or not a run looked for it.
+pub async fn waiting(
+    conn: &mut PgConnection,
+    connection: ConnectionId,
+    now: DateTime<Utc>,
+) -> Result<Option<Waiting>> {
+    sqlx::query(
+        "UPDATE connectors.address_checks
+            SET state = 'failed', reason = 'not_found', updated_at = $2
+          WHERE connection_id = $1 AND state = 'waiting'
+            AND (sent_at IS NULL OR sent_at <= $3)",
     )
     .bind(connection)
+    .bind(now)
+    .bind(now - WINDOW)
+    .execute(&mut *conn)
+    .await?;
+    let row: Option<(Uuid, Option<DateTime<Utc>>, String)> = sqlx::query_as(
+        "SELECT a.nonce, a.sent_at, c.address
+           FROM connectors.address_checks a
+           JOIN connectors.connections c ON c.id = a.connection_id
+          WHERE a.connection_id = $1 AND a.state = 'waiting' AND a.sent_at > $2
+            AND a.address = lower(btrim(c.address))",
+    )
+    .bind(connection)
+    .bind(now - WINDOW)
     .fetch_optional(conn)
     .await?;
-    Ok(row.and_then(|(nonce, sent_at)| {
+    Ok(row.and_then(|(nonce, sent_at, address)| {
         Some(Waiting {
             nonce,
             sent_at: sent_at?,
+            address,
         })
     }))
+}
+
+/// End every check of `connection` still under way (`address_changed`):
+/// its address was changed, or is no longer verified. In the transaction
+/// that changes it, whatever the daily budget.
+pub async fn abandon(
+    conn: &mut PgConnection,
+    connection: ConnectionId,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    sqlx::query(
+        "UPDATE connectors.address_checks
+            SET state = 'failed', reason = 'address_changed', updated_at = $2
+          WHERE connection_id = $1 AND state IN ('sending', 'waiting')",
+    )
+    .bind(connection)
+    .bind(now)
+    .execute(conn)
+    .await?;
+    Ok(())
 }
 
 /// The message of check `nonce` went out (or may have): look for it now.
@@ -199,7 +260,8 @@ pub async fn failed(
 }
 
 /// The connection's address is verified (by check `nonce`, or already):
-/// the check ends `verified`, in the same transaction as the connection.
+/// the check ends `verified`, in the same transaction as the connection,
+/// only while the connection's address is still the one the check checked.
 pub async fn verified(
     conn: &mut PgConnection,
     connection: ConnectionId,
@@ -207,9 +269,12 @@ pub async fn verified(
     now: DateTime<Utc>,
 ) -> Result<bool> {
     let ended = sqlx::query(
-        "UPDATE connectors.address_checks
+        "UPDATE connectors.address_checks a
             SET state = 'verified', reason = NULL, updated_at = $3
-          WHERE connection_id = $1 AND nonce = $2 AND state IN ('sending', 'waiting')",
+           FROM connectors.connections c
+          WHERE a.connection_id = $1 AND a.nonce = $2 AND a.state IN ('sending', 'waiting')
+            AND c.id = a.connection_id AND c.provider = 'imap'
+            AND a.address = lower(btrim(c.address))",
     )
     .bind(connection)
     .bind(nonce)
@@ -219,15 +284,28 @@ pub async fn verified(
     if ended.rows_affected() != 1 {
         return Ok(false);
     }
+    let checked = normalized(&check_address(&mut *conn, connection).await?);
     sqlx::query(
         "UPDATE connectors.connections SET address_verified = true, updated_at = $2
-          WHERE id = $1 AND provider = 'imap'",
+          WHERE id = $1 AND provider = 'imap' AND lower(btrim(address)) = $3",
     )
     .bind(connection)
     .bind(now)
+    .bind(checked)
     .execute(conn)
     .await?;
     Ok(true)
+}
+
+/// The address connection `connection`'s check row checks (empty when none).
+async fn check_address(conn: &mut PgConnection, connection: ConnectionId) -> Result<String> {
+    let address: Option<String> = sqlx::query_scalar(
+        "SELECT address FROM connectors.address_checks WHERE connection_id = $1",
+    )
+    .bind(connection)
+    .fetch_optional(conn)
+    .await?;
+    Ok(address.unwrap_or_default())
 }
 
 /// What a run's look for check `nonce`'s code found.
@@ -240,26 +318,27 @@ pub enum Looked {
 }
 
 /// Record, in a transaction of `workspace`, what a run found for `check`:
-/// found, the address is verified; not found, one search more, and the
-/// check fails past [`WINDOW`] or [`MAX_SEARCHES`].
+/// found within [`WINDOW`] of the send, the address is verified; found
+/// later, or not found, one search more, and the check fails past the
+/// window or [`MAX_SEARCHES`].
 pub async fn record(
     pool: &PgPool,
     workspace: WorkspaceId,
     connection: ConnectionId,
-    check: Waiting,
+    check: &Waiting,
     looked: Looked,
     now: DateTime<Utc>,
 ) -> Result<()> {
     use campbooks_kernel::db::BeginFor as _;
+    let over = now >= check.sent_at + WINDOW;
     let mut tx = pool.begin_for(workspace).await?;
     match looked {
-        Looked::Found => {
+        Looked::Found if !over => {
             if verified(&mut tx, connection, check.nonce, now).await? {
                 tracing::info!(%workspace, %connection, "an IMAP mailbox's address was verified");
             }
         }
-        Looked::NotFound => {
-            let over = now >= check.sent_at + WINDOW;
+        Looked::Found | Looked::NotFound => {
             sqlx::query(
                 "UPDATE connectors.address_checks
                     SET searches = searches + 1,

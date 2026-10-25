@@ -119,17 +119,37 @@ until its address is shown to be the mailbox's.
 | A code sent by the instance's own mail (to the address, through its real MX), found in the mailbox's Inbox | proves the mailbox receives the address's mail even against a hostile server; but needs instance mail on every install, and makes the instance mail arbitrary addresses on a member's word |
 | **A code sent through the mailbox's own SMTP server, to the address, found in the same connection's Inbox over IMAP** (chosen) | no instance mail; defends the case #313 named (a lax but honest relay that lets any sender through delivers the code to the real mailbox of the address, not to the member's); bounded, rate-limited, every step through the existing guard, TLS and bounded framers |
 
-What it does not defend: a server whose operator is the member connecting
-it relays the code and can file it anywhere. Such a member gains nothing
-from Campbooks there: their own server already sends as anyone. Recorded
-as a known limit.
+What it does not defend, plainly: the member holds the mailbox's IMAP
+password and can `APPEND` any message to its Inbox, so the check holds only
+while the member cannot see the code. It fails (the member can verify an
+address that is not theirs) at a server whose operator is the member, at a
+server that files submitted mail in Sent (the member reads the code there),
+and at a relay that bounces the message back to the authenticated account.
+It does not stop a lax shared relay outright; it stops one that delivers
+the code to the address's real mailbox and keeps no copy the member can
+read. Recorded as a known limit.
 
 **The code.** 128 bits: the first 16 bytes of the instance signer's HMAC
-over `connectors.address_check`, the connection id and a fresh random
-nonce kept with the check (the nonce alone proves nothing). It travels in
-the check message's `Message-ID`, `<cb-check-<32 hex>@<address domain>>`,
-and in no log, job payload or event. A retry draws a new nonce: an older
-message never counts.
+over `connectors.address_check` and `<connection id>:<nonce>:<address>`
+(the address trimmed and lower-cased; the nonce, fresh per check and kept
+with it, proves nothing alone). It travels in the check message's
+`Message-ID`, `<cb-check-<32 hex>@<address domain>>`, and in no log, job
+payload or event. A retry draws a new nonce: an older message never counts.
+
+**Bound to one address.** The check row keeps the address it checks (the
+connection's, when it started). The code is made from the connection's
+address when the message is sent and when it is looked for; a run looks
+only while that is still the checked address. Connecting a mailbox again
+with its address unverified (a new address, or the same one) ends every
+check under way (`failed`, `address_changed`) in the transaction that saves
+it, whatever the daily budget leaves, and `verified` sets
+`address_verified` only when, in its transaction, the connection's address
+is still the checked one.
+
+**Over after its window.** A check whose message was sent more than 15
+minutes ago is over: the run's look ends it `failed` (`not_found`) before
+anything is searched, a code found that late verifies nothing, and a check
+no run looks at (a paused or failing stream) shows as failed once stale.
 
 **The message.** From and To the address, plain text (UTF-8, base64), its
 subject and body in the member's locale (the locale of the connect or
@@ -215,15 +235,16 @@ still sending or waiting as `failed`, and the retry accepts it.
 Schema `connectors`. Migration
 `20261104010000_connectors__address_verification.sql`:
 
-- `connectors.address_checks`: `connection_id uuid PRIMARY KEY REFERENCES
-  connectors.connections (id) ON DELETE CASCADE`, `workspace_id uuid NOT
-  NULL`, `state text CHECK IN ('sending', 'waiting', 'verified',
+- `connectors.address_checks`: `connection_id uuid PRIMARY KEY`,
+  `workspace_id uuid NOT NULL`, `FOREIGN KEY (connection_id, workspace_id)
+  REFERENCES connectors.connections (id, workspace_id) ON DELETE CASCADE`,
+  `address text NOT NULL` (the address checked, lower-cased), `state text CHECK IN ('sending', 'waiting', 'verified',
   'failed')`, `reason text NULL` (a stable code), `nonce uuid NOT NULL`,
   `locale text CHECK IN ('en', 'pt-PT', 'es-ES', 'fr')`, `searches integer
   NOT NULL DEFAULT 0`, `sent_at timestamptz NULL`, `updated_at timestamptz
   NOT NULL`. Row-level security enabled and forced (`workspace_isolation`),
-  `SELECT, INSERT, UPDATE, DELETE` to `campbooks_app`. No address, no
-  content: a state, codes, a nonce and times.
+  `SELECT, INSERT, UPDATE, DELETE` to `campbooks_app`. No code and no
+  content: a state, codes, a nonce, the checked address and times.
 
 No event is added or changed: `address_verified` is the connection's own
 column, read by the send job at send time and by the connection view. The

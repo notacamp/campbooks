@@ -16,6 +16,7 @@ use secrecy::SecretString;
 use sqlx::{Postgres, Transaction};
 
 use super::{
+    address_checks,
     connections::{self, parse_capabilities},
     credentials,
     imap_servers::{self, ImapAccount},
@@ -322,6 +323,12 @@ async fn save(
     }
     if let Some(account) = &g.grant.imap {
         imap_servers::store(tx, g.grant.workspace, id, account, g.now).await?;
+    }
+    // An address check proves one address: a connection whose address is
+    // not verified (now, perhaps under another address) ends the checks it
+    // had under way, whatever the daily budget leaves (campbooks-cloud#314).
+    if g.grant.provider == Provider::Imap && !g.grant.address_verified {
+        address_checks::abandon(tx, id, g.now).await?;
     }
     for (_, blob) in &g.mailboxes {
         state

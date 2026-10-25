@@ -34,6 +34,7 @@ struct Mailbox {
     ws: WorkspaceId,
     ana: Caller,
     connection: String,
+    servers: Servers,
 }
 
 async fn mailbox(
@@ -64,7 +65,7 @@ async fn mailbox(
                 "address": "ana@bakery.example",
                 "username": "ana",
                 "password": "pw",
-                "servers": servers,
+                "servers": &servers,
             }),
         )
         .await;
@@ -85,6 +86,7 @@ async fn mailbox(
         ws,
         ana,
         connection,
+        servers,
     };
     m.kit.run_jobs().await;
     m
@@ -142,6 +144,24 @@ impl Mailbox {
             )
             .await;
         (asked.status, asked.json)
+    }
+}
+
+impl Mailbox {
+    /// Why the check ended, if it did.
+    async fn reason(&self) -> Option<String> {
+        sqlx::query_scalar("SELECT reason FROM connectors.address_checks")
+            .fetch_one(&self.kit.db)
+            .await
+            .unwrap()
+    }
+
+    /// Fail the check under way, as a run past its window would.
+    async fn fail_check(&self) {
+        sqlx::query("UPDATE connectors.address_checks SET state = 'failed'")
+            .execute(&self.kit.db)
+            .await
+            .unwrap();
     }
 }
 
@@ -479,4 +499,101 @@ fn encoded_words_never_carry_a_line_break() {
         );
         assert!(word.len() <= 75, "{word}");
     }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_address_changed_once_the_checks_are_spent_is_never_verified(db: PgPool) {
+    let m = mailbox(db, |_| {}, |_| {}).await;
+    // The day's checks spent: the connect's, then four more, the last sent
+    // to the address the member owns, its code read by them.
+    for _ in 0..4 {
+        m.fail_check().await;
+        let (status, json) = m.ask_again().await;
+        assert_eq!(status, StatusCode::ACCEPTED, "{json:?}");
+    }
+    m.kit.run_jobs().await;
+    let fifth = m.checks().pop().unwrap();
+
+    // The same connection, connected again under someone else's address,
+    // with no check left for it.
+    let again = m
+        .kit
+        .post(
+            &m.ana,
+            &format!("/api/v1/w/{}/connections/imap", m.ws),
+            json!({
+                "address": "victim@victim.example",
+                "username": "ana",
+                "password": "pw",
+                "servers": &m.servers,
+                "connection": m.connection,
+            }),
+        )
+        .await;
+    assert_eq!(again.status, StatusCode::CREATED, "{:?}", again.json);
+    assert_eq!(again.json["address"], "victim@victim.example");
+    assert_eq!(again.json["address_check"], "failed");
+    assert_eq!(m.reason().await.as_deref(), Some("address_changed"));
+
+    // The fifth code, filed in the Inbox by the member, verifies nothing.
+    m.deliver(&fifth);
+    m.run().await;
+    let connection = m.connection().await;
+    assert_eq!(connection["address"], "victim@victim.example");
+    assert_eq!(connection["address_verified"], false);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_code_for_one_address_never_verifies_another(db: PgPool) {
+    let m = mailbox(db, |_| {}, |_| {}).await;
+    let raw = m.checks().remove(0);
+    // The connection's address changed under the check (by any path).
+    sqlx::query("UPDATE connectors.connections SET address = 'billing@bakery.example'")
+        .execute(&m.kit.db)
+        .await
+        .unwrap();
+    m.deliver(&raw);
+    m.run().await;
+    assert_eq!(m.connection().await["address_verified"], false);
+    let verified: bool = sqlx::query_scalar("SELECT address_verified FROM connectors.connections")
+        .fetch_one(&m.kit.db)
+        .await
+        .unwrap();
+    assert!(!verified);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_check_past_its_window_is_over_even_if_no_run_looked(db: PgPool) {
+    let m = mailbox(db, |_| {}, |_| {}).await;
+    let raw = m.checks().remove(0);
+    m.deliver(&raw);
+    // No run for 16 minutes (a paused or failing stream), then one.
+    m.kit.clock.advance(TimeDelta::minutes(16));
+    m.run().await;
+    let connection = m.connection().await;
+    assert_eq!(connection["address_verified"], false);
+    assert_eq!(connection["address_check"], "failed");
+    assert_eq!(m.reason().await.as_deref(), Some("not_found"));
+}
+
+#[test]
+fn a_code_is_made_for_one_address() {
+    use campbooks_kernel::crypto::{SecretKey, Signer};
+
+    use crate::domain::{address_checks::code, model::ConnectionId};
+
+    let signer = Signer::new(&SecretKey::from_bytes([1; 32]));
+    let (connection, nonce) = (ConnectionId::new(), uuid::Uuid::now_v7());
+    assert_ne!(
+        code(&signer, connection, nonce, "ana@bakery.example"),
+        code(&signer, connection, nonce, "billing@bakery.example")
+    );
+    assert_eq!(
+        code(&signer, connection, nonce, " Ana@Bakery.example "),
+        code(&signer, connection, nonce, "ana@bakery.example")
+    );
+    assert_eq!(
+        code(&signer, connection, nonce, "ana@bakery.example").len(),
+        32
+    );
 }

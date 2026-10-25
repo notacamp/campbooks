@@ -911,9 +911,12 @@ address, through the mailbox's own SMTP server, finds it in that mailbox's Inbox
 (within 15 minutes), marks the address verified and removes the message by its UID (or moves
 it to Trash, or leaves it where the server offers neither safely). The member types nothing;
 Settings → Mailboxes shows the check and offers to try again (at most 5 checks a day per
-mailbox). A server run by the person connecting it can always pass this check, since it sees
-the code it relays; the check stops a shared server that lets any sender through from making
-someone else's address sendable.
+mailbox). Each check proves one address: connecting the mailbox again under another address
+ends it. Know its limit: the member holds the mailbox's IMAP password and can put any message
+in its Inbox, so the check holds only while they cannot see the code. A server they run, a
+server that files submitted mail in Sent, or a relay that bounces the message back to the
+signed-in account lets them pass it; it stops a lax shared relay only when that relay delivers
+the code to the address's real mailbox and keeps no copy the member can read.
 
 Connecting needs the built-in sign-in: an install that sets `CAMPBOOKS_AUTH__ISSUER` to an
 outside issuer cannot connect mail. `connectors.start_connection` answers with the

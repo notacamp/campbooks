@@ -97,7 +97,12 @@ impl Look<'_> {
             return Ok(Found::No);
         };
         let removal = match self.remove(uid, uidplus, moves).await {
-            Err(Trouble::Hostile(_)) => return Ok(Found::Hostile),
+            Err(Trouble::Hostile(_)) => {
+                // No folder stays open, even after a server that did more
+                // than it was asked.
+                let _ = self.deselect(unselect).await;
+                return Ok(Found::Hostile);
+            }
             other => other,
         };
         // Left as found whatever the removal did: no folder stays open.
