@@ -71,23 +71,105 @@ export const OLD_NOTES = page(6, {
 
 export const PAGES: readonly Summary[] = [HANDBOOK, ONBOARDING, HOLIDAYS, IDEAS, BUDGET];
 
-/** A document of two paragraphs, as the server stores it. */
-function demoDocument(...lines: string[]): { update: string; state_vector: string } {
-  const doc = new Y.Doc();
-  const fragment = doc.getXmlFragment("default");
-  for (const line of lines) {
-    const paragraph = new Y.XmlElement("paragraph");
-    paragraph.insert(0, [new Y.XmlText(line)]);
-    fragment.push([paragraph]);
-  }
+/** A member of the demo workspace who is not in the other demos. */
+export const JONAS = {
+  user_id: "0192f1a0-0000-7000-8000-0000000000c1",
+  display_name: "Jonas Weber",
+  email: "jonas@example.com",
+  role: "member",
+  joined_at: "2026-09-12T09:00:00Z",
+  you: false,
+} as const;
+
+/** A task the viewer cannot open: no read answers for it. */
+export const SECRET_TASK_ID = "0192f1a0-0000-7000-8000-00000000dead";
+
+/** The document, as the server stores it. */
+export function documentOf(doc: Y.Doc): { update: string; state_vector: string } {
   return {
     update: toBase64(Y.encodeStateAsUpdate(doc)),
     state_vector: toBase64(Y.encodeStateVector(doc)),
   };
 }
 
+function block(name: string, attributes: Record<string, string | number | boolean>, ...inline: (string | Y.XmlElement)[]) {
+  const element = new Y.XmlElement(name);
+  for (const [key, value] of Object.entries(attributes)) {
+    element.setAttribute(key, value as string);
+  }
+  if (inline.length > 0) {
+    element.insert(
+      0,
+      inline.map((part) => (typeof part === "string" ? new Y.XmlText(part) : part)),
+    );
+  }
+  return element;
+}
+
+const mention = (type: string, id: string) => block("mention", { ref_type: type, ref_id: id });
+const wrap = (name: string, attributes: Record<string, string | number | boolean>, ...inside: Y.XmlElement[]) => {
+  const element = new Y.XmlElement(name);
+  for (const [key, value] of Object.entries(attributes)) {
+    element.setAttribute(key, value as string);
+  }
+  element.insert(0, inside);
+  return element;
+};
+
+/** Paragraphs of plain text. */
+export function plainDoc(...lines: string[]): Y.Doc {
+  const doc = new Y.Doc();
+  doc.getXmlFragment("default").push(lines.map((line) => block("paragraph", {}, line)));
+  return doc;
+}
+
+/**
+ * A page that shows the editor off: headings, a paragraph, three to-dos
+ * (one done), a callout, a list, and mentions of a person, a thread, a task
+ * and a task the viewer cannot open.
+ */
+export function richDoc(threadId: string, taskId: string): Y.Doc {
+  const doc = new Y.Doc();
+  const todo = (text: string, checked: boolean) =>
+    wrap("taskItem", { checked }, block("paragraph", {}, text));
+  const item = (...inline: (string | Y.XmlElement)[]) =>
+    wrap("listItem", {}, block("paragraph", {}, ...inline));
+  doc.getXmlFragment("default").push([
+    block("heading", { level: 1 }, "How we work"),
+    block("paragraph", {}, "Welcome to Acme Studio. This is how we work together."),
+    block("paragraph", {}, "Questions go to ", mention("workspaces.member", JONAS.user_id), " first."),
+    block("heading", { level: 2 }, "This week"),
+    wrap(
+      "taskList",
+      {},
+      todo("Book the venue", true),
+      todo("Send the agenda", false),
+      todo("Confirm the budget", false),
+    ),
+    wrap("callout", { tone: "info" }, block("paragraph", {}, "The kickoff is on Thursday at 10:00.")),
+    block("heading", { level: 2 }, "Linked from here"),
+    wrap(
+      "bulletList",
+      {},
+      item("Email: ", mention("conversations.conversation", threadId)),
+      item("Task: ", mention("tasks.task", taskId)),
+      item("Budget notes: ", mention("tasks.task", SECRET_TASK_ID)),
+    ),
+  ]);
+  return doc;
+}
+
 /** The page as `pages.get` returns it. */
 export function viewOf(summary: Summary, lines: string[]): View {
+  return viewOfDoc(summary, plainDoc(...lines));
+}
+
+/** The page as `pages.get` returns it, with `doc` as its body. */
+export function viewOfDoc(
+  summary: Summary,
+  doc: Y.Doc,
+  extra: Partial<View> = {},
+): View {
   return {
     ...summary,
     created_at: "2026-10-01T09:00:00Z",
@@ -95,6 +177,7 @@ export function viewOf(summary: Summary, lines: string[]): View {
     revision: 1,
     ancestors: [],
     grants: [],
-    document: demoDocument(...lines),
+    document: documentOf(doc),
+    ...extra,
   };
 }
