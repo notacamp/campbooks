@@ -27,7 +27,7 @@
   },
   "week": {
     "label": "Semana",
-    "due": "Vencen",
+    "due": "Tareas",
     "allDay": "Todo el día"
   },
   "month": {
@@ -51,7 +51,8 @@
     "expiry": "Caducidad",
     "hold": "Reservado",
     "none": "Evento",
-    "due": "Vencimiento"
+    "due": "Vencimiento",
+    "planned": "Planificada"
   },
   "from": {
     "email": "De un correo"
@@ -99,7 +100,6 @@
   "due": {
     "label": "Vence",
     "pay": "Pagar · {{title}}",
-    "payAmount": "Pagar · {{title}} · {{amount}}",
     "do": "Hacer · {{title}}",
     "today": "Vence hoy",
     "at": "Vence a las {{time}}",
@@ -108,16 +108,14 @@
     "meta": "Tarea",
     "wasDue": "Vencía el {{day}}",
     "dueOn": "Vence el {{day}}",
-    "note": "Una tarea: vive en tus tareas y aparece aquí el día de su vencimiento",
-    "calendar": "Tareas",
-    "markPaid": "Márcala como pagada desde la tarea",
-    "markDone": "Márcala como hecha desde la tarea",
+    "note": "Una tarea: vive en tus tareas y aparece aquí el día de su vencimiento y el día que la planificaste",
     "paid": "Pagada",
     "done": "Hecha",
-    "hold": "Reservar tiempo",
-    "later": "Más tarde",
     "open": "Abrir tarea",
-    "failed": "No se pudo. Inténtalo de nuevo."
+    "planned": "Planificada",
+    "plannedOn": "Era para el {{day}}",
+    "metaPlanned": "Planificada",
+    "plannedFact": "Planificada para el {{day}}"
   },
   "form": {
     "newTitle": "Nuevo evento",
