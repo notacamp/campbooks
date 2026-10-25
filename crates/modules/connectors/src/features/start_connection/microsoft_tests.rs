@@ -19,7 +19,7 @@ use crate::{
 /// Every mail scope, as Microsoft may answer them (short names).
 const GRANTED: [&str; 4] = ["Mail.ReadWrite", "Mail.Send", "User.Read", "offline_access"];
 
-async fn member(kit: &Kit, name: &str, ws: WorkspaceId) -> crate::testkit::Caller {
+fn member(kit: &Kit, name: &str, ws: WorkspaceId) -> crate::testkit::Caller {
     let caller = kit.user(name);
     kit.join(&caller, ws, Role::Member);
     caller
@@ -29,7 +29,7 @@ async fn member(kit: &Kit, name: &str, ws: WorkspaceId) -> crate::testkit::Calle
 async fn a_member_connects_outlook(db: PgPool) {
     let kit = Kit::with_microsoft(db).await;
     let ws = WorkspaceId::new();
-    let ana = member(&kit, "ana", ws).await;
+    let ana = member(&kit, "ana", ws);
 
     // The front door is asked for Microsoft's mail scopes.
     let intake = crate::grant_intake(kit.deps.clone());
@@ -122,7 +122,7 @@ async fn a_member_connects_outlook(db: PgPool) {
 async fn the_same_account_again_keeps_one_connection_and_one_mailbox(db: PgPool) {
     let kit = Kit::with_microsoft(db).await;
     let ws = WorkspaceId::new();
-    let ana = member(&kit, "ana", ws).await;
+    let ana = member(&kit, "ana", ws);
     let first = kit.connect_microsoft(&ana, ws).await;
     let second = kit.connect_microsoft(&ana, ws).await;
     assert_eq!(first["id"], second["id"]);
@@ -139,7 +139,7 @@ async fn the_same_account_again_keeps_one_connection_and_one_mailbox(db: PgPool)
     );
 
     // Another member connecting the same account is refused.
-    let bea = member(&kit, "bea", ws).await;
+    let bea = member(&kit, "bea", ws);
     let taken = kit
         .adopt_microsoft(&bea, ws, SUB, true, &GRANTED, None)
         .await
@@ -151,7 +151,7 @@ async fn the_same_account_again_keeps_one_connection_and_one_mailbox(db: PgPool)
 async fn a_reconnect_is_for_its_own_account_and_mailbox_only(db: PgPool) {
     let kit = Kit::with_microsoft(db).await;
     let ws = WorkspaceId::new();
-    let ana = member(&kit, "ana", ws).await;
+    let ana = member(&kit, "ana", ws);
     let id = kit.connect_microsoft(&ana, ws).await["id"]
         .as_str()
         .unwrap()
@@ -208,7 +208,7 @@ async fn a_reconnect_is_for_its_own_account_and_mailbox_only(db: PgPool) {
 async fn a_grant_without_mail_or_a_mailbox_connects_nothing(db: PgPool) {
     let kit = Kit::with_microsoft(db).await;
     let ws = WorkspaceId::new();
-    let ana = member(&kit, "ana", ws).await;
+    let ana = member(&kit, "ana", ws);
     for scopes in [
         &["Mail.ReadWrite", "User.Read", "offline_access"][..],
         &["Mail.Read", "Mail.Send", "User.Read"][..],
@@ -247,7 +247,7 @@ async fn a_grant_without_mail_or_a_mailbox_connects_nothing(db: PgPool) {
 async fn an_address_is_verified_only_where_it_was_proven(db: PgPool) {
     let kit = Kit::with_microsoft(db).await;
     let ws = WorkspaceId::new();
-    let ana = member(&kit, "ana", ws).await;
+    let ana = member(&kit, "ana", ws);
     // The ID token's address was not verified (no `xms_edov`).
     let id = kit
         .adopt_microsoft(&ana, ws, SUB, false, &GRANTED, None)
@@ -281,7 +281,7 @@ async fn an_address_is_verified_only_where_it_was_proven(db: PgPool) {
 async fn a_held_grant_whose_access_token_expired_is_refreshed_once(db: PgPool) {
     let kit = Kit::with_microsoft(db).await;
     let ws = WorkspaceId::new();
-    let ana = member(&kit, "ana", ws).await;
+    let ana = member(&kit, "ana", ws);
     // A sign-up's grant, adopted after its access token stopped working.
     let before = kit.microsoft.token_calls();
     let (access, refresh) = kit.microsoft.grant();
@@ -353,7 +353,7 @@ async fn microsoft_is_not_offered_while_its_mail_is_off(db: PgPool) {
     let kit = Kit::new(db).await;
     assert!(kit.deps.microsoft.is_none());
     let ws = WorkspaceId::new();
-    let ana = member(&kit, "ana", ws).await;
+    let ana = member(&kit, "ana", ws);
     let intake = crate::grant_intake(kit.deps.clone());
     assert!(intake.mailbox_scopes("microsoft").is_empty());
     let started = kit
