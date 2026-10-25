@@ -28,7 +28,7 @@ use crate::{
         ops::{self, EventPath, OccurrenceQuery},
         outbound, publish,
         rows::{EventRow, calendar_of, event_of},
-        settings,
+        settings, tracked,
         views::{EventView, event_view},
         write::{MAX_NOTES, MAX_PLACE, MAX_TITLE, NewRow, insert, tidy},
     },
@@ -374,6 +374,8 @@ pub async fn handler(
     } else {
         publish::changed(&state, &mut tx, access.workspace, member, &updated).await?;
     }
+    // What changed, by name: the times, and the other fields.
+    tracked::changes(&state, &mut tx, access.workspace, &row).await?;
     let after = event_of(&mut tx, member, row.id).await?;
     tx.commit().await?;
     let event = event_view(&after, zone, None).ok_or(Error::NotFound)?;

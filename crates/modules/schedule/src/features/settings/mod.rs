@@ -20,9 +20,11 @@ use crate::{
         ops,
         rows::calendars_of,
         settings::{self, Settings, WorkingHours},
+        tracked,
     },
     model::{CalendarId, EventKind},
     scopes::{ScheduleRead, ScheduleWrite},
+    tracking,
 };
 
 /// A member's settings.
@@ -136,6 +138,8 @@ pub async fn update(
     let member = ops::require_calendars_type(&state, access, Action::Write)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut current = settings::load(&mut tx, member).await?;
+    let before = current.clone();
+    let zone_chosen = patch.time_zone.is_some();
     if let Some(zone) = &patch.time_zone {
         settings::check_zone(zone)?;
         current.time_zone = Some(zone.clone());
@@ -179,6 +183,46 @@ pub async fn update(
         current.also_add_to = also;
     }
     settings::save(&mut tx, access.workspace, member, &current).await?;
+    // Which settings changed, never their values; none tracks nothing.
+    let fields = changed(&before, &current, zone_chosen);
+    if !fields.is_empty() {
+        let saved = settings::load(&mut tx, member).await?;
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::SettingsUpdated {
+                    workspace: access.workspace,
+                    settings: tracked::settings(member, &saved),
+                    fields,
+                },
+            )
+            .await?;
+    }
     tx.commit().await?;
     Ok(Json(SettingsView::of(&current)))
+}
+
+/// The settings that differ between `before` and `after`; a new time zone
+/// is the member's choice when they sent one (`zone_chosen`), else their
+/// device's.
+fn changed(before: &Settings, after: &Settings, zone_chosen: bool) -> Vec<tracking::SettingsField> {
+    let mut fields = Vec::new();
+    if before.time_zone != after.time_zone {
+        fields.push(if zone_chosen {
+            tracking::SettingsField::TimeZone
+        } else {
+            tracking::SettingsField::DeviceTimeZone
+        });
+    }
+    if before.working_hours != after.working_hours {
+        fields.push(tracking::SettingsField::WorkingHours);
+    }
+    if before.scout_kinds != after.scout_kinds {
+        fields.push(tracking::SettingsField::ScoutKinds);
+    }
+    if before.also_add_to != after.also_add_to {
+        fields.push(tracking::SettingsField::AlsoAddTo);
+    }
+    fields
 }

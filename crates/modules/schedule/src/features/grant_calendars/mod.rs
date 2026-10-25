@@ -11,9 +11,11 @@ use crate::{
         blobs::{MAX_DOCUMENT_BYTES, read_json},
         moment::parse_zone,
         rows::ensure_campbooks_calendar,
+        tracked,
     },
     inbound::{CalendarList, CapabilityGranted},
     model::CalendarId,
+    tracking,
 };
 
 /// Makes the calendars of a calendar grant.
@@ -59,7 +61,8 @@ impl EventHandler for GrantCalendars {
                 .color
                 .filter(|color| is_color(color))
                 .map(|color| color.to_ascii_lowercase());
-            added += sqlx::query(
+            let id = CalendarId::new();
+            let inserted = sqlx::query(
                 "INSERT INTO schedule.calendars
                      (id, workspace_id, member_id, source, connection_id, provider_calendar_id,
                       name, color, time_zone, syncing, writable, is_primary, provider)
@@ -67,7 +70,7 @@ impl EventHandler for GrantCalendars {
                  ON CONFLICT (workspace_id, connection_id, provider_calendar_id)
                     WHERE source = 'provider' DO NOTHING",
             )
-            .bind(CalendarId::new())
+            .bind(id)
             .bind(workspace)
             .bind(granted.granted_by)
             .bind(granted.connection)
@@ -81,6 +84,22 @@ impl EventHandler for GrantCalendars {
             .execute(&mut **tx)
             .await?
             .rows_affected();
+            added += inserted;
+            // A calendar the module did not have yet.
+            if inserted > 0
+                && let Some(snapshot) = tracked::calendar(tx, id).await?
+            {
+                state
+                    .tracker
+                    .track(
+                        tx,
+                        &tracking::CalendarAdded {
+                            workspace,
+                            calendar: snapshot,
+                        },
+                    )
+                    .await?;
+            }
         }
         tracing::info!(calendars = added, "calendars made for a calendar grant");
         Ok(())

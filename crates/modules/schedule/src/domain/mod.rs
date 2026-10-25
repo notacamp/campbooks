@@ -15,5 +15,6 @@ pub mod recur;
 pub mod resources;
 pub mod rows;
 pub mod settings;
+pub mod tracked;
 pub mod views;
 pub mod write;
