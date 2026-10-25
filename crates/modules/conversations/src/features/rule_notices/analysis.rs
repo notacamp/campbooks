@@ -1026,13 +1026,13 @@ mod tests {
             "spring", "summer", "autumn", "winter", "travel", "cooking", "gardens", "music",
             "cinema", "design", "science", "history",
         ];
-        let mut mail: Vec<Mail> = topics
+        let mut all: Vec<Mail> = topics
             .iter()
             .take(promos)
             .zip(0..)
             .map(|(topic, i)| mail(&format!("Exclusive offer on {topic} picks"), 2 * i, false))
             .collect();
-        mail.extend(
+        all.extend(
             topics
                 .iter()
                 .rev()
@@ -1040,7 +1040,7 @@ mod tests {
                 .zip(0..)
                 .map(|(topic, i)| mail(&format!("This week in {topic}"), 2 * i + 1, true)),
         );
-        mail
+        all
     }
 
     #[test]
