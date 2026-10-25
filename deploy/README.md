@@ -669,8 +669,9 @@ With the built-in issuer:
   `organizations` (work and school only, for an app registered that way), `consumers`
   (personal only) or one tenant id. Microsoft does not verify the address it reports, so
   it counts as verified (for an invite-only instance) only when you also add the optional
-  claim `xms_edov` to the ID token (**Token configuration**). Microsoft has no mailbox
-  adapter yet: signing in with it connects no mail.
+  claim `xms_edov` to the ID token (**Token configuration**). Signing in with Microsoft
+  connects no mail unless Microsoft mail is turned on (**Outlook and Microsoft 365** under
+  "Connected accounts").
 - **Sign in with Zoho**, in every Zoho data centre. In the Zoho API console, add a
   **Server-based application** with the redirect URI
   `${CAMPBOOKS_PUBLIC_URL}/auth/callback/zoho`, and turn on **Multi-DC** (Settings) so the
@@ -833,8 +834,8 @@ minted codes, and the setting needs no value when you only use minted ones.
 
 ## Connected accounts
 
-Members connect outside accounts (Gmail, Zoho Mail and, when turned on, any mailbox over
-IMAP); Campbooks asks Google for consent through
+Members connect outside accounts (Gmail, Zoho Mail, any mailbox over IMAP and, when turned
+on, Outlook and Microsoft 365); Campbooks asks Google for consent through
 its built-in sign-in (the same redirect URI, `/auth/callback/google`), keeps the grant
 encrypted with the instance secret key (schema `connectors`), and
 syncs mail on its own: every minute while an account is busy, backing off to every few
@@ -917,6 +918,46 @@ in its Inbox, so the check holds only while they cannot see the code. A server t
 server that files submitted mail in Sent, or a relay that bounces the message back to the
 signed-in account lets them pass it; it stops a lax shared relay only when that relay delivers
 the code to the address's real mailbox and keeps no copy the member can read.
+
+**Outlook and Microsoft 365** (Outlook.com, Hotmail, Live, MSN, and work and school
+mailboxes) connect through Microsoft Graph with the app of Sign in with Microsoft (above):
+the same client, secret and redirect URI (`/auth/callback/microsoft`, or
+`CAMPBOOKS_MICROSOFT__REDIRECT_PATH` behind a proxy that rewrites it). It is **off by
+default** while reading mail is being built: `CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED=true`
+turns it on, and then Settings → Mailboxes → Add a mailbox sends an Outlook or Microsoft 365
+address to Microsoft's own sign-in ("Connect Outlook") instead of saying it is coming soon.
+With the flag off nothing about Microsoft mail is read or checked, so a server with the
+sign-in client alone starts and offers no Microsoft mailbox. With it on, a missing Microsoft
+client or instance secret key is a warning (Microsoft is not offered); only a tenant that is
+none stops the server. To set up the app for mail:
+
+1. In the Microsoft Entra admin center (**App registrations**), the app's supported account
+   types must be "Accounts in any organizational directory and personal Microsoft accounts",
+   so Outlook.com and Hotmail mailboxes connect as well as work and school ones.
+2. Its **Web** redirect URI is the one sign-in uses:
+   `${CAMPBOOKS_PUBLIC_URL}/auth/callback/microsoft`, e.g.
+   `https://campbooks.example.com/auth/callback/microsoft`.
+3. Under **API permissions**, add the delegated Microsoft Graph permissions
+   `offline_access`, `Mail.ReadWrite`, `Mail.Send` and `User.Read` (with `openid`, `email`
+   and `profile`). None needs an administrator's consent, though a work or school tenant may
+   require one by policy.
+4. Do the **publisher verification** (Branding & properties, with a Microsoft Partner Network
+   account): until then personal accounts see an "unverified" consent screen, and many work
+   tenants refuse apps from unverified publishers.
+5. Set `CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED=true` and restart. The consent goes to the
+   tenant `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` (default `common`: personal, work and
+   school accounts), separate from sign-in's `CAMPBOOKS_MICROSOFT__TENANT`, and its tokens
+   are refreshed there. Where sign-in's tenant is narrower (`organizations`), a personal
+   mailbox still connects, without becoming a way to sign in.
+
+Campbooks reads the mailbox's id and primary address from Graph (`/me`) and calls only
+`login.microsoftonline.com` and `graph.microsoft.com`. A grant Microsoft no longer honours
+(revoked, expired, its consent withdrawn) shows the mailbox as needing its member to sign in
+again. Microsoft has no way to revoke one app's grant without signing the person out of
+every app, so disconnecting deletes its tokens and the member removes the app at
+`https://account.live.com/consent/Manage` (personal) or `https://myapps.microsoft.com`
+(work and school). Reading the mail lands in a later release: until then a connected Outlook
+mailbox keeps its grant alive and shows no mail.
 
 Connecting needs the built-in sign-in: an install that sets `CAMPBOOKS_AUTH__ISSUER` to an
 outside issuer cannot connect mail. `connectors.start_connection` answers with the
