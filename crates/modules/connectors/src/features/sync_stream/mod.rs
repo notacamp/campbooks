@@ -121,6 +121,10 @@ impl JobHandler for SyncStream {
     const QUEUE: &'static str = "sync";
     const MAX_ATTEMPTS: u32 = 3;
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one run read top to bottom: load, token, backlog, the provider's read"
+    )]
     async fn run(&self, ctx: &mut JobContext, payload: SyncStreamPayload) -> Result<(), JobError> {
         let workspace: WorkspaceId = ctx
             .workspace()

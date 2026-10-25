@@ -277,12 +277,12 @@ mod tests {
             inbox,
             ["INBOX", "STARRED", "UNREAD", "category:Red", "folder:in"]
         );
-        let flags = flags(&inbox, &cursor);
-        assert!(flags.mailbox.in_inbox && !flags.read && flags.starred);
-        assert_eq!(flags.direction, Direction::Inbound);
-        assert_eq!(flags.provider_stream, Some(Some(ProviderStream::Primary)));
+        let shown = flags(&inbox, &cursor);
+        assert!(shown.mailbox.in_inbox && !shown.read && shown.starred);
+        assert_eq!(shown.direction, Direction::Inbound);
+        assert_eq!(shown.provider_stream, Some(Some(ProviderStream::Primary)));
         assert_eq!(
-            flags.labels,
+            shown.labels,
             [Label {
                 key: "Red".into(),
                 name: "Red".into()

@@ -37,7 +37,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::post,
 };
-use campbooks_kernel::{AppState, clock::Clock as _, db::BeginFor as _, tenancy::WorkspaceId};
+use campbooks_kernel::{AppState, db::BeginFor as _, tenancy::WorkspaceId};
 use serde::Deserialize;
 use uuid::Uuid;
 
