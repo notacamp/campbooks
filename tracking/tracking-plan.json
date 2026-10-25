@@ -110,7 +110,7 @@
       "pr": "#672"
     },
     {
-      "change": "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check and the kernel's maintenance schedules and change-feed sequencer.",
+      "change": "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check, search.on_page_changed and the kernel's maintenance schedules and change-feed sequencer.",
       "date": "2026-10-25",
       "plan_version": 13,
       "pr": "#666"
@@ -404,6 +404,12 @@
       "exemption": "projection of conversations.message_sent: the conversation's entries in the index refreshed",
       "kind": "handler",
       "name": "search.on_message_sent"
+    },
+    {
+      "events": [],
+      "exemption": "projection of pages.page_changed: the page's entry in the index refreshed (removed when trashed or gone)",
+      "kind": "handler",
+      "name": "search.on_page_changed"
     },
     {
       "events": [],

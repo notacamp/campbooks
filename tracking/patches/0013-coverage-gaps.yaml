@@ -2,13 +2,13 @@
 # require-full-tracking-coverage): the rows still missing on next. An IMAP
 # mailbox's address check asked for again (connectors.check_address) and its
 # message sent or not (connectors.send_address_check), both from
-# campbooks-cloud#314; and the kernel's own maintenance, which no module
-# owned. Applied with
+# campbooks-cloud#314; search's projection of pages (campbooks-cloud#363);
+# and the kernel's own maintenance, which no module owned. Applied with
 # `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0013-coverage-gaps.yaml`.
 changelog:
   - date: "2026-10-25"
     plan_version: 13
-    change: "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check and the kernel's maintenance schedules and change-feed sequencer."
+    change: "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check, search.on_page_changed and the kernel's maintenance schedules and change-feed sequencer."
     pr: "#666"
 
 events:
@@ -63,6 +63,10 @@ coverage:
   - kind: "job"
     name: "connectors.send_address_check"
     events: [connectors.address_check_send_completed]
+  # Pages (campbooks-cloud#363, #672) landed with a handler of its own in search.
+  - kind: "handler"
+    name: "search.on_page_changed"
+    exemption: "projection of pages.page_changed: the page's entry in the index refreshed (removed when trashed or gone)"
   # The kernel's own background work.
   - kind: "schedule"
     name: "kernel.prune_jobs"
