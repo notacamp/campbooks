@@ -41,6 +41,33 @@ describe("rules in words", () => {
     );
   });
 
+  it("titles the model's words for a sender's mail, and says a kind's template", () => {
+    const [base] = LEDGER_SUGGESTIONS.suggestions;
+    const phrase =
+      base === undefined
+        ? undefined
+        : {
+            ...base,
+            likeness: "sender_phrase" as const,
+            conditions: [
+              { field: "sender_address" as const, value: "orders@shop.example" },
+              { field: "subject_contains" as const, value: "sale starts now" },
+            ],
+          };
+    expect(phrase === undefined ? "" : likenessTitle(t, phrase)).toBe(
+      'rules.likeness.phrase{"phrase":"sale starts now","from":"orders@shop.example"}',
+    );
+    expect(
+      ruleSentence(t, "en", {
+        conditions: [
+          { field: "sender_address", value: "orders@shop.example" },
+          { field: "subject_template", value: "deals of the week #" },
+        ],
+        actions: [{ action: "archive" }],
+      }),
+    ).toContain(String.raw`rules.when.like{\"value\":\"deals of the week #\"}`);
+  });
+
   it("says what a rule did to a row, counting the others", () => {
     expect(ruleLine(t, LEDGER_RULE, "en")).toBe(
       String.raw`rules.row.withOthers{"line":"rules.row.move","others":"rules.row.others{\"count\":39,\"n\":\"39\",\"from\":\"rules.when.from{\\\"value\\\":\\\"hello@weekly-ledger.example\\\"}\"}"}`,

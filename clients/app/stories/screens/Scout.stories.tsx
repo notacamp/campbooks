@@ -52,12 +52,14 @@ import {
 } from "../../test/demo/attention";
 import {
   BUILDS_NOTICE,
+  DEALS_NOTICE,
   INBOX,
   LEDGER_RULE,
   PRIMARY,
   Q4,
   Q4_BODY,
   Q4_DETAIL,
+  SALES_NOTICE,
   STREAM_COUNTS,
   W,
 } from "../../test/demo/conversations";
@@ -542,6 +544,95 @@ export const AskFromScoutNoticed: Story = {
 /** Scout noticed without a play (recordings). */
 export const AskFromScoutNoticedLive: Story = {
   args: { path: HOME, api: everywhere() },
+};
+
+/** The shop's promotions, as search returns them for "See the 12 emails". */
+const SALE_HITS = ["Our boots sale starts now", "Our scarves sale starts now"].map(
+  (subject, index) => ({
+    container: { type: "conversations.inbox", id: INBOX.id },
+    record: {
+      type: "conversations.conversation",
+      id: `0192f1a0-0000-7000-8000-00000000c2${String(index)}0`,
+    },
+    facets: { stream: "primary", count: 1, unread: true },
+    from: { address: SALES_NOTICE.sender, name: SALES_NOTICE.sender_name },
+    occurred_at: `2026-10-${String(22 - 7 * index)}T09:30:00Z`,
+    title: [{ text: subject, hit: false }],
+    snippet: [{ text: "New styles are in, while they last.", hit: false }],
+  }),
+);
+
+/**
+ * Home with what Scout noticed about one shop's mail (campbooks-cloud#356):
+ * `notices`, each about one kind of it; "See the N emails" searches that
+ * kind, and Not now hides one with Undo.
+ */
+function kindsApi(notices: (typeof DEALS_NOTICE)[]): Record<string, MockRoute> {
+  return {
+    ...everywhere(),
+    [`GET ${W}/rule-notices`]: { body: { notices } },
+    ...Object.fromEntries(
+      notices.flatMap((notice): [string, MockRoute][] => [
+        [`GET ${W}/rule-notices/${notice.id}`, { body: notice }],
+        [`POST ${W}/rule-notices/${notice.id}/answer`, { status: 204 }],
+        [`DELETE ${W}/rule-notices/${notice.id}/answer`, { status: 204 }],
+      ]),
+    ),
+    [`GET ${W}/search`]: (_body, url) => {
+      const q = url.searchParams.get("q") ?? "";
+      return {
+        body: {
+          hits: q.includes('subject:"sale starts now"') ? SALE_HITS : [],
+          indexing: false,
+          next_cursor: null,
+          query: { filters: [], text: q, warnings: [] },
+        },
+      };
+    },
+  };
+}
+
+/**
+ * Scout noticed one kind of a shop's mail, by its subject template: the
+ * sentence quotes a real subject, and "See the 40 emails" is narrowed to it.
+ */
+export const ScoutNoticedTemplateKind: Story = {
+  args: { path: HOME, api: kindsApi([DEALS_NOTICE]) },
+  play: async ({ canvasElement }) => {
+    const note = await within(canvasElement).findByRole("region", { name: "Scout noticed" });
+    await expect(
+      within(note).getByText(
+        /Northwind \(orders@shop\.example\) sent you 40 emails like “Deals of the week 40: up to half off garden tools” in the last 60 days/u,
+      ),
+    ).toBeVisible();
+    await expect(within(note).getByRole("button", { name: "Archive them…" })).toBeVisible();
+    await expect(within(note).getByRole("button", { name: "See the 40 emails" })).toBeVisible();
+  },
+};
+
+/**
+ * Scout noticed the shop's promotions by the model's words for them: the
+ * sentence quotes one, and its emails are searched by those words.
+ */
+export const ScoutNoticedPhraseKind: Story = {
+  args: { path: HOME, api: kindsApi([SALES_NOTICE]) },
+  play: async ({ canvasElement }) => {
+    const note = await within(canvasElement).findByRole("region", { name: "Scout noticed" });
+    await expect(
+      within(note).getByText(
+        /You got 12 emails like “Our boots sale starts now” from Northwind \(orders@shop\.example\)/u,
+      ),
+    ).toBeVisible();
+    await userEvent.click(within(note).getByRole("button", { name: "See the 12 emails" }));
+    await expect(
+      (await within(canvasElement).findAllByText("Our scarves sale starts now"))[0],
+    ).toBeVisible();
+  },
+};
+
+/** Both kinds, one after the other, without a play (recordings). */
+export const ScoutNoticedKindsLive: Story = {
+  args: { path: HOME, api: kindsApi([DEALS_NOTICE, SALES_NOTICE]) },
 };
 
 /** Scout's memory: a rule's More menu, Ask Scout about this rule (recordings). */

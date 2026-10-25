@@ -305,6 +305,92 @@ describe("Scout noticed", () => {
     });
   });
 
+  it("names one kind of a sender's mail by a real subject, and narrows its emails to it", async () => {
+    const kind: Schema<"RuleNotice"> = {
+      ...NOTICE,
+      kind: "archive_on_arrival",
+      sender: "orders@shop.example",
+      sender_name: "Northwind",
+      conditions: [
+        { field: "sender_address", value: "orders@shop.example" },
+        { field: "subject_template", value: "deals of the week #" },
+      ],
+      actions: [{ action: "archive" }, { action: "surface", value: "never" }],
+      evidence: { ...NOTICE.evidence, received: 40, archived_unread: 38, cadence: null },
+      pattern: {
+        source: "template",
+        example:
+          "Deals of the week 40: everything for the garden, the kitchen and the long winter ahead",
+        search: 'subject:"deals of the week"',
+      },
+    };
+    mockApi({
+      [`GET ${W}/rule-notices`]: { body: { notices: [kind] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+    });
+    const root = createRootRoute({ component: Outlet });
+    const home = createRoute({
+      getParentRoute: () => root,
+      path: "/",
+      component: () => <ScoutNoticed workspaceId={DUARTE.id} />,
+    });
+    const results = createRoute({
+      getParentRoute: () => root,
+      path: "/w/$workspaceId/search",
+      validateSearch: (search: Record<string, unknown>): { q?: string } =>
+        typeof search["q"] === "string" ? { q: search["q"] } : {},
+      component: () => <p>Search results</p>,
+    });
+    const router = createRouter({
+      routeTree: root.addChildren([home, results]),
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    });
+    renderWithProviders(<RouterProvider router={router} />);
+    const note = await screen.findByRole("region", { name: "Scout noticed" });
+    // The example, cut to fit, as plain text.
+    expect(
+      within(note).getByText(
+        "Northwind (orders@shop.example) sent you 40 emails like “Deals of the week 40: everything for the garden, the…” in the last 60 days, and you archived or deleted 38 of them unread. Archive them as they arrive?",
+      ),
+    ).toBeVisible();
+
+    fireEvent.click(within(note).getByRole("button", { name: "See the 40 emails" }));
+
+    expect(await screen.findByText("Search results")).toBeVisible();
+    expect(router.state.location.search).toEqual({
+      q: 'from:orders@shop.example newer_than:60d subject:"deals of the week"',
+    });
+  });
+
+  it("names the model's words for a kind, kept off Home", async () => {
+    const kind: Schema<"RuleNotice"> = {
+      ...NOTICE,
+      sender: "orders@shop.example",
+      sender_name: null,
+      conditions: [
+        { field: "sender_address", value: "orders@shop.example" },
+        { field: "subject_contains", value: "sale starts now" },
+      ],
+      evidence: { ...NOTICE.evidence, received: 12, opened: 1, cadence: null },
+      pattern: {
+        source: "phrase",
+        example: "Our boots sale starts now",
+        search: 'subject:"sale starts now"',
+      },
+    };
+    mockApi({
+      [`GET ${W}/rule-notices`]: { body: { notices: [kind] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+    });
+    renderWithProviders(<ScoutNoticed workspaceId={DUARTE.id} />);
+    const note = await screen.findByRole("region", { name: "Scout noticed" });
+    expect(
+      within(note).getByText(
+        "You got 12 emails like “Our boots sale starts now” from orders@shop.example in the last 60 days and opened 1. Keep them off Home and file them under Updates?",
+      ),
+    ).toBeVisible();
+  });
+
   it("asks what should happen first: the verb button starts on Scout's guess", async () => {
     const api = mockApi({
       [`GET ${W}/rule-notices`]: { body: { notices: [NOTICE] } },

@@ -34,7 +34,7 @@ The member can change an event's kind. Events that only have a day are all-day e
 
 ### Obligations are not events
 
-Something the member has to do by a date, such as pay by Friday, sign, submit, or renew by a date, is a task. It is shown on the calendar as Due, but it is not an event and it is not in this calendar. Ask about what is due through the tasks, not through events.
+Something the member has to do by a date, such as pay by Friday, sign, submit, or renew by a date, is a task. It is shown on the calendar as Due, but it is not an event and it is not in this calendar. Ask about what is due through the tasks, not through events. A task the member planned for a day is shown on the calendar on that day too, as Planned. Ask the tasks (`my_tasks`) for planned and due tasks, not the events.
 
 ### Adding to the member's own calendar
 

@@ -14,12 +14,13 @@ import { CONNECTION, ZOHO_CONNECTION } from "../../../test/demo/identity";
 import {
   CALENDARS,
   DENTIST,
-  DUE_ITEMS,
   FLIGHT,
   HOLIDAYS,
   REVIEW,
   SETTINGS,
   SCHEDULE_NOW,
+  TASKS,
+  taskSources,
   WEEK_EVENTS,
   conversationId,
   sourceDetail,
@@ -27,8 +28,8 @@ import {
 import { DUARTE } from "../../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../../test/render";
 import type { MailboxConsent } from "~/modules/connectors";
+import type { TaskSource, UseTaskSources } from "~/modules/tasks";
 
-import { DUE_ACTION_KEY, dueKey, type DueItem } from "./due";
 import { buildScheduleRoutes } from "./index";
 
 const S = `${W}/schedule`;
@@ -43,6 +44,22 @@ const consent = (start: MailboxConsent["start"] = vi.fn()): MailboxConsent => ({
   wayInFate: () => "unchanged",
 });
 
+/** The emails the demo tasks came from, as the app's conversations module tells them. */
+const useSources: UseTaskSources = (_workspaceId, ids) =>
+  new Map(
+    taskSources()
+      .filter((mail) => ids.includes(mail.id))
+      .map((mail): [string, TaskSource] => [
+        mail.id,
+        {
+          name: mail.latest_from?.name ?? "",
+          subject: mail.subject,
+          date: mail.last_message_at,
+          href: `/w/${DUARTE.id}/inbox/${mail.stream}/${mail.id}`,
+        },
+      ]),
+  );
+
 function renderAt(
   path: string,
   { locale = "en", start }: { locale?: "en" | "pt-PT"; start?: MailboxConsent["start"] } = {},
@@ -55,7 +72,9 @@ function renderAt(
   });
   const router = createRouter({
     routeTree: root.addChildren([
-      workspace.addChildren(buildScheduleRoutes(workspace, { useConsent: () => consent(start) })),
+      workspace.addChildren(
+        buildScheduleRoutes(workspace, { useConsent: () => consent(start), useSources }),
+      ),
     ]),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
@@ -68,6 +87,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
     [`GET ${S}/settings`]: { body: SETTINGS },
     [`GET ${S}/calendars`]: { body: { calendars: CALENDARS } },
     [`GET ${S}/events`]: { body: { events: WEEK_EVENTS, truncated: false } },
+    [`GET ${W}/tasks`]: { body: { tasks: [] } },
     [`GET ${W}/conversations/${conversationId(5)}`]: { body: sourceDetail(5) },
     [`GET ${W}/conversations/${conversationId(1)}`]: { body: sourceDetail(1) },
     ...extra,
@@ -317,61 +337,113 @@ describe("the Calendar place", () => {
   });
 });
 
-describe("the Due layer", () => {
+describe("tasks on the calendar", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  const items = DUE_ITEMS as unknown as DueItem[];
-
-  function withDue() {
+  /** Ana's open tasks, answering Done by taking the task off the list, as the server would. */
+  function withTasks(view = WEEK) {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(SCHEDULE_NOW));
-    api();
-    const view = renderAt(WEEK);
-    view.queryClient.setQueryData(dueKey(DUARTE.id), items);
-    return view;
+    let open = [...TASKS];
+    const mocked = api({
+      [`GET ${W}/tasks`]: () => ({ body: { tasks: open } }),
+      ...Object.fromEntries(
+        TASKS.map((each) => [
+          `POST ${W}/tasks/${each.id}/done`,
+          () => {
+            open = open.filter((other) => other.id !== each.id);
+            return { body: { ...each, state: "done", revision: 2 } };
+          },
+        ]),
+      ),
+    });
+    return { mocked, view: renderAt(view) };
   }
 
-  it("shows tasks due on their day, and an overdue one on today in the danger tone", async () => {
-    withDue();
+  it("shows tasks on the day they are due, an overdue one on today in the danger tone", async () => {
+    withTasks();
 
     expect((await screen.findAllByText("Overdue · 2 days")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /Pay · Costa Obras invoice/u })).toBeVisible();
     expect(
-      screen.getByRole("button", { name: /Pay · Costa Obras invoice · €1,240\.00/u }),
-    ).toBeVisible();
-    expect(screen.getByRole("button", { name: /Do · Send the signed lease/u })).toBeVisible();
+      (await screen.findAllByRole("button", { name: /Do · Send the lease/u })).length,
+    ).toBeGreaterThan(0);
   });
 
-  it("opens a task's sheet with Paid, Hold time, Later and Open task, and no Remove", async () => {
-    withDue();
+  it("shows a task on its planned day as well, and a slipped plan on today", async () => {
+    withTasks();
+
+    // The lease: planned Wednesday, due Thursday, two rows.
+    expect(await screen.findAllByRole("button", { name: /Do · Send the lease/u })).toHaveLength(2);
+    expect(screen.getByText("Was for Mon")).toBeInTheDocument();
+  });
+
+  it("shows one row, saying it is planned, when it is planned for its due day", async () => {
+    withTasks();
+
+    expect(
+      await screen.findAllByRole("button", { name: /Pay · Costa Obras invoice/u }),
+    ).toHaveLength(1);
+  });
+
+  it("shows no Planned row for a task put off until later, and keeps its Due row", async () => {
+    withTasks();
+
+    expect(
+      await screen.findAllByRole("button", { name: /Do · Book the car inspection/u }),
+    ).toHaveLength(1);
+  });
+
+  it("opens a task's sheet with Paid and Open task, and no Hold time, Later or Remove", async () => {
+    withTasks();
 
     fireEvent.click(await screen.findByRole("button", { name: /Pay · EDP bill/u }));
 
     const sheet = await screen.findByRole("complementary", { name: /Pay · EDP bill/u });
-    for (const name of [/Paid/u, /Hold time/u, /Later/u, /Open task/u]) {
+    for (const name of [/Paid/u, /Open task/u]) {
       expect(within(sheet).getByRole("button", { name })).toBeVisible();
     }
-    expect(within(sheet).queryByRole("button", { name: /Remove/u })).toBeNull();
+    for (const name of [/Hold time/u, /Later/u, /Remove/u]) {
+      expect(within(sheet).queryByRole("button", { name })).toBeNull();
+    }
     expect(within(sheet).getByText(/^Was due .*25/u)).toBeVisible();
+    expect(within(sheet).getByText("Your October bill")).toBeVisible();
   });
 
-  it("marks it paid with E, and offers Undo", async () => {
-    const view = withDue();
-    const done = vi.fn<(input: unknown) => Promise<{ label: string; undo: () => void }>>(() =>
-      Promise.resolve({ label: "EDP bill marked paid", undo: vi.fn() }),
+  it("tells a Planned row's sheet apart: the Planned chip, the plan and the due day", async () => {
+    withTasks(`${PATH}?view=agenda&date=2026-10-28`);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^(?=.*Send the lease)(?=.*Planned)/u }),
     );
-    view.queryClient.setMutationDefaults(DUE_ACTION_KEY, { mutationFn: done });
+
+    const sheet = await screen.findByRole("complementary", { name: /Do · Send the lease/u });
+    expect(within(sheet).getByText("Planned")).toBeVisible();
+    expect(within(sheet).getByText(/^Planned for .*28/u)).toBeVisible();
+    expect(within(sheet).getByText(/^Due .*29/u)).toBeVisible();
+  });
+
+  it("marks it paid with E, takes it off the calendar, and offers Undo", async () => {
+    const { mocked } = withTasks();
 
     fireEvent.click(await screen.findByRole("button", { name: /Pay · EDP bill/u }));
     await screen.findByRole("complementary", { name: /Pay · EDP bill/u });
     fireEvent.keyDown(document, { key: "e" });
 
-    expect(await screen.findByText("EDP bill marked paid")).toBeVisible();
-    expect(done.mock.calls[0]?.[0]).toEqual({ item: items[0], action: "done" });
+    expect(await screen.findByText("Paid · EDP bill")).toBeVisible();
+    await waitFor(() => {
+      expect(mocked.calls.map((call) => call.route)).toContain(
+        `POST ${W}/tasks/${TASKS[0]?.id ?? ""}/done`,
+      );
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /Pay · EDP bill/u })).toBeNull();
+    });
   });
 
-  it("shows no Due row where nothing is wired", async () => {
+  it("shows no task row where there are no tasks", async () => {
     api();
     renderAt(WEEK);
 
