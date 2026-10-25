@@ -48,9 +48,9 @@
 //!   message that is not flagged is queued for nothing.
 //!
 //! - Switching whose move it is on later runs this again once for every
-//!   inbox (`needs_backfills.moves_asked`): the dispatcher puts the finished
-//!   backfills that were made without it back to pending, so the mail of the
-//!   last days is asked whose move it is. With it off nothing is reset and
+//!   inbox (`needs_backfills.moves_asked`): the dispatcher starts the finished
+//!   backfills that were made without it again, so the mail of the last days
+//!   is asked whose move it is. With it off nothing is reset and
 //!   nothing is asked.
 //!
 //! Each refresh also settles the need against the time now and writes when
@@ -153,11 +153,13 @@ impl Job for DispatchNeedsBackfills {
         let tx = ctx.maintenance_tx().await?;
         if self.moves {
             // Whose move it is was switched on after these backfills ran:
-            // once more, which asks it of the recent mail. A runtime query,
-            // so the column added since needs no entry in the `.sqlx` cache.
+            // once more, which asks it of the recent mail. Started at once
+            // (`running`), as the maintenance policy only lets a row be
+            // started. A runtime query, so the column added since needs no
+            // entry in the `.sqlx` cache.
             let again = sqlx::query(
                 "UPDATE conversations.needs_backfills
-                    SET state = 'pending', after_id = NULL, refreshed = 0, finished_at = NULL
+                    SET state = 'running', after_id = NULL, refreshed = 0, finished_at = NULL
                   WHERE state = 'done' AND NOT moves_asked",
             )
             .execute(&mut **tx)
