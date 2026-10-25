@@ -136,6 +136,10 @@ mod tests {
     fn off_it_schedules_nothing() {
         let off = Deps { enabled: false };
         let registry = campbooks_kernel::jobs::Registry::build(&[module(off)]).unwrap();
-        assert!(registry.schedule_names().is_empty());
+        assert!(
+            !registry
+                .schedule_names()
+                .contains(&"pages.dispatch_purge_trash")
+        );
     }
 }

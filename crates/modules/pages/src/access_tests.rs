@@ -320,7 +320,7 @@ async fn search_reads_a_pages_title_and_text_and_a_trashed_page_leaves_the_index
     let texts = source
         .texts(
             context(&kit, &mut tx, workspace),
-            &[group.entries[0].record.clone()],
+            std::slice::from_ref(&group.entries[0].record),
         )
         .await
         .unwrap();
