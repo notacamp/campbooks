@@ -26,17 +26,19 @@ crate.
 
 - **A fourth provider, `microsoft`**, for the `messages` capability. One
   consent asks for `offline_access Mail.ReadWrite Mail.Send User.Read`
-  (with `openid email profile`, as every round trip does), at tenant
-  **`common`** by default, so personal Microsoft accounts (Outlook.com,
-  Hotmail, Live, MSN) connect as well as work and school ones. The tenant is
-  `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT`, separate from sign-in's
-  `CAMPBOOKS_MICROSOFT__TENANT`.
+  (with `openid email profile`, as every round trip does), at the mail
+  tenant `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT`. Unset, it is sign-in's
+  `CAMPBOOKS_MICROSOFT__TENANT`, itself `common` by default, so personal
+  Microsoft accounts (Outlook.com, Hotmail, Live, MSN) connect as well as
+  work and school ones, and an app registered for one tenant never widens;
+  set to `common`, personal mailboxes connect where sign-in is narrower.
 - **The same OAuth app as Microsoft sign-in** (`CAMPBOOKS_MICROSOFT__CLIENT_ID`
   and its secret), as Google and Zoho share theirs.
 - **The same front-door rules as Gmail**: a connection is its grantor's; the
   same account connected again refreshes it; a reconnect with another
   account is refused (`account_mismatch`); "Also use this account to sign
-  in"; a Microsoft sign-in's grant is adopted when its scopes allow.
+  in"; a Microsoft sign-up's grant is adopted when its scopes allow (a
+  sign-in asks for mail only for a new account, as Zoho's does).
 - **The mailbox is read from Graph**: after the code exchange, Graph `/me`
   gives the mailbox key (the Graph user id) and its address (`mail`, else
   `userPrincipalName`, normalised). Everything Graph returns is validated,

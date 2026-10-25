@@ -449,6 +449,26 @@ async fn existing(
             MESSAGES.reason("account_connected_by_another_member"),
         ));
     }
+    // A Microsoft account reads one mailbox (its Graph user): a grant naming
+    // another is refused, never added beside it. Checked under the lock.
+    if let Some(found) = &existing
+        && g.grant.provider == Provider::Microsoft
+    {
+        let keys: Vec<String> = sqlx::query_scalar(
+            "SELECT mailbox_key FROM connectors.streams
+              WHERE connection_id = $1 AND capability = 'messages'",
+        )
+        .bind(found.id)
+        .fetch_all(&mut **tx)
+        .await?;
+        if keys
+            .iter()
+            .any(|key| !g.grant.mailboxes.iter().any(|m| m.key == *key))
+        {
+            tracing::info!(connection = %found.id, "refused a Microsoft grant for another mailbox of a connected account");
+            return Err(Error::Conflict(MESSAGES.reason("account_mismatch")));
+        }
+    }
     if existing.is_none()
         && matches!(&g.grant.secret, Secret::Tokens(tokens) if tokens.refresh_token.is_none())
     {

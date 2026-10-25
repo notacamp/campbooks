@@ -124,9 +124,7 @@ impl GrantIntake for Intake {
                     (Provider::Zoho, capabilities, Some(server), mailboxes)
                 }
                 "microsoft" if self.deps.microsoft.is_some() => {
-                    let mailbox = self
-                        .microsoft_grant(state, &grant, &mut tokens, &address)
-                        .await?;
+                    let mailbox = self.microsoft_grant(&grant, &mut tokens, &address).await?;
                     address.clone_from(&mailbox.address);
                     address_verified = mailbox.address_verified;
                     if mailbox.display_name.is_some() {
@@ -261,13 +259,13 @@ impl GrantIntake for Intake {
 impl Intake {
     /// The mailbox of a Microsoft grant whose ID token named `address`:
     /// every mail scope granted, read from Graph `/me` (`tokens` refreshed if
-    /// its access token had expired), the same mailbox as the workspace's
-    /// connection of that account reads. Its address is verified only when
+    /// its access token had expired). That it is the mailbox the workspace's
+    /// connection of the account reads is checked where that connection is
+    /// locked (`grants::create_or_refresh_connection`). Its address is verified only when
     /// the proof the identity module checked (`xms_edov`), which is for the
     /// ID token's address, is for this one.
     async fn microsoft_grant(
         &self,
-        state: &AppState,
         grant: &Grant,
         tokens: &mut TokenGrant,
         address: &str,
@@ -276,7 +274,6 @@ impl Intake {
             return Err(Error::Denied(MESSAGES.reason("consent_incomplete")));
         }
         let user = self.microsoft_mailbox(tokens).await?;
-        self.same_microsoft_mailbox(state, grant, &user).await?;
         Ok(Mailbox {
             address_verified: grant.address_verified && user.address == address,
             key: user.id,
@@ -304,13 +301,14 @@ impl Intake {
                 access_token,
                 expires_in,
                 refresh_token: rotated,
-                scope: _,
+                scope: granted,
             } = microsoft
                 .refresh(&refresh)
                 .await
                 .map_err(|err| refused(&err))?;
-            // What the consent granted (the refresh asks for no more).
-            let scope = tokens.scope.take();
+            // What Microsoft says the new token holds; else what the
+            // consent granted (the refresh asks for no more).
+            let scope = granted.or_else(|| tokens.scope.take());
             *tokens = TokenGrant {
                 access_token,
                 expires_in,
@@ -320,34 +318,6 @@ impl Intake {
             answer = microsoft.me(&tokens.access_token).await;
         }
         answer.map_err(|err| refused(&err))
-    }
-
-    /// Refuse a Microsoft grant whose Graph user is not the mailbox the
-    /// workspace's connection of the same account reads (`account_mismatch`):
-    /// one account, one mailbox, never a second one beside it.
-    async fn same_microsoft_mailbox(
-        &self,
-        state: &AppState,
-        grant: &Grant,
-        mailbox: &GraphUser,
-    ) -> Result<(), Error> {
-        let mut tx = state.db.begin_for(grant.workspace).await?;
-        let keys: Vec<String> = sqlx::query_scalar(
-            "SELECT s.mailbox_key FROM connectors.streams s
-               JOIN connectors.connections c ON c.id = s.connection_id
-              WHERE c.workspace_id = $1 AND c.provider = 'microsoft'
-                AND c.account_subject = $2 AND s.capability = 'messages'",
-        )
-        .bind(grant.workspace)
-        .bind(&grant.account_subject)
-        .fetch_all(&mut *tx)
-        .await?;
-        tx.commit().await?;
-        if keys.iter().any(|key| *key != mailbox.id) {
-            tracing::info!(workspace = %grant.workspace, "refused a Microsoft grant for another mailbox of a connected account");
-            return Err(Error::Conflict(MESSAGES.reason("account_mismatch")));
-        }
-        Ok(())
     }
 
     /// The data centre of a Zoho grant (its validated issuer) and the

@@ -46,9 +46,10 @@ pub const CALL_TIMEOUT: Duration = Duration::from_secs(15);
 /// few kilobytes).
 pub const MAX_ANSWER_BYTES: usize = 64 * 1024;
 
-/// The tenant of a mail connection unless
-/// `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` names another: personal, work
-/// and school accounts.
+/// The tenant of a mail connection when neither
+/// `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` nor sign-in's
+/// `CAMPBOOKS_MICROSOFT__TENANT` names one (sign-in's own default): personal,
+/// work and school accounts.
 pub const DEFAULT_TENANT: &str = "common";
 
 /// AADSTS errors that say the grant is gone, and only the person can bring
@@ -228,6 +229,12 @@ impl Microsoft {
             ));
         }
         Ok(grant)
+    }
+
+    /// The token endpoint refreshes go to (the mail tenant's).
+    #[cfg(test)]
+    pub fn token_endpoint(&self) -> &Url {
+        &self.endpoints.token
     }
 
     /// The mailbox `access_token` reaches: Graph `/me`, validated.

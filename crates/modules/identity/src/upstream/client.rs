@@ -15,7 +15,8 @@
 //!   have is computed from its own `tid`, then checked with the signature.
 //!   Its address counts as verified only with `xms_edov`. A mail connection's
 //!   round trip may go to another tenant than sign-in's (the mail tenant,
-//!   `common` by default): a second client, [`Upstream::for_mailbox`].
+//!   `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT`, sign-in's own when unset): a
+//!   second client, [`Upstream::for_mailbox`].
 //! - **Zoho**: the callback names the data centre's accounts server, which
 //!   must be one of Zoho's (a fixed list) before anything is sent; the code
 //!   is exchanged there, and its ID token must be issued by it.

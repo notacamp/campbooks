@@ -4,9 +4,10 @@
 The `microsoft` provider SHALL offer the `messages` capability only, through
 the front door, with one consent for `offline_access`, `Mail.ReadWrite`,
 `Mail.Send` and `User.Read` (and the identity scopes every round trip asks
-for), at the tenant `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` (`common` by
-default, so personal Microsoft accounts and work and school accounts both
-connect), with the OAuth client Microsoft sign-in uses
+for), at the tenant `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` (unset:
+sign-in's `CAMPBOOKS_MICROSOFT__TENANT`, itself `common` by default, so
+personal and work and school accounts both connect, and an app registered
+for one tenant never widens), with the OAuth client Microsoft sign-in uses
 (`CAMPBOOKS_MICROSOFT__CLIENT_ID` and its secret). When the grant arrives,
 connectors SHALL refuse it unless every mail scope was granted (compared
 without the `https://graph.microsoft.com/` prefix and ignoring case), then
@@ -23,6 +24,10 @@ carry a token, a code or an answer's body.
 #### Scenario: Member connects Outlook
 - **WHEN** a member starts a Microsoft connection for `messages` and the grant comes back through the intake with every mail scope
 - **THEN** a connection with provider `microsoft`, the member as grantor and health `ok` is created, its messages stream's mailbox is the Graph user id and its address the mailbox's primary address, and `connectors.connection_added` and `connectors.capability_granted` are published
+
+#### Scenario: The mail tenant follows sign-in's
+- **WHEN** `CAMPBOOKS_MICROSOFT__TENANT` is one tenant id and `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` is unset
+- **THEN** a mail consent and its token refreshes go to that tenant; set to `common`, they go to `common`
 
 #### Scenario: Same account again
 - **WHEN** the member connects the same Microsoft account again in the same workspace
@@ -49,7 +54,7 @@ carry a token, a code or an answer's body.
 - **THEN** the connection is kept with `address_verified` false
 
 #### Scenario: A sign-in's grant
-- **WHEN** a person signed up with Microsoft while Microsoft mail is offered, and adopts the held grant in their workspace
+- **WHEN** a person signed up with Microsoft while Microsoft mail is offered (the new account's second round trip asked for the mailbox), and adopts the held grant in their workspace
 - **THEN** it becomes their Microsoft connection like a connect's grant
 
 ### Requirement: Microsoft connection health

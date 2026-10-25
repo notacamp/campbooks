@@ -203,10 +203,25 @@ fn microsoft_client(
         );
         return Ok(None);
     }
-    let tenant = settings.microsoft.tenant.trim();
+    // Unset, sign-in's tenant (what the consent went to as well): an app
+    // registered for one tenant never widens.
+    let tenant = settings
+        .microsoft
+        .tenant
+        .as_deref()
+        .map(str::trim)
+        .map(ToOwned::to_owned)
+        .or_else(|| {
+            figment
+                .find_value("microsoft.tenant")
+                .ok()
+                .and_then(|value| value.as_str().map(|tenant| tenant.trim().to_owned()))
+                .filter(|tenant| !tenant.is_empty())
+        })
+        .unwrap_or_else(|| microsoft::DEFAULT_TENANT.to_owned());
     let endpoints = match base {
-        None => microsoft::Endpoints::microsoft(tenant)?,
-        Some(base) => microsoft::Endpoints::under(&base, tenant)?,
+        None => microsoft::Endpoints::microsoft(&tenant)?,
+        Some(base) => microsoft::Endpoints::under(&base, &tenant)?,
     };
     Ok(Some(Arc::new(Microsoft::new(
         client_id,
@@ -493,7 +508,38 @@ mod tests {
             "connectors": {"microsoft": {"enabled": true}}
         })));
         let deps = Deps::from_figment(&on, &kernel_config(), key()).unwrap();
-        assert!(deps.microsoft.is_some() && deps.cipher.is_some());
+        assert!(deps.cipher.is_some());
+        assert_eq!(
+            deps.microsoft.unwrap().token_endpoint().as_str(),
+            "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+        );
+        // The mail tenant, unset, is sign-in's: a single-tenant app never
+        // widens. Set, it is its own.
+        let token = |settings: serde_json::Value| {
+            let figment = Figment::from(Serialized::defaults(settings));
+            Deps::from_figment(&figment, &kernel_config(), key())
+                .unwrap()
+                .microsoft
+                .unwrap()
+                .token_endpoint()
+                .path()
+                .to_owned()
+        };
+        let work = "72f988bf-86f1-41af-91ab-2d7cd011db47";
+        assert_eq!(
+            token(serde_json::json!({
+                "microsoft": {"client_id": "m", "client_secret": "s", "tenant": work},
+                "connectors": {"microsoft": {"enabled": true}}
+            })),
+            format!("/{work}/oauth2/v2.0/token")
+        );
+        assert_eq!(
+            token(serde_json::json!({
+                "microsoft": {"client_id": "m", "client_secret": "s", "tenant": work},
+                "connectors": {"microsoft": {"enabled": true, "tenant": "common"}}
+            })),
+            "/common/oauth2/v2.0/token"
+        );
         // The client missing, or the secret key: a warning, not offered.
         let no_client = Figment::from(Serialized::defaults(serde_json::json!({
             "connectors": {"microsoft": {"enabled": true}}

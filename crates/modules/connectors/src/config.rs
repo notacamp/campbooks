@@ -96,17 +96,18 @@ pub struct MicrosoftMailConfig {
     /// OAuth client (`CAMPBOOKS_MICROSOFT__CLIENT_ID` and a secret) and the
     /// instance secret key; without them it is not offered, with a warning.
     pub enabled: bool,
-    /// The tenant a mail consent and its token refreshes go to (default
-    /// `common`: personal, work and school accounts), separate from
-    /// sign-in's `CAMPBOOKS_MICROSOFT__TENANT`: `common`, `organizations`,
-    /// `consumers` or a tenant id.
+    /// The tenant a mail consent and its token refreshes go to: `common`
+    /// (personal, work and school accounts), `organizations`, `consumers` or
+    /// a tenant id. Unset, sign-in's (`CAMPBOOKS_MICROSOFT__TENANT`, itself
+    /// `common` by default), so an app registered for one tenant never
+    /// widens.
     #[serde(deserialize_with = "any_text")]
-    pub tenant: String,
+    pub tenant: Option<String>,
 }
 
 /// Any value as text, so its shape never stops a server that does not use
 /// it: a scalar as written, anything else as nothing (checked where used).
-fn any_text<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+fn any_text<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
     #[derive(Deserialize)]
     #[serde(untagged)]
     enum Raw {
@@ -116,20 +117,20 @@ fn any_text<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String,
         Bool(bool),
         Other(serde::de::IgnoredAny),
     }
-    Ok(match Raw::deserialize(deserializer)? {
+    Ok(Some(match Raw::deserialize(deserializer)? {
         Raw::Text(text) => text,
         Raw::Integer(number) => number.to_string(),
         Raw::Float(number) => number.to_string(),
         Raw::Bool(value) => value.to_string(),
         Raw::Other(_) => String::new(),
-    })
+    }))
 }
 
 impl Default for MicrosoftMailConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            tenant: crate::microsoft::DEFAULT_TENANT.to_owned(),
+            tenant: None,
         }
     }
 }
@@ -483,11 +484,13 @@ impl ConnectorsConfig {
     /// The Microsoft mail settings: checked only while Microsoft mail is on,
     /// so a stray value never stops an instance that does not offer it.
     fn check_microsoft(&self) -> Result<(), String> {
-        if self.microsoft.enabled && !crate::microsoft::is_tenant(self.microsoft.tenant.trim()) {
+        if let Some(tenant) = &self.microsoft.tenant
+            && self.microsoft.enabled
+            && !crate::microsoft::is_tenant(tenant.trim())
+        {
             return Err(format!(
-                "CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT={}: use common, organizations, consumers \
-                 or a tenant id (or turn CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED off)",
-                self.microsoft.tenant
+                "CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT={tenant}: use common, organizations, \
+                 consumers or a tenant id (or turn CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED off)"
             ));
         }
         Ok(())
@@ -1007,13 +1010,14 @@ mod tests {
     fn microsoft_mail_is_off_by_default_and_checked_only_while_on() {
         let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
         assert!(!config.microsoft.enabled);
-        assert_eq!(config.microsoft.tenant, "common");
+        // Unset: sign-in's tenant, resolved where the client is built.
+        assert_eq!(config.microsoft.tenant, None);
         let on = ConnectorsConfig::from_figment(&figment(serde_json::json!({
             "connectors": {"microsoft": {"enabled": true, "tenant": "organizations"}}
         })))
         .unwrap();
         assert!(on.microsoft.enabled);
-        assert_eq!(on.microsoft.tenant, "organizations");
+        assert_eq!(on.microsoft.tenant.as_deref(), Some("organizations"));
         for bad in ["not a tenant", "../evil", ""] {
             // Off: it starts, whatever the value.
             let off = ConnectorsConfig::from_figment(&figment(serde_json::json!({

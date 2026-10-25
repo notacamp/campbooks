@@ -21,8 +21,9 @@ reuses that round trip and adds the `microsoft` provider to connectors.
 
 ### Who knows the mail tenant
 
-The mail connection's tenant is `common` (personal and work accounts), and
-sign-in's (`CAMPBOOKS_MICROSOFT__TENANT`) may be narrower. Identity runs the
+The mail connection's tenant may be wider than sign-in's
+(`CAMPBOOKS_MICROSOFT__TENANT`): `common` for personal mailboxes where sign-in
+is for `organizations`. Identity runs the
 consent, so it must send the browser to the mail tenant for a connect or
 reconnect; connectors refreshes tokens, so it must refresh there too.
 
@@ -33,7 +34,12 @@ reconnect; connectors refreshes tokens, so it must refresh there too.
 | Module coupling | reads one key of another module's section (as both already read `CAMPBOOKS_GOOGLE__*`) | widens the kernel port for one provider | none |
 
 **Chosen: one setting, `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT`, read by
-both.** Identity builds a second Microsoft client for mail round trips at
+both, defaulting to sign-in's tenant** (`CAMPBOOKS_MICROSOFT__TENANT`, itself
+`common` by default). Defaulting to `common` was rejected in the security
+review: an app registered for one tenant would break, and one registered for
+work accounts would widen without anyone choosing it. An operator who wants
+personal mailboxes where sign-in is narrower sets it to `common`. Identity
+builds a second Microsoft client for mail round trips at
 start-up when the two tenants differ, and uses it for every connect and
 reconnect (never for a sign-in or a link). Identity reads the value
 leniently: an invalid one is ignored there, and connectors' own check
@@ -44,6 +50,17 @@ A connect round trip that should also add a way in ("Also use this account
 to sign in") adds one only when sign-in's tenant would admit that account;
 otherwise the mailbox connects as a shared one would (no way in), since a
 way in sign-in refuses would be a dead entry.
+
+### Mail at sign-in
+
+Google's sign-in asks for mail in the same consent, every time. For Microsoft
+that would mint a mail-scoped refresh token at each sign-in of a known
+account, which Campbooks drops but cannot revoke (no per-app revoke), and a
+work tenant that requires an administrator's consent for `Mail.*` would fail
+the sign-in itself. **Chosen: as for Zoho**: a Microsoft sign-in asks for no
+mail; only a new account's second round trip (`consent_retry`) asks for the
+mailbox, so the first mailbox still comes with sign-up, and connect and
+reconnect always ask.
 
 ### The connection's account key
 
@@ -59,7 +76,8 @@ reconnect. The mailbox (the `messages` stream's `mailbox_key`, as Zoho's
 `accountId` is) is the Graph user id, with the primary address. They come
 from one token response, so they are one account; on a refresh of an
 existing connection, a Graph id that differs from the stored mailbox key is
-refused (`account_mismatch`) rather than adding a second mailbox.
+refused (`account_mismatch`) rather than adding a second mailbox, checked in
+the transaction that locks the connection.
 
 ### The address and whether it is verified
 
@@ -126,7 +144,7 @@ offered, and `not_supported_yet: microsoft` otherwise.
 ## Settings and boot safety
 
 `CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED` (default `false`) and
-`CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` (default `common`). Microsoft is
+`CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` (default: sign-in's tenant). Microsoft is
 offered only when the flag is on, the `CAMPBOOKS_MICROSOFT__*` client is
 configured and the instance secret key is set.
 

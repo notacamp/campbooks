@@ -670,8 +670,8 @@ With the built-in issuer:
   (personal only) or one tenant id. Microsoft does not verify the address it reports, so
   it counts as verified (for an invite-only instance) only when you also add the optional
   claim `xms_edov` to the ID token (**Token configuration**). Signing in with Microsoft
-  connects no mail unless Microsoft mail is turned on (**Outlook and Microsoft 365** under
-  "Connected accounts").
+  asks for no mail; only a new account's sign-up asks for its mailbox, and only while
+  Microsoft mail is turned on (**Outlook and Microsoft 365** under "Connected accounts").
 - **Sign in with Zoho**, in every Zoho data centre. In the Zoho API console, add a
   **Server-based application** with the redirect URI
   `${CAMPBOOKS_PUBLIC_URL}/auth/callback/zoho`, and turn on **Multi-DC** (Settings) so the
@@ -945,10 +945,12 @@ none stops the server. To set up the app for mail:
    account): until then personal accounts see an "unverified" consent screen, and many work
    tenants refuse apps from unverified publishers.
 5. Set `CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED=true` and restart. The consent goes to the
-   tenant `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` (default `common`: personal, work and
-   school accounts), separate from sign-in's `CAMPBOOKS_MICROSOFT__TENANT`, and its tokens
-   are refreshed there. Where sign-in's tenant is narrower (`organizations`), a personal
-   mailbox still connects, without becoming a way to sign in.
+   tenant `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT`, and its tokens are refreshed there.
+   Unset, it is sign-in's `CAMPBOOKS_MICROSOFT__TENANT` (itself `common` by default:
+   personal, work and school accounts), so an app registered for one tenant keeps working
+   and nothing widens on its own. Set it to `common` to connect personal mailboxes where
+   sign-in is narrower (`organizations`): such a mailbox connects without becoming a way to
+   sign in.
 
 Campbooks reads the mailbox's id and primary address from Graph (`/me`) and calls only
 `login.microsoftonline.com` and `graph.microsoft.com`. A grant Microsoft no longer honours
