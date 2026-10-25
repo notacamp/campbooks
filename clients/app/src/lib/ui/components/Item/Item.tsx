@@ -108,7 +108,10 @@ export function Item({
           <span className={styles["eyebrow"]}>
             <Dot signal={eyebrow.signal} />
             {eyebrow.kind} <span aria-hidden="true">·</span>{" "}
-            <span className={styles["eyebrowReason"]} data-danger={eyebrow.danger || undefined}>
+            <span
+              className={styles["eyebrowReason"]}
+              data-danger={eyebrow.danger === true || undefined}
+            >
               {eyebrow.reason}
             </span>
           </span>{" "}

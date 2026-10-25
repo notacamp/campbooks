@@ -135,7 +135,7 @@ impl BandInput {
     }
 
     /// Whether a person sent it.
-    fn from_person(&self) -> bool {
+    fn sent_by_person(&self) -> bool {
         self.from_person == Some(true)
     }
 }
@@ -180,7 +180,7 @@ pub fn band(item: &BandInput, today: NaiveDate, now: DateTime<Utc>) -> (Band, Ba
         return (Band::Today, BandReason::on(BandRule::NudgeDue, item.due_on));
     }
     let waited = (now - item.since).num_days();
-    if item.reason == Reason::Reply && item.from_person() && waited >= WAITED_DAYS {
+    if item.reason == Reason::Reply && item.sent_by_person() && waited >= WAITED_DAYS {
         return (Band::Today, BandReason::days(BandRule::Waited, waited));
     }
     if let Some(due) = due
@@ -188,7 +188,7 @@ pub fn band(item: &BandInput, today: NaiveDate, now: DateTime<Utc>) -> (Band, Ba
     {
         return (Band::Week, BandReason::on(BandRule::DueOn, Some(due)));
     }
-    if matches!(item.reason, Reason::Reply | Reason::Decide) && item.from_person() {
+    if matches!(item.reason, Reason::Reply | Reason::Decide) && item.sent_by_person() {
         return (Band::Week, BandReason::of(BandRule::WaitingAnswer));
     }
     if item.reason == Reason::WorthALook {
@@ -222,7 +222,7 @@ pub fn sort_key(item: &BandInput, band: Band) -> SortKey {
         !item.warning,
         date.is_none(),
         date,
-        !item.from_person(),
+        !item.sent_by_person(),
         item.since,
         item.id,
     )

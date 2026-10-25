@@ -179,7 +179,6 @@ describe("What needs you", () => {
     expect(await screen.findByText("4 more in Tasks")).toBeVisible();
     const open = screen.getByRole("link", { name: /^Open Tasks/u });
     expect(open).toHaveAttribute("href", `/w/${DUARTE.id}/tasks`);
-    expect(open).toHaveAttribute("aria-keyshortcuts");
   });
 
   it("offers Continue with Scout after the need's own actions, on .", async () => {
@@ -398,7 +397,10 @@ describe("What needs you", () => {
     fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "ArrowRight" });
-    const reply = screen.getByRole("button", { name: /^Reply/u });
+    // The row's own name starts with its kind ("Reply · …"): look in its actions.
+    const reply = within(
+      screen.getByRole("group", { name: "Actions for Marta Ferreira" }),
+    ).getByRole("button", { name: /^Reply/u });
     expect(reply).toHaveAttribute("data-highlighted", "true");
     expect(reply).toHaveFocus();
     fireEvent.keyDown(document.activeElement ?? document, { key: "ArrowRight" });

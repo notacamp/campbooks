@@ -13,7 +13,7 @@ export type BandReason = Schema<"BandReason">;
  * (`waiting`) is never in the queue: Home lists it under "Waiting on
  * others" until it turns into a nudge (campbooks-cloud#293).
  */
-export const BANDS: readonly Band[] = ["now", "today", "week", "whenever"];
+const BANDS: readonly Band[] = ["now", "today", "week", "whenever"];
 
 /**
  * The signal colour of a reason: its own, except "Worth a look", which has
@@ -80,8 +80,8 @@ export function reasonSentence(
   reason: BandReason | null | undefined,
   { name, today, locale }: { name?: string | undefined; today: Date; locale: string },
 ): { key: string; values: Record<string, string | number> } {
-  const named = name !== undefined && name !== "";
-  const who = named ? { name } : {};
+  const who: Record<string, string> = name === undefined || name === "" ? {} : { name };
+  const named = "name" in who;
   switch (reason?.rule) {
     case "warning": {
       return { key: "reason.warning", values: {} };

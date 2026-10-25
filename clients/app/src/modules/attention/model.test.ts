@@ -110,7 +110,7 @@ describe("attention model", () => {
     expect(isPressing({ rule: "warning" })).toBe(true);
     expect(isPressing({ rule: "overdue", days: 1 })).toBe(true);
     expect(isPressing({ rule: "due_today" })).toBe(false);
-    expect(isPressing(undefined)).toBe(false);
+    expect(isPressing(null)).toBe(false);
   });
 
   it("offers a nudge its own actions, whatever the catalogue rated", () => {
