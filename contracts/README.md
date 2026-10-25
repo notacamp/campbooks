@@ -17,6 +17,7 @@ produce or accept against the file.
 | `conversations.send_requested.v1.schema.json` | `conversations` | `connectors` | The event announcing a send once its undo window ends (ids and the outgoing message blob) |
 | `conversations.need_changed.v1.schema.json` | `conversations` | `attention` | What a conversation needs from its inbox's members, opened, changed or cleared (ids, enums and a date only) |
 | `tasks.task_changed.v1.schema.json` | `tasks` | `attention` | A task made or changed: state, verb, due, plan, assignee and source (ids, enums, dates and times only, never a title) |
+| `pages.page_changed.v1.schema.json` | `pages` | `search` | A page made or changed, trashed, moved, shared or deleted (ids and enums only, never a title or any text) |
 | `connectors.send_completed.v1.schema.json` | `connectors` | `conversations` | The event telling how a send ended: sent (with the provider's id) or failed (with a reason) |
 | `connectors.connection_removed.v1.schema.json` | `connectors` | `conversations` | The event announcing a disconnected connection, with the inboxes it fed and whether their mail is deleted or kept read-only |
 | `conversations.message_read.v1.schema.json` | `conversations` | `schedule`, `tasks` | The event announcing a stored read of one message: its items (things at a time), its asks (obligations) and whether a summary is ready (ids, enums, keys and times only) |

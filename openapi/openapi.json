@@ -9590,6 +9590,1545 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/pages": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "List the pages the caller may open.",
+        "operationId": "pages.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "trashed",
+            "in": "query",
+            "description": "`true` for the trash: the pages deleted in the last 30 days, each the\nroot of what was deleted with it. Default `false`.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "parent",
+            "in": "query",
+            "description": "Only the sub-pages of this page.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "place",
+            "in": "query",
+            "description": "Only the pages in this place.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Where a top-level page lives; sub-pages are always in their parent's.",
+              "enum": [
+                "private",
+                "workspace"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pages the caller may open.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or a token acting for nobody.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Make a page.",
+        "operationId": "pages.create",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A title over 200 characters (`invalid_title`), an unknown icon, a bad position, or a body that is not valid (`invalid_update`, `unknown_block`, `link_scheme`, `document_too_large`, `foreign_blob`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the parent but not write in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or a parent you cannot see.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The parent is in the trash (`page_trashed`), or pages would nest deeper than 12 levels (`page_too_deep`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.trash"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/backlinks": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Where a record is linked from.",
+        "operationId": "pages.backlinks",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "The record type: `workspaces.member`, `conversations.conversation`,\n`tasks.task`, `schedule.event`, `pages.page` or `person`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "description": "The record's id (for `person`, the cleaned address).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pages the caller may open that link to the record.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backlinks"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A record type or id a page cannot link to (`invalid_ref`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or a token acting for nobody.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or a record you cannot read.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Read a page.",
+        "operationId": "pages.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page, with its body as one Yjs update and its state vector.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Delete a page in the trash, and what was deleted with it, for good.",
+        "operationId": "pages.purge",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page that was deleted.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The page and everything deleted with it are gone for good."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not delete it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is not in the trash (`page_not_trashed`), or was deleted with another page (`page_not_trash_root`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "high"
+        }
+      },
+      "patch": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Change a page's title or icon.",
+        "operationId": "pages.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The page afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A title over 200 characters (`invalid_title`) or an unknown icon (`invalid_icon`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page changed since you saw it (`page_changed`), or it is in the trash (`page_trashed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.update"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/files": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Add a file or an image to a page.",
+        "operationId": "pages.upload_file",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadBytes"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The stored file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadedFile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No bytes (`file_empty`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not change it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is in the trash (`page_trashed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over 20 MiB.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/files/{hash}": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Download a file or an image of a page.",
+        "operationId": "pages.get_file",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "hash",
+            "in": "path",
+            "description": "The blob's hash.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The bytes: a raster image inline, anything else as a download of opaque bytes.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadBytes"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page or file, or you cannot see the page.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/grants/{member_id}": {
+      "put": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Share a page with a member, or change their role.",
+        "operationId": "pages.share",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "description": "The member.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The member's role on the page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a member of this workspace (`not_a_member`), or yourself (`share_yourself`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not share it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is in the trash (`page_trashed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "share",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.unshare"
+        }
+      },
+      "delete": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Stop sharing a page with a member.",
+        "operationId": "pages.unshare",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "description": "The member.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The page is no longer shared with the member."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not share it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it, or it was not shared with the member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "share",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.share"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/move": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Move a page.",
+        "operationId": "pages.move",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageMove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The page afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad position (`invalid_position`), or a place that is not the parent's (`place_mismatch`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page (or where it goes) but not write it; moving it between the private and workspace places needs sharing it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it or where it goes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page changed since you saw it (`page_changed`), is in the trash (`page_trashed`), would go inside itself (`page_cycle`) or nest deeper than 12 levels (`page_too_deep`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.move"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/restore": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Bring a page in the trash back, with the sub-pages deleted with it.",
+        "operationId": "pages.restore",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page that was deleted.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page, back where it was, or at the top level of its place when what it was under is gone or in the trash.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not delete it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is not in the trash (`page_not_trashed`), or was deleted with another page: restore that one (`page_not_trash_root`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.trash"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/sync": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Merge a client's changes into a page's body, and get back what it lacks.",
+        "operationId": "pages.sync",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What the client is missing, and the new state vector.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The update is not valid: not a Yjs update or one that cannot be applied (`invalid_update`), over 256 KiB (`update_too_large`), uses a block or attribute the page cannot hold (`unknown_block`), links outside https, http and mailto (`link_scheme`), names a file that was not uploaded to this page (`foreign_blob`), or would make the page too large (`document_too_large`). Nothing is stored.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not change it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is in the trash (`page_trashed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/trash": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Put a page and its sub-pages in the trash.",
+        "operationId": "pages.trash",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page, now in the trash for 30 days.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not delete it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is in the trash already (`page_trashed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.restore"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/person-notes": {
       "get": {
         "tags": [
@@ -17821,6 +19360,58 @@
           }
         }
       },
+      "Backlink": {
+        "type": "object",
+        "description": "A page that links to the record.",
+        "required": [
+          "page",
+          "title",
+          "place",
+          "edited_at"
+        ],
+        "properties": {
+          "edited_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was last changed."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its icon."
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The page."
+          },
+          "place": {
+            "$ref": "#/components/schemas/Place",
+            "description": "Private or workspace."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title."
+          }
+        }
+      },
+      "Backlinks": {
+        "type": "object",
+        "description": "The pages that link to a record.",
+        "required": [
+          "pages"
+        ],
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Backlink"
+            },
+            "description": "The pages, most recently edited first."
+          }
+        }
+      },
       "Band": {
         "type": "string",
         "description": "Where an item stands on Home, in the order Home shows the bands.",
@@ -19785,6 +21376,31 @@
           }
         }
       },
+      "Crumb": {
+        "type": "object",
+        "description": "A page above another, for the breadcrumb: only ones the caller may open.",
+        "required": [
+          "id",
+          "title"
+        ],
+        "properties": {
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its icon."
+          },
+          "id": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The page."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title."
+          }
+        }
+      },
       "Decision": {
         "type": "string",
         "description": "Allow or deny.",
@@ -20004,6 +21620,29 @@
           }
         },
         "additionalProperties": false
+      },
+      "DocumentState": {
+        "type": "object",
+        "description": "A page's body as a Yjs document: what the client loads and merges.",
+        "required": [
+          "update",
+          "state_vector"
+        ],
+        "properties": {
+          "state_vector": {
+            "type": "string",
+            "description": "The document's state vector (v1), in base64."
+          },
+          "update": {
+            "type": "string",
+            "description": "The whole document as one Yjs update (v1), in base64."
+          }
+        }
+      },
+      "DownloadBytes": {
+        "type": "string",
+        "format": "binary",
+        "description": "A file's bytes, as the OpenAPI document describes them."
       },
       "DraftAttachment": {
         "type": "object",
@@ -20690,6 +22329,24 @@
           "time_zone": {
             "type": "string",
             "description": "The time zone the working hours and the times are in."
+          }
+        }
+      },
+      "GrantView": {
+        "type": "object",
+        "description": "A member a page is shared with.",
+        "required": [
+          "member",
+          "role"
+        ],
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member."
+          },
+          "role": {
+            "$ref": "#/components/schemas/PageRole",
+            "description": "Their role on the page and its sub-pages."
           }
         }
       },
@@ -22559,6 +24216,77 @@
         },
         "additionalProperties": false
       },
+      "NewGrant": {
+        "type": "object",
+        "description": "What the member may do.",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/PageRole",
+            "description": "`reader`, `writer` or `manager`."
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewPage": {
+        "type": "object",
+        "description": "A new page.",
+        "properties": {
+          "document": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its body as one Yjs update (v1), in base64. Default: empty."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its icon, one of the page icons."
+          },
+          "parent": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PageId",
+                "description": "The page it goes under; none for the top level of `place`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "place": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place",
+                "description": "`private` (the default) or `workspace`, for a top-level page. A\nsub-page is always in its parent's place."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it sits among its siblings: a fractional-indexing key. Default:\nafter the last one."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its title: 0 to 200 characters. A page may be made before it has one."
+          }
+        },
+        "additionalProperties": false
+      },
       "NewRuleState": {
         "type": "string",
         "description": "Whether a new rule should act now or wait for a yes.",
@@ -22777,6 +24505,302 @@
           "still_to_pay"
         ]
       },
+      "PageId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "PageId (UUIDv7)"
+      },
+      "PageList": {
+        "type": "object",
+        "description": "The pages.",
+        "required": [
+          "pages"
+        ],
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageSummary"
+            },
+            "description": "The pages, sorted by position among their siblings."
+          }
+        }
+      },
+      "PageMove": {
+        "type": "object",
+        "description": "Where the page should end up.",
+        "required": [
+          "meta_revision"
+        ],
+        "properties": {
+          "meta_revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The `meta_revision` you saw."
+          },
+          "parent": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PageId",
+                "description": "The page it goes under; none for the top level of `place`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "place": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place",
+                "description": "For a top-level page, `private` or `workspace` (default: where it\nis). A sub-page is always in its parent's place."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A fractional-indexing key among its new siblings. Default: after the\nlast one."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PageRole": {
+        "type": "string",
+        "description": "What a member can do with a page, lowest first.",
+        "enum": [
+          "reader",
+          "writer",
+          "manager"
+        ]
+      },
+      "PageSummary": {
+        "type": "object",
+        "description": "One page of the tree, as `pages.list` shows it.",
+        "required": [
+          "id",
+          "place",
+          "position",
+          "title",
+          "has_children",
+          "role",
+          "created_by",
+          "edited_at",
+          "meta_revision"
+        ],
+        "properties": {
+          "created_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who made it."
+          },
+          "edited_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was last changed."
+          },
+          "has_children": {
+            "type": "boolean",
+            "description": "Whether it has sub-pages."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its icon, one of the page icons."
+          },
+          "id": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The page."
+          },
+          "meta_revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with a change of the title, icon or position."
+          },
+          "parent": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PageId",
+                "description": "Its parent, when it is a sub-page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "place": {
+            "$ref": "#/components/schemas/Place",
+            "description": "Private or workspace."
+          },
+          "position": {
+            "type": "string",
+            "description": "Where it sits among its siblings: sort by it."
+          },
+          "role": {
+            "$ref": "#/components/schemas/PageRole",
+            "description": "What the caller can do with it."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title (empty when it has none yet)."
+          },
+          "trashed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was put in the trash, for a page in the trash."
+          }
+        }
+      },
+      "PageUpdate": {
+        "type": "object",
+        "description": "The page as it should become.",
+        "required": [
+          "meta_revision",
+          "title"
+        ],
+        "properties": {
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its icon, one of the page icons; none clears it."
+          },
+          "meta_revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The `meta_revision` you saw."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title: 0 to 200 characters."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PageView": {
+        "type": "object",
+        "description": "A page, as `pages.get` shows it.",
+        "required": [
+          "id",
+          "place",
+          "position",
+          "title",
+          "role",
+          "created_by",
+          "created_at",
+          "edited_by",
+          "edited_at",
+          "revision",
+          "meta_revision",
+          "grants",
+          "ancestors",
+          "document"
+        ],
+        "properties": {
+          "ancestors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Crumb"
+            },
+            "description": "The pages above it that the caller may open, outermost first."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was made."
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who made it."
+          },
+          "document": {
+            "$ref": "#/components/schemas/DocumentState",
+            "description": "The body."
+          },
+          "edited_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was last changed."
+          },
+          "edited_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who last changed it."
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantView"
+            },
+            "description": "The members it is shared with."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its icon."
+          },
+          "id": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The page."
+          },
+          "meta_revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with a change of the title, icon or position: send the one\nyou saw with `pages.update` and `pages.move`."
+          },
+          "parent": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PageId",
+                "description": "Its parent, when it is a sub-page."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "place": {
+            "$ref": "#/components/schemas/Place",
+            "description": "Private or workspace."
+          },
+          "position": {
+            "type": "string",
+            "description": "Where it sits among its siblings."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change."
+          },
+          "role": {
+            "$ref": "#/components/schemas/PageRole",
+            "description": "What the caller can do with it."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title."
+          },
+          "trashed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was put in the trash."
+          }
+        }
+      },
       "ParsedQuery": {
         "type": "object",
         "description": "The query as understood.",
@@ -22949,6 +24973,14 @@
           "backfill",
           "incremental",
           "resync"
+        ]
+      },
+      "Place": {
+        "type": "string",
+        "description": "Where a top-level page lives; sub-pages are always in their parent's.",
+        "enum": [
+          "private",
+          "workspace"
         ]
       },
       "PlanTask": {
@@ -26572,6 +28604,51 @@
           "never"
         ]
       },
+      "SyncRequest": {
+        "type": "object",
+        "description": "What the client holds, and what it wants to add.",
+        "required": [
+          "state_vector"
+        ],
+        "properties": {
+          "state_vector": {
+            "type": "string",
+            "description": "The client's document's state vector (v1), in base64."
+          },
+          "update": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Changes the server has not seen, as one Yjs update (v1) of at most\n256 KiB, in base64."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncResponse": {
+        "type": "object",
+        "description": "What the server holds that the client does not.",
+        "required": [
+          "update",
+          "state_vector",
+          "revision"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The page's revision after this call."
+          },
+          "state_vector": {
+            "type": "string",
+            "description": "The server's document's state vector (v1), in base64."
+          },
+          "update": {
+            "type": "string",
+            "description": "What the client is missing, as one Yjs update (v1), in base64."
+          }
+        }
+      },
       "SyncScheduled": {
         "type": "object",
         "description": "What was scheduled.",
@@ -27365,6 +29442,36 @@
           }
         }
       },
+      "UploadBytes": {
+        "type": "string",
+        "format": "binary",
+        "description": "A file's bytes, as the OpenAPI document describes the request body."
+      },
+      "UploadedFile": {
+        "type": "object",
+        "description": "What was stored.",
+        "required": [
+          "blob",
+          "size",
+          "content_type"
+        ],
+        "properties": {
+          "blob": {
+            "type": "string",
+            "description": "The blob's hash: what a `file` or `image` block names."
+          },
+          "content_type": {
+            "type": "string",
+            "description": "The media type it was sent with, lower-cased; never trusted."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Its size in bytes.",
+            "minimum": 0
+          }
+        }
+      },
       "UserEntity": {
         "type": "object",
         "description": "The account the credential is for.",
@@ -27794,7 +29901,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `schedule:read`: See your calendars and events, your calendar settings, and when you are free.\n- `schedule:write`: Create, change, delete and answer events, add them to your provider calendars, and change your calendars and calendar settings.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `tasks:read`: See your tasks and the ones you handed to someone.\n- `tasks:write`: Add tasks, change them, mark them done and hand them to a teammate.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `pages:read`: See the pages you may open, and who they are shared with.\n- `pages:write`: Make, edit, move, share and delete pages, and add files to them.\n- `schedule:read`: See your calendars and events, your calendar settings, and when you are free.\n- `schedule:write`: Create, change, delete and answer events, add them to your provider calendars, and change your calendars and calendar settings.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status, and report the app's own errors and timings.\n- `tasks:read`: See your tasks and the ones you handed to someone.\n- `tasks:write`: Add tasks, change them, mark them done and hand them to a teammate.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -27844,6 +29951,10 @@
     {
       "name": "tasks",
       "description": "What you have to do: your tasks, with a due date, a plan (a day, or Later), a hand-off to one teammate and an undo for every change. Personal: a task is seen by who it is with, and by who handed it off."
+    },
+    {
+      "name": "pages",
+      "description": "What you and your team write: pages in a tree, each a block document that several people edit at once and the server merges, with mentions of people, threads, tasks and events, backlinks, files, sharing by member and role, and a trash that keeps what you delete for 30 days. Off unless the instance turns it on (`CAMPBOOKS_PAGES__ENABLED`); while off, every operation answers 404."
     },
     {
       "name": "changes",

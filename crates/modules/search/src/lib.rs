@@ -71,6 +71,7 @@ pub fn module() -> Module {
             .on_event::<features::refresh::OnMessageReceived>()
             .on_event::<features::refresh::OnMessageSent>()
             .on_event::<features::refresh::OnConversationChanged>()
+            .on_event::<features::refresh::OnPageChanged>()
             .on_event::<features::refresh::OnInboxRemoved>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>()
@@ -111,6 +112,7 @@ mod tests {
             "search.on_message_received",
             "search.on_message_sent",
             "search.on_conversation_changed",
+            "search.on_page_changed",
             "search.schedule_workspace_purge",
             "search.purge_workspace",
             "search.backfill",

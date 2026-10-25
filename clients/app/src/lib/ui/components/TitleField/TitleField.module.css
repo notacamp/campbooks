@@ -1,0 +1,27 @@
+.title {
+  display: block;
+  width: 100%;
+  height: var(--title-height, auto);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  resize: none;
+}
+
+.title::placeholder {
+  color: var(--text-disabled);
+}
+
+.title:disabled {
+  opacity: 1;
+  color: var(--text-primary);
+}

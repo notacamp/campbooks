@@ -1,0 +1,203 @@
+{
+  "title": "Páginas",
+  "untitled": "Sem título",
+  "shortcuts": {
+    "create": "Nova página"
+  },
+  "tree": {
+    "label": "Páginas",
+    "workspace": "Espaço de trabalho",
+    "private": "Privadas",
+    "shared": "Partilhadas consigo",
+    "trash": "Reciclagem",
+    "newPage": "Nova página",
+    "addSubPage": "Adicionar uma subpágina a {{title}}",
+    "showSubPages": "Mostrar as subpáginas de {{title}}",
+    "hideSubPages": "Ocultar as subpáginas de {{title}}",
+    "workspaceEmpty": "Páginas que todos aqui podem ler e editar.",
+    "privateEmpty": "Só você as vê, até partilhar uma."
+  },
+  "empty": {
+    "title": "Escreva uma vez",
+    "body": "Notas, planos e listas, ao lado do seu correio e das suas tarefas. Ligue uma página a um e-mail, uma tarefa ou um evento com @.",
+    "add": "Escrever uma página"
+  },
+  "error": {
+    "title": "Não foi possível carregar as suas páginas",
+    "body": "Nada foi alterado. Tente novamente.",
+    "retry": "Tentar novamente"
+  },
+  "screen": {
+    "label": "Página",
+    "back": "Voltar às páginas",
+    "trail": "Onde está esta página",
+    "more": "Mais",
+    "trash": "Mover para a reciclagem",
+    "inTrash": "Esta página está na reciclagem.",
+    "icon": "Ícone",
+    "iconCurrent": "Ícone da página: {{name}}",
+    "titleLabel": "Título da página",
+    "edited": "Editada {{when}}",
+    "emptyTitle": "Escolha uma página",
+    "emptyBody": "Escolha uma da lista ou escreva uma nova.",
+    "missingTitle": "Esta página não está aqui",
+    "missingBody": "Pode ter sido eliminada ou nunca foi partilhada consigo."
+  },
+  "save": {
+    "saved": "Guardado",
+    "saving": "A guardar…",
+    "retrying": "Sem ligação, vai tentar de novo",
+    "rejected": "Não foi possível guardar esta alteração"
+  },
+  "backlinks": {
+    "title_one": "Ligada a partir de {{count}} local",
+    "title_other": "Ligada a partir de {{count}} locais"
+  },
+  "share": {
+    "title": "Partilhar {{title}}",
+    "button": "Partilhar",
+    "placeWorkspace": "Todos no espaço de trabalho",
+    "placeWorkspaceNote": "Qualquer pessoa aqui pode ler e editar esta página.",
+    "placePrivate": "Página privada",
+    "placePrivateNote": "Só as pessoas abaixo a podem abrir.",
+    "people": "Pessoas com acesso",
+    "someone": "Alguém",
+    "owner": "Proprietário",
+    "accessOf": "Acesso de {{name}}",
+    "remove": "Remover {{name}}",
+    "add": "Adicionar uma pessoa",
+    "who": "Pessoa",
+    "access": "Acesso",
+    "invite": "Partilhar",
+    "mentions": "Mencionar alguém numa página não a partilha com essa pessoa.",
+    "role": {
+      "reader": "Pode ler",
+      "writer": "Pode editar",
+      "manager": "Pode gerir"
+    }
+  },
+  "trash": {
+    "label": "Páginas na reciclagem",
+    "note": "As páginas aqui são eliminadas definitivamente após 30 dias.",
+    "emptyTitle": "A reciclagem está vazia",
+    "emptyBody": "As páginas que eliminar esperam aqui durante 30 dias.",
+    "deletedOn": "Eliminada {{date}}",
+    "restore": "Restaurar",
+    "purge": "Eliminar definitivamente",
+    "purgeConfirm": "Eliminar definitivamente",
+    "cancel": "Manter",
+    "purgeWarning": "Eliminar definitivamente {{title}} e as suas subpáginas? Não pode ser desfeito."
+  },
+  "toast": {
+    "created": "Página criada",
+    "createFailed": "Não foi possível criar a página. Nada foi guardado.",
+    "renameFailed": "Não foi possível mudar o nome da página. Nada foi alterado.",
+    "trashed": "{{title}} movida para a reciclagem",
+    "trashFailed": "Não foi possível mover {{title}} para a reciclagem. Nada foi alterado.",
+    "restored": "{{title}} restaurada",
+    "restoreFailed": "Não foi possível restaurar {{title}}. Nada foi alterado.",
+    "purged": "{{title}} eliminada definitivamente",
+    "purgeFailed": "Não foi possível eliminar {{title}}. Nada foi alterado.",
+    "moved": "{{title}} movida",
+    "moveFailed": "Não foi possível mover {{title}}. Nada foi alterado.",
+    "shared": "Partilhada com {{name}}",
+    "shareFailed": "Não foi possível alterar o acesso de {{name}}. Nada foi alterado.",
+    "unshared": "{{name}} removido",
+    "unshareFailed": "Não foi possível remover {{name}}. Nada foi alterado."
+  },
+  "editor": {
+    "label": "Texto da página",
+    "placeholder": "Escreva ou prima / para blocos",
+    "heading": "Título"
+  },
+  "block": {
+    "add": "Adicionar um bloco",
+    "menu": "Opções do bloco",
+    "turnInto": "Transformar em",
+    "block": "Bloco",
+    "duplicate": "Duplicar",
+    "delete": "Eliminar"
+  },
+  "format": {
+    "label": "Formatação",
+    "block": "Transformar em",
+    "mention": "Mencionar",
+    "todo": "Tarefa",
+    "bold": "Negrito",
+    "italic": "Itálico",
+    "hide": "Fechar"
+  },
+  "mention": {
+    "label": "Mencionar",
+    "empty": "Nada encontrado",
+    "searching": "A pesquisar…",
+    "closed": "Algo que não pode abrir",
+    "group": {
+      "people": "Pessoas",
+      "threads": "Conversas",
+      "tasks": "Tarefas",
+      "events": "Eventos",
+      "pages": "Páginas"
+    }
+  },
+  "embed": {
+    "page": "Página",
+    "person": "Pessoa",
+    "thread": "Conversa",
+    "task": "Tarefa",
+    "event": "Evento"
+  },
+  "toggle": {
+    "show": "Mostrar",
+    "hide": "Ocultar"
+  },
+  "slash": {
+    "label": "Blocos",
+    "empty": "Nenhum bloco corresponde",
+    "group": {
+      "basic": "Básicos",
+      "campbooks": "Do seu trabalho"
+    },
+    "text": "Texto",
+    "heading1": "Título 1",
+    "heading2": "Título 2",
+    "heading3": "Título 3",
+    "todo": "Lista de tarefas",
+    "bullets": "Lista com marcas",
+    "numbers": "Lista numerada",
+    "toggle": "Secção recolhível",
+    "quote": "Citação",
+    "callout": "Destaque",
+    "divider": "Separador",
+    "code": "Código",
+    "mention": "Menção",
+    "embed": "Incorporar um registo",
+    "subpage": "Subpágina",
+    "file": "Ficheiro",
+    "image": "Imagem"
+  },
+  "upload": {
+    "failed": "Não foi possível carregar {{name}}."
+  },
+  "subpage": {
+    "failed": "Não foi possível adicionar a subpágina."
+  },
+  "icon": {
+    "document": "Documento",
+    "tasks": "Tarefas",
+    "schedule": "Calendário",
+    "people": "Pessoas",
+    "star": "Estrela",
+    "pin": "Alfinete",
+    "mail": "Correio",
+    "money": "Dinheiro",
+    "home": "Casa",
+    "inbox": "Caixa de entrada",
+    "archive": "Arquivo",
+    "image": "Imagem",
+    "travel": "Viagem",
+    "dining": "Refeição",
+    "parcel": "Encomenda",
+    "ticket": "Bilhete"
+  }
+}

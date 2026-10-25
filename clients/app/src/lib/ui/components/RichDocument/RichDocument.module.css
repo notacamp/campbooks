@@ -1,0 +1,302 @@
+.document {
+  color: var(--text-primary);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.document :where([contenteditable]) {
+  outline: none;
+}
+
+.document :where(.tiptap > * + *) {
+  margin-top: var(--space-2);
+}
+
+.document :where(p) {
+  margin: 0;
+}
+
+.document :where(h1, h2, h3) {
+  margin: 0;
+  font-family: var(--font-display);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+}
+
+.document :where(h1) {
+  margin-top: var(--space-6);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+}
+
+.document :where(h2) {
+  margin-top: var(--space-5);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+}
+
+.document :where(h3) {
+  margin-top: var(--space-4);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.document :where(ul, ol) {
+  margin: 0;
+  padding-left: var(--space-6);
+}
+
+.document :where(li > p) {
+  margin: 0;
+}
+
+.document :where(a) {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.document :where(code) {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-xs);
+  background: var(--surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.document :where(pre) {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.document :where(pre code) {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.document :where(blockquote) {
+  margin: 0;
+  padding-left: var(--space-4);
+  border-left: var(--space-1) solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.document :where(hr) {
+  margin: var(--space-4) 0;
+  border: 0;
+  border-top: var(--border-width) solid var(--border-subtle);
+}
+
+.document :where([data-type="callout"]) {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  box-shadow: inset var(--space-1) 0 0 var(--border-strong);
+}
+
+.document :where([data-type="callout"][data-tone="info"]) {
+  background: var(--accent-soft);
+  box-shadow: inset var(--space-1) 0 0 var(--accent);
+}
+
+.document :where([data-type="callout"][data-tone="warning"]) {
+  background: var(--danger-soft);
+  box-shadow: inset var(--space-1) 0 0 var(--danger);
+}
+
+/* To-dos: a checkbox, then the text. */
+.document :where(ul[data-type="taskList"]) {
+  padding-left: 0;
+  list-style: none;
+}
+
+.document :where(ul[data-type="taskList"] > li) {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: var(--size-hit);
+}
+
+.document :where(ul[data-type="taskList"] > li > label) {
+  display: grid;
+  flex: none;
+  place-items: center;
+  height: var(--size-hit);
+  user-select: none;
+}
+
+.document :where(ul[data-type="taskList"] > li > div) {
+  flex: 1;
+  min-width: 0;
+  padding-top: var(--space-2);
+}
+
+.document :where(ul[data-type="taskList"] > li[data-checked="true"] > div) {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+.document :where(ul[data-type="taskList"] input[type="checkbox"]) {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* The placeholder on an empty line. */
+.document :where([data-placeholder])::before {
+  float: left;
+  height: 0;
+  color: var(--text-tertiary);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.document :where(.ProseMirror-selectednode) {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* Wide blocks scroll inside their own box; the page never does. */
+.document :where(table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: 0 var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
+  color: var(--text-primary);
+  text-decoration: none;
+  vertical-align: baseline;
+}
+
+a.chip:hover {
+  background: var(--surface-hover);
+}
+
+.chip[data-state="closed"],
+.chip[data-state="loading"] {
+  color: var(--text-tertiary);
+}
+
+.chipLabel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
+}
+
+.card[data-state="closed"] {
+  color: var(--text-tertiary);
+}
+
+.cardLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.cardLink:hover .cardTitle {
+  text-decoration: underline;
+}
+
+.cardText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cardTitle {
+  overflow: hidden;
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardMeta {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.figure {
+  margin: 0;
+}
+
+.image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+.figureClosed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
+  color: var(--text-tertiary);
+}
+
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.toggleArrow {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--size-control-sm);
+  height: var(--size-control-sm);
+  margin-top: var(--space-0-5);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.toggleArrow:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.toggleBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle[data-open="false"] [data-node-view-content] > * + * {
+  display: none;
+}

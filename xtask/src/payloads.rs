@@ -249,6 +249,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
     ("kernel.sequence_changes", "workspace", WORKSPACE_ID),
     ("workspaces.purge_workspace", "workspace", WORKSPACE_ID),
     (
+        "pages.compact",
+        "page",
+        "the page's id (a UUID), never its title or text",
+    ),
+    (
         "search.backfill",
         "group_type",
         "a record type's name (`<module>.<record>`), from the code",

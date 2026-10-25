@@ -1,0 +1,25 @@
+{
+  "errors": {
+    "page_forbidden": "Pode ler esta página, mas não pode fazer isso com ela.",
+    "invalid_title": "O título de uma página tem no máximo 200 caracteres.",
+    "invalid_icon": "Esse não é um dos ícones de página.",
+    "invalid_position": "Essa posição não é válida.",
+    "place_mismatch": "Uma subpágina fica sempre no mesmo sítio que a página em que está.",
+    "page_changed": "Esta página mudou desde que a viu. Volte a carregá-la e tente de novo.",
+    "page_trashed": "Esta página está na reciclagem. Restaure-a primeiro.",
+    "page_not_trashed": "Só uma página que está na reciclagem pode ser eliminada de vez.",
+    "page_not_trash_root": "Esta página foi eliminada em conjunto com outra. Use essa página.",
+    "page_too_deep": "As páginas podem ficar aninhadas até 12 níveis.",
+    "page_cycle": "Uma página não pode ser movida para dentro de si própria nem de uma das suas subpáginas.",
+    "invalid_update": "Essa alteração à página não é válida.",
+    "update_too_large": "Uma alteração a uma página pode ter no máximo 256 KiB.",
+    "document_too_large": "A página ficaria demasiado grande: no máximo 4 MiB, 20 000 blocos e 32 níveis.",
+    "unknown_block": "A alteração usa um bloco ou uma definição que uma página não pode ter.",
+    "link_scheme": "As ligações só podem começar por https, http ou mailto.",
+    "foreign_blob": "A alteração indica um ficheiro que não foi carregado para esta página.",
+    "not_a_member": "Só pode partilhar uma página com um membro deste espaço de trabalho.",
+    "share_yourself": "Escolha outra pessoa para partilhar.",
+    "invalid_ref": "Uma página não pode ligar a esse tipo de registo.",
+    "file_empty": "O ficheiro não tem conteúdo."
+  }
+}

@@ -6,10 +6,10 @@
 # calendar_change_completed, as for release_delete), the one-off backfill's
 # dispatcher and job, and attention's projection of schedule.invitation_changed.
 # Applied with
-# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0012-home-invitations.yaml`.
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0013-home-invitations.yaml`.
 changelog:
   - date: "2026-10-25"
-    plan_version: 12
+    plan_version: 13
     change: "Invitations awaiting an answer on Home (campbooks-cloud#360): Coverage for schedule.release_response (connectors.calendar_change_completed), schedule.dispatch_invitation_backfills, schedule.announce_invitations and attention.project_invitation; no new event."
     pr: "#676"
 

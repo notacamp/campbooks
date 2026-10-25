@@ -166,7 +166,7 @@ Nothing is changed without the member: an answer is their press, with Undo.
 Checked `tracking/tracking-plan.xlsx` (Coverage) and `docs/tracking.md`. No
 tracked event is added: an answer is `schedule.respond_event`, which tracks
 `schedule.calendar_event_responded` (an Undo tracks the answer before).
-Patch `tracking/patches/0012-home-invitations.yaml` (plan version 12) adds
+Patch `tracking/patches/0013-home-invitations.yaml` (plan version 13) adds
 Coverage rows:
 
 | Kind | Name | Events / exemption |
