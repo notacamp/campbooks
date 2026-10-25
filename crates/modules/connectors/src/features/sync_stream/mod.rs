@@ -51,6 +51,7 @@ use crate::{
         push::Push,
         removal::BATCH_OWNER,
         schedule::{self, LEASE, Rate, SYNC_STREAM, SyncStreamPayload},
+        tracked,
     },
     features::imap_idle::lease,
     gmail::{self, Reader},
@@ -65,7 +66,7 @@ use crate::{
     mail::{IndexOp, ReadError},
     metrics::{self, SyncOutcome},
     provider::ProviderError,
-    zoho,
+    tracking, zoho,
 };
 
 /// Runs `connectors.sync_stream`.
@@ -273,6 +274,15 @@ impl SyncStream {
             (stream, target.at()),
             &pushed.outcome,
             now,
+        )
+        .await?;
+        tracked::outbound_changes_made(
+            &mut tx,
+            &ctx.state().tracker,
+            workspace,
+            (stream, target.connection),
+            provider,
+            &pushed.outcome,
         )
         .await?;
         for (id, name) in &pushed.created {
@@ -724,6 +734,7 @@ impl SyncStream {
             pool: ctx.pool(),
             blobs: &state.blobs,
             binding: &state.binding,
+            tracker: &state.tracker,
             workspace,
             connection: target.connection,
             stream: target.stream,
@@ -840,11 +851,11 @@ impl SyncStream {
         reason: &'static str,
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
-        let events = ctx.state().events.clone();
+        let state = ctx.state().clone();
         health::needs_reauth(
             ctx.tx().await?,
-            &events,
-            &workspace.to_string(),
+            &state,
+            workspace,
             target.connection,
             target.granted_by,
             reason,
@@ -888,7 +899,8 @@ impl SyncStream {
     /// call for another at once.
     #[allow(
         clippy::too_many_arguments,
-        reason = "one call site; the values are distinct"
+        clippy::too_many_lines,
+        reason = "one call site; the values are distinct; one transaction read top to bottom"
     )]
     async fn apply(
         &self,
@@ -965,7 +977,34 @@ impl SyncStream {
         .execute(&mut **tx)
         .await?;
         if matches!(target.health, Health::Throttled | Health::Failing) {
-            health::set(tx, target.connection, Health::Ok, None, now).await?;
+            health::set(
+                tx,
+                &state.tracker,
+                workspace,
+                target.connection,
+                Health::Ok,
+                None,
+                now,
+            )
+            .await?;
+        }
+        // One summary per run, only when it stored something or moved on.
+        if change_count > 0 || page.phase != target.phase {
+            let (stream, provider) = tracked::stream(tx, target.stream).await?;
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::StreamSynced {
+                        workspace,
+                        stream,
+                        provider,
+                        before_phase: tracked::phase(target.phase),
+                        changes: i64::try_from(change_count).unwrap_or(i64::MAX),
+                        batches: i64::try_from(batches.len()).unwrap_or(i64::MAX),
+                    },
+                )
+                .await?;
         }
         let least_wait = self
             .offer_idle(tx, workspace, target, page.idle.as_ref(), now)
@@ -1056,11 +1095,11 @@ impl SyncStream {
         // the member.
         let failures = target.consecutive_failures.saturating_add(1);
         if u32::try_from(failures).unwrap_or(u32::MAX) >= self.deps.config.failing_after {
-            let events = ctx.state().events.clone();
+            let state = ctx.state().clone();
             health::needs_reauth(
                 ctx.tx().await?,
-                &events,
-                &workspace.to_string(),
+                &state,
+                workspace,
                 target.connection,
                 target.granted_by,
                 "access_refused",
@@ -1103,6 +1142,7 @@ impl SyncStream {
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
         let poll = &self.deps.config.poll;
+        let tracker = ctx.state().tracker.clone();
         let outcome = match err {
             ProviderError::Unauthorized | ProviderError::InvalidGrant => SyncOutcome::Refused,
             ProviderError::RateLimited { .. } => SyncOutcome::Throttled,
@@ -1114,11 +1154,11 @@ impl SyncStream {
         match err {
             ProviderError::Unauthorized => self.refused(ctx, workspace, target, now).await,
             ProviderError::InvalidGrant => {
-                let events = ctx.state().events.clone();
+                let state = ctx.state().clone();
                 health::needs_reauth(
                     ctx.tx().await?,
-                    &events,
-                    &workspace.to_string(),
+                    &state,
+                    workspace,
                     target.connection,
                     target.granted_by,
                     "grant_revoked",
@@ -1143,6 +1183,8 @@ impl SyncStream {
                 .await?;
                 health::set(
                     tx,
+                    &tracker,
+                    workspace,
                     target.connection,
                     Health::Throttled,
                     Some("rate_limited"),
@@ -1175,6 +1217,8 @@ impl SyncStream {
                 if u32::try_from(failures).unwrap_or(u32::MAX) >= self.deps.config.failing_after {
                     health::set(
                         tx,
+                        &tracker,
+                        workspace,
                         target.connection,
                         Health::Failing,
                         Some("provider_errors"),
@@ -1290,6 +1334,7 @@ struct ImapRun<'a> {
     pool: &'a PgPool,
     blobs: &'a campbooks_kernel::blobs::BlobStore,
     binding: &'a campbooks_kernel::binding::Binding,
+    tracker: &'a campbooks_kernel::tracking::Tracker,
     workspace: WorkspaceId,
     connection: ConnectionId,
     stream: StreamId,
@@ -1455,6 +1500,15 @@ async fn record_imap_push(
         (run.stream, run.at),
         &pushed.push.outcome,
         run.now,
+    )
+    .await?;
+    tracked::outbound_changes_made(
+        &mut tx,
+        run.tracker,
+        run.workspace,
+        (run.stream, run.connection),
+        Provider::Imap,
+        &pushed.push.outcome,
     )
     .await?;
     imap::state::apply(&mut tx, run.workspace, run.stream, pushed.locations).await?;

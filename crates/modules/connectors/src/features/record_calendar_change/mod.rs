@@ -14,8 +14,10 @@
 //! connection is gone, or waits for the member), ends at once for the
 //! schedule module to know: nothing is written and nothing waits for ever.
 
-use campbooks_kernel::{Event, EventConsumer, JobContext, JobError, tenancy::WorkspaceId};
-use sqlx::PgConnection;
+use campbooks_kernel::{
+    AppState, Event, EventConsumer, JobContext, JobError, tenancy::WorkspaceId,
+};
+use sqlx::{PgConnection, Postgres, Transaction};
 
 use crate::{
     calendar::{
@@ -25,9 +27,10 @@ use crate::{
     deps::Deps,
     domain::{
         model::{ConnectionId, Provider, StreamId},
-        schedule,
+        schedule, tracked,
     },
     events::{CalendarChangeCompleted, CalendarOutcome, CalendarReason, OutboundRequested},
+    tracking,
 };
 
 /// Records a member's calendar changes for the connector to make.
@@ -76,24 +79,11 @@ impl EventConsumer for RecordCalendarChange {
             .calendar_requests
             .stored_change(&state, tx, workspace, asked.request)
             .await?;
-        let end = |reason: CalendarReason| CalendarChangeCompleted {
-            workspace: asked.workspace.clone(),
-            request: asked.request,
-            calendar: asked.calendar,
-            event: asked.event,
-            outcome: CalendarOutcome::Skipped,
-            provider_event_id: None,
-            etag: None,
-            reason: Some(reason),
-        };
         let Some(stored) = stored else {
             // It does not stand: nothing is made, and the schedule module
             // is told so its event does not wait.
             tracing::warn!(%workspace, request = %asked.request, "a calendar change that does not stand is not recorded");
-            state
-                .events
-                .publish(tx, &end(CalendarReason::Unverified))
-                .await?;
+            end_at_once(&state, tx, workspace, &asked, CalendarReason::Unverified).await?;
             return Ok(());
         };
         if stored.calendar != asked.calendar
@@ -112,17 +102,11 @@ impl EventConsumer for RecordCalendarChange {
         )
         .await?;
         let Some(document) = document.filter(|d| d.is_sound() && d.change == asked.change) else {
-            state
-                .events
-                .publish(tx, &end(CalendarReason::Rejected))
-                .await?;
+            end_at_once(&state, tx, workspace, &asked, CalendarReason::Rejected).await?;
             return Ok(());
         };
         let Some(target) = target_of(tx, asked.connection).await? else {
-            state
-                .events
-                .publish(tx, &end(CalendarReason::NotConnected))
-                .await?;
+            end_at_once(&state, tx, workspace, &asked, CalendarReason::NotConnected).await?;
             return Ok(());
         };
         let offered = match target.provider {
@@ -131,18 +115,12 @@ impl EventConsumer for RecordCalendarChange {
             Provider::Imap => false,
         };
         if !offered {
-            state
-                .events
-                .publish(tx, &end(CalendarReason::NotConnected))
-                .await?;
+            end_at_once(&state, tx, workspace, &asked, CalendarReason::NotConnected).await?;
             return Ok(());
         }
         if target.paused {
             // The member must connect again first.
-            state
-                .events
-                .publish(tx, &end(CalendarReason::NeedsReauth))
-                .await?;
+            end_at_once(&state, tx, workspace, &asked, CalendarReason::NeedsReauth).await?;
             return Ok(());
         }
         // Serialise with the stream's run, which looks for changes recorded
@@ -171,6 +149,52 @@ impl EventConsumer for RecordCalendarChange {
         }
         Ok(())
     }
+}
+
+/// End the change `asked` names at once, skipped for `reason`: the schedule
+/// module is told (`connectors.calendar_change_completed`) so its event does
+/// not wait, and the end is tracked. Nothing was recorded, so no stream
+/// is named.
+async fn end_at_once(
+    state: &AppState,
+    tx: &mut Transaction<'static, Postgres>,
+    workspace: WorkspaceId,
+    asked: &OutboundRequested,
+    reason: CalendarReason,
+) -> Result<(), JobError> {
+    state
+        .events
+        .publish(
+            tx,
+            &CalendarChangeCompleted {
+                workspace: asked.workspace.clone(),
+                request: asked.request,
+                calendar: asked.calendar,
+                event: asked.event,
+                outcome: CalendarOutcome::Skipped,
+                provider_event_id: None,
+                etag: None,
+                reason: Some(reason),
+            },
+        )
+        .await?;
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::CalendarChangeCompleted {
+                workspace,
+                request_id: asked.request,
+                calendar_id: asked.calendar,
+                event_id: asked.event,
+                stream_id: None,
+                change: tracked::calendar_change(&asked.change),
+                outcome: tracking::CalendarOutcome::Skipped,
+                reason: Some(tracked::calendar_reason(reason)),
+            },
+        )
+        .await?;
+    Ok(())
 }
 
 /// The calendar stream of `connection`, when it has one.
