@@ -5,6 +5,7 @@
 import type { Schema } from "~/lib/api";
 
 import { INBOX, Q4 } from "./conversations";
+import { ANA } from "./workspaces";
 
 type Event = Schema<"EventView">;
 type Calendar = Schema<"CalendarView">;
@@ -396,53 +397,112 @@ export const DENTIST_READ: Read = {
   status: "done",
 };
 
-/** Tasks due, as the Due layer will draw them once `tasks` publishes them. */
-export const DUE_ITEMS = [
-  {
-    id: id(91),
-    verb: "pay",
+type Task = Schema<"TaskView">;
+
+const task = (n: number, over: Partial<Task>): Task => ({
+  id: id(n),
+  title: "",
+  verb: "do",
+  origin: "ask",
+  due_on: null,
+  due_at: null,
+  overdue: false,
+  plan: "none",
+  plan_on: null,
+  later_until: null,
+  state: "open",
+  closed_at: null,
+  assignee: ANA.user_id,
+  created_by: ANA.user_id,
+  handed_by: null,
+  source: null,
+  revision: 1,
+  created_at: "2026-10-20T09:00:00Z",
+  updated_at: "2026-10-20T09:00:00Z",
+  ...over,
+});
+
+const fromEmail = (n: number) => ({ type: "conversations.conversation", id: conversation(n) });
+
+/**
+ * Ana's open tasks around Tuesday 27 October, as `tasks.list` answers them:
+ * overdue; due today and planned for today (one row); planned Wednesday and
+ * due Thursday (two rows); a plan that slipped; a Later with a due day.
+ */
+export const TASKS = [
+  task(91, {
     title: "EDP bill",
-    amount: { minor: 8420, currency: "EUR" },
-    due: "2026-10-25",
-    source: {
-      conversationId: conversation(9),
-      stream: "receipts",
-      subject: "Your October bill",
-      sender: "EDP",
-      sentAt: "2026-10-12T08:00:00Z",
-      quote: "Please pay €84.20 by 25 October 2026.",
-    },
-  },
-  {
-    id: id(92),
     verb: "pay",
+    due_on: "2026-10-25",
+    overdue: true,
+    source: fromEmail(9),
+  }),
+  task(92, {
     title: "Costa Obras invoice",
-    amount: { minor: 124_000, currency: "EUR" },
-    due: "2026-10-27",
-    source: {
-      conversationId: conversation(10),
-      stream: "primary",
-      subject: "Invoice 2026-118, works at Rua da Prata",
-      sender: "Rui Costa",
-      sentAt: "2026-10-20T10:00:00Z",
-      quote: "Please settle invoice 2026-118 (€1,240.00) by 27 October.",
-    },
-  },
-  {
-    id: id(93),
-    verb: "do",
+    verb: "pay",
+    due_on: "2026-10-27",
+    plan: "date",
+    plan_on: "2026-10-27",
+    source: fromEmail(10),
+  }),
+  task(93, {
     title: "Send the signed lease",
-    due: "2026-10-29",
-    source: {
-      conversationId: conversation(11),
-      stream: "primary",
-      subject: "Lease for the Alfama flat",
-      sender: "Marta Lopes",
-      sentAt: "2026-10-26T18:12:00Z",
-      quote: "Can you send me the signed lease by Thursday 29 October?",
-    },
-  },
-] as const;
+    due_on: "2026-10-29",
+    plan: "date",
+    plan_on: "2026-10-28",
+    source: fromEmail(11),
+  }),
+  task(94, {
+    title: "Call the accountant about Q3 VAT",
+    plan: "date",
+    plan_on: "2026-10-26",
+  }),
+  task(95, {
+    title: "Book the car inspection",
+    due_on: "2026-10-30",
+    plan: "later",
+    later_until: "2026-11-02T09:00:00Z",
+  }),
+];
+
+/** The emails the tasks above came from (`conversations.list?ids=`). */
+export function taskSources(): Summary[] {
+  const mail = (
+    n: number,
+    stream: string,
+    subject: string,
+    name: string,
+    address: string,
+    at: string,
+  ): Summary => ({
+    ...Q4,
+    id: conversation(n),
+    stream,
+    subject,
+    last_message_at: at,
+    latest_from: { name, address },
+    labels: [],
+  });
+  return [
+    mail(9, "receipts", "Your October bill", "EDP", "faturas@edp.example", "2026-10-12T08:00:00Z"),
+    mail(
+      10,
+      "primary",
+      "Invoice 2026-118, works at Rua da Prata",
+      "Rui Costa",
+      "rui@costaobras.example",
+      "2026-10-20T10:00:00Z",
+    ),
+    mail(
+      11,
+      "primary",
+      "Lease for the Alfama flat",
+      "Marta Lopes",
+      "marta@lopesimoveis.example",
+      "2026-10-26T18:12:00Z",
+    ),
+  ];
+}
 
 /** The email the reader stories open: a lease with a dated handover and a deadline. */
 export const LEASE: Summary = {

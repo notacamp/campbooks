@@ -90,7 +90,10 @@ export function buildModuleRoutes<
       ...assistant.workspace,
       // Tasks made from emails say where they came from: the conversations module knows.
       ...buildTasksRoutes(workspace, { useSources: useConversationSources }),
-      ...buildScheduleRoutes(workspace, { useConsent: useMailboxConsent }),
+      ...buildScheduleRoutes(workspace, {
+        useConsent: useMailboxConsent,
+        useSources: useConversationSources,
+      }),
       // `cargo xtask new-module` inserts above this line.
     ],
   } as const;

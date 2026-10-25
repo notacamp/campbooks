@@ -27,7 +27,7 @@
   },
   "week": {
     "label": "Week",
-    "due": "Due",
+    "due": "Tasks",
     "allDay": "All day"
   },
   "month": {
@@ -51,7 +51,8 @@
     "expiry": "Expiry",
     "hold": "Held",
     "none": "Event",
-    "due": "Due"
+    "due": "Due",
+    "planned": "Planned"
   },
   "from": {
     "email": "From email"
@@ -99,7 +100,6 @@
   "due": {
     "label": "Due",
     "pay": "Pay · {{title}}",
-    "payAmount": "Pay · {{title}} · {{amount}}",
     "do": "Do · {{title}}",
     "today": "Due today",
     "at": "Due {{time}}",
@@ -108,16 +108,14 @@
     "meta": "Task",
     "wasDue": "Was due {{day}}",
     "dueOn": "Due {{day}}",
-    "note": "A task: it lives in your tasks and shows here on its due date",
-    "calendar": "Tasks",
-    "markPaid": "Mark it paid from the task",
-    "markDone": "Mark it done from the task",
+    "note": "A task: it lives in your tasks and shows here on the day it is due and the day you planned it",
     "paid": "Paid",
     "done": "Done",
-    "hold": "Hold time",
-    "later": "Later",
     "open": "Open task",
-    "failed": "Couldn’t do that. Try again."
+    "planned": "Planned",
+    "plannedOn": "Planned {{day}}",
+    "metaPlanned": "Planned",
+    "plannedFact": "Planned for {{day}}"
   },
   "form": {
     "newTitle": "New event",
