@@ -456,8 +456,14 @@ async fn ids_are_path_segments_and_links_give_only_their_token() {
             next: graph::Next::More("s-2".to_owned()),
         })
     );
+    // Only the fake was asked, never the link's host.
     let calls = server.received_requests().await.unwrap();
-    assert!(calls.iter().all(|r| r.url.host_str() == Some("127.0.0.1")));
+    assert_eq!(calls.len(), 1);
+    assert!(
+        calls
+            .iter()
+            .all(|r| !r.url.as_str().contains("elsewhere.example.com"))
+    );
 }
 
 #[tokio::test]
