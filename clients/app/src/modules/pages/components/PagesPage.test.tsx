@@ -207,7 +207,7 @@ describe("the pages tree", () => {
       return found;
     };
     expect(screen.getByText(BUDGET.title).closest("div[draggable='true']")).toBeNull();
-    const dataTransfer = { effectAllowed: "", setData: () => undefined };
+    const dataTransfer = { effectAllowed: "", setData: () => {} };
     const source = row(IDEAS.title);
     const target = row(HANDBOOK.title);
     fireEvent.dragStart(source, { dataTransfer });

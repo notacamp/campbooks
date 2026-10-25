@@ -146,7 +146,10 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
     <>
       <div className="flex flex-wrap items-center gap-2 p-3">
         <IconButton icon="chevron-left" label={t("screen.back")} size="lg" onClick={onBack} />
-        <nav aria-label={t("screen.trail")} className="flex w-full min-w-0 items-center gap-1 sm:w-auto sm:flex-1">
+        <nav
+          aria-label={t("screen.trail")}
+          className="flex w-full min-w-0 items-center gap-1 sm:w-auto sm:flex-1"
+        >
           <Text as="span" tone="tertiary" size="sm">
             {section}
           </Text>

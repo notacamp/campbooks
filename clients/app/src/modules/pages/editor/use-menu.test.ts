@@ -34,7 +34,7 @@ describe("a suggestion menu", () => {
   it("is at the top left when the editor cannot say where the caret is", () => {
     const { result } = renderHook(() => useMenu<string>(vi.fn()));
     act(() => {
-      result.current.bridge.show({ ...props(["a"]), clientRect: null } as never);
+      result.current.bridge.show({ ...props(["a"]), clientRect: null });
     });
     expect(result.current.menu?.anchor).toEqual({ x: 0, y: 0 });
   });
