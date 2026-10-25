@@ -1517,6 +1517,180 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the pages the caller may open. */
+        get: operations["pages.list"];
+        put?: never;
+        /** Make a page. */
+        post: operations["pages.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/backlinks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where a record is linked from. */
+        get: operations["pages.backlinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a page. */
+        get: operations["pages.get"];
+        put?: never;
+        post?: never;
+        /** Delete a page in the trash, and what was deleted with it, for good. */
+        delete: operations["pages.purge"];
+        options?: never;
+        head?: never;
+        /** Change a page's title or icon. */
+        patch: operations["pages.update"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a file or an image to a page. */
+        post: operations["pages.upload_file"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/files/{hash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a file or an image of a page. */
+        get: operations["pages.get_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/grants/{member_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Share a page with a member, or change their role. */
+        put: operations["pages.share"];
+        post?: never;
+        /** Stop sharing a page with a member. */
+        delete: operations["pages.unshare"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a page. */
+        post: operations["pages.move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring a page in the trash back, with the sub-pages deleted with it. */
+        post: operations["pages.restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge a client's changes into a page's body, and get back what it lacks. */
+        post: operations["pages.sync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put a page and its sub-pages in the trash. */
+        post: operations["pages.trash"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/person-notes": {
         parameters: {
             query?: never;
@@ -2835,6 +3009,27 @@ export interface components {
             /** @description The identity provider's signed logout token. */
             logout_token: string;
         };
+        /** @description A page that links to the record. */
+        Backlink: {
+            /**
+             * Format: date-time
+             * @description When it was last changed.
+             */
+            edited_at: string;
+            /** @description Its icon. */
+            icon?: string | null;
+            /** @description The page. */
+            page: components["schemas"]["PageId"];
+            /** @description Private or workspace. */
+            place: components["schemas"]["Place"];
+            /** @description Its title. */
+            title: string;
+        };
+        /** @description The pages that link to a record. */
+        Backlinks: {
+            /** @description The pages, most recently edited first. */
+            pages: components["schemas"]["Backlink"][];
+        };
         /**
          * @description How regularly a sender writes.
          * @enum {string}
@@ -3675,6 +3870,15 @@ export interface components {
             /** @description `public-key`. */
             type: string;
         };
+        /** @description A page above another, for the breadcrumb: only ones the caller may open. */
+        Crumb: {
+            /** @description Its icon. */
+            icon?: string | null;
+            /** @description The page. */
+            id: components["schemas"]["PageId"];
+            /** @description Its title. */
+            title: string;
+        };
         /**
          * @description Allow or deny.
          * @enum {string}
@@ -3760,6 +3964,18 @@ export interface components {
             /** @description Its `key`. */
             key: string;
         };
+        /** @description A page's body as a Yjs document: what the client loads and merges. */
+        DocumentState: {
+            /** @description The document's state vector (v1), in base64. */
+            state_vector: string;
+            /** @description The whole document as one Yjs update (v1), in base64. */
+            update: string;
+        };
+        /**
+         * Format: binary
+         * @description A file's bytes, as the OpenAPI document describes them.
+         */
+        DownloadBytes: string;
         /** @description A forwarded attachment, as the draft shows it. */
         DraftAttachment: {
             /** @description Its media type, as sent (not trusted). */
@@ -4032,6 +4248,13 @@ export interface components {
             slots: components["schemas"]["SlotView"][];
             /** @description The time zone the working hours and the times are in. */
             time_zone: string;
+        };
+        /** @description A member a page is shared with. */
+        GrantView: {
+            /** @description The member. */
+            member: components["schemas"]["UserId"];
+            /** @description Their role on the page and its sub-pages. */
+            role: components["schemas"]["Role"];
         };
         /** @description Who to hand it to. */
         HandOffTo: {
@@ -4859,6 +5082,27 @@ export interface components {
              */
             title: string;
         };
+        /** @description What the member may do. */
+        NewGrant: {
+            /** @description `reader`, `writer` or `manager`. */
+            role: components["schemas"]["Role"];
+        };
+        /** @description A new page. */
+        NewPage: {
+            /** @description Its body as one Yjs update (v1), in base64. Default: empty. */
+            document?: string | null;
+            /** @description Its icon, one of the page icons. */
+            icon?: string | null;
+            parent?: components["schemas"]["PageId"] | null;
+            place?: components["schemas"]["Place"] | null;
+            /**
+             * @description Where it sits among its siblings: a fractional-indexing key. Default:
+             *     after the last one.
+             */
+            position?: string | null;
+            /** @description Its title: 0 to 200 characters. A page may be made before it has one. */
+            title?: string | null;
+        };
         /**
          * @description Whether a new rule should act now or wait for a yes.
          * @enum {string}
@@ -4939,6 +5183,130 @@ export interface components {
          * @enum {string}
          */
         Outcome: "done" | "not_needed" | "already_paid" | "still_to_pay";
+        /**
+         * Format: uuid
+         * @description PageId (UUIDv7)
+         */
+        PageId: string;
+        /** @description The pages. */
+        PageList: {
+            /** @description The pages, sorted by position among their siblings. */
+            pages: components["schemas"]["PageSummary"][];
+        };
+        /** @description Where the page should end up. */
+        PageMove: {
+            /**
+             * Format: int64
+             * @description The `meta_revision` you saw.
+             */
+            meta_revision: number;
+            parent?: components["schemas"]["PageId"] | null;
+            place?: components["schemas"]["Place"] | null;
+            /**
+             * @description A fractional-indexing key among its new siblings. Default: after the
+             *     last one.
+             */
+            position?: string | null;
+        };
+        /** @description One page of the tree, as `pages.list` shows it. */
+        PageSummary: {
+            /** @description The member who made it. */
+            created_by: components["schemas"]["UserId"];
+            /**
+             * Format: date-time
+             * @description When it was last changed.
+             */
+            edited_at: string;
+            /** @description Whether it has sub-pages. */
+            has_children: boolean;
+            /** @description Its icon, one of the page icons. */
+            icon?: string | null;
+            /** @description The page. */
+            id: components["schemas"]["PageId"];
+            /**
+             * Format: int64
+             * @description Grows with a change of the title, icon or position.
+             */
+            meta_revision: number;
+            parent?: components["schemas"]["PageId"] | null;
+            /** @description Private or workspace. */
+            place: components["schemas"]["Place"];
+            /** @description Where it sits among its siblings: sort by it. */
+            position: string;
+            /** @description What the caller can do with it. */
+            role: components["schemas"]["Role"];
+            /** @description Its title (empty when it has none yet). */
+            title: string;
+            /**
+             * Format: date-time
+             * @description When it was put in the trash, for a page in the trash.
+             */
+            trashed_at?: string | null;
+        };
+        /** @description The page as it should become. */
+        PageUpdate: {
+            /** @description Its icon, one of the page icons; none clears it. */
+            icon?: string | null;
+            /**
+             * Format: int64
+             * @description The `meta_revision` you saw.
+             */
+            meta_revision: number;
+            /** @description Its title: 0 to 200 characters. */
+            title: string;
+        };
+        /** @description A page, as `pages.get` shows it. */
+        PageView: {
+            /** @description The pages above it that the caller may open, outermost first. */
+            ancestors: components["schemas"]["Crumb"][];
+            /**
+             * Format: date-time
+             * @description When it was made.
+             */
+            created_at: string;
+            /** @description The member who made it. */
+            created_by: components["schemas"]["UserId"];
+            /** @description The body. */
+            document: components["schemas"]["DocumentState"];
+            /**
+             * Format: date-time
+             * @description When it was last changed.
+             */
+            edited_at: string;
+            /** @description The member who last changed it. */
+            edited_by: components["schemas"]["UserId"];
+            /** @description The members it is shared with. */
+            grants: components["schemas"]["GrantView"][];
+            /** @description Its icon. */
+            icon?: string | null;
+            /** @description The page. */
+            id: components["schemas"]["PageId"];
+            /**
+             * Format: int64
+             * @description Grows with a change of the title, icon or position: send the one
+             *     you saw with `pages.update` and `pages.move`.
+             */
+            meta_revision: number;
+            parent?: components["schemas"]["PageId"] | null;
+            /** @description Private or workspace. */
+            place: components["schemas"]["Place"];
+            /** @description Where it sits among its siblings. */
+            position: string;
+            /**
+             * Format: int64
+             * @description Grows with every change.
+             */
+            revision: number;
+            /** @description What the caller can do with it. */
+            role: components["schemas"]["Role"];
+            /** @description Its title. */
+            title: string;
+            /**
+             * Format: date-time
+             * @description When it was put in the trash.
+             */
+            trashed_at?: string | null;
+        };
         /** @description The query as understood. */
         ParsedQuery: {
             /** @description The filters applied. */
@@ -5026,6 +5394,11 @@ export interface components {
          * @enum {string}
          */
         Phase: "backfill" | "incremental" | "resync";
+        /**
+         * @description Where a top-level page lives; sub-pages are always in their parent's.
+         * @enum {string}
+         */
+        Place: "private" | "workspace";
         /** @description The plan the task should have. */
         PlanTask: {
             /**
@@ -6565,6 +6938,28 @@ export interface components {
          * @enum {string}
          */
         SurfaceWhen: "always" | "never";
+        /** @description What the client holds, and what it wants to add. */
+        SyncRequest: {
+            /** @description The client's document's state vector (v1), in base64. */
+            state_vector: string;
+            /**
+             * @description Changes the server has not seen, as one Yjs update (v1) of at most
+             *     256 KiB, in base64.
+             */
+            update?: string | null;
+        };
+        /** @description What the server holds that the client does not. */
+        SyncResponse: {
+            /**
+             * Format: int64
+             * @description The page's revision after this call.
+             */
+            revision: number;
+            /** @description The server's document's state vector (v1), in base64. */
+            state_vector: string;
+            /** @description What the client is missing, as one Yjs update (v1), in base64. */
+            update: string;
+        };
         /** @description What was scheduled. */
         SyncScheduled: {
             /**
@@ -6883,6 +7278,23 @@ export interface components {
             time_zone?: string | null;
             /** @description The previous title, if it changed. */
             title?: string | null;
+        };
+        /**
+         * Format: binary
+         * @description A file's bytes, as the OpenAPI document describes the request body.
+         */
+        UploadBytes: string;
+        /** @description What was stored. */
+        UploadedFile: {
+            /** @description The blob's hash: what a `file` or `image` block names. */
+            blob: string;
+            /** @description The media type it was sent with, lower-cased; never trusted. */
+            content_type: string;
+            /**
+             * Format: int64
+             * @description Its size in bytes.
+             */
+            size: number;
         };
         /** @description The account the credential is for. */
         UserEntity: {
@@ -12938,6 +13350,925 @@ export interface operations {
                 };
             };
             /** @description `last_owner`: you are its only owner. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.list": {
+        parameters: {
+            query?: {
+                /**
+                 * @description `true` for the trash: the pages deleted in the last 30 days, each the
+                 *     root of what was deleted with it. Default `false`.
+                 */
+                trashed?: boolean;
+                /** @description Only the sub-pages of this page. */
+                parent?: components["schemas"]["PageId"];
+                /** @description Only the pages in this place. */
+                place?: "private" | "workspace";
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pages the caller may open. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a token acting for nobody. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewPage"];
+            };
+        };
+        responses: {
+            /** @description The page. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageView"];
+                };
+            };
+            /** @description A title over 200 characters (`invalid_title`), an unknown icon, a bad position, or a body that is not valid (`invalid_update`, `unknown_block`, `link_scheme`, `document_too_large`, `foreign_blob`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the parent but not write in it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or a parent you cannot see. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The parent is in the trash (`page_trashed`), or pages would nest deeper than 12 levels (`page_too_deep`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.backlinks": {
+        parameters: {
+            query: {
+                /**
+                 * @description The record type: `workspaces.member`, `conversations.conversation`,
+                 *     `tasks.task`, `schedule.event`, `pages.page` or `person`.
+                 */
+                type: string;
+                /** @description The record's id (for `person`, the cleaned address). */
+                id: string;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pages the caller may open that link to the record. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backlinks"];
+                };
+            };
+            /** @description A record type or id a page cannot link to (`invalid_ref`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a token acting for nobody. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or a record you cannot read. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page, with its body as one Yjs update and its state vector. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page that was deleted. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page and everything deleted with it are gone for good. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not delete it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is not in the trash (`page_not_trashed`), or was deleted with another page (`page_not_trash_root`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageUpdate"];
+            };
+        };
+        responses: {
+            /** @description The page afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageSummary"];
+                };
+            };
+            /** @description A title over 200 characters (`invalid_title`) or an unknown icon (`invalid_icon`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page changed since you saw it (`page_changed`), or it is in the trash (`page_trashed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.upload_file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": components["schemas"]["UploadBytes"];
+            };
+        };
+        responses: {
+            /** @description The stored file. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadedFile"];
+                };
+            };
+            /** @description No bytes (`file_empty`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not change it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is in the trash (`page_trashed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Over 20 MiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.get_file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+                /** @description The blob's hash. */
+                hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bytes: a raster image inline, anything else as a download of opaque bytes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": components["schemas"]["DownloadBytes"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page or file, or you cannot see the page. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+                /** @description The member. */
+                member_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewGrant"];
+            };
+        };
+        responses: {
+            /** @description The member's role on the page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantView"];
+                };
+            };
+            /** @description Not a member of this workspace (`not_a_member`), or yourself (`share_yourself`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not share it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is in the trash (`page_trashed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.unshare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+                /** @description The member. */
+                member_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page is no longer shared with the member. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not share it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it, or it was not shared with the member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageMove"];
+            };
+        };
+        responses: {
+            /** @description The page afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageSummary"];
+                };
+            };
+            /** @description A bad position (`invalid_position`), or a place that is not the parent's (`place_mismatch`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page (or where it goes) but not write it; moving it between the private and workspace places needs sharing it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it or where it goes. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page changed since you saw it (`page_changed`), is in the trash (`page_trashed`), would go inside itself (`page_cycle`) or nest deeper than 12 levels (`page_too_deep`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page that was deleted. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page, back where it was, or at the top level of its place when what it was under is gone or in the trash. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not delete it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is not in the trash (`page_not_trashed`), or was deleted with another page: restore that one (`page_not_trash_root`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncRequest"];
+            };
+        };
+        responses: {
+            /** @description What the client is missing, and the new state vector. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncResponse"];
+                };
+            };
+            /** @description The update is not valid: not a Yjs update or one that cannot be applied (`invalid_update`), over 256 KiB (`update_too_large`), uses a block or attribute the page cannot hold (`unknown_block`), links outside https, http and mailto (`link_scheme`), names a file that was not uploaded to this page (`foreign_blob`), or would make the page too large (`document_too_large`). Nothing is stored. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not change it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is in the trash (`page_trashed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page, now in the trash for 30 days. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not delete it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is in the trash already (`page_trashed`). */
             409: {
                 headers: {
                     [name: string]: unknown;
