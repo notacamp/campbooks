@@ -912,7 +912,8 @@ impl SyncStream {
     /// call for another at once.
     #[allow(
         clippy::too_many_arguments,
-        reason = "one call site; the values are distinct"
+        clippy::too_many_lines,
+        reason = "one call site; the values are distinct; one transaction read top to bottom"
     )]
     async fn apply(
         &self,

@@ -176,7 +176,7 @@ impl SendAddressCheck {
         let code = address_checks::code(&ctx.state().signer, connection, check.nonce);
         let message = message(
             check.locale,
-            &address.to_string(),
+            AsRef::<str>::as_ref(&address),
             &address_checks::message_id(&code, &domain),
             now,
         );
