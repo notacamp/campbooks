@@ -89,15 +89,7 @@ impl GrantIntake for Intake {
             let mut address = grant.address.trim().to_lowercase();
             let mut address_verified = grant.address_verified;
             let mut display_name = grant.display_name.clone();
-            let mut tokens = TokenGrant {
-                access_token: grant.access_token.expose_secret().to_owned(),
-                expires_in: grant.expires_in.and_then(|s| i64::try_from(s).ok()),
-                refresh_token: grant
-                    .refresh_token
-                    .as_ref()
-                    .map(|t| t.expose_secret().to_owned()),
-                scope: Some(grant.scopes.join(" ")),
-            };
+            let mut tokens = tokens_of(&grant);
             let (provider, capabilities, provider_server, mailboxes) = match grant.provider.as_str()
             {
                 "google" if self.deps.google.is_some() => {
@@ -403,6 +395,19 @@ impl Intake {
             return Err(Error::Conflict(MESSAGES.reason("no_mailbox")));
         }
         Ok((centre.issuer, mailboxes))
+    }
+}
+
+/// The tokens `grant` brings, as they are kept.
+fn tokens_of(grant: &Grant) -> TokenGrant {
+    TokenGrant {
+        access_token: grant.access_token.expose_secret().to_owned(),
+        expires_in: grant.expires_in.and_then(|s| i64::try_from(s).ok()),
+        refresh_token: grant
+            .refresh_token
+            .as_ref()
+            .map(|t| t.expose_secret().to_owned()),
+        scope: Some(grant.scopes.join(" ")),
     }
 }
 
