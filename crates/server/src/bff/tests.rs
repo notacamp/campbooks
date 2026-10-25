@@ -2357,7 +2357,7 @@ async fn the_functions_never_reach_another_accounts_session(db: PgPool) {
             .unwrap()
     );
     assert!(
-        store::delete_session(&mut *runtime.acquire().await.unwrap(), &unknown)
+        store::delete_session(&mut runtime.acquire().await.unwrap(), &unknown)
             .await
             .unwrap()
             .is_none()
@@ -2389,7 +2389,7 @@ async fn the_functions_never_reach_another_accounts_session(db: PgPool) {
     // One account's sessions end; the other's stay.
     assert_eq!(
         store::delete_for_logout(
-            &mut *runtime.acquire().await.unwrap(),
+            &mut runtime.acquire().await.unwrap(),
             Some("test-user"),
             None
         )
@@ -2398,7 +2398,7 @@ async fn the_functions_never_reach_another_accounts_session(db: PgPool) {
         1
     );
     assert_eq!(
-        store::delete_for_logout(&mut *runtime.acquire().await.unwrap(), None, None)
+        store::delete_for_logout(&mut runtime.acquire().await.unwrap(), None, None)
             .await
             .unwrap(),
         0
@@ -2406,7 +2406,7 @@ async fn the_functions_never_reach_another_accounts_session(db: PgPool) {
     assert_eq!(ana.get("/bff/session").await.json()["authenticated"], false);
     assert_eq!(sam.get("/bff/session").await.json()["authenticated"], true);
     // Ending by a token hash ends that session only.
-    let ended = store::delete_session(&mut *runtime.acquire().await.unwrap(), &sam_hash)
+    let ended = store::delete_session(&mut runtime.acquire().await.unwrap(), &sam_hash)
         .await
         .unwrap()
         .unwrap();
@@ -3156,7 +3156,15 @@ async fn a_call_through_the_bff_is_tracked_in_the_operation_it_reaches(db: PgPoo
 async fn a_suspension_through_the_bff_ends_web_sessions_on_the_administrators_behalf(db: PgPool) {
     use campbooks_kernel::jobs::Worker;
 
-    let h = harness(db).await;
+    // With the registry, the suspension's event is delivered to its
+    // handlers, as in the server.
+    let h = harness_limited(
+        db,
+        ORIGIN,
+        |_| {},
+        |state| state.with_registry(crate::registry().unwrap()),
+    )
+    .await;
     let target = uuid::Uuid::now_v7();
     sqlx::query(
         "INSERT INTO identity.accounts (id, primary_email_verified, created_at)
