@@ -62,7 +62,7 @@ describe("a suggestion menu", () => {
     act(() => {
       expect(result.current.bridge.key(key("Enter"))).toBe(true);
     });
-    expect(command).toHaveBeenCalledWith("a");
+    expect(command).toHaveBeenCalledWith("c");
     act(() => {
       expect(result.current.bridge.key(key("Escape"))).toBe(true);
     });

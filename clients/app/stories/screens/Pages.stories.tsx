@@ -293,8 +293,7 @@ export const TypingKeepsTheCaret: Story = {
     const canvas = within(canvasElement);
     const editor = await canvas.findByRole("textbox", { name: "Page text" });
     const last = await within(editor).findByText("Notes from the kickoff go below.");
-    await userEvent.click(last);
-    await userEvent.keyboard("{End}{Enter}Pages save as you type.");
+    await userEvent.type(last, "{Enter}Pages save as you type.");
     // The save goes out and is answered...
     await canvas.findByText("Saving…");
     await canvas.findByText("Saved");
