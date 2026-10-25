@@ -1,0 +1,25 @@
+{
+  "errors": {
+    "page_forbidden": "You can read this page but not do that with it.",
+    "invalid_title": "A page title has at most 200 characters.",
+    "invalid_icon": "That is not one of the page icons.",
+    "invalid_position": "That position is not valid.",
+    "place_mismatch": "A sub-page is always in the same place as the page it is under.",
+    "page_changed": "This page changed since you saw it. Reload it and try again.",
+    "page_trashed": "This page is in the trash. Restore it first.",
+    "page_not_trashed": "Only a page in the trash can be deleted for good.",
+    "page_not_trash_root": "This page was deleted together with another one. Use that page instead.",
+    "page_too_deep": "Pages can be nested at most 12 levels deep.",
+    "page_cycle": "A page can't be moved inside itself or one of its sub-pages.",
+    "invalid_update": "That change to the page is not valid.",
+    "update_too_large": "A change to a page can be at most 256 KiB.",
+    "document_too_large": "The page would be too large: at most 4 MiB, 20,000 blocks and 32 levels.",
+    "unknown_block": "The change uses a block or a setting that a page can't hold.",
+    "link_scheme": "Links can only start with https, http or mailto.",
+    "foreign_blob": "The change names a file that was not uploaded to this page.",
+    "not_a_member": "You can only share a page with a member of this workspace.",
+    "share_yourself": "Choose someone else to share it with.",
+    "invalid_ref": "A page can't link to that kind of record.",
+    "file_empty": "The file has no content."
+  }
+}

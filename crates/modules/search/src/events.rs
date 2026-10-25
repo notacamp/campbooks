@@ -10,6 +10,9 @@ use campbooks_kernel::DomainEvent;
 /// The record type of a conversation (the group search shows).
 pub const CONVERSATION_RECORD: &str = "conversations.conversation";
 
+/// The record type of a page (a group search shows).
+pub const PAGE_RECORD: &str = "pages.page";
+
 /// `conversations.message_received` v1.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MessageReceived {
@@ -57,6 +60,26 @@ pub struct ConversationChanged {
 
 impl DomainEvent for ConversationChanged {
     const NAME: &'static str = "conversations.conversation_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `pages.page_changed` v1 (`contracts/pages.page_changed.v1.schema.json`):
+/// a page was made or changed, put in the trash or brought back, shared or
+/// deleted for good.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PageChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The page (a group of the index).
+    pub page: String,
+}
+
+impl DomainEvent for PageChanged {
+    const NAME: &'static str = "pages.page_changed";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

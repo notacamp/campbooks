@@ -10,6 +10,7 @@ use crate::{
     domain::index,
     events::{
         CONVERSATION_RECORD, ConversationChanged, InboxRemoved, MessageReceived, MessageSent,
+        PAGE_RECORD, PageChanged,
     },
 };
 
@@ -89,6 +90,21 @@ impl EventHandler for OnConversationChanged {
             conversation,
         } = event.payload;
         refresh(ctx, &workspace, CONVERSATION_RECORD, &conversation).await
+    }
+}
+
+/// `pages.page_changed` → refresh the page (a page in the trash, or gone, is
+/// removed from the index).
+pub struct OnPageChanged;
+
+impl EventHandler for OnPageChanged {
+    type Event = PageChanged;
+    const NAME: &'static str = "search.on_page_changed";
+    const QUEUE: &'static str = "events";
+
+    async fn handle(ctx: &mut JobContext, event: Event<PageChanged>) -> Result<(), JobError> {
+        let PageChanged { workspace, page } = event.payload;
+        refresh(ctx, &workspace, PAGE_RECORD, &page).await
     }
 }
 
