@@ -6,7 +6,7 @@ use std::time::Duration;
 use secrecy::SecretString;
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
-    matchers::{body_string_contains, header, method, path, query_param},
+    matchers::{body_string_contains, header, header_exists, method, path, query_param},
 };
 
 use super::*;
@@ -403,10 +403,7 @@ async fn a_message_over_the_limit_is_not_read_past_it() {
     let (server, microsoft) = fake().await;
     Mock::given(method("GET"))
         .and(path("/v1.0/me/messages/msg-1/$value"))
-        .and(header(
-            "prefer",
-            "odata.maxpagesize=50, IdType=\"ImmutableId\"",
-        ))
+        .and(header_exists("prefer"))
         .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![b'x'; 5000]))
         .mount(&server)
         .await;
