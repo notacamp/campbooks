@@ -167,6 +167,50 @@ impl DomainEvent for TaskChanged {
     }
 }
 
+/// `schedule.invitation_changed` v1
+/// (`contracts/schedule.invitation_changed.v1.schema.json`,
+/// campbooks-cloud#360): an invitation awaiting its member's answer opened,
+/// changed or closed. Only what the projection reads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InvitationChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The event.
+    pub event: String,
+    /// The member who is asked.
+    pub owner: UserId,
+    /// Grows with every announcement of this event's invitation.
+    pub revision: i64,
+    /// The invitation while it awaits an answer.
+    #[serde(default)]
+    pub invitation: Option<InvitationFacts>,
+    /// Why it no longer awaits one (`answered`, `cancelled`, `removed`,
+    /// `hidden`, `started`).
+    #[serde(default)]
+    pub closed_because: Option<String>,
+}
+
+/// An invitation as `schedule.invitation_changed` carries it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InvitationFacts {
+    /// The day the event starts, in the member's zone.
+    pub on: NaiveDate,
+    /// When it stops awaiting an answer.
+    pub lapses_at: DateTime<Utc>,
+    /// Whether a person sent it; `None` when unknown.
+    #[serde(default)]
+    pub from_person: Option<bool>,
+}
+
+impl DomainEvent for InvitationChanged {
+    const NAME: &'static str = "schedule.invitation_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 /// `workspaces.workspace_deleting`: the workspace is gone at once and its
 /// data is purged at `purge_after`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

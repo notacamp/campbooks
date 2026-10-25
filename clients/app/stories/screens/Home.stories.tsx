@@ -35,9 +35,12 @@ import { INBOX, NOW, STREAM_COUNTS, W } from "../../test/demo/conversations";
 import {
   HOME_CALENDARS,
   HOME_COUNTS,
+  HOME_COUNTS_INVITED,
   HOME_DUE,
   HOME_EVENTS,
+  HOME_INVITATION_EVENTS,
   HOME_ITEMS,
+  HOME_ITEMS_INVITED,
   HOME_NEEDS,
   HOME_SETTINGS,
   HOME_TASKS,
@@ -685,4 +688,91 @@ export const ScoutIsntSureRecording: Story = { args: { path: PATH, api: copied()
 export const ScoutIsntSurePhoneRecording: Story = {
   args: { path: PATH, api: copied() },
   ...at("phone", 375, 812),
+};
+
+// Invitations awaiting Sam's answer (campbooks-cloud#360), on the same
+// demo day: a webinar tomorrow from a service, while the furniture is
+// delivered (busy then), and Beatriz's offsite planning on Thursday (free
+// then).
+function invited(): Record<string, MockRoute> {
+  const schedule = scheduleApi([...HOME_EVENTS, ...HOME_INVITATION_EVENTS], {
+    calendars: HOME_CALENDARS,
+  });
+  return {
+    ...yourDay(),
+    ...schedule.routes,
+    [`GET ${W}/schedule/settings`]: { body: HOME_SETTINGS },
+    [`GET ${W}/attention`]: (_body, url) =>
+      url.searchParams.get("state") === "cleared"
+        ? { body: { items: CLEARED, counts: [], tasks_elsewhere: 0 } }
+        : {
+            body: {
+              items: HOME_ITEMS_INVITED,
+              counts: HOME_COUNTS_INVITED,
+              tasks_elsewhere: HOME_TASKS_ELSEWHERE,
+            },
+          },
+  };
+}
+
+/** Each invitation is a Decide row: the day of its event, who asked, when and where, free or busy. */
+export const Invitations: Story = {
+  ...onDemoDay,
+  args: { path: PATH, api: invited() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole("heading", { level: 1, name: "12 things need you" }),
+    ).toBeVisible();
+    await expect(
+      await canvas.findByText("Invitation: Offsite planning · Office, 3rd floor"),
+    ).toBeVisible();
+    await expect(canvas.getByText("Free then")).toBeVisible();
+    await expect(canvas.getByText("Busy then")).toBeVisible();
+    await expect(canvas.getByText("Event tomorrow")).toBeVisible();
+  },
+};
+
+/** Selected, an invitation offers Accept (1), Decline (2), Maybe (3), Snooze and Open in Calendar. */
+export const InvitationSelected: Story = {
+  ...onDemoDay,
+  args: { path: PATH, api: invited() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByText("Invitation: Offsite planning · Office, 3rd floor"),
+    );
+    const actions = await canvas.findByRole("group", { name: "Actions for Offsite planning" });
+    await expect(within(actions).getByRole("button", { name: /Accept/u })).toBeVisible();
+    await expect(within(actions).getByRole("button", { name: /Maybe/u })).toBeVisible();
+  },
+};
+
+/** 1 accepts it: the row folds away, and the toast offers Undo. */
+export const InvitationAccepted: Story = {
+  ...onDemoDay,
+  args: { path: PATH, api: invited() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByText("Invitation: Offsite planning · Office, 3rd floor"),
+    );
+    await userEvent.keyboard("1");
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByText("Accepted: Offsite planning")).toBeVisible();
+  },
+};
+
+/** The invitations on a phone: nothing scrolls sideways. */
+export const InvitationsPhone: Story = {
+  ...onDemoDay,
+  args: { path: PATH, api: invited() },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Invitation: Offsite planning · Office, 3rd floor");
+    await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
+      globalThis.innerWidth,
+    );
+  },
 };

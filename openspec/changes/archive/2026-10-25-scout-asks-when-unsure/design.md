@@ -165,6 +165,6 @@ Coverage row.
 
 ## Migrations
 
-`20261108010000_conversations__unsure_asks.sql`: three nullable columns on
+`20261108020000_conversations__unsure_asks.sql`: three nullable columns on
 `needs`, one boolean on `needs_backfills`, and the clocks. No check
 constraint changes (the verdict stays `not_needed`).

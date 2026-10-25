@@ -19460,10 +19460,13 @@
           "overdue",
           "due_today",
           "due_tomorrow",
+          "event_today",
+          "event_tomorrow",
           "planned_today",
           "nudge_due",
           "waited",
           "due_on",
+          "event_on",
           "waiting_answer",
           "kept_by_rule",
           "no_date"
@@ -22219,6 +22222,17 @@
             "type": "boolean",
             "description": "Whether it is on a provider calendar and exists there."
           },
+          "organizer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrganizerView",
+                "description": "Who organises it, when the provider said and it is not you."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "origin": {
             "$ref": "#/components/schemas/EventOrigin",
             "description": "Who made it."
@@ -24470,6 +24484,35 @@
           "template",
           "phrase"
         ]
+      },
+      "OrganizerView": {
+        "type": "object",
+        "description": "Who organises an event.",
+        "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their address, when the provider gave one.",
+            "example": "joao@example.com"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their name, when the provider gave one.",
+            "example": "João Pereira"
+          },
+          "person": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether a person rather than a machine (a no-reply or service\naddress) organises it, from the address alone; `null` when unknown."
+          }
+        }
       },
       "Outcome": {
         "type": "string",

@@ -492,6 +492,51 @@ async fn what_needs_me_follows_homes_bands(db: PgPool) {
     only_reads(&kit);
 }
 
+/// campbooks-cloud#360: an invitation awaiting an answer is listed with
+/// what it is and who asked, read from the calendar.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn what_needs_me_names_an_invitation_and_who_asked(db: PgPool) {
+    let server = MockServer::start().await;
+    once(&server, calling("what_needs_me", &json!({}))).await;
+    once(&server, text(ANSWER)).await;
+    let kit = kit_with(db, Some(gateway(&server.uri()))).await;
+    {
+        let mut mail = kit.mail.lock().unwrap();
+        mail.items = vec![json!({
+            "id": "item-2", "reason": "decide", "due_on": "2026-11-12", "overdue": false,
+            "urgent": false, "since": "2026-11-09T09:00:00Z",
+            "band": "week", "band_reason": {"rule": "event_on", "days": null, "on": "2026-11-12"},
+            "record": {"type": "schedule.event", "id": INVITE},
+        })];
+        let mut invite = event_on(INVITE, WORK);
+        invite["title"] = "Offsite planning".into();
+        invite["response"] = "needs_action".into();
+        invite["organizer"] =
+            json!({"name": "João Pereira", "address": "joao@example.com", "person": true});
+        mail.events.insert(INVITE.into(), invite);
+    }
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let asked = kit
+        .post(
+            &sam,
+            &format!("{}/{id}/questions", chats(workspace)),
+            json!({ "text": "What should I answer?" }),
+        )
+        .await;
+    assert_eq!(asked.status, StatusCode::OK, "{}", asked.json);
+    let told = results(&server).await;
+    let result: Value = serde_json::from_str(&told[0]).unwrap();
+    let need = &result["needs"][0];
+    assert_eq!(need["band_reason"]["rule"], "event_on", "{result}");
+    assert_eq!(need["invitation"]["title"], "Offsite planning", "{result}");
+    assert_eq!(need["invitation"]["asked_by"], "João Pereira", "{result}");
+    assert_eq!(need["invitation"]["response"], "needs_action", "{result}");
+    assert!(need["conversation"].is_null(), "{result}");
+    only_reads(&kit);
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_tool_that_does_not_exist_is_never_run(db: PgPool) {
     let server = MockServer::start().await;

@@ -1,6 +1,7 @@
 //! One folder per use case.
 
 pub mod add_read_items;
+pub mod announce_invitations;
 pub mod apply_calendar_changes;
 pub mod apply_outcome;
 pub mod calendar_requests;

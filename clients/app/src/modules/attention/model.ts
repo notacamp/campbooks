@@ -95,6 +95,19 @@ export function reasonSentence(
     case "due_tomorrow": {
       return { key: "reason.dueTomorrow", values: {} };
     }
+    // An invitation's date is the day of its event (campbooks-cloud#360).
+    case "event_today": {
+      return { key: "reason.eventToday", values: {} };
+    }
+    case "event_tomorrow": {
+      return { key: "reason.eventTomorrow", values: {} };
+    }
+    case "event_on": {
+      const on = reason.on ?? null;
+      return on === null
+        ? { key: "reason.noDate", values: {} }
+        : { key: "reason.eventOn", values: { date: reasonDay(on, today, locale) } };
+    }
     case "planned_today": {
       return { key: "reason.plannedToday", values: {} };
     }

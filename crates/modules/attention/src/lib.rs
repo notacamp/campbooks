@@ -5,7 +5,8 @@
 //! conversation) with a **reason** that module declared (review, reply,
 //! decide, do, pay), a due date and the container that decides who may see
 //! it. Items are a projection of the owning modules' events
-//! (`conversations.need_changed`), rebuilt by replaying them; they hold ids,
+//! (`conversations.need_changed`, `tasks.task_changed`,
+//! `schedule.invitation_changed`), rebuilt by replaying them; they hold ids,
 //! enums and dates only, never names or text, so the owning module renders
 //! each row. The member's own "Later" (a snooze) is this module's write
 //! model. Who sees an item is asked of the kernel's `Visibility` port.
@@ -45,6 +46,7 @@ pub fn module() -> Module {
             .publishes::<events::ItemChanged>()
             .on_event::<features::project_need::ProjectConversationNeed>()
             .on_event::<features::project_task::ProjectTask>()
+            .on_event::<features::project_invitation::ProjectInvitation>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .on_event::<features::purge_workspace::ForgetMember>()
             .on_event::<features::purge_workspace::ForgetInbox>()
@@ -88,6 +90,7 @@ mod tests {
         for kind in [
             "attention.project_conversation_need",
             "attention.project_task",
+            "attention.project_invitation",
             "attention.schedule_workspace_purge",
             "attention.forget_member",
             "attention.purge_workspace",

@@ -11,12 +11,18 @@ use campbooks_kernel::{
 use serde_json::{Value, json};
 
 use crate::{
-    events::{CalendarSyncChanged, EventCancelled, EventChanged, EventCreated, OutboundRequested},
+    events::{
+        CalendarSyncChanged, EventCancelled, EventChanged, EventCreated, InvitationChanged,
+        InvitationFacts, OutboundRequested,
+    },
     inbound::{
         CalendarBatch, CalendarChangeCompleted, CalendarChanged, CalendarList, CapabilityGranted,
         MessageRead, Outcome, ReadTexts,
     },
-    model::{CalendarChange, CalendarId, ConnectionId, EventId, EventKind, EventOrigin, RequestId},
+    model::{
+        CalendarChange, CalendarId, ConnectionId, EventId, EventKind, EventOrigin,
+        InvitationClosed, RequestId,
+    },
 };
 
 /// Whether `document` validates against the contract `file`.
@@ -114,6 +120,54 @@ fn an_event_event_names_no_text() {
     assert!(!accepts(
         "schedule.event_created.v1.schema.json",
         &with_title
+    ));
+}
+
+#[test]
+fn an_invitation_follows_its_contract_open_or_closed() {
+    let open = InvitationChanged {
+        workspace: UUID.to_owned(),
+        event: EventId::new(),
+        calendar: CalendarId::new(),
+        owner: UserId::new(),
+        revision: 3,
+        invitation: Some(InvitationFacts {
+            on: "2026-10-29".parse().unwrap(),
+            lapses_at: "2026-10-29T13:00:00Z".parse().unwrap(),
+            from_person: Some(true),
+        }),
+        closed_because: None,
+    };
+    let value = serde_json::to_value(&open).unwrap();
+    assert!(accepts(
+        "schedule.invitation_changed.v1.schema.json",
+        &value
+    ));
+    assert_eq!(InvitationChanged::NAME, "schedule.invitation_changed");
+    let closed = InvitationChanged {
+        invitation: None,
+        closed_because: Some(InvitationClosed::Answered),
+        ..open
+    };
+    let value = serde_json::to_value(&closed).unwrap();
+    assert_eq!(value["closed_because"], "answered");
+    assert!(value.get("invitation").is_none());
+    assert!(accepts(
+        "schedule.invitation_changed.v1.schema.json",
+        &value
+    ));
+    // Neither, or both, is refused; so is any text.
+    let mut neither = value.clone();
+    neither.as_object_mut().unwrap().remove("closed_because");
+    assert!(!accepts(
+        "schedule.invitation_changed.v1.schema.json",
+        &neither
+    ));
+    let mut titled = value;
+    titled["title"] = json!("Offsite planning");
+    assert!(!accepts(
+        "schedule.invitation_changed.v1.schema.json",
+        &titled
     ));
 }
 

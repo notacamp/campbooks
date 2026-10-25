@@ -94,6 +94,13 @@ describe("attention model", () => {
     });
     expect(say({ rule: "nudge_due", on: null }, "Rui").key).toBe("reason.nudgeDueToday");
     expect(say({ rule: "nudge_due", on: "2026-10-26" }).key).toBe("reason.nudgeDueTodayNoName");
+    // An invitation says the day of its event (campbooks-cloud#360).
+    expect(say({ rule: "event_today" }).key).toBe("reason.eventToday");
+    expect(say({ rule: "event_tomorrow" }, "Beatriz").key).toBe("reason.eventTomorrow");
+    expect(say({ rule: "event_on", on: "2026-10-29" })).toEqual({
+      key: "reason.eventOn",
+      values: { date: "Thu" },
+    });
     expect(say({ rule: "kept_by_rule" }).key).toBe("reason.keptByRule");
     expect(say({ rule: "no_date" }).key).toBe("reason.noDate");
     expect(say(null).key).toBe("reason.noDate");

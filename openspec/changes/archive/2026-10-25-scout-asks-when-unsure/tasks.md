@@ -22,7 +22,7 @@
 
 - [x] 3.1 `NeedView.unsure` for a question about a reply or an action on mail with other people
 - [x] 3.2 `wait_on` on `conversations.resolve_need`: `not_a_party`, two corrections, the verdict kept with the person, a `waiting` need on them; reopen withdraws both
-- [x] 3.3 Migration `20261108010000_conversations__unsure_asks.sql`: columns, `moves_asked`, clocks for every open need (the re-derivation, no model)
+- [x] 3.3 Migration `20261108020000_conversations__unsure_asks.sql`: columns, `moves_asked`, clocks for every open need (the re-derivation, no model)
 - [x] 3.4 HTTP tests: the copy is a question, Nudge files two corrections and waits, Undo, `not_a_party`
 
 ## 4. Client

@@ -401,6 +401,24 @@ fn event_line(event: &Value) -> Value {
     out
 }
 
+/// An invitation awaiting the member's answer (`schedule.get_event`), as
+/// `what_needs_me` lists it (campbooks-cloud#360): the event's line and who
+/// asked.
+pub fn invitation(event: &Value) -> Value {
+    let mut out = event_line(event);
+    let organizer = &event["organizer"];
+    let who = if organizer["name"].is_null() {
+        &organizer["address"]
+    } else {
+        &organizer["name"]
+    };
+    let who = short(who);
+    if let (Some(object), false) = (out.as_object_mut(), who.is_null()) {
+        object.insert("asked_by".to_owned(), who);
+    }
+    out
+}
+
 /// The member's events in a window (`schedule.list_events`): the first
 /// [`EVENTS`], and whether there were more.
 pub fn calendar(list: &Value) -> Value {
