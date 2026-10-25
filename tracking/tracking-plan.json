@@ -71,7 +71,7 @@
       "change": "The connectors module instrumented (campbooks-cloud#329): 10 events for connections added, reconnected, removed, their health changed and a sync asked for, sync runs (one summary per run, with counts), the outbound changes a run made (counts by end), calendar changes completed, and sends succeeded or failed; records connection, stream and send; Coverage for every operation, job, schedule and handler of the module; the identity operations that hand it a grant name the connection events.",
       "date": "2026-10-25",
       "plan_version": 6,
-      "pr": ""
+      "pr": "#659"
     }
   ],
   "coverage": [
