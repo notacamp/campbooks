@@ -5364,7 +5364,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google" | "zoho" | "imap";
+        Provider: "google" | "zoho" | "imap" | "microsoft";
         /** @description Where to add it. */
         PushTo: {
             /** @description One of your provider calendars that can be written. */
@@ -6393,7 +6393,7 @@ export interface components {
         StartConnection: {
             /**
              * @description The capabilities to ask for (`messages`, and `calendar` for Google,
-             *     and for Zoho while its flag is on).
+             *     and for Zoho while its flag is on; `messages` only for Microsoft).
              */
             capabilities: components["schemas"]["Capability"][];
             connection?: components["schemas"]["ConnectionId"] | null;

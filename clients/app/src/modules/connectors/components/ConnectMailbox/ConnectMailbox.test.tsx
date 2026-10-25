@@ -132,6 +132,36 @@ describe("ConnectMailbox", () => {
     expect(screen.queryByRole("button", { name: /^Connect/u })).toBeNull();
   });
 
+  it("sends an Outlook address to Microsoft's sign-in where the instance offers it", async () => {
+    const { door } = openDialog(
+      { [DISCOVER]: { body: { kind: "use_provider", provider: "microsoft" } } },
+      consent({ providers: ["google", "microsoft", "zoho"] }),
+    );
+    await add("ana@outlook.com");
+
+    expect(await screen.findByRole("heading", { name: "Connect Outlook" })).toBeVisible();
+    expect(screen.getByText(/is an Outlook or Microsoft 365 mailbox/u)).toBeVisible();
+    expect(screen.queryByText("Outlook is coming soon")).toBeNull();
+    expect(screen.queryByLabelText(/password/iu)).toBeNull();
+    expect(
+      screen.getByRole("checkbox", { name: "Also use this account to sign in" }),
+    ).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: /Connect Outlook/u }));
+    expect(door.start).toHaveBeenCalledWith({
+      purpose: "connect",
+      provider: "microsoft",
+      signIn: true,
+    });
+  });
+
+  it("says Outlook is not set up where Microsoft's sign-in is missing", async () => {
+    openDialog({ [DISCOVER]: { body: { kind: "use_provider", provider: "microsoft" } } });
+    await add("ana@outlook.com");
+
+    expect(await screen.findByText(/doesn't have Outlook set up yet/u)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Connect Outlook/u })).toBeNull();
+  });
+
   it("shows Yahoo's app-password steps, with Advanced closed and prefilled", async () => {
     openDialog({ [DISCOVER]: { body: YAHOO_DISCOVERY } });
     await add("ana@yahoo.example");

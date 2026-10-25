@@ -8,7 +8,7 @@
   "additionalProperties": false,
   "properties": {
     "version": { "const": 1 },
-    "provider": { "enum": ["google", "zoho", "imap"], "description": "The provider; more values arrive with their adapters. `imap`: any mailbox over IMAP and SMTP, connected with its password." },
+    "provider": { "enum": ["google", "zoho", "imap", "microsoft"], "description": "The provider; more values arrive with their adapters. `imap`: any mailbox over IMAP and SMTP, connected with its password. `microsoft`: Outlook.com, Hotmail and Microsoft 365 through Microsoft Graph." },
     "address": { "type": "string", "minLength": 1, "description": "The account's email address, lower-cased." },
     "address_verified": { "type": "boolean", "description": "Whether the provider verified the address. An unverified address must not be treated as the account's identity." },
     "display_name": { "type": ["string", "null"], "description": "The account's display name, when the provider gives one." }

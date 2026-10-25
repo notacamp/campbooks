@@ -298,14 +298,18 @@ pub(super) async fn redirect_to_provider(
 }
 
 /// Whether a round trip asks for the mailbox (and offline access): a
-/// connect or reconnect, and a sign-in, except a first Zoho sign-in: Zoho
-/// caps the refresh tokens a person holds per app, so one is asked for only
-/// once the account turns out to be new (a second round trip, below), never
-/// on each sign-in of a known account.
+/// connect or reconnect, and a sign-in, except a first Zoho or Microsoft
+/// sign-in. Zoho caps the refresh tokens a person holds per app; Microsoft
+/// cannot revoke one app's refresh token, and a work tenant may need an
+/// administrator's consent for mail. So for them one is asked for only once
+/// the account turns out to be new (a second round trip, below), never on
+/// each sign-in of a known account.
 pub(super) fn asks_mailbox(flow: &Flow) -> bool {
     match flow.purpose {
         Purpose::Link => false,
-        Purpose::SignIn => flow.provider != Provider::Zoho || flow.consent_retry,
+        Purpose::SignIn => {
+            !matches!(flow.provider, Provider::Zoho | Provider::Microsoft) || flow.consent_retry
+        }
         Purpose::Connect | Purpose::Reconnect => true,
     }
 }
@@ -429,6 +433,9 @@ pub async fn callback(
             clear_flow,
         ));
     };
+    // A round trip that brings a mailbox went to the mail tenant (Microsoft):
+    // its code is redeemed, and its ID token validated, there.
+    let upstream = upstream.for_mailbox(flow.purpose.wants_mailbox());
     let signed_in = match identify(upstream, code, &query, &flow).await {
         Ok(found) => found,
         Err(code) => return Ok(with_cookie(fail(&ctx, &flow, code).await?, clear_flow)),
@@ -755,9 +762,32 @@ impl MailGrant {
                 .map(ToOwned::to_owned)
                 .collect(),
         };
-        let granted = !wanted.is_empty() && wanted.iter().all(|s| scopes.contains(s));
+        let granted = !wanted.is_empty()
+            && wanted
+                .iter()
+                .all(|w| scopes.iter().any(|s| same_scope(provider, s, w)));
         Self { granted, scopes }
     }
+}
+
+/// How Microsoft may prefix a Graph scope in a token answer.
+const GRAPH_RESOURCE: &str = "https://graph.microsoft.com/";
+
+/// Whether `granted` is the `wanted` scope. Microsoft may answer a Graph
+/// scope with or without its resource prefix, in any case; the others answer
+/// what was asked.
+fn same_scope(provider: Provider, granted: &str, wanted: &str) -> bool {
+    if provider != Provider::Microsoft {
+        return granted == wanted;
+    }
+    let name = |scope: &str| -> String {
+        let lower = scope.to_ascii_lowercase();
+        lower
+            .strip_prefix(GRAPH_RESOURCE)
+            .unwrap_or(&lower)
+            .to_owned()
+    };
+    name(granted) == name(wanted)
 }
 
 /// Keep `identity` (and its mailbox grant, when there is one with offline
@@ -1130,7 +1160,7 @@ async fn track_refusal(
 
 #[cfg(test)]
 mod tests {
-    use super::{MailGrant, Provider};
+    use super::{Flow, MailGrant, Provider, Purpose, asks_mailbox};
 
     fn wanted() -> Vec<String> {
         ["ZohoMail.accounts.READ", "ZohoMail.messages.ALL"]
@@ -1155,6 +1185,73 @@ mod tests {
         let partial =
             MailGrant::from_answer(Provider::Zoho, Some("ZohoMail.accounts.READ"), &wanted());
         assert!(!partial.granted);
+    }
+
+    #[test]
+    fn a_microsoft_or_zoho_sign_in_asks_for_mail_only_for_a_new_account() {
+        for provider in [Provider::Microsoft, Provider::Zoho] {
+            let sign_in = Flow::sign_in(provider, None, "/".to_owned());
+            assert!(!asks_mailbox(&sign_in), "{provider:?}");
+            let retry = Flow {
+                consent_retry: true,
+                ..Flow::sign_in(provider, None, "/".to_owned())
+            };
+            assert!(asks_mailbox(&retry), "{provider:?}");
+            for purpose in [Purpose::Connect, Purpose::Reconnect] {
+                let connect = Flow {
+                    purpose,
+                    ..Flow::sign_in(provider, None, "/".to_owned())
+                };
+                assert!(asks_mailbox(&connect), "{provider:?}");
+            }
+            let link = Flow {
+                purpose: Purpose::Link,
+                ..Flow::sign_in(provider, None, "/".to_owned())
+            };
+            assert!(!asks_mailbox(&link));
+        }
+        // Google asks on every sign-in (one consent for sign-in and mail).
+        assert!(asks_mailbox(&Flow::sign_in(
+            Provider::Google,
+            None,
+            "/".to_owned()
+        )));
+    }
+
+    #[test]
+    fn microsoft_scopes_are_granted_with_or_without_the_graph_prefix() {
+        let wanted: Vec<String> = ["Mail.ReadWrite", "Mail.Send", "User.Read"]
+            .map(str::to_owned)
+            .to_vec();
+        let prefixed = MailGrant::from_answer(
+            Provider::Microsoft,
+            Some(
+                "https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send \
+                 https://graph.microsoft.com/User.Read openid profile email offline_access",
+            ),
+            &wanted,
+        );
+        assert!(prefixed.granted);
+        let short = MailGrant::from_answer(
+            Provider::Microsoft,
+            Some("mail.readwrite Mail.Send User.Read"),
+            &wanted,
+        );
+        assert!(short.granted);
+        let without_send = MailGrant::from_answer(
+            Provider::Microsoft,
+            Some("https://graph.microsoft.com/Mail.ReadWrite User.Read"),
+            &wanted,
+        );
+        assert!(!without_send.granted);
+        // Only Microsoft's answers are read so.
+        let google = MailGrant::from_answer(
+            Provider::Google,
+            Some("https://graph.microsoft.com/Mail.ReadWrite Mail.Send User.Read"),
+            &wanted,
+        );
+        assert!(!google.granted);
+        assert!(!MailGrant::from_answer(Provider::Microsoft, None, &wanted).granted);
     }
 
     #[test]

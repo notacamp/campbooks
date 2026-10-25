@@ -112,7 +112,7 @@ impl EventConsumer for RecordCalendarChange {
         let offered = match target.provider {
             Provider::Google => self.deps.google.is_some(),
             Provider::Zoho => self.deps.zoho.is_some() && self.deps.config.zoho_calendar,
-            Provider::Imap => false,
+            Provider::Imap | Provider::Microsoft => false,
         };
         if !offered {
             end_at_once(&state, tx, workspace, &asked, CalendarReason::NotConnected).await?;
