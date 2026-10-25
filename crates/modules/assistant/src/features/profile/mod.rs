@@ -5,6 +5,9 @@
 //!
 //! Also the kernel's `MemberPreferences` port: other modules ask it whether
 //! a member lets Scout act on what it is sure of and tell them afterwards.
+//!
+//! Tracked (ADR 0020): `assistant.profile_updated`, naming the settings that
+//! changed; saving the values the profile already has tracks nothing.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -23,6 +26,7 @@ use utoipa::ToSchema;
 use crate::{
     domain::{Proactivity, resources},
     scopes::{AssistantRead, AssistantWrite},
+    tracking,
 };
 
 /// What the member told Scout.
@@ -108,6 +112,7 @@ pub async fn update(
     let id = workspace.access.workspace;
     let mut tx = state.db.begin_for(id).await?;
     let user = resources::require_own(&state, &mut tx, &workspace.access, Action::Write).await?;
+    let before = read(&mut tx, id, user).await?;
     sqlx::query!(
         r#"
         INSERT INTO assistant.profiles (workspace_id, user_id, proactivity, asked_at)
@@ -126,6 +131,30 @@ pub async fn update(
     .execute(&mut *tx)
     .await?;
     let view = read(&mut tx, id, user).await?;
+    let mut fields = Vec::new();
+    if view.proactivity != before.proactivity {
+        fields.push(tracking::ProfileSetting::Proactivity);
+    }
+    if view.asked_at.is_some() != before.asked_at.is_some() {
+        fields.push(tracking::ProfileSetting::Asked);
+    }
+    if !fields.is_empty() {
+        let event = tracking::ProfileUpdated {
+            workspace: id,
+            fields,
+            profile: tracking::ProfileSnapshot {
+                user_id: *user.as_uuid(),
+                proactivity: match view.proactivity {
+                    Proactivity::AskFirst => tracking::Proactivity::AskFirst,
+                    Proactivity::ActThenTell => tracking::Proactivity::ActThenTell,
+                },
+                asked: view.asked_at.is_some(),
+                asked_at: view.asked_at,
+                revision: i64::from(view.revision),
+            },
+        };
+        state.tracker.track(&mut tx, &event).await?;
+    }
     tx.commit().await?;
     Ok(Json(view))
 }

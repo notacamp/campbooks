@@ -21,6 +21,11 @@
 //! the assistant or automation, and a client token acting for nobody gets
 //! no chat. Logs say how a question went in sizes and names, never what
 //! was asked, read or written.
+//!
+//! Tracked (ADR 0020, [`tracked`]): a chat started, continued (a question
+//! stored), answered and deleted, and a proposal confirmed, declined or
+//! undone, each in the transaction of its change, with ids, references,
+//! enums and counts only.
 
 mod about;
 mod answer;
@@ -30,6 +35,7 @@ mod prompt;
 mod propose;
 mod store;
 mod tools;
+mod tracked;
 mod types;
 mod words;
 
@@ -67,7 +73,7 @@ use tokio::sync::mpsc;
 
 use self::types::{
     AskChat, ChatFinish, ChatId, ChatList, ChatMessageId, ChatMessageView, ChatProposal, ChatTool,
-    ChatView, ProposalId, SettleProposal, StartChat,
+    ChatView, ProposalId, SettleProposal, Settlement, StartChat,
 };
 use self::{
     about::Seen,
@@ -81,6 +87,7 @@ use crate::{
     domain::resources::{self, CHAT_RECORD},
     handbook::Handbook,
     scopes::{AssistantRead, AssistantWrite},
+    tracking,
 };
 
 /// Questions per member and workspace per hour.
@@ -223,6 +230,11 @@ pub async fn start(
     } else if let Some(row) =
         store::create(&mut tx, workspace.id, user, body.about.as_ref()).await?
     {
+        let event = tracking::ChatStarted {
+            workspace: workspace.id,
+            chat: tracked::chat(&row),
+        };
+        state.tracker.track(&mut tx, &event).await?;
         (StatusCode::CREATED, row)
     } else {
         // Made meanwhile, by the same member in another tab.
@@ -359,7 +371,16 @@ pub async fn delete(
         needs_member,
     )
     .await?;
+    // The chat as it stands, read before it goes.
+    let chat = store::chat(&mut tx, path.chat_id).await?;
     store::delete(&mut tx, path.chat_id).await?;
+    if let Some(row) = chat {
+        let event = tracking::ChatDeleted {
+            workspace: workspace.id,
+            chat: tracked::chat(&row),
+        };
+        state.tracker.track(&mut tx, &event).await?;
+    }
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -427,6 +448,31 @@ pub async fn settle(
     proposal.state = body.state.into();
     let settled = proposal.clone();
     store::set_proposals(&mut tx, message, &proposals).await?;
+    let snapshot = tracked::proposal(path.chat_id, &settled);
+    let ws = workspace.id;
+    match body.state {
+        Settlement::Done | Settlement::Failed => {
+            let event = tracking::ProposalConfirmed {
+                workspace: ws,
+                proposal: snapshot,
+            };
+            state.tracker.track(&mut tx, &event).await?;
+        }
+        Settlement::Declined => {
+            let event = tracking::ProposalDeclined {
+                workspace: ws,
+                proposal: snapshot,
+            };
+            state.tracker.track(&mut tx, &event).await?;
+        }
+        Settlement::Undone => {
+            let event = tracking::ProposalUndone {
+                workspace: ws,
+                proposal: snapshot,
+            };
+            state.tracker.track(&mut tx, &event).await?;
+        }
+    }
     tx.commit().await?;
     tracing::info!(
         kind = ?settled.kind,
@@ -506,7 +552,7 @@ pub async fn ask(
         }
         Err(failure) => {
             question.report("failed", failure.kind(), false);
-            question.store_failed(answer_id).await?;
+            question.store_failed(answer_id, failure.kind()).await?;
             Err(problem_of(failure))
         }
     }
@@ -582,7 +628,7 @@ pub async fn stream(
         Err(failure) => {
             question.report("failed", failure.kind(), true);
             let answer_id = question.store_question().await?;
-            question.store_failed(answer_id).await?;
+            question.store_failed(answer_id, failure.kind()).await?;
             return Err(problem_of(failure));
         }
     };
@@ -616,7 +662,7 @@ pub async fn stream(
             },
             Err(failure) => {
                 question.report("failed", failure.kind(), true);
-                if let Err(error) = question.store_failed(answer_id).await {
+                if let Err(error) = question.store_failed(answer_id, failure.kind()).await {
                     tracing::warn!(
                         error = error.code(),
                         "chat: the failure could not be stored"
@@ -627,6 +673,11 @@ pub async fn stream(
         };
         let _ = frames.send(last);
     };
+    // The body streams after this handler returns, outside the request's
+    // tracking context: the answer's events (and the AI meter's) are still
+    // the member's, in their request.
+    let work =
+        campbooks_kernel::tracking::scope(campbooks_kernel::tracking::current_or_outside(), work);
     let mut response = Sse::new(frames_until_done(work, rx))
         .keep_alive(KeepAlive::new().interval(KEEP_ALIVE))
         .into_response();
@@ -857,6 +908,12 @@ impl Question {
             ));
         }
         let answer = store::ask(&mut tx, self.workspace, self.chat, &self.text).await?;
+        let chat = store::chat_for_update(&mut tx, self.chat).await?;
+        let event = tracking::ChatContinued {
+            workspace: self.workspace,
+            chat: tracked::chat(&chat),
+        };
+        self.state.tracker.track(&mut tx, &event).await?;
         tx.commit().await?;
         Ok(answer)
     }
@@ -884,14 +941,20 @@ impl Question {
         )
         .await?
         .ok_or(Error::NotFound)?;
+        let event = tracking::AnswerFinished {
+            workspace: self.workspace,
+            answer: tracked::answer(self.chat, &view, None),
+        };
+        self.state.tracker.track(&mut tx, &event).await?;
         tx.commit().await?;
         Ok(view)
     }
 
-    /// Keep Scout's answer as failed, with no text.
-    async fn store_failed(&self, answer_id: ChatMessageId) -> Result<()> {
+    /// Keep Scout's answer as failed, with no text; `failure` is the answer
+    /// loop's kind of failure.
+    async fn store_failed(&self, answer_id: ChatMessageId, failure: &str) -> Result<()> {
         let mut tx = self.state.db.begin_for(self.workspace).await?;
-        store::finish(
+        let view = store::finish(
             &mut tx,
             self.chat,
             answer_id,
@@ -901,6 +964,13 @@ impl Question {
             ChatFinish::Failed,
         )
         .await?;
+        if let Some(view) = view {
+            let event = tracking::AnswerFinished {
+                workspace: self.workspace,
+                answer: tracked::answer(self.chat, &view, Some(failure)),
+            };
+            self.state.tracker.track(&mut tx, &event).await?;
+        }
         tx.commit().await?;
         Ok(())
     }

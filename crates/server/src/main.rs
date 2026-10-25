@@ -469,7 +469,10 @@ async fn run(
     telemetry: &Telemetry,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let bff = check(&config, role)?;
-    let composition = campbooks_server::Composition::from_env(&config)?;
+    // Envelopes say which part of the server tracked an event.
+    let tracker =
+        campbooks_kernel::tracking::Tracker::new(&config.tracking).with_role(role.as_str());
+    let composition = campbooks_server::Composition::from_env(&config, &tracker)?;
     log_composition(&composition);
     let registry = campbooks_server::registry_with(&composition)?;
     if config.run_migrations {
@@ -499,8 +502,6 @@ async fn run(
             .with_mailer(mailer),
         &composition,
     );
-    // Envelopes say which part of the server tracked an event.
-    let tracker = state.tracker.clone().with_role(role.as_str());
     let state = state.with_tracker(tracker);
     // Flipped to `true` on Ctrl-C/SIGTERM, or when one part stops, so the
     // other parts stop too.

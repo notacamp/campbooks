@@ -2738,3 +2738,330 @@ async fn events_share_the_cap_and_the_dedupe_with_every_other_card(db: PgPool) {
     assert!(told[5].contains("already in this answer"), "{told:?}");
     only_reads(&kit);
 }
+
+// --- tracked events (ADR 0020, campbooks-cloud#330) -------------------------
+
+/// The module with `gateway`, writing tracked events to the outbox, and
+/// Marta's conversation readable.
+async fn tracked_kit(db: PgPool, gateway: Option<Gateway>) -> Kit {
+    let kit = Kit::tracking(
+        db,
+        AssistantDeps {
+            ai: gateway,
+            ..AssistantDeps::default()
+        },
+    )
+    .await;
+    {
+        let mut mail = kit.mail.lock().unwrap();
+        mail.conversations.insert(CONVERSATION.into(), marta(RENT));
+        mail.histories.insert(CONVERSATION.into(), history());
+    }
+    kit
+}
+
+async fn tracked(kit: &Kit, name: &str) -> Vec<campbooks_kernel::testing::TrackedRow> {
+    campbooks_kernel::testing::tracked_events(&kit.db, name).await
+}
+
+/// `event` is version 1 of `name`, in `workspace`, from `sub`'s own request
+/// to `operation`, and holds nothing anyone wrote: no question, no answer,
+/// no name, no address, no subject.
+fn by_member(
+    event: &campbooks_kernel::testing::TrackedRow,
+    name: &str,
+    workspace: WorkspaceId,
+    sub: &str,
+    operation: &str,
+) {
+    assert_eq!(event.name, name);
+    assert_eq!(event.version, 1, "{name}");
+    assert_eq!(event.workspace_id, Some(*workspace.as_uuid()), "{name}");
+    let envelope = &event.envelope;
+    assert_eq!(
+        envelope["actor"],
+        json!({"type": "user", "id": sub}),
+        "{name}"
+    );
+    assert_eq!(envelope["operation"], operation, "{name}");
+    assert_eq!(envelope["workspace_id"], workspace.to_string(), "{name}");
+    assert_eq!(
+        envelope["plan_version"],
+        campbooks_kernel::tracking::PLAN_VERSION
+    );
+    let body = event.body.to_string();
+    for never in [
+        "Marta",
+        "marta@",
+        "Rent",
+        "rent",
+        "Pay because",
+        "under Pay",
+        "@",
+        "inbox",
+    ] {
+        assert!(!body.contains(never), "{name} holds `{never}`: {body}");
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_chat_is_tracked_from_start_to_deletion(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(text(ANSWER)))
+        .mount(&server)
+        .await;
+    let kit = tracked_kit(db, Some(gateway(&server.uri()))).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+
+    let id = started(&kit, &sam, workspace).await;
+    // Continuing the chat about the same record writes nothing: no event.
+    let again = kit.post(&sam, &chats(workspace), about()).await;
+    assert_eq!(again.status, StatusCode::OK);
+    let events = tracked(&kit, "assistant.chat_started").await;
+    assert_eq!(events.len(), 1);
+    by_member(
+        &events[0],
+        "assistant.chat_started",
+        workspace,
+        "sam",
+        "assistant.start_chat",
+    );
+    let chat = &events[0].body["chat"];
+    assert_eq!(chat["id"], id.as_str());
+    assert_eq!(
+        chat["about"],
+        json!({"type": "conversations.conversation", "id": CONVERSATION})
+    );
+    assert_eq!(chat["questions"], 0);
+
+    let asked = kit
+        .post(
+            &sam,
+            &format!("{}/{id}/questions", chats(workspace)),
+            json!({ "text": "Why is this under Pay?" }),
+        )
+        .await;
+    assert_eq!(asked.status, StatusCode::OK, "{}", asked.json);
+    let continued = tracked(&kit, "assistant.chat_continued").await;
+    assert_eq!(continued.len(), 1);
+    by_member(
+        &continued[0],
+        "assistant.chat_continued",
+        workspace,
+        "sam",
+        "assistant.ask_chat",
+    );
+    assert_eq!(continued[0].body["chat"]["id"], id.as_str());
+    assert_eq!(continued[0].body["chat"]["questions"], 1);
+    let answered = tracked(&kit, "assistant.answer_finished").await;
+    assert_eq!(answered.len(), 1);
+    by_member(
+        &answered[0],
+        "assistant.answer_finished",
+        workspace,
+        "sam",
+        "assistant.ask_chat",
+    );
+    let answer = &answered[0].body["answer"];
+    assert_eq!(answer["id"], asked.json["id"]);
+    assert_eq!(answer["chat_id"], id.as_str());
+    assert_eq!(answer["finish"], "done");
+    assert_eq!(answer["tools"], json!([]));
+    assert_eq!(answer["proposals"], 0);
+    assert!(answer.get("failure").is_none());
+
+    let deleted = kit
+        .delete(&sam, &format!("{}/{id}", chats(workspace)))
+        .await;
+    assert_eq!(deleted.status, StatusCode::NO_CONTENT);
+    let events = tracked(&kit, "assistant.chat_deleted").await;
+    assert_eq!(events.len(), 1);
+    by_member(
+        &events[0],
+        "assistant.chat_deleted",
+        workspace,
+        "sam",
+        "assistant.delete_chat",
+    );
+    assert_eq!(events[0].body["chat"]["id"], id.as_str());
+    assert_eq!(events[0].body["chat"]["questions"], 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_streamed_answer_is_tracked_as_the_member_with_its_tools(db: PgPool) {
+    let server = MockServer::start().await;
+    once_streamed(
+        &server,
+        streamed_call(
+            "conversation_history",
+            &json!({ "conversation_id": CONVERSATION }),
+        ),
+    )
+    .await;
+    once_streamed(&server, streamed_text(ANSWER)).await;
+    let kit = tracked_kit(db, Some(gateway(&server.uri()))).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let response = kit
+        .post_streamed(
+            &sam,
+            &format!("{}/{id}/questions/stream", chats(workspace)),
+            json!({ "text": "Why is this under Pay?" }),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let events = frames(response).await;
+    assert_eq!(events.last().map(|(name, _)| name.as_str()), Some("done"));
+
+    let continued = tracked(&kit, "assistant.chat_continued").await;
+    assert_eq!(continued.len(), 1);
+    by_member(
+        &continued[0],
+        "assistant.chat_continued",
+        workspace,
+        "sam",
+        "assistant.stream_chat",
+    );
+    // Written while the body streamed, after the handler returned: still
+    // Sam's, in his request.
+    let answered = tracked(&kit, "assistant.answer_finished").await;
+    assert_eq!(answered.len(), 1);
+    by_member(
+        &answered[0],
+        "assistant.answer_finished",
+        workspace,
+        "sam",
+        "assistant.stream_chat",
+    );
+    assert_eq!(
+        answered[0].envelope["correlation"],
+        continued[0].envelope["correlation"]
+    );
+    let answer = &answered[0].body["answer"];
+    assert_eq!(answer["finish"], "done");
+    assert_eq!(answer["tools"], json!(["conversation_history"]));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_failed_answer_is_tracked_with_its_kind_only(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(500).set_body_string("echo: marta@example.com Rent for November"),
+        )
+        .mount(&server)
+        .await;
+    let kit = tracked_kit(db, Some(gateway(&server.uri()))).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let failed = kit
+        .post(
+            &sam,
+            &format!("{}/{id}/questions", chats(workspace)),
+            json!({ "text": "Why is Marta's rent under Pay?" }),
+        )
+        .await;
+    assert_eq!(failed.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(tracked(&kit, "assistant.chat_continued").await.len(), 1);
+    let answered = tracked(&kit, "assistant.answer_finished").await;
+    assert_eq!(answered.len(), 1);
+    by_member(
+        &answered[0],
+        "assistant.answer_finished",
+        workspace,
+        "sam",
+        "assistant.ask_chat",
+    );
+    let answer = &answered[0].body["answer"];
+    assert_eq!(answer["finish"], "failed");
+    assert!(
+        ["status", "transport", "invalid_response"]
+            .contains(&answer["failure"].as_str().unwrap_or_default()),
+        "{answer}"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn settling_a_proposal_is_tracked_once_per_settlement(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = tracked_kit(db, Some(gateway(&server.uri()))).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let answer = ask_proposing(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        &[change("archive", &json!({})), change("star", &json!({}))],
+    )
+    .await;
+    let archive = &answer["proposals"][0]["id"];
+    let star = &answer["proposals"][1]["id"];
+    let answered = tracked(&kit, "assistant.answer_finished").await;
+    assert_eq!(answered[0].body["answer"]["proposals"], 2);
+
+    // Refused settlements change nothing and track nothing.
+    let early = settle(&kit, &sam, workspace, &id, archive, "undone").await;
+    assert_eq!(early.status, StatusCode::CONFLICT);
+    let done = settle(&kit, &sam, workspace, &id, archive, "done").await;
+    assert_eq!(done.status, StatusCode::OK, "{}", done.json);
+    let again = settle(&kit, &sam, workspace, &id, archive, "done").await;
+    assert_eq!(again.status, StatusCode::CONFLICT);
+    let undone = settle(&kit, &sam, workspace, &id, archive, "undone").await;
+    assert_eq!(undone.status, StatusCode::OK);
+    let declined = settle(&kit, &sam, workspace, &id, star, "declined").await;
+    assert_eq!(declined.status, StatusCode::OK);
+    let late = settle(&kit, &sam, workspace, &id, star, "done").await;
+    assert_eq!(late.status, StatusCode::CONFLICT);
+
+    let confirmed = tracked(&kit, "assistant.proposal_confirmed").await;
+    assert_eq!(confirmed.len(), 1);
+    by_member(
+        &confirmed[0],
+        "assistant.proposal_confirmed",
+        workspace,
+        "sam",
+        "assistant.settle_proposal",
+    );
+    let proposal = &confirmed[0].body["proposal"];
+    assert_eq!(proposal["id"], *archive);
+    assert_eq!(proposal["chat_id"], id.as_str());
+    assert_eq!(proposal["kind"], "change");
+    assert_eq!(proposal["action"], "archive");
+    assert_eq!(proposal["state"], "done");
+    assert_eq!(
+        proposal["record"],
+        json!({"type": "conversations.conversation", "id": CONVERSATION})
+    );
+    assert!(proposal.get("facts").is_none() && proposal.get("request").is_none());
+
+    let undone = tracked(&kit, "assistant.proposal_undone").await;
+    assert_eq!(undone.len(), 1);
+    by_member(
+        &undone[0],
+        "assistant.proposal_undone",
+        workspace,
+        "sam",
+        "assistant.settle_proposal",
+    );
+    assert_eq!(undone[0].body["proposal"]["state"], "undone");
+
+    let declined = tracked(&kit, "assistant.proposal_declined").await;
+    assert_eq!(declined.len(), 1);
+    by_member(
+        &declined[0],
+        "assistant.proposal_declined",
+        workspace,
+        "sam",
+        "assistant.settle_proposal",
+    );
+    assert_eq!(declined[0].body["proposal"]["id"], *star);
+    assert_eq!(declined[0].body["proposal"]["action"], "star");
+    assert_eq!(declined[0].body["proposal"]["state"], "declined");
+}

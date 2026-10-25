@@ -56,6 +56,16 @@ pub struct World {
 /// `ada` is a super admin, `ops` may only see jobs, `fixer` may only retry
 /// them; anyone else is not an administrator.
 pub async fn world(db: PgPool, deps: Deps) -> World {
+    build(db, deps, false).await
+}
+
+/// [`world`], writing tracked events to the outbox (ADR 0020) and serving
+/// the admin routes in the request's tracking context, as the server does.
+pub async fn tracked_world(db: PgPool, deps: Deps) -> World {
+    build(db, deps, true).await
+}
+
+async fn build(db: PgPool, deps: Deps, tracking: bool) -> World {
     let idp = TestIdp::start().await;
     let trail = Arc::new(Trail::default());
     let profiles = Profiles(HashMap::from([
@@ -74,7 +84,20 @@ pub async fn world(db: PgPool, deps: Deps) -> World {
     let config = Arc::make_mut(&mut state.config);
     config.database_url = "postgres://app:db-password@db.example.com/campbooks".into();
     config.signup.codes = Some("signup-code-1".into());
-    let app = testing::admin_app(crate::module_with(deps), state);
+    if !tracking {
+        let app = testing::admin_app(crate::module_with(deps), state);
+        return World { idp, app, trail };
+    }
+    let state = testing::tracking_outbox(state);
+    let module = crate::module_with(deps);
+    let (_, spec) = crate::module()
+        .admin_router
+        .unwrap_or_else(|| unreachable!("the system module has admin routes"))
+        .split_for_parts();
+    let app = campbooks_kernel::tracking::http::around(
+        testing::admin_app(module, state),
+        campbooks_kernel::tracking::http::HttpTracking::from_spec(&spec),
+    );
     World { idp, app, trail }
 }
 

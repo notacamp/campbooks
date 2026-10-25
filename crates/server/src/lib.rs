@@ -155,10 +155,14 @@ pub struct Composition {
 
 impl Composition {
     /// Read every module's dependencies from the environment. A broken
-    /// setting is an error naming it.
-    pub fn from_env(config: &campbooks_kernel::Config) -> Result<Self, String> {
+    /// setting is an error naming it. `tracker` is the server's (with its
+    /// role): what the AI usage meter tracks the daily limit with.
+    pub fn from_env(
+        config: &campbooks_kernel::Config,
+        tracker: &campbooks_kernel::tracking::Tracker,
+    ) -> Result<Self, String> {
         let ai = campbooks_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
-        let (gateway, ai_usage) = ai_gateway(ai)?;
+        let (gateway, ai_usage) = ai_gateway(ai, tracker.clone())?;
         let connectors = campbooks_connectors::Deps::from_env(config)?;
         let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
         let assistant = campbooks_assistant::AssistantDeps {
@@ -187,10 +191,12 @@ impl Composition {
 
 /// The AI gateway every module calls models through (none when no role is
 /// configured), and the meter it counts every call with, per workspace and
-/// UTC day, under `ai`'s daily cap (campbooks-cloud#152). The admin AI
-/// usage read shows the same meter.
+/// UTC day, under `ai`'s daily cap (campbooks-cloud#152), tracking the day's
+/// first refusal with `tracker`. The admin AI usage read shows the same
+/// meter.
 pub fn ai_gateway(
     ai: campbooks_ai::AiConfig,
+    tracker: campbooks_kernel::tracking::Tracker,
 ) -> Result<
     (
         Option<campbooks_ai::Gateway>,
@@ -198,7 +204,7 @@ pub fn ai_gateway(
     ),
     String,
 > {
-    let meter = campbooks_system::AiUsageMeter::new(ai.daily_call_cap());
+    let meter = campbooks_system::AiUsageMeter::new(ai.daily_call_cap()).with_tracker(tracker);
     if ai.roles.is_empty() {
         return Ok((None, meter));
     }

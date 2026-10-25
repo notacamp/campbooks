@@ -774,6 +774,16 @@ impl Kit {
 
     /// The module composed with `deps` over `db`.
     pub async fn with_deps(db: PgPool, deps: AssistantDeps) -> Self {
+        Self::build(db, deps, false).await
+    }
+
+    /// [`with_deps`](Self::with_deps), writing tracked events to the outbox
+    /// (ADR 0020), read back with [`testing::tracked_events`].
+    pub async fn tracking(db: PgPool, deps: AssistantDeps) -> Self {
+        Self::build(db, deps, true).await
+    }
+
+    async fn build(db: PgPool, deps: AssistantDeps, tracking: bool) -> Self {
         let idp = TestIdp::start().await;
         let pool = testing::app_role_pool(&db).await;
         let membership = Arc::new(TestMembership::default());
@@ -834,6 +844,11 @@ impl Kit {
             .state(pool)
             .with_membership(membership.clone())
             .with_registry(registry);
+        let state = if tracking {
+            testing::tracking_outbox(state)
+        } else {
+            state
+        };
         let Composed { routes, state, .. } = compose(api, state);
         let app = routes.with_state(state.clone());
         Self {

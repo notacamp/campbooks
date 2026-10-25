@@ -330,3 +330,59 @@ async fn an_unreachable_ledger_is_an_error_not_an_admission() {
         .await;
     assert!(result.is_err());
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_days_first_refusal_is_tracked_as_whoever_made_the_call(db: PgPool) {
+    use campbooks_kernel::{
+        config::{TrackingConfig, TrackingSink},
+        tracking::{self, Actor, Tracker, TrackingContext},
+    };
+    let pool = app_role_pool(&db).await;
+    let tracker = Tracker::new(&TrackingConfig {
+        sink: TrackingSink::Outbox,
+        ..TrackingConfig::default()
+    });
+    // A cap of 3: background work may make 2 calls, a person the third.
+    let (meter, _) = meter(Some(3));
+    let meter = meter.with_tracker(tracker);
+    let workspace = WorkspaceId::new();
+    let context = TrackingContext::new(Actor::system("conversations.triage"))
+        .on_behalf_of(Actor::user("sam"));
+    tracking::scope(context, async {
+        for _ in 0..4 {
+            meter
+                .admit_call(&pool, call(workspace, Role::Decide))
+                .await
+                .unwrap();
+        }
+        // A person's calls past the whole cap: refused, and not the day's
+        // first refusal.
+        for _ in 0..2 {
+            meter
+                .admit_call(&pool, asked(workspace, Role::Complete))
+                .await
+                .unwrap();
+        }
+    })
+    .await;
+    let events = testing::tracked_events(&db, "system.ai_limit_reached").await;
+    assert_eq!(events.len(), 1, "{events:?}");
+    let event = &events[0];
+    assert_eq!(event.version, 1);
+    assert_eq!(event.workspace_id, Some(*workspace.as_uuid()));
+    assert_eq!(
+        event.envelope["actor"],
+        serde_json::json!({"type": "system", "id": "conversations.triage"})
+    );
+    assert_eq!(
+        event.envelope["on_behalf_of"],
+        serde_json::json!({"type": "user", "id": "sam"})
+    );
+    assert_eq!(
+        event.body,
+        serde_json::json!({
+            "day": "2026-10-16", "cap": 3, "reserve": 1,
+            "interactive": false, "ai_role": "decide",
+        })
+    );
+}

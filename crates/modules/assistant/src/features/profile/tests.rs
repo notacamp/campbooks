@@ -220,3 +220,51 @@ async fn leaving_and_deleting_purge(db: PgPool) {
         .unwrap();
     assert_eq!(left, 0);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_profile_change_is_tracked_by_the_settings_it_changed(db: PgPool) {
+    let kit = Kit::tracking(db, crate::AssistantDeps::default()).await;
+    let workspace = WorkspaceId::new();
+    let (ines, user) = kit.member("ines", workspace);
+    // The defaults saved first: nothing the member sees changed. Then the
+    // same values twice, which tracks once.
+    for (proactivity, asked) in [
+        ("ask_first", false),
+        ("ask_first", true),
+        ("ask_first", true),
+        ("act_then_tell", true),
+        ("ask_first", false),
+    ] {
+        let response = kit
+            .put(
+                &ines,
+                &uri(workspace),
+                json!({ "proactivity": proactivity, "asked": asked }),
+            )
+            .await;
+        assert_eq!(response.status, StatusCode::OK, "{}", response.json);
+    }
+
+    let events =
+        campbooks_kernel::testing::tracked_events(&kit.db, "assistant.profile_updated").await;
+    assert_eq!(events.len(), 3, "{events:?}");
+    for event in &events {
+        assert_eq!(event.version, 1);
+        assert_eq!(event.workspace_id, Some(*workspace.as_uuid()));
+        assert_eq!(
+            event.envelope["actor"],
+            json!({"type": "user", "id": "ines"})
+        );
+        assert_eq!(event.envelope["operation"], "assistant.update_profile");
+        assert_eq!(event.body["profile"]["user_id"], user.to_string());
+    }
+    assert_eq!(events[0].body["fields"], json!(["asked"]));
+    assert_eq!(events[0].body["profile"]["proactivity"], "ask_first");
+    assert_eq!(events[0].body["profile"]["asked"], true);
+    assert!(events[0].body["profile"]["asked_at"].is_string());
+    assert_eq!(events[1].body["fields"], json!(["proactivity"]));
+    assert_eq!(events[1].body["profile"]["proactivity"], "act_then_tell");
+    assert_eq!(events[2].body["fields"], json!(["proactivity", "asked"]));
+    assert_eq!(events[2].body["profile"]["asked"], false);
+    assert!(events[2].body["profile"].get("asked_at").is_none());
+}

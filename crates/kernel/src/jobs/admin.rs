@@ -21,6 +21,11 @@
 //!   operator's way not to wait for it.
 //! - **Across workspaces.** The queue is every workspace's: each function
 //!   runs in the kernel scope ([`begin_kernel`](crate::db::begin_kernel)).
+//! - **Tracked.** Each change is tracked in its transaction (ADR 0020):
+//!   `kernel.job_retried`, `kernel.jobs_retried`, `kernel.job_discarded` and
+//!   `kernel.schedule_run_discarded`, with the job's id, kind, queue and
+//!   counts, never its payload or error. A call that changes nothing tracks
+//!   nothing.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -29,7 +34,12 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{JobId, NOTIFY_CHANNEL, Registry};
-use crate::{Error, admin::AdminGrant, i18n};
+use crate::{
+    Error,
+    admin::AdminGrant,
+    i18n,
+    tracking::{self, Tracker},
+};
 
 /// Most failed jobs [`retry_kind`] requeues per call; call again for more.
 pub const RETRY_BATCH: i64 = 1_000;
@@ -279,7 +289,13 @@ pub async fn failed(
 }
 
 /// Put one dead job back on its queue: pending, due now, attempts reset.
-pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry, Error> {
+/// Tracks `kernel.job_retried` when it did.
+pub async fn retry(
+    db: &PgPool,
+    tracker: &Tracker,
+    _grant: &AdminGrant,
+    id: JobId,
+) -> Result<Retry, Error> {
     let id = Uuid::from(id);
     let mut tx = crate::db::begin_kernel(db).await?;
     let requeued = sqlx::query!(
@@ -302,6 +318,10 @@ pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry,
     .await?;
     if let Some(row) = requeued {
         notify(&mut tx, &row.queue).await?;
+        let job = job(&mut tx, id).await?;
+        tracker
+            .track(&mut tx, &tracking::JobRetried { job })
+            .await?;
         tx.commit().await?;
         return Ok(Retry::Requeued);
     }
@@ -319,9 +339,10 @@ pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry,
 /// oldest first, at most [`RETRY_BATCH`] per call. Jobs whose unique key is
 /// held by another unfinished job of their workspace are skipped. Returns
 /// how many were requeued; a result equal to the batch size means there may
-/// be more.
+/// be more. Tracks one `kernel.jobs_retried` when any was.
 pub async fn retry_kind(
     db: &PgPool,
+    tracker: &Tracker,
     _grant: &AdminGrant,
     kind: &str,
     queue: Option<&str>,
@@ -374,22 +395,44 @@ pub async fn retry_kind(
     for queue in &touched {
         notify(&mut tx, queue).await?;
     }
+    let requeued = i64::try_from(queues.len()).unwrap_or(i64::MAX);
+    if requeued > 0 {
+        // The kind matched dead jobs, so it is a kind of the code's; the
+        // queue filter, when given, matched them too.
+        let event = tracking::JobsRetried {
+            kind: kind.to_owned(),
+            queue: queue.map(str::to_owned),
+            requeued,
+            more: requeued >= RETRY_BATCH,
+        };
+        tracker.track(&mut tx, &event).await?;
+    }
     tx.commit().await?;
     Ok(queues.len() as u64)
 }
 
-/// Delete one dead job. A job that is not dead is never deleted.
-pub async fn discard(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Discard, Error> {
+/// Delete one dead job. A job that is not dead is never deleted. Tracks
+/// `kernel.job_discarded`, with the job as it stood, when it was.
+pub async fn discard(
+    db: &PgPool,
+    tracker: &Tracker,
+    _grant: &AdminGrant,
+    id: JobId,
+) -> Result<Discard, Error> {
     let id = Uuid::from(id);
     let mut tx = crate::db::begin_kernel(db).await?;
-    let deleted = sqlx::query!(
-        "DELETE FROM kernel.jobs WHERE id = $1 AND state = 'failed'",
-        id
+    let deleted: Option<JobRow> = sqlx::query_as(
+        "DELETE FROM kernel.jobs WHERE id = $1 AND state = 'failed'
+         RETURNING id, kind, queue, workspace_id, state, attempts, max_attempts, created_at",
     )
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
-    if deleted > 0 {
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some(row) = deleted {
+        let job = snapshot(row)?;
+        tracker
+            .track(&mut tx, &tracking::JobDiscarded { job })
+            .await?;
         tx.commit().await?;
         return Ok(Discard::Discarded);
     }
@@ -428,22 +471,27 @@ pub async fn discard_schedule(
     };
     let (_, leased) = super::worker::stuck_after(&state.config.jobs, schedule.every);
     let mut tx = crate::db::begin_kernel(&state.db).await?;
-    let deleted = sqlx::query!(
-        r#"
-        DELETE FROM kernel.jobs
-         WHERE kind = $1 AND unique_key = 'schedule:' || $1
-           AND state IN ('pending', 'running')
-           AND (state = 'pending' OR workspace_id IS NOT NULL
-                OR locked_until < now() OR locked_until > now() + make_interval(secs => $2))
-        "#,
-        schedule.name,
-        leased,
+    let deleted: Vec<JobRow> = sqlx::query_as(
+        "DELETE FROM kernel.jobs
+          WHERE kind = $1 AND unique_key = 'schedule:' || $1
+            AND state IN ('pending', 'running')
+            AND (state = 'pending' OR workspace_id IS NOT NULL
+                 OR locked_until < now() OR locked_until > now() + make_interval(secs => $2))
+         RETURNING id, kind, queue, workspace_id, state, attempts, max_attempts, created_at",
     )
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
+    .bind(schedule.name)
+    .bind(leased)
+    .fetch_all(&mut *tx)
+    .await?;
+    for row in &deleted {
+        let job = snapshot(row.clone())?;
+        state
+            .tracker
+            .track(&mut tx, &tracking::ScheduleRunDiscarded { job })
+            .await?;
+    }
     tx.commit().await?;
-    if deleted > 0 {
+    if !deleted.is_empty() {
         tracing::warn!(
             schedule = schedule.name,
             "an administrator discarded a schedule's pending or stuck row"
@@ -451,6 +499,53 @@ pub async fn discard_schedule(
         return Ok(DiscardSchedule::Discarded);
     }
     Ok(DiscardSchedule::Unchanged)
+}
+
+/// One `kernel.jobs` row, as a tracked event shows it: never its payload or
+/// its error.
+#[derive(Debug, Clone, sqlx::FromRow)]
+struct JobRow {
+    id: Uuid,
+    kind: String,
+    queue: String,
+    workspace_id: Option<String>,
+    state: String,
+    attempts: i32,
+    max_attempts: i32,
+    created_at: DateTime<Utc>,
+}
+
+/// Job `id` as it is now, for a change that must have left it.
+async fn job(conn: &mut sqlx::PgConnection, id: Uuid) -> Result<tracking::JobSnapshot, Error> {
+    let row: Option<JobRow> = sqlx::query_as(
+        "SELECT id, kind, queue, workspace_id, state, attempts, max_attempts, created_at
+           FROM kernel.jobs WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(conn)
+    .await?;
+    snapshot(row.ok_or_else(|| Error::internal("a tracked job is gone"))?)
+}
+
+/// The plan's snapshot of `row`. A workspace id that is not a UUID (none
+/// is) is left out rather than failing the change.
+fn snapshot(row: JobRow) -> Result<tracking::JobSnapshot, Error> {
+    let state = match row.state.as_str() {
+        "pending" => tracking::JobState::Pending,
+        "running" => tracking::JobState::Running,
+        "failed" => tracking::JobState::Failed,
+        other => return Err(Error::internal(format!("a tracked job is `{other}`"))),
+    };
+    Ok(tracking::JobSnapshot {
+        id: row.id,
+        kind: row.kind,
+        queue: row.queue,
+        workspace_id: row.workspace_id.and_then(|w| w.parse().ok()),
+        state,
+        attempts: i64::from(row.attempts),
+        max_attempts: i64::from(row.max_attempts),
+        created_at: row.created_at,
+    })
 }
 
 async fn notify(conn: &mut sqlx::PgConnection, queue: &str) -> Result<(), sqlx::Error> {
