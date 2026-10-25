@@ -149,9 +149,31 @@ function at(name: string, width: number, height: number) {
 
 const DUE = asDue(DUE_ITEMS);
 
+/** No view in the address: the Calendar opens on Week on a desktop. */
+export const DefaultDesktop: Story = {
+  args: { path: SCHEDULE, api: calendarApi(), due: DUE },
+  play: async ({ canvasElement }) => {
+    await expect(await within(canvasElement).findByRole("region", { name: "Week" })).toBeVisible();
+  },
+};
+
+/** No view in the address: the Calendar opens on Agenda on a phone. */
+export const DefaultPhone: Story = {
+  args: { path: SCHEDULE, api: calendarApi(), due: DUE },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText(DENTIST.title);
+    await expect(canvas.queryByRole("region", { name: "Week" })).toBeNull();
+    await waitFor(() =>
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+    );
+  },
+};
+
 /** Agenda: the week's days from today, a flight's sheet beside them. */
 export const AgendaDesktop: Story = {
-  args: { path: `${SCHEDULE}?event=${FLIGHT.id}`, api: calendarApi(), due: DUE },
+  args: { path: `${SCHEDULE}?view=agenda&event=${FLIGHT.id}`, api: calendarApi(), due: DUE },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect((await canvas.findAllByText(FLIGHT.title)).length).toBeGreaterThan(1);
@@ -185,7 +207,7 @@ export const WeekPhone: Story = {
 
 /** Agenda on a phone: the week strip, one row per event, a mail mark for Scout's. */
 export const AgendaPhone: Story = {
-  args: { path: SCHEDULE, api: calendarApi(), due: DUE },
+  args: { path: `${SCHEDULE}?view=agenda`, api: calendarApi(), due: DUE },
   ...at("phone", 375, 812),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -198,7 +220,7 @@ export const AgendaPhone: Story = {
 
 /** An event's sheet fills the phone's screen. */
 export const SheetPhone: Story = {
-  args: { path: `${SCHEDULE}?event=${FLIGHT.id}`, api: calendarApi(), due: DUE },
+  args: { path: `${SCHEDULE}?view=agenda&event=${FLIGHT.id}`, api: calendarApi(), due: DUE },
   ...at("phone", 375, 812),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -214,7 +236,7 @@ export const SheetPhone: Story = {
  * came from, the sentence it read the date from, and Add to my calendar.
  */
 export const EventSheet: Story = {
-  args: { path: `${SCHEDULE}?event=${DENTIST.id}`, api: calendarApi(), due: DUE },
+  args: { path: `${SCHEDULE}?view=agenda&event=${DENTIST.id}`, api: calendarApi(), due: DUE },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const sheet = await canvas.findByRole("complementary", { name: DENTIST.title });
@@ -230,7 +252,7 @@ export const EventSheet: Story = {
 
 /** Remove, with Undo in the toast for ten seconds. */
 export const RemoveWithUndo: Story = {
-  args: { path: `${SCHEDULE}?event=${DENTIST.id}`, api: calendarApi(), due: DUE },
+  args: { path: `${SCHEDULE}?view=agenda&event=${DENTIST.id}`, api: calendarApi(), due: DUE },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const sheet = await canvas.findByRole("complementary", { name: DENTIST.title });
@@ -242,7 +264,7 @@ export const RemoveWithUndo: Story = {
 
 /** An invitation: Accept / Maybe / Decline, and the change Google refused. */
 export const InvitationSheet: Story = {
-  args: { path: `${SCHEDULE}?event=${REVIEW.id}`, api: calendarApi(), due: DUE },
+  args: { path: `${SCHEDULE}?view=agenda&event=${REVIEW.id}`, api: calendarApi(), due: DUE },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const sheet = await canvas.findByRole("complementary", { name: REVIEW.title });
@@ -261,7 +283,11 @@ export const InvitationSheet: Story = {
 
 /** A task due today: Paid (E), Hold time (H), Later (S), Open task (↵), and no Remove. */
 export const TaskSheet: Story = {
-  args: { path: `${SCHEDULE}?event=due:${DUE[1]?.id ?? ""}`, api: calendarApi(), due: DUE },
+  args: {
+    path: `${SCHEDULE}?view=agenda&event=due:${DUE[1]?.id ?? ""}`,
+    api: calendarApi(),
+    due: DUE,
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const sheet = await canvas.findByRole("complementary", { name: /Pay · Costa Obras invoice/u });
@@ -276,7 +302,11 @@ export const TaskSheet: Story = {
 
 /** An overdue task: marked in the danger colour; Paid takes it off with an Undo. */
 export const TaskSheetOverdue: Story = {
-  args: { path: `${SCHEDULE}?event=due:${DUE[0]?.id ?? ""}`, api: calendarApi(), due: DUE },
+  args: {
+    path: `${SCHEDULE}?view=agenda&event=due:${DUE[0]?.id ?? ""}`,
+    api: calendarApi(),
+    due: DUE,
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const sheet = await canvas.findByRole("complementary", { name: /Pay · EDP bill/u });
@@ -308,7 +338,7 @@ export const MonthPhone: Story = {
 
 /** Nothing ahead: one line. */
 export const Empty: Story = {
-  args: { path: SCHEDULE, api: calendarApi([]) },
+  args: { path: `${SCHEDULE}?view=agenda`, api: calendarApi([]) },
   play: async ({ canvasElement }) => {
     await expect(await within(canvasElement).findByText("Nothing on your calendar.")).toBeVisible();
   },
@@ -316,7 +346,7 @@ export const Empty: Story = {
 
 /** New event (N, then E): the form, with the day looked at. */
 export const NewEvent: Story = {
-  args: { path: SCHEDULE, api: calendarApi(), due: DUE },
+  args: { path: `${SCHEDULE}?view=agenda`, api: calendarApi(), due: DUE },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByText(DENTIST.title);
@@ -498,9 +528,15 @@ export const SettingsPhone: Story = {
 /* Twins without a `play`, for the recording (scenarios/calendar.ts): a story
    with a play acts on load, and the recording does the acting itself. */
 
-/** The Calendar as a member finds it, to drive by hand. */
+/** The Calendar as a member finds it, to drive by hand: Week on a desktop, Agenda on a phone. */
 export const CalendarIdle: Story = {
   args: { path: SCHEDULE, api: calendarApi(), due: DUE },
+};
+
+/** The same, at 375px: the address names no view and the Calendar opens on Agenda. */
+export const CalendarIdlePhone: Story = {
+  args: { path: SCHEDULE, api: calendarApi(), due: DUE },
+  ...at("phone", 375, 812),
 };
 
 /** The lease email, read, to drive by hand. */
@@ -523,7 +559,7 @@ export const SettingsAddAccessIdle: Story = {
 
 /** The invitation Google refused a change to, to drive by hand. */
 export const InvitationSheetIdle: Story = {
-  args: { path: `${SCHEDULE}?event=${REVIEW.id}`, api: calendarApi(), due: DUE },
+  args: { path: `${SCHEDULE}?view=agenda&event=${REVIEW.id}`, api: calendarApi(), due: DUE },
 };
 
 /** The lease email, read, with Google calendars connected: Add to my calendar. */
