@@ -214,6 +214,10 @@
       "title": "Outlook llegará pronto",
       "lead": "{{address}} es un buzón de Outlook o Microsoft 365. Campbooks aún no puede conectarlos; podrá pronto."
     },
+    "microsoft": {
+      "name": "Outlook",
+      "lead": "{{address}} es un buzón de Outlook o Microsoft 365. Se conecta con el inicio de sesión de la propia Microsoft, así que aquí no se escribe ninguna contraseña."
+    },
     "fallback": {
       "title": "Conectar un buzón",
       "lead": "Este Campbooks conecta buzones de estos proveedores:"

@@ -35,18 +35,27 @@ const PAGE = `/w/${DUARTE.id}/settings/mailboxes`;
 const ADD = `${PAGE}?add=1`;
 const W = `/bff/api/v1/w/${DUARTE.id}`;
 
-/** Discovery as the server answers it, by the address's domain (demo domains only). */
-function discovery(body: unknown) {
+/** The Outlook.com family of domains (and the demo's Microsoft 365 one). */
+const MICROSOFT_DOMAINS = new Set(["outlook.com", "hotmail.com", "live.com", "msn.com"]);
+
+/**
+ * Discovery as the server answers it, by the address's domain (demo domains
+ * only). An Outlook address goes to Microsoft's sign-in where the instance
+ * offers Microsoft mail (`microsoft`), and is coming soon elsewhere.
+ */
+function discovery(body: unknown, microsoft = false) {
   const address = (body as { address?: string } | undefined)?.address ?? "";
   const domain = address.split("@").at(-1) ?? "";
+  if (MICROSOFT_DOMAINS.has(domain) || domain === "contoso.example") {
+    return {
+      body: { kind: microsoft ? "use_provider" : "not_supported_yet", provider: "microsoft" },
+    };
+  }
   if (domain === "gmail.com") {
     return { body: { kind: "use_provider", provider: "google" } };
   }
   if (domain === "zohomail.com") {
     return { body: { kind: "use_provider", provider: "zoho" } };
-  }
-  if (domain === "outlook.com") {
-    return { body: { kind: "not_supported_yet", provider: "microsoft" } };
   }
   if (domain.startsWith("gmx")) {
     return { body: { ...GMX_DISCOVERY, username_hint: address } };
@@ -58,16 +67,23 @@ function discovery(body: unknown) {
 }
 
 /**
- * Add a mailbox's server side, kept in memory: discovery by domain; a
- * connect that `refuse`s with a code, or creates the bakery's mailbox, its
- * address being checked; its check that ends `verified` (or `failed`)
- * after `checks` reads, and a retry that starts it again.
+ * Add a mailbox's server side, kept in memory: discovery by domain (Outlook
+ * through Microsoft's sign-in with `microsoft`); a connect that `refuse`s
+ * with a code, or creates the bakery's mailbox, its address being checked;
+ * its check that ends `verified` (or `failed`) after `checks` reads, and a
+ * retry that starts it again.
  */
 function addMailbox({
   refuse,
   ends = "verified",
   checks = 2,
-}: { refuse?: string; ends?: "verified" | "failed"; checks?: number } = {}) {
+  microsoft = false,
+}: {
+  refuse?: string;
+  ends?: "verified" | "failed";
+  checks?: number;
+  microsoft?: boolean;
+} = {}) {
   let reads = 0;
   let outcome = ends;
   let connected: typeof IMAP_CONNECTION | undefined;
@@ -93,7 +109,7 @@ function addMailbox({
     [`GET ${W}/connections`]: () => ({
       body: { connections: connected === undefined ? [CONNECTION] : [CONNECTION, view()] },
     }),
-    [`POST ${W}/connections/imap/discover`]: (body: unknown) => discovery(body),
+    [`POST ${W}/connections/imap/discover`]: (body: unknown) => discovery(body, microsoft),
     [`POST ${W}/connections/imap`]: (body: unknown) => {
       if (refuse !== undefined) {
         return {
@@ -507,12 +523,32 @@ export const AddGmail: Story = {
   },
 };
 
-/** An Outlook address: coming soon. */
+/** An Outlook address while Microsoft mail is off here: coming soon. */
 export const AddOutlook: Story = {
   args: { path: ADD, api: signedIn({ imap: addMailbox() }) },
   play: async ({ canvasElement }) => {
     const dialog = await addAddress(canvasElement, "ana@outlook.com");
     await expect(await dialog.findByText("Outlook is coming soon")).toBeVisible();
+    await expect(dialog.queryByRole("button", { name: /Connect Outlook/u })).toBeNull();
+  },
+};
+
+/** Microsoft mail is offered on this instance (campbooks-cloud#315). */
+const OFFERS_MICROSOFT = ["google", "microsoft", "zoho"] as const;
+
+/** An Outlook address where the instance offers Microsoft mail: Microsoft's own sign-in, like Gmail. */
+export const AddOutlookOffered: Story = {
+  args: {
+    path: ADD,
+    api: signedIn({ mailboxProviders: OFFERS_MICROSOFT, imap: addMailbox({ microsoft: true }) }),
+  },
+  play: async ({ canvasElement }) => {
+    const dialog = await addAddress(canvasElement, "ana@outlook.com");
+    await expect(await dialog.findByRole("button", { name: /Connect Outlook/u })).toBeVisible();
+    await expect(
+      dialog.getByRole("checkbox", { name: "Also use this account to sign in" }),
+    ).toBeChecked();
+    await expect(dialog.queryByLabelText(/password/iu)).toBeNull();
   },
 };
 
@@ -673,5 +709,50 @@ export const AddNotVerifiedIdle: Story = {
 /** The same at 375px. */
 export const AddNotVerifiedIdlePhone: Story = {
   ...AddNotVerifiedIdle,
+  ...at("phone", 375, 812),
+};
+
+/** Connect Outlook at 375px. */
+export const AddOutlookOfferedPhone: Story = {
+  ...AddOutlookOffered,
+  ...at("phone", 375, 812),
+};
+
+/** Outlook coming soon at 375px. */
+export const AddOutlookPhone: Story = {
+  ...AddOutlook,
+  ...at("phone", 375, 812),
+};
+
+/**
+ * Add a mailbox where the instance offers Microsoft mail, to drive by hand:
+ * an Outlook, Hotmail, Live, MSN or `contoso.example` (Microsoft 365)
+ * address goes to "Connect Outlook". Nothing follows the front door.
+ */
+export const AddOutlookIdle: Story = {
+  args: {
+    path: ADD,
+    api: signedIn({
+      connections: [CONNECTION],
+      mailboxProviders: OFFERS_MICROSOFT,
+      imap: addMailbox({ microsoft: true }),
+    }),
+  },
+};
+
+/** The same at 375px. */
+export const AddOutlookIdlePhone: Story = {
+  ...AddOutlookIdle,
+  ...at("phone", 375, 812),
+};
+
+/** Add a mailbox while Microsoft mail is off, to drive by hand: Outlook is coming soon. */
+export const AddOutlookComingSoonIdle: Story = {
+  args: { path: ADD, api: signedIn({ connections: [CONNECTION], imap: addMailbox() }) },
+};
+
+/** The same at 375px. */
+export const AddOutlookComingSoonIdlePhone: Story = {
+  ...AddOutlookComingSoonIdle,
   ...at("phone", 375, 812),
 };

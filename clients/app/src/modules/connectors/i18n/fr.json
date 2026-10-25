@@ -214,6 +214,10 @@
       "title": "Outlook arrive bientôt",
       "lead": "{{address}} est une boîte Outlook ou Microsoft 365. Campbooks ne peut pas encore les connecter ; ce sera bientôt possible."
     },
+    "microsoft": {
+      "name": "Outlook",
+      "lead": "{{address}} est une boîte Outlook ou Microsoft 365. Elle se connecte avec la connexion Microsoft : aucun mot de passe n’est saisi ici."
+    },
     "fallback": {
       "title": "Connecter une boîte mail",
       "lead": "Ce Campbooks connecte les boîtes mail de ces fournisseurs :"

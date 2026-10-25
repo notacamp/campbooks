@@ -214,6 +214,10 @@
       "title": "O Outlook chega em breve",
       "lead": "{{address}} é uma caixa de correio Outlook ou Microsoft 365. O Campbooks ainda não as consegue ligar; vai conseguir em breve."
     },
+    "microsoft": {
+      "name": "Outlook",
+      "lead": "{{address}} é uma caixa de correio Outlook ou Microsoft 365. Liga-se com o início de sessão da própria Microsoft, por isso não escreve aqui nenhuma palavra-passe."
+    },
     "fallback": {
       "title": "Ligar uma caixa de correio",
       "lead": "Este Campbooks liga caixas de correio destes fornecedores:"

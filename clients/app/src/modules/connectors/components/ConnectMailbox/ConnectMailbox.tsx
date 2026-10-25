@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -39,10 +40,13 @@ export interface ConnectMailboxProps {
   onClose: () => void;
 }
 
+/** The providers whose own sign-in connects a mailbox (the front door). */
+type NativeProvider = "google" | "zoho" | "microsoft";
+
 /** Where the dialog is. */
 type Step =
   | { kind: "address" }
-  | { kind: "native"; provider: "google" | "zoho" }
+  | { kind: "native"; provider: NativeProvider }
   | { kind: "outlook" }
   | { kind: "password"; found: DiscoveredImap }
   | { kind: "fallback" }
@@ -73,8 +77,9 @@ function server({ host, port, security }: ServerFields): MailServer | undefined 
 
 /**
  * Add a mailbox (campbooks-cloud#314): the address first, then the way it
- * connects. Gmail and Zoho go to their own sign-in (the front door), Outlook
- * is coming soon, and any other mailbox connects with an app password: the
+ * connects. Gmail and Zoho go to their own sign-in (the front door), and so
+ * does Outlook where the instance offers Microsoft mail (campbooks-cloud#315;
+ * coming soon elsewhere), and any other mailbox connects with an app password: the
  * provider's steps, one password field, and Advanced servers prefilled from
  * discovery. An address the login does not prove is then checked by
  * Campbooks, which this dialog follows. The password never stays in the
@@ -121,7 +126,9 @@ export function ConnectMailbox({ workspaceId, consent, open, onClose }: ConnectM
       onSuccess: (found) => {
         if (
           found.kind === "use_provider" &&
-          (found.provider === "google" || found.provider === "zoho")
+          (found.provider === "google" ||
+            found.provider === "zoho" ||
+            found.provider === "microsoft")
         ) {
           setStep({ kind: "native", provider: found.provider });
         } else if (found.kind === "use_provider" || found.kind === "not_supported_yet") {
@@ -159,7 +166,7 @@ export function ConnectMailbox({ workspaceId, consent, open, onClose }: ConnectM
         return t("add.title");
       }
       case "native": {
-        return t("add.native.title", { provider: t(`provider.${step.provider}`) });
+        return t("add.native.title", { provider: nativeName(t, step.provider) });
       }
       case "outlook": {
         return t("add.outlook.title");
@@ -312,24 +319,33 @@ function errorKey(code: ConnectError): Exclude<ConnectError, "step_up"> {
   return code === "step_up" ? "unknown" : code;
 }
 
+/** A native provider's name as the provider step says it: Outlook for Microsoft. */
+function nativeName(t: TFunction<"connectors">, provider: NativeProvider): string {
+  return provider === "microsoft" ? t("add.microsoft.name") : t(`provider.${provider}`);
+}
+
 function NativeStep({
   provider,
   address,
   consent,
   onBack,
 }: {
-  provider: "google" | "zoho";
+  provider: NativeProvider;
   address: string;
   consent: MailboxConsent;
   onBack: () => void;
 }) {
   const { t } = useTranslation("connectors");
   const [signIn, setSignIn] = useState(true);
-  const name = t(`provider.${provider}`);
+  const name = nativeName(t, provider);
   const offered = consent.providers?.includes(provider) ?? false;
   return (
     <div className="flex flex-col gap-4">
-      <Text>{t("add.native.lead", { address, provider: name })}</Text>
+      <Text>
+        {provider === "microsoft"
+          ? t("add.microsoft.lead", { address })
+          : t("add.native.lead", { address, provider: name })}
+      </Text>
       <ConsentRefusal consent={consent} />
       {offered ? (
         <Checkbox

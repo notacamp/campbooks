@@ -214,6 +214,10 @@
       "title": "Outlook is coming soon",
       "lead": "{{address}} is an Outlook or Microsoft 365 mailbox. Campbooks can't connect those yet; it will soon."
     },
+    "microsoft": {
+      "name": "Outlook",
+      "lead": "{{address}} is an Outlook or Microsoft 365 mailbox. It connects with Microsoft's own sign-in, so no password is typed here."
+    },
     "fallback": {
       "title": "Connect a mailbox",
       "lead": "This Campbooks connects mailboxes from these providers:"

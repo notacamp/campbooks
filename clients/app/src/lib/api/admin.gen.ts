@@ -1096,7 +1096,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google" | "zoho" | "imap";
+        Provider: "google" | "zoho" | "imap" | "microsoft";
         /**
          * @description The queue at a glance: one row per queue and kind with unfinished or
          *     failed work. Succeeded jobs are pruned and not counted.
