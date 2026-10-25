@@ -45,7 +45,10 @@ const ALL_PAGES = [HANDBOOK, ONBOARDING, HOLIDAYS, IDEAS, BUDGET, OLD_NOTES, MAD
 const MEMBERS = [...TEAM, JONAS];
 
 type Summary = (typeof PAGES)[number];
-interface Grant { member: string; role: "reader" | "writer" | "manager" }
+interface Grant {
+  member: string;
+  role: "reader" | "writer" | "manager";
+}
 
 /** What the server holds, from the start. */
 function fresh() {
