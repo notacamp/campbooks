@@ -30,7 +30,10 @@ export function useMenu<TItem>(close: () => void) {
       setMenu({
         items: props.items,
         loading: props.loading,
-        anchor: rect === null || rect === undefined ? { x: 0, y: 0 } : { x: rect.left, y: rect.bottom + 4 },
+        anchor:
+          rect === null || rect === undefined
+            ? { x: 0, y: 0 }
+            : { x: rect.left, y: rect.bottom + 4 },
         command: props.command,
       });
       setActive(0);

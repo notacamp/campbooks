@@ -19,7 +19,15 @@ import {
 import { useMembers } from "~/modules/workspaces";
 
 import { usePages } from "../api/queries";
-import { buildSections, byPosition, dropOn, isWithin, rowsOf, zoneOf, type TreeNode } from "../model";
+import {
+  buildSections,
+  byPosition,
+  dropOn,
+  isWithin,
+  rowsOf,
+  zoneOf,
+  type TreeNode,
+} from "../model";
 import { iconOf, type PagePlace, type PageSummary } from "../types";
 
 import { PageScreen } from "./PageScreen";
@@ -102,14 +110,11 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
   const siblingsOf = (page: PageSummary) =>
     all
       .filter(
-        (other) =>
-          (other.parent ?? null) === (page.parent ?? null) && other.place === page.place,
+        (other) => (other.parent ?? null) === (page.parent ?? null) && other.place === page.place,
       )
       .toSorted(byPosition);
   const childrenOf = (page: PageSummary) =>
-    all
-      .filter((other) => other.parent === page.id)
-      .toSorted(byPosition);
+    all.filter((other) => other.parent === page.id).toSorted(byPosition);
 
   const dragOver = (event: DragEvent<HTMLDivElement>, page: PageSummary) => {
     if (dragging === undefined || isWithin(sections, dragging, page.id)) {

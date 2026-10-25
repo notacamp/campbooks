@@ -200,18 +200,31 @@ restored one comes back.
 
 ## Tracked events (ADR 0020) and Coverage
 
-Tracked events added (properties are ids, enums and counts only):
+Tracked events added, as built (`tracking/patches/0011-pages.yaml`; every
+property is an id, an enum or a number, never a title, an icon, a body or a
+mention):
 
-- `page_created` (`place`, `depth`, `from`: `tree` | `slash` | `shortcut`)
-- `page_edited` (debounced per page per member per 10 minutes; `blocks_added`
-  bucket)
-- `page_shared` (`role`, `target`: `member`)
-- `page_moved` (`across_places`: bool)
-- `page_trashed` / `page_restored` / `page_purged`
-- `mention_inserted` (`ref_type`)
+- `page_created` (`page`: id, place, parent, creator, revision)
+- `page_edited` (`page`, `fields`: `title` and/or `icon`; the same values
+  again track nothing)
+- `page_moved` (`page` afterwards, `before`: the place and parent it had)
+- `page_shared` (`page`, `member`, `role`, `previous_role`) and
+  `page_unshared` (`page`, `member`)
+- `page_trashed` / `page_restored` / `page_purged` (`page`; a purge reads the
+  page just before its rows go; the 30-day purge job tracks nothing)
 
-Coverage rows: one per operation above, the compaction job, the trash purge
-job, the workspace purge handler, and the search source handler.
+Not tracked, by decision: edits to a page's body (many, and each would carry
+what the member wrote), so `pages.sync` has an exemption; and
+`mention_inserted`, which would need the body read on the request path. The
+first draft of this design listed `depth`, `from`, `blocks_added`,
+`across_places` and `mention_inserted`; the built set is the one above.
+
+Coverage rows: every mutating operation (`create`, `update`, `move`, `share`,
+`unshare`, `trash`, `restore`, `purge`; `sync` and `upload_file` with an
+exemption), the handlers `pages.forget_member` and
+`pages.schedule_workspace_purge`, the jobs `pages.purge_workspace`,
+`pages.purge_trash` and `pages.compact`, and the schedule
+`pages.dispatch_purge_trash` (the last four with exemptions).
 
 ## Client
 

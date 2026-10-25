@@ -21,7 +21,7 @@ use utoipa::ToSchema;
 use crate::{
     domain::{
         MAX_DEPTH, PageId, PageRow, PageSummary, Place, SELECT_ONE, access, announce, expect_live,
-        expect_meta_revision, position, roles, view,
+        expect_meta_revision, position, roles, tracked, view,
     },
     events::PageChangeKind,
     features::get::PagePath,
@@ -182,6 +182,15 @@ pub async fn handler(
         kinds.push(PageChangeKind::Share);
     }
     announce(&state, &mut tx, access, path.page_id, kinds).await?;
+    tracked::moved(
+        &state,
+        &mut tx,
+        access.workspace,
+        path.page_id,
+        row.parent_id,
+        before_place,
+    )
+    .await?;
     let row: PageRow = sqlx::query_as(SELECT_ONE)
         .bind(path.page_id)
         .fetch_one(&mut *tx)

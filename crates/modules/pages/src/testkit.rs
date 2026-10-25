@@ -169,6 +169,15 @@ impl Kit {
         self
     }
 
+    /// The same kit, writing tracked events to the outbox (ADR 0020), read
+    /// back with [`testing::tracked_events`].
+    #[must_use]
+    pub fn tracking(mut self) -> Self {
+        self.state = testing::tracking_outbox(self.state);
+        self.app = testing::app(crate::module(crate::Deps::default()), self.state.clone());
+        self
+    }
+
     /// A user `sub`, member of `workspace`, with every scope of the module.
     pub fn member(&self, sub: &str, workspace: WorkspaceId) -> (String, UserId) {
         self.member_as(sub, workspace, Role::Member)

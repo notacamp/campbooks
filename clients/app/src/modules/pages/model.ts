@@ -148,7 +148,7 @@ export function dropOn(
   dragged: string,
 ): Drop {
   if (zone === "inside") {
-    const last = children.filter((child) => child.id !== dragged).at(-1);
+    const last = children.findLast((child) => child.id !== dragged);
     return {
       parent: target.id,
       place: target.place,

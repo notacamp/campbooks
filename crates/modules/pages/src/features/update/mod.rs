@@ -16,7 +16,7 @@ use utoipa::ToSchema;
 use crate::{
     domain::{
         PageId, PageRow, PageSummary, SELECT_ONE, access, announce, clean_icon, clean_title,
-        expect_live, expect_meta_revision, view,
+        expect_live, expect_meta_revision, tracked, view,
     },
     events::PageChangeKind,
     features::get::PagePath,
@@ -79,7 +79,8 @@ pub async fn handler(
         access::require_page(&state, &mut tx, access, Action::Write, path.page_id, true).await?;
     expect_live(&row)?;
     expect_meta_revision(&row, request.meta_revision)?;
-    if row.title != title || row.icon != icon {
+    let (title_changed, icon_changed) = (row.title != title, row.icon != icon);
+    if title_changed || icon_changed {
         let Some(editor) = access.user else {
             return Err(campbooks_kernel::Error::Forbidden);
         };
@@ -101,6 +102,15 @@ pub async fn handler(
             access,
             path.page_id,
             vec![PageChangeKind::Meta],
+        )
+        .await?;
+        tracked::edited(
+            &state,
+            &mut tx,
+            access.workspace,
+            path.page_id,
+            title_changed,
+            icon_changed,
         )
         .await?;
     }

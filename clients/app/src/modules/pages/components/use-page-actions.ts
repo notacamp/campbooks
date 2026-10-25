@@ -71,13 +71,13 @@ export function usePageActions(workspaceId: string) {
       undo.push({
         label: t("toast.created"),
         undo: () => {
-          void attempt(t("toast.trashFailed", { title: title(current) }), () => calls.trash(current)).then(
-            (trashed) => {
-              if (trashed !== undefined) {
-                current = trashed;
-              }
-            },
-          );
+          void attempt(t("toast.trashFailed", { title: title(current) }), () =>
+            calls.trash(current),
+          ).then((trashed) => {
+            if (trashed !== undefined) {
+              current = trashed;
+            }
+          });
         },
         redo: () => {
           void attempt(t("toast.restoreFailed", { title: title(current) }), () =>
@@ -98,7 +98,9 @@ export function usePageActions(workspaceId: string) {
       undo.push({
         label: t("toast.trashed", { title: title(page) }),
         undo: () => {
-          void attempt(t("toast.restoreFailed", { title: title(page) }), () => calls.restore(trashed));
+          void attempt(t("toast.restoreFailed", { title: title(page) }), () =>
+            calls.restore(trashed),
+          );
         },
         redo: () => {
           void attempt(t("toast.trashFailed", { title: title(page) }), () => calls.trash(trashed));

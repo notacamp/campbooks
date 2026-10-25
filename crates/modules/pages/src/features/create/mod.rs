@@ -17,7 +17,7 @@ use crate::{
     domain::{
         MAX_DEPTH, PageId, PageRow, PageView, Place, SELECT_ONE, access, announce, body,
         clean_icon, clean_title, expect_live, position, resources::PAGE_RECORD, roles,
-        store::Loaded, view,
+        store::Loaded, tracked, view,
     },
     events::PageChangeKind,
     scopes::PagesWrite,
@@ -151,6 +151,14 @@ pub async fn handler(
         }
     }
     announce(&state, &mut tx, access, id, kinds).await?;
+    tracked::simple(
+        &state,
+        &mut tx,
+        access.workspace,
+        id,
+        tracked::Change::Created,
+    )
+    .await?;
     let row: PageRow = sqlx::query_as(SELECT_ONE)
         .bind(id)
         .fetch_one(&mut *tx)

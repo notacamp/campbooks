@@ -68,12 +68,7 @@ export class PageSync {
    * @param doc The page's document, already holding what the server sent.
    * @param serverVector The state vector the server answered with.
    */
-  constructor(
-    doc: Y.Doc,
-    serverVector: Uint8Array,
-    call: SyncCall,
-    options: PageSyncOptions = {},
-  ) {
+  constructor(doc: Y.Doc, serverVector: Uint8Array, call: SyncCall, options: PageSyncOptions = {}) {
     this.doc = doc;
     this.server = serverVector;
     this.call = call;

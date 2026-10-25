@@ -4,7 +4,14 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "r
 import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
-import { BlockHandle, FormatBar, IconButton, RichDocument, SuggestionMenu, useUndoToast } from "~/lib/ui";
+import {
+  BlockHandle,
+  FormatBar,
+  IconButton,
+  RichDocument,
+  SuggestionMenu,
+  useUndoToast,
+} from "~/lib/ui";
 import type { SuggestionGroup } from "~/lib/ui";
 
 import { searchMentions, type MentionCandidate } from "../api/mention-search";
@@ -13,7 +20,14 @@ import type { PageSummary, UploadedFile } from "../types";
 import { EditorEnvironmentContext, type EditorEnvironment } from "./environment";
 import { createExtensions } from "./extensions";
 import { createMentionMenu, createSlashMenu } from "./menus";
-import { filterSlash, runSlash, SLASH_ITEMS, TURN_INTO, type SlashId, type SlashItem } from "./slash";
+import {
+  filterSlash,
+  runSlash,
+  SLASH_ITEMS,
+  TURN_INTO,
+  type SlashId,
+  type SlashItem,
+} from "./slash";
 import { useMenu } from "./use-menu";
 
 export interface PageEditorProps {
@@ -238,7 +252,10 @@ export function PageEditor({
       setHandle(undefined);
       return;
     }
-    setHandle({ top: dom.getBoundingClientRect().top - box.getBoundingClientRect().top, pos: start });
+    setHandle({
+      top: dom.getBoundingClientRect().top - box.getBoundingClientRect().top,
+      pos: start,
+    });
   };
 
   const startDrag = (event: DragEvent<HTMLButtonElement>) => {

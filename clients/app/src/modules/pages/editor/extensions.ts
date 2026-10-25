@@ -25,7 +25,7 @@ const SafeCodeBlock = CodeBlock.extend({
         parseHTML: (element) =>
           codeLanguage(
             element.firstElementChild?.getAttribute("class")?.replace("language-", "") ??
-              element.getAttribute("data-language"),
+              element.dataset.language,
           ),
         renderHTML: (attributes) => {
           const language: unknown = attributes["language"];

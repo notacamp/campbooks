@@ -223,9 +223,11 @@ function fileAddress(workspaceId: string, pageId: string, blob: string): string 
 }
 
 const kilobytes = (bytes: number, language: string) =>
-  new Intl.NumberFormat(language, { style: "unit", unit: "kilobyte", maximumFractionDigits: 0 }).format(
-    Math.max(1, Math.round(bytes / 1024)),
-  );
+  new Intl.NumberFormat(language, {
+    style: "unit",
+    unit: "kilobyte",
+    maximumFractionDigits: 0,
+  }).format(Math.max(1, Math.round(bytes / 1024)));
 
 function FileView({ node }: NodeViewProps) {
   const { i18n } = useTranslation("pages");
@@ -355,7 +357,7 @@ export const Toggle = BlockNode.create({
     return {
       open: {
         default: false,
-        parseHTML: (element) => element.getAttribute("data-open") === "true",
+        parseHTML: (element) => element.dataset.open === "true",
         renderHTML: (attributes) => ({ "data-open": String(attributes["open"] === true) }),
       },
     };

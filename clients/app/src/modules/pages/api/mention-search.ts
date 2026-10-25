@@ -128,7 +128,12 @@ export async function searchMentions(
         await api.GET("/api/v1/w/{workspace_id}/schedule/events", {
           params: {
             path,
-            query: { from: day(-30), to: day(180), limit: PER_KIND, ...(typed === "" ? {} : { q: typed }) },
+            query: {
+              from: day(-30),
+              to: day(180),
+              limit: PER_KIND,
+              ...(typed === "" ? {} : { q: typed }),
+            },
           },
           signal,
         }),

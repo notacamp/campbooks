@@ -1,15 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  Avatar,
-  Button,
-  Popover,
-  PopoverSection,
-  Select,
-  Spacer,
-  Text,
-} from "~/lib/ui";
+import { Avatar, Button, Popover, PopoverSection, Select, Spacer, Text } from "~/lib/ui";
 import { useMembers, type Member } from "~/modules/workspaces";
 
 import type { PageRole, PageView } from "../types";
@@ -56,7 +48,9 @@ export function ShareMenu({ workspaceId, page, actions }: ShareMenuProps) {
         </Button>
       )}
     >
-      <PopoverSection title={t(page.place === "workspace" ? "share.placeWorkspace" : "share.placePrivate")}>
+      <PopoverSection
+        title={t(page.place === "workspace" ? "share.placeWorkspace" : "share.placePrivate")}
+      >
         <Text tone="tertiary" size="sm">
           {t(page.place === "workspace" ? "share.placeWorkspaceNote" : "share.placePrivateNote")}
         </Text>

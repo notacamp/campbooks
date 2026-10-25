@@ -13,6 +13,6 @@ describe("codeLanguage", () => {
   it("drops what it does not know", () => {
     expect(codeLanguage("brainfuck")).toBeNull();
     expect(codeLanguage("")).toBeNull();
-    expect(codeLanguage(undefined)).toBeNull();
+    expect(codeLanguage()).toBeNull();
   });
 });

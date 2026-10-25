@@ -13,6 +13,7 @@ pub mod resources;
 pub mod roles;
 pub mod search;
 pub mod store;
+pub mod tracked;
 pub mod view;
 
 use campbooks_kernel::{

@@ -18,7 +18,8 @@ use campbooks_kernel::{
 
 use crate::{
     domain::{
-        PageId, PageRow, PageSummary, Place, SELECT_ONE, access, announce, position, purge, view,
+        PageId, PageRow, PageSummary, Place, SELECT_ONE, access, announce, position, purge,
+        tracked, view,
     },
     events::PageChangeKind,
     features::get::PagePath,
@@ -82,6 +83,16 @@ pub async fn trash(
     .bind(member)
     .fetch_all(&mut *tx)
     .await?;
+    if !gone.is_empty() {
+        tracked::simple(
+            &state,
+            &mut tx,
+            access.workspace,
+            path.page_id,
+            tracked::Change::Trashed,
+        )
+        .await?;
+    }
     announce(
         &state,
         &mut tx,
@@ -167,6 +178,14 @@ pub async fn restore(
                 .await?;
         }
     }
+    tracked::simple(
+        &state,
+        &mut tx,
+        access.workspace,
+        path.page_id,
+        tracked::Change::Restored,
+    )
+    .await?;
     announce(
         &state,
         &mut tx,
@@ -234,6 +253,14 @@ pub async fn purge(
     let row =
         access::require_page(&state, &mut tx, access, Action::Delete, path.page_id, true).await?;
     expect_trash_root(&row)?;
+    tracked::simple(
+        &state,
+        &mut tx,
+        access.workspace,
+        path.page_id,
+        tracked::Change::Purged,
+    )
+    .await?;
     purge::root(&state, &mut tx, access.workspace, &row).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)

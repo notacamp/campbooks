@@ -96,10 +96,7 @@ export {
   type WeekGridProps,
   type WeekPill,
 } from "./components/Calendar/Calendar";
-export {
-  BlockHandle,
-  type BlockHandleProps,
-} from "./components/BlockHandle/BlockHandle";
+export { BlockHandle, type BlockHandleProps } from "./components/BlockHandle/BlockHandle";
 export {
   FormatBar,
   type FormatBarItem,

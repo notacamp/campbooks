@@ -2,13 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 
-import {
-  DocCard,
-  DocImage,
-  DocToggle,
-  MentionChip,
-  RichDocument,
-} from "./RichDocument";
+import { DocCard, DocImage, DocToggle, MentionChip, RichDocument } from "./RichDocument";
 
 const meta = {
   title: "Components/RichDocument",
@@ -113,7 +107,9 @@ export const WideCode: Story = {
     <RichDocument {...args}>
       <pre>
         <code>
-          {"const a = 'a very long line that goes well past the edge of a phone screen and keeps going and going';"}
+          {
+            "const a = 'a very long line that goes well past the edge of a phone screen and keeps going and going';"
+          }
         </code>
       </pre>
     </RichDocument>
@@ -123,7 +119,10 @@ export const WideCode: Story = {
 export const Image: Story = {
   render: (args) => (
     <RichDocument {...args}>
-      <DocImage src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="A pixel" />
+      <DocImage
+        src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
+        alt="A pixel"
+      />
       <DocImage src="" alt="Something you can't open" state="closed" />
     </RichDocument>
   ),

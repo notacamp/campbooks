@@ -76,7 +76,12 @@ export function PageScreen({ workspaceId, pageId, pages, actions, onBack }: Page
   );
 }
 
-const SAVE_TONE = { saved: "ok", saving: "waiting", retrying: "problem", rejected: "problem" } as const;
+const SAVE_TONE = {
+  saved: "ok",
+  saving: "waiting",
+  retrying: "problem",
+  rejected: "problem",
+} as const;
 
 interface OpenPageProps extends Omit<PageScreenProps, "pageId"> {
   page: PageView;
@@ -189,9 +194,7 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
       </div>
       <ReaderBody>
         <article className="mx-auto flex w-full max-w-measure flex-col gap-3 p-4">
-          {trashed ? (
-            <Text tone="secondary">{t("screen.inTrash")}</Text>
-          ) : null}
+          {trashed ? <Text tone="secondary">{t("screen.inTrash")}</Text> : null}
           <div className="flex items-center gap-2">
             {editable ? (
               <Select

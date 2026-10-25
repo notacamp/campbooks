@@ -18,7 +18,7 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{GrantView, PageId, Role, access, announce},
+    domain::{GrantView, PageId, Role, access, announce, tracked},
     events::PageChangeKind,
     scopes::PagesWrite,
 };
@@ -110,6 +110,12 @@ pub async fn share(
     if member.is_none() {
         return Err(Error::BadRequest(crate::MESSAGES.reason("not_a_member")));
     }
+    let previous: Option<String> =
+        sqlx::query_scalar("SELECT role FROM pages.grants WHERE page_id = $1 AND member_id = $2")
+            .bind(path.page_id)
+            .bind(path.member_id)
+            .fetch_optional(&mut *tx)
+            .await?;
     sqlx::query(
         "INSERT INTO pages.grants (page_id, workspace_id, member_id, role, granted_by)
          VALUES ($1, $2, $3, $4, $5)
@@ -133,6 +139,16 @@ pub async fn share(
         access,
         path.page_id,
         vec![PageChangeKind::Share],
+    )
+    .await?;
+    tracked::shared(
+        &state,
+        &mut tx,
+        access.workspace,
+        path.page_id,
+        path.member_id,
+        request.role,
+        previous.and_then(|role| role.parse().ok()),
     )
     .await?;
     tx.commit().await?;
@@ -194,6 +210,14 @@ pub async fn unshare(
         access,
         path.page_id,
         vec![PageChangeKind::Share],
+    )
+    .await?;
+    tracked::unshared(
+        &state,
+        &mut tx,
+        access.workspace,
+        path.page_id,
+        path.member_id,
     )
     .await?;
     tx.commit().await?;
