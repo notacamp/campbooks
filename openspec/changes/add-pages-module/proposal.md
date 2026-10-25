@@ -64,7 +64,7 @@ access to a mentioned record is answered by the kernel's `authz` catalogue
   confirmation.
 - **Search.** Page titles and text are found by `⌘K` search, only for callers
   who may read the page.
-- **Pages place** (`g p`, new page `n p`), as in the prototype: the tree, the
+- **Pages place** (`g p`, new page `n g`), as in the prototype: the tree, the
   breadcrumb, Share, the slash menu (`/`), mentions (`@`), Markdown shortcuts,
   drag to move blocks and pages, the phone layout with a formatting bar, and
   an Undo toast for every page action.

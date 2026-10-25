@@ -232,7 +232,7 @@ Module `clients/app/src/modules/pages`, registered in `app/modules.ts`:
 
 - **Routes** `/w/$workspaceId/pages` (opens the last page, or the empty
   state) and `/w/$workspaceId/pages/$pageId`.
-- **Nav** "Pages" with `g p`. New page `n p` (a global sequence, like `n t`).
+- **Nav** "Pages" with `g p`. New page `n g` (a global sequence, like `n t`).
   `⌘K` finds pages through search.
 - **Tree**: Workspace, Private, Shared with you; expand and collapse, drag to
   reorder and nest, "New page" and "Add a sub-page" on hover, the trash at
@@ -321,3 +321,12 @@ the same way it learns which connectors are offered.
   they made in the workspace place. `pages.share` and the handler take the
   same per-member advisory lock and the handler re-checks the membership, so
   a share racing a departure leaves no grant behind (cloud #291).
+
+- **New page is `n g`, not `n p`.** `n p` already adds a passkey (identity), and
+  the shortcut registry refuses two shortcuts on the same keys.
+- **Page mentions read their title from the tree.** A `pages.page` mention takes
+  its name from `pages.list` (ids and titles, only what the viewer may open), so
+  a page of mentions downloads no page bodies. A mentioned page in the trash
+  shows as "Something you can't open" until it is restored.
+- **The role schema is `PageRole`.** The page role enum shared the OpenAPI name
+  `Role` with the workspace role and replaced it in the generated client.

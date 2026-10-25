@@ -33,7 +33,7 @@
 
 ## 5. Client
 
-- [x] 5.1 Module `clients/app/src/modules/pages` (routes, nav item, `g p`, `n p` global sequence, flag, i18n en/pt-PT/es-ES/fr); TipTap, yjs, y-prosemirror, fractional-indexing pinned
+- [x] 5.1 Module `clients/app/src/modules/pages` (routes, nav item, `g p`, `n g` global sequence, flag, i18n en/pt-PT/es-ES/fr); TipTap, yjs, y-prosemirror, fractional-indexing pinned
 - [x] 5.2 Tree: places, Shared with you, expand/collapse, drag to reorder and nest, new page and sub-page, trash view with restore and confirmed delete, undo toasts
 - [x] 5.3 Editor: schema extensions, Collaboration over `pages.sync` + change-feed pulls, retry with backoff and save status, slash menu, Markdown shortcuts, block handle, sanitised paste, file/image upload
 - [x] 5.4 Mentions and embeds: `@` picker by name (members, correspondents, threads, tasks, events, pages); renderers through each module's public read hook; "Something you can't open"

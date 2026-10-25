@@ -4,7 +4,7 @@ import { PagesPage } from "./components/PagesPage";
 
 /**
  * `/w/$workspaceId/pages` and `/pages/$pageId`: the tree, with a page open
- * beside it. `/pages?new=1` makes a page and opens it (`n p`).
+ * beside it. `/pages?new=1` makes a page and opens it (`n g`).
  */
 export function buildPagesRoutes<TParent extends AnyRoute>(parent: TParent) {
   function PagesRoute() {

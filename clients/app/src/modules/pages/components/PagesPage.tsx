@@ -38,7 +38,7 @@ export interface PagesPageProps {
   workspaceId: string;
   /** The page open beside the tree. */
   pageId?: string | undefined;
-  /** `?new=1`: make a page and open it (`n p`). */
+  /** `?new=1`: make a page and open it (`n g`). */
   creating?: boolean | undefined;
 }
 
@@ -78,7 +78,7 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
     }
   };
 
-  // `?new=1` (from `n p` elsewhere): a new private page, made once.
+  // `?new=1` (from `n g` elsewhere): a new private page, made once.
   const latestMake = useRef(make);
   useEffect(() => {
     latestMake.current = make;
