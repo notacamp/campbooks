@@ -57,7 +57,7 @@
   },
   "why": {
     "title": "Pourquoi c’est ici",
-    "sentence": "Dans « {{band}} » parce que {{reason}}."
+    "sentence": "Dans « {{band}} » : {{reason}}."
   },
   "context": "Fait aujourd’hui",
   "doneTodayTitle": "Fait aujourd’hui",

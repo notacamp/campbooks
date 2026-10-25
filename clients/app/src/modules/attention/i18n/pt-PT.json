@@ -57,7 +57,7 @@
   },
   "why": {
     "title": "Porque está aqui",
-    "sentence": "Está em «{{band}}» porque {{reason}}."
+    "sentence": "Em «{{band}}»: {{reason}}."
   },
   "context": "Feito hoje",
   "doneTodayTitle": "Feito hoje",

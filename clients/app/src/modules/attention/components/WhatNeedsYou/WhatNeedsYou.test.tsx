@@ -161,7 +161,7 @@ describe("What needs you", () => {
     renderHome();
     fireEvent.click(await screen.findByText("Marta Ferreira is waiting for your reply"));
     const why = await screen.findByRole("region", { name: "Why it’s here" });
-    expect(why).toHaveTextContent("In Today because due tomorrow.");
+    expect(why).toHaveTextContent("In Today: due tomorrow.");
     expect(why).toHaveTextContent(
       "Due today or tomorrow, planned for today, nudges that are due, and people who have waited 3 days or more.",
     );

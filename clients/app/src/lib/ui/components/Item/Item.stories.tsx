@@ -276,7 +276,7 @@ export const WhyItsHere: Story = {
       <ItemDetail
         why={{
           label: "Why it’s here",
-          text: "In Today because Pedro has waited 4 days.",
+          text: "In Today: Pedro has waited 4 days.",
           notes: [
             "Due today or tomorrow, planned for today, nudges that are due, and people who have waited 3 days or more.",
           ],
@@ -288,6 +288,6 @@ export const WhyItsHere: Story = {
   },
   play: async ({ canvasElement }) => {
     const why = within(canvasElement).getByRole("region", { name: "Why it’s here" });
-    await expect(why).toHaveTextContent("In Today because Pedro has waited 4 days.");
+    await expect(why).toHaveTextContent("In Today: Pedro has waited 4 days.");
   },
 };

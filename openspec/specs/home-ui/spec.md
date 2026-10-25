@@ -817,7 +817,7 @@ nothing.
 
 #### Scenario: Opened in Today
 - **WHEN** Sam opens Pedro's reply, which has waited 4 days
-- **THEN** it says "In Today because Pedro has waited 4 days." and the Today description
+- **THEN** it says "In Today: Pedro has waited 4 days." and the Today description
 
 ### Requirement: More in Tasks
 When `attention.list` says some open tasks are not for today

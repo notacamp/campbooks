@@ -127,7 +127,7 @@ tool description and the assistant handbook line say "most pressing first".
 - Reason sentences come from `band_reason` in the member's language; names
   are the first name Home already derives (`firstNameOf`), with a neutral
   sentence when there is none.
-- "Why it's here" in the opened item: the visor, "In Today because Marta has
+- "Why it's here" in the opened item: the visor, "In Today: Marta has
   waited 4 days." and the band's description.
 
 ## Scopes

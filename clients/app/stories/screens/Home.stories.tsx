@@ -507,6 +507,6 @@ export const WhyItsHere: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByText("Tiago Nunes is waiting for your reply"));
     const why = await canvas.findByRole("region", { name: "Why it’s here" });
-    await expect(why).toHaveTextContent("In Today because Tiago has waited 4 days.");
+    await expect(why).toHaveTextContent("In Today: Tiago has waited 4 days.");
   },
 };
