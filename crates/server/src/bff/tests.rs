@@ -1679,6 +1679,7 @@ async fn the_admin_api_is_reached_through_the_bff_by_administrators_only(db: PgP
     let mut conn = h.db.acquire().await.unwrap();
     campbooks_admin::cli::grant(
         &mut conn,
+        &campbooks_kernel::tracking::Tracker::default(),
         "test-user",
         &[campbooks_kernel::admin::Permission::Super],
         None,
@@ -1730,9 +1731,15 @@ async fn the_admin_api_is_reached_through_the_bff_by_administrators_only(db: PgP
     assert_eq!(reply.json()["outcome"], "applied");
 
     // Revoked: gone at once.
-    campbooks_admin::cli::revoke(&mut conn, "test-user", &[], chrono::Utc::now())
-        .await
-        .unwrap();
+    campbooks_admin::cli::revoke(
+        &mut conn,
+        &campbooks_kernel::tracking::Tracker::default(),
+        "test-user",
+        &[],
+        chrono::Utc::now(),
+    )
+    .await
+    .unwrap();
     browser
         .get("/bff/admin/v1/system/overview")
         .await
@@ -3182,6 +3189,7 @@ async fn a_suspension_through_the_bff_ends_web_sessions_on_the_administrators_be
     let mut conn = h.db.acquire().await.unwrap();
     campbooks_admin::cli::grant(
         &mut conn,
+        &campbooks_kernel::tracking::Tracker::default(),
         "test-user",
         &[campbooks_kernel::admin::Permission::Super],
         None,

@@ -55,9 +55,16 @@ impl World {
 
     async fn grant(&self, account: &str, permissions: &[Permission]) {
         let mut conn = self.db.acquire().await.unwrap();
-        campbooks_admin::cli::grant(&mut conn, account, permissions, None, Utc::now())
-            .await
-            .unwrap();
+        campbooks_admin::cli::grant(
+            &mut conn,
+            &campbooks_kernel::tracking::Tracker::default(),
+            account,
+            permissions,
+            None,
+            Utc::now(),
+        )
+        .await
+        .unwrap();
     }
 
     async fn trail(&self) -> Vec<campbooks_admin::cli::Action> {

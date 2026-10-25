@@ -1,0 +1,64 @@
+# The admin module's tracked events (campbooks-cloud#331, OpenSpec change
+# track-admin-events): an administrator's profile granted and revoked by the
+# operator's `campbooks-server admin grant|revoke`. The module serves no
+# operation and runs no job, schedule or handler, so it adds no Coverage row.
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0008-admin.yaml`.
+changelog:
+  - date: "2026-10-25"
+    plan_version: 8
+    change: "The admin module instrumented (campbooks-cloud#331): 2 instance-wide events for an administrator's profile granted (created or given more permissions) and revoked (permissions taken away or the profile removed) by the server's admin command, as system; record profile and enum permission; no Coverage rows (the module serves no operation and runs no job, schedule or handler)."
+    pr: "#662"
+
+events:
+  - name: "admin.profile_granted"
+    version: 1
+    module: "admin"
+    object: "profile"
+    action: "granted"
+    scope: "instance"
+    status: "live"
+    actor_types: [system]
+    description: "An account was made an instance administrator, or an administrator was given more permissions, by the operator's `campbooks-server admin grant`. The snapshot is the profile afterwards, with the permissions it held before."
+    fires_when: "admin grant (campbooks_admin::cli::grant) creates the profile or adds a permission it lacked, in the transaction that writes the profile and its audit entry; permissions it already holds track nothing, with or without a new note."
+    added_in: 8
+    openspec_change: "track-admin-events"
+  - name: "admin.profile_revoked"
+    version: 1
+    module: "admin"
+    object: "profile"
+    action: "revoked"
+    scope: "instance"
+    status: "live"
+    actor_types: [system]
+    description: "An administrator lost permissions, or stopped being one (the whole profile removed), by the operator's `campbooks-server admin revoke`. The snapshot is the profile afterwards: with no permissions and removed_at set when it was removed."
+    fires_when: "admin revoke (campbooks_admin::cli::revoke) takes away at least one permission the profile held, or removes the profile, in the transaction that writes the change and its audit entry; an account with no profile, or only permissions it does not hold, track nothing."
+    added_in: 8
+    openspec_change: "track-admin-events"
+
+properties:
+  - { event: "admin.profile_granted", version: 1, property: "profile", type: "record", of: "admin.profile", required: true, classification: "operational", description: "The profile afterwards." }
+  - { event: "admin.profile_granted", version: 1, property: "before", type: "enum", list: true, of: "admin.permission", required: true, classification: "operational", description: "The permissions it held before; empty when the account was not an administrator." }
+  - { event: "admin.profile_granted", version: 1, property: "granted", type: "enum", list: true, of: "admin.permission", required: true, classification: "operational", description: "The permissions it gained." }
+  - { event: "admin.profile_granted", version: 1, property: "new_profile", type: "bool", required: true, classification: "operational", description: "Whether the grant created the profile: the account was not an administrator." }
+  - { event: "admin.profile_revoked", version: 1, property: "profile", type: "record", of: "admin.profile", required: true, classification: "operational", description: "The profile afterwards; with no permissions and removed_at set when it was removed." }
+  - { event: "admin.profile_revoked", version: 1, property: "before", type: "enum", list: true, of: "admin.permission", required: true, classification: "operational", description: "The permissions it held before." }
+  - { event: "admin.profile_revoked", version: 1, property: "revoked", type: "enum", list: true, of: "admin.permission", required: true, classification: "operational", description: "The permissions it lost." }
+
+records:
+  - { record: "admin.profile", field: "account_id", type: "id", required: false, classification: "pseudonymous", description: "The administrator: their Campbooks account id. Absent when the profile names an account of another identity provider (a token subject that is not a Campbooks id, which may be an address)." }
+  - { record: "admin.profile", field: "permissions", type: "enum", list: true, enum: "admin.permission", required: true, classification: "operational", description: "What the administrator may do; empty once the profile is removed." }
+  - { record: "admin.profile", field: "with_note", type: "bool", required: true, classification: "operational", description: "Whether the operator wrote a note (never the note)." }
+  - { record: "admin.profile", field: "granted_at", type: "timestamp", required: true, classification: "operational", description: "When the profile was first granted." }
+  - { record: "admin.profile", field: "updated_at", type: "timestamp", required: true, classification: "operational", description: "When it last changed." }
+  - { record: "admin.profile", field: "removed_at", type: "timestamp", required: false, classification: "operational", description: "When a revoke removed the whole profile: the account is no longer an administrator." }
+
+enums:
+  - { enum: "admin.permission", value: "super", description: "Everything, including permissions added later (super)." }
+  - { enum: "admin.permission", value: "system_read", description: "See the system overview (system.read)." }
+  - { enum: "admin.permission", value: "signups_review", description: "Approve or refuse signup requests (signups.review)." }
+  - { enum: "admin.permission", value: "users_read", description: "See accounts (users.read)." }
+  - { enum: "admin.permission", value: "users_suspend", description: "Suspend and restore accounts (users.suspend)." }
+  - { enum: "admin.permission", value: "workspaces_read", description: "See workspaces, metadata only (workspaces.read)." }
+  - { enum: "admin.permission", value: "jobs_read", description: "See background jobs (jobs.read)." }
+  - { enum: "admin.permission", value: "jobs_retry", description: "Retry failed background jobs (jobs.retry)." }

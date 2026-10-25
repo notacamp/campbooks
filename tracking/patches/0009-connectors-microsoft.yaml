@@ -1,7 +1,7 @@
 # Microsoft mail (campbooks-cloud#315, OpenSpec change microsoft-mail-connection):
 # a fourth connectors provider, so the connection and send records can name it.
 # No new event, record field or Coverage row. Applied with
-# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0008-connectors-microsoft.yaml`.
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0009-connectors-microsoft.yaml`.
 
 enums:
   - { enum: "connectors.provider", value: "microsoft", description: "Microsoft: Outlook.com, Hotmail and Microsoft 365 mail." }

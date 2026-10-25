@@ -29,6 +29,10 @@ use uuid::Uuid;
 pub mod cli;
 pub mod scopes;
 
+/// The module's tracked events, generated from the tracking plan (ADR 0020).
+#[path = "tracking.gen.rs"]
+pub mod tracking;
+
 /// Module name: crate directory and Postgres schema.
 pub const NAME: &str = "admin";
 
