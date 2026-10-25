@@ -253,19 +253,22 @@ async fn a_reply_goes_out_once_with_its_thread_and_no_copy_written(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_copy_filed_late_comes_with_the_sync_once(db: PgPool) {
+async fn a_copy_filed_late_is_found_and_never_sent_again(db: PgPool) {
     let m = mailbox(db, true).await;
     m.kit.microsoft.delay_filing(true);
     let send = m.send(|_| {}).await;
+    m.kit.run_jobs().await;
+    // Taken, its copy not in Sent Items yet: not settled, not sent again.
+    assert!(m.completed().await.is_empty());
+    assert_eq!(m.kit.microsoft.send_calls(), 1);
+    m.kit.microsoft.file_sent();
     m.settle().await;
     assert_eq!(m.outcome().await, ("sent".to_owned(), None));
-    assert_eq!(m.key(send).await, None);
-    m.kit.microsoft.file_sent();
-    m.run().await;
+    assert_eq!(m.kit.microsoft.send_calls(), 1);
     let id = m.kit.microsoft.sent_items()[0].id.clone();
+    assert_eq!(m.key(send).await.as_deref(), Some(id.as_str()));
     m.run().await;
     assert_eq!(m.upserts(&id).await, 1);
-    assert_eq!(m.kit.microsoft.send_calls(), 1);
     m.only_sent();
 }
 

@@ -142,8 +142,9 @@ the job looks the copy up in Sent Items by its `internetMessageId`
 (`$filter`, at most two answers) and, when exactly one is there, indexes the
 message as sent under that Graph id with the Sent Items tokens, announces it
 and records the id on the send; the next sync knows the id and emits
-nothing new. When the copy is not there yet the send is still sent, with no
-id, and the next sync brings the copy once (as Zoho without an id).
+nothing new. `connectors.send_completed` names the provider's id of every
+sent message, so while the copy is not there yet the attempt stays unclear:
+the next one (at least 90 seconds on) only looks it up (§8).
 
 ### 8. At most once
 
@@ -232,7 +233,7 @@ Coverage row.
 ## Risks
 
 - Exchange keeping the client's `Message-ID` on a MIME sendMail is what lets
-  the Sent Items copy be found; when it does not, the send is still sent (no
-  id) and the copy comes with the next sync, and an unclear attempt ends
-  `unknown_outcome` rather than being sent twice.
+  the Sent Items copy be found; were it not kept, every send would end
+  `unknown_outcome` after its attempts (never sent twice). Worth checking
+  against a real mailbox before the flag goes on.
 - Sending needs `xms_edov` configured: without it no Microsoft send goes out.

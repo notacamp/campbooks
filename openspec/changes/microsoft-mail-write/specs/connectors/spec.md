@@ -118,9 +118,10 @@ whose base64 is larger than 4 MB SHALL fail `too_large` without calling
 Graph, and a 413 SHALL be `too_large`. Campbooks SHALL never write a copy to
 Sent Items: after Graph accepts the message, the job SHALL look its copy up
 in Sent Items by its `internetMessageId` and, when exactly one is there,
-index and announce the message under that copy's id, so the next sync emits
-nothing new; otherwise the send SHALL still be sent and the next sync SHALL
-bring the copy once. Every `sendMail` SHALL be preceded by an attempt
+record the send sent with that copy's id and index and announce the message
+under it, so the next sync emits nothing new; while the copy is not there,
+the attempt SHALL stay unclear (looked up again, never sent again). Every
+`sendMail` SHALL be preceded by an attempt
 committed on its own; an unclear one (a timeout, a 5xx, a lost answer)
 SHALL be looked up by its `internetMessageId` in Sent Items before anything
 else: found, the send is sent; otherwise it SHALL never be sent again and
@@ -130,6 +131,10 @@ send after that wait, at most an hour.
 #### Scenario: A reply
 - **WHEN** a member replies from a Microsoft inbox
 - **THEN** Graph receives one `sendMail` whose MIME carries the document's `Message-ID`, `In-Reply-To` and `References`, the send is sent with the Sent Items copy's id, and no copy is written to Sent Items
+
+#### Scenario: A copy filed late
+- **WHEN** Graph takes a `sendMail` but files its copy in Sent Items only after the job looked for it
+- **THEN** the send is not settled yet, the next attempt finds the copy and records the send sent, and Graph receives no second `sendMail`
 
 #### Scenario: The next sync
 - **WHEN** the stream syncs after a send and Sent Items' delta lists the copy

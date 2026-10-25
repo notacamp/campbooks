@@ -23,7 +23,7 @@
 - [ ] 5.3 Conflicts: a 412 re-read then made; Graph's later change wins
 - [ ] 5.4 A move keeps the index; a move answering another id
 - [ ] 5.5 Throttling of a push and of a send (`Retry-After`)
-- [ ] 5.6 Sending: once, no Sent echo, the next sync deduped, threading headers, over the limit, unverified address, another From, an unclear attempt
+- [ ] 5.6 Sending: once, no Sent echo, the next sync deduped, a copy filed late, threading headers, over the limit, unverified address, another From, an unclear attempt
 - [ ] 5.7 Microsoft mail off: no write-back, no send; production's settings still start
 
 ## 6. Finish

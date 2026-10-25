@@ -46,8 +46,8 @@ setting, no new event, no new operation.
   RFC 5322 Gmail sends: `Message-ID`, `In-Reply-To`, `References`, Bcc in the
   headers), which Graph saves to Sent Items itself: Campbooks writes no copy.
   The Sent Items copy is found by its `internetMessageId` and indexed under
-  its Graph id, so the next sync does not announce it again; when it is not
-  there yet, the next sync brings it once.
+  its Graph id, so the next sync does not announce it again; until it is
+  there, the attempt stays unclear and is only looked up again.
 - **At most once.** Every sendMail is preceded by a committed attempt; an
   unclear one (a timeout, a 5xx) is looked up in Sent Items by its
   `internetMessageId` before anything else, and, when it is not found, is

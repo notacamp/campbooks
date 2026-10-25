@@ -16,9 +16,10 @@
 //! `internetMessageId` first: found, it is sent; otherwise it is looked for
 //! again, and it is never sent again (`unknown_outcome` once no attempt is
 //! left), since Graph files the copy asynchronously and a miss proves
-//! nothing. After a 202 the copy is looked up once: found, the message is
-//! indexed and announced under its Graph id, so the next sync knows it;
-//! not yet there, the next sync brings it.
+//! nothing. After a 202 the copy is looked up: found, the message is
+//! indexed and announced under its Graph id (the send is recorded sent with
+//! it), so the next sync knows it; not there yet, the attempt stays unclear
+//! and the next one looks again.
 
 use campbooks_kernel::{JobContext, JobError, db::BeginFor as _};
 use chrono::{DateTime, Utc};
@@ -136,21 +137,23 @@ impl SendMessage {
         target.unclear = true;
         match client.send_mime(token, &raw).await {
             Ok(SendAnswer::Accepted) => {
-                // Graph filed the copy in Sent Items; it may not be there yet.
-                let sent = match client.sent_copy(token, &document.rfc_message_id).await {
-                    Ok(SentLookup::Found(copy)) => as_sent(&target, copy, Some(raw), now),
-                    Ok(SentLookup::Missing | SentLookup::Several) | Err(_) => {
-                        tracing::info!(%workspace, %send, "the sent message will come with the next sync");
-                        Sent {
-                            id: None,
-                            thread_key: None,
-                            fetched: None,
-                            copy: None,
-                        }
+                // Graph files the copy in Sent Items, perhaps not yet: until
+                // it is found, the attempt stays unclear, so the next one
+                // only looks it up and never sends again.
+                match client.sent_copy(token, &document.rfc_message_id).await {
+                    Ok(SentLookup::Found(copy)) => {
+                        let sent = as_sent(&target, copy, Some(raw), now);
+                        self.finish_sent(ctx, workspace, send, &target, stream, sent, now)
+                            .await
                     }
-                };
-                self.finish_sent(ctx, workspace, send, &target, stream, sent, now)
-                    .await
+                    Ok(SentLookup::Missing | SentLookup::Several) | Err(_) => {
+                        tracing::info!(%workspace, %send, "sent; its copy is not in Sent Items yet");
+                        Err(JobError::retry_after(
+                            "sent; looking for its copy in Sent Items next time",
+                            UNCLEAR_WAIT,
+                        ))
+                    }
+                }
             }
             Ok(SendAnswer::TooLarge) => {
                 // A definite answer: not sent.

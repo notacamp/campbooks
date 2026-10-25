@@ -80,8 +80,7 @@ impl Mailbox {
             .into_iter()
             .rev()
             .find(|c| c["op"] == "upsert" && c["message"]["provider_message_id"] == id)
-            .map(|c| c["message"].clone())
-            .unwrap_or_else(|| panic!("no upsert of {id}"))
+            .map_or_else(|| panic!("no upsert of {id}"), |c| c["message"].clone())
     }
 
     /// Every outbound change as (kind, state, reason), oldest first.
