@@ -105,7 +105,7 @@ export function metaLine(event: EventView, calendars: readonly CalendarView[]): 
   return calendars.find((calendar) => calendar.id === event.calendar_id)?.name ?? "";
 }
 
-/** "Pay · EDP bill", or "Do · Send the signed lease". */
+/** "Pay · EDP bill", or "Do · Send the lease". */
 export function dueTitle(t: T, row: TaskRow): string {
   return t(row.task.verb === "pay" ? "due.pay" : "due.do", { title: row.task.title });
 }

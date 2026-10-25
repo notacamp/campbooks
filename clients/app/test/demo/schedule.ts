@@ -446,14 +446,14 @@ export const TASKS = [
     source: fromEmail(10),
   }),
   task(93, {
-    title: "Send the signed lease",
+    title: "Send the lease",
     due_on: "2026-10-29",
     plan: "date",
     plan_on: "2026-10-28",
     source: fromEmail(11),
   }),
   task(94, {
-    title: "Call the accountant about Q3 VAT",
+    title: "Call the accountant",
     plan: "date",
     plan_on: "2026-10-26",
   }),
@@ -469,7 +469,7 @@ export const TASKS = [
 export function taskSources(): Summary[] {
   const mail = (
     n: number,
-    stream: string,
+    stream: Summary["stream"],
     subject: string,
     name: string,
     address: string,
@@ -519,7 +519,7 @@ export const LEASE: Summary = {
   last_sent_at: null,
   sent_to: [],
   replied_since_sent: false,
-  // The same ask as the "Do · Send the signed lease" row on the calendar.
+  // The same ask as the "Do · Send the lease" row on the calendar.
   need: {
     reason: "do",
     trust: "sure",

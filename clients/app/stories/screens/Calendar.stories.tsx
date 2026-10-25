@@ -103,10 +103,10 @@ function tasksApi(): Record<string, MockRoute> {
   const routes: Record<string, MockRoute> = {
     [`GET ${W}/tasks`]: () => ({ body: { tasks: open } }),
     [`GET ${W}/conversations`]: (_body, url) => {
-      const ids = (url.searchParams.get("ids") ?? "").split(",");
+      const ids = new Set((url.searchParams.get("ids") ?? "").split(","));
       return {
         body: {
-          conversations: taskSources().filter((mail) => ids.includes(mail.id)),
+          conversations: taskSources().filter((mail) => ids.has(mail.id)),
           next_cursor: null,
         },
       };
@@ -315,7 +315,7 @@ export const TaskSheetPlanned: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const sheet = await canvas.findByRole("complementary", { name: /Do · Send the signed lease/u });
+    const sheet = await canvas.findByRole("complementary", { name: /Do · Send the lease/u });
     const inSheet = within(sheet);
     await expect(inSheet.getByText("Planned")).toBeVisible();
     await expect(inSheet.getByText(/^Planned for .*28/u)).toBeVisible();
@@ -379,7 +379,10 @@ export const MonthPhone: Story = {
 
 /** Nothing ahead: one line. */
 export const Empty: Story = {
-  args: { path: `${SCHEDULE}?view=agenda`, api: calendarApi([]) },
+  args: {
+    path: `${SCHEDULE}?view=agenda`,
+    api: () => ({ ...calendarApi([])(), [`GET ${W}/tasks`]: { body: { tasks: [] } } }),
+  },
   play: async ({ canvasElement }) => {
     await expect(await within(canvasElement).findByText("Nothing on your calendar.")).toBeVisible();
   },

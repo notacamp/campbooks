@@ -22,8 +22,8 @@ export interface TaskRow {
   alsoPlanned: boolean;
 }
 
-export const dueKeyOf = (taskId: string) => `due:${taskId}`;
-export const planKeyOf = (taskId: string) => `plan:${taskId}`;
+const dueKeyOf = (taskId: string) => `due:${taskId}`;
+const planKeyOf = (taskId: string) => `plan:${taskId}`;
 
 const later = (day: Ymd, today: Ymd): Ymd => (day < today ? today : day);
 const behind = (day: Ymd, today: Ymd): number => Math.max(daysBetween(day, today), 0);
