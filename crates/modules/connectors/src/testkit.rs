@@ -434,6 +434,17 @@ impl Kit {
 
     /// The module with `config`.
     pub async fn with_config(db: PgPool, config: ConnectorsConfig) -> Self {
+        Self::with_filter_limit(db, config, None).await
+    }
+
+    /// The module with `config`, its Microsoft client taking Graph to list
+    /// at most `filter_limit` messages in a filtered delta round (Graph's
+    /// own is 5000).
+    pub async fn with_filter_limit(
+        db: PgPool,
+        config: ConnectorsConfig,
+        filter_limit: Option<u32>,
+    ) -> Self {
         let imap_config = config.imap.clone();
         let google = FakeGoogle::start().await;
         let clock = Arc::new(FixedClock::new(
@@ -452,6 +463,10 @@ impl Kit {
                 .unwrap(),
             )
             .unwrap();
+            let client = match filter_limit {
+                Some(limit) => client.with_filter_limit(limit),
+                None => client,
+            };
             Arc::new(if config.microsoft.adapter().notifications {
                 client.with_notifications(url::Url::parse(NOTIFICATION_URL).unwrap())
             } else {

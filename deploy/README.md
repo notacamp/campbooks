@@ -965,8 +965,13 @@ Deleted Items, Archive and the member's own folders (never Drafts or Outbox), ea
 by its own change log, first the last 90 days (`CAMPBOOKS_CONNECTORS__MICROSOFT__BACKFILL_DAYS`),
 then what changes. Reading never changes, moves or deletes anything in the mailbox; writing
 back (read, archive, move) and sending come in a later release. A message larger than
-`CAMPBOOKS_CONNECTORS__MICROSOFT__MAX_MESSAGE_BYTES` (50 MiB) is skipped, and Microsoft's own
-throttling (`Retry-After`, honoured for up to an hour) shows the mailbox as throttled.
+`CAMPBOOKS_CONNECTORS__MICROSOFT__MAX_MESSAGE_BYTES` (50 MiB, at most 64 MiB) is skipped; a run
+holds about `…__RUN_BUDGET_BYTES` (64 MiB) plus the four messages it downloads at once. At most
+`…__MAX_FOLDERS` folders are read (100): the well-known ones always, then the member's own, those
+already read first. Graph lists at most 5000 messages of a folder's window at once, the newest:
+in a bigger folder the oldest are left out, and none of a folder's messages is ever taken for
+deleted only because a listing left it out. Microsoft's own throttling (`Retry-After`, honoured
+for up to an hour) shows the mailbox as throttled.
 
 **New mail as it arrives** (optional): with
 `CAMPBOOKS_CONNECTORS__MICROSOFT__NOTIFICATIONS=true`, each mailbox subscribes to Graph's
@@ -978,7 +983,11 @@ is made, and refuses the subscription when it cannot reach it. Subscriptions las
 days and are renewed by the mailbox's runs; while one is live the mailbox is polled only at
 `CAMPBOOKS_CONNECTORS__POLL__MAX_SECONDS`. The callback needs no sign-in: each subscription
 has its own random secret, which Campbooks keeps only as a keyed hash and checks on every
-notification, and a notification only makes that mailbox read early. Without the setting, or
+notification, and a notification only makes that mailbox read early. The callback is rate
+limited (per address, for the whole instance, and per process before the database is asked
+anything) and is not served at all while notifications are off. A subscription whose secret was
+hashed under an earlier `CAMPBOOKS_SECRET_KEY` is made again after a key rotation, before the old
+key retires. Without the setting, or
 without such a URL (a warning at start), the mailboxes are polled as usual; nothing about
 notifications ever stops the server.
 

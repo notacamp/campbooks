@@ -674,7 +674,7 @@ pub fn router_with(
     let bff = bff::Bff::new(bff, &state, api_only, admin_only, identity.clone());
     // Where Microsoft Graph posts change notifications (campbooks-cloud#316):
     // public like the issuer's endpoints, and like them outside the
-    // operation catalogue. It answers 404 unless notifications are on.
+    // operation catalogue. Empty unless notifications are on.
     let identity = identity.merge(campbooks_connectors::notifications_router(
         state.clone(),
         composition.connectors.clone(),

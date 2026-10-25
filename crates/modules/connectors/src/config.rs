@@ -107,11 +107,13 @@ pub struct MicrosoftMailConfig {
     #[serde(deserialize_with = "any_text")]
     pub backfill_days: Option<String>,
     /// Messages larger than this (bytes, as Graph sends their MIME) are
-    /// recorded as oversized and not stored (default 50 MiB).
+    /// recorded as oversized and not stored (default 50 MiB, at most 64 MiB:
+    /// up to four are downloaded at once).
     #[serde(deserialize_with = "any_text")]
     pub max_message_bytes: Option<String>,
     /// One run starts no download once it has fetched this many bytes
-    /// (default 64 MiB), so a run's memory stays bounded.
+    /// (default 64 MiB). A run holds at most about this much plus the four
+    /// downloads in flight (each at most `max_message_bytes`).
     #[serde(deserialize_with = "any_text")]
     pub run_budget_bytes: Option<String>,
     /// Requests per minute each Microsoft connection may make, shared by
@@ -129,6 +131,11 @@ pub struct MicrosoftMailConfig {
     #[serde(deserialize_with = "any_text")]
     pub notifications: Option<String>,
 }
+
+/// The largest `CAMPBOOKS_CONNECTORS__MICROSOFT__MAX_MESSAGE_BYTES`: four
+/// downloads in flight hold at most four such messages besides the run's
+/// budget.
+pub const MAX_MICROSOFT_MESSAGE_BYTES: u64 = 64 * 1024 * 1024;
 
 /// The Microsoft adapter's settings, read (defaults for what is unset).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,7 +203,7 @@ impl MicrosoftMailConfig {
                 self.max_message_bytes.as_deref(),
                 "MAX_MESSAGE_BYTES",
                 1,
-                1024 * 1024 * 1024,
+                MAX_MICROSOFT_MESSAGE_BYTES,
                 defaults.max_message_bytes,
             )?,
             run_budget_bytes: number(
@@ -1248,6 +1255,10 @@ mod tests {
         // On with a broken value: refused, naming it.
         for (bad, name) in [
             (serde_json::json!({"max_folders": 0}), "MAX_FOLDERS"),
+            (
+                serde_json::json!({"max_message_bytes": 100 * 1024 * 1024}),
+                "MAX_MESSAGE_BYTES",
+            ),
             (serde_json::json!({"max_folders": "lots"}), "MAX_FOLDERS"),
             (serde_json::json!({"backfill_days": 4000}), "BACKFILL_DAYS"),
             (

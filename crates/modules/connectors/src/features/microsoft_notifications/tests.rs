@@ -3,7 +3,10 @@
 
 use axum::http::StatusCode;
 use campbooks_kernel::clock::Clock as _;
-use campbooks_kernel::tenancy::{Role, WorkspaceId};
+use campbooks_kernel::{
+    rate_limit::RateKey,
+    tenancy::{Role, WorkspaceId},
+};
 use chrono::{DateTime, TimeDelta, Utc};
 use sqlx::PgPool;
 
@@ -352,4 +355,60 @@ async fn a_refused_subscription_polls_and_is_tried_again_an_hour_later(db: PgPoo
     assert_eq!(tries(&kit), 2);
     assert_eq!(kit.microsoft.subscriptions().len(), 1);
     kit.microsoft.clear_calls();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_callback_is_rate_limited_before_it_looks_anything_up(db: PgPool) {
+    let kit = Kit::with_microsoft_notifications(db).await;
+    connect(&kit).await;
+    let subscription = only(&kit.microsoft.subscriptions());
+    kit.state
+        .rate_limits
+        .exhaust(&kit.state.db, &super::ALL, &RateKey::text("instance"))
+        .await;
+    let answered = kit
+        .hook(
+            HOOK,
+            &posted(&subscription.id, &subscription.client_state, None),
+        )
+        .await;
+    assert_eq!(answered.status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(pending_streams(&kit).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_new_instance_key_makes_a_new_subscription(db: PgPool) {
+    let kit = Kit::with_microsoft_notifications(db).await;
+    connect(&kit).await;
+    let made = only(&kit.microsoft.subscriptions());
+    // As if the clientState had been hashed under the key before a rotation.
+    sqlx::query("UPDATE connectors.microsoft_subscriptions SET key_tag = $1")
+        .bind(vec![7_u8; 32])
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    kit.next_run().await;
+    let subscriptions = kit.microsoft.subscriptions();
+    assert_eq!(subscriptions.len(), 2);
+    let fresh = subscriptions.last().unwrap().clone();
+    assert_ne!(fresh.client_state, made.client_state);
+    let (id, key): (String, Vec<u8>) =
+        sqlx::query_as("SELECT subscription_id, key_tag FROM connectors.microsoft_subscriptions")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(id, fresh.id);
+    assert_eq!(
+        key,
+        crate::microsoft::subscriptions::key_tag(&kit.state.signer)
+    );
+    // The new one's notifications verify; the old one's are unknown.
+    let old = kit
+        .hook(HOOK, &posted(&made.id, &made.client_state, None))
+        .await;
+    assert_eq!(old.status, StatusCode::NOT_FOUND);
+    let new = kit
+        .hook(HOOK, &posted(&fresh.id, &fresh.client_state, None))
+        .await;
+    assert_eq!(new.status, StatusCode::ACCEPTED);
 }

@@ -5,7 +5,7 @@
 -- (`POST /hooks/microsoft/mail`) finds across workspaces to know whose
 -- stream to run. No message content and no address here: ids, the keyed hash
 -- of the subscription's `clientState` (HMAC-SHA256 under the instance key;
--- the secret itself is never stored) and times. The row goes with its
+-- the secret itself is never stored), the key's fingerprint and times. The row goes with its
 -- connection.
 --
 -- Written to run again safely: every object is created only when missing.
@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS connectors.microsoft_subscriptions (
     subscription_id text UNIQUE CHECK (subscription_id ~ '^[A-Za-z0-9-]{1,64}$'),
     -- HMAC-SHA256 of the `clientState`, 32 bytes.
     client_state_tag bytea CHECK (octet_length(client_state_tag) = 32),
+    -- The fingerprint of the instance key the hash was made under (an HMAC
+    -- of nothing, 32 bytes): after a key rotation the subscription is made
+    -- again, before the old key retires.
+    key_tag bytea CHECK (octet_length(key_tag) = 32),
     expires_at timestamptz,
     -- After a refused creation, the next try is not before this.
     retry_at timestamptz,
@@ -33,6 +37,7 @@ CREATE TABLE IF NOT EXISTS connectors.microsoft_subscriptions (
         REFERENCES connectors.streams (id, connection_id) ON DELETE CASCADE,
     CHECK ((subscription_id IS NULL) = (client_state_tag IS NULL)),
     CHECK ((subscription_id IS NULL) = (expires_at IS NULL)),
+    CHECK ((subscription_id IS NULL) = (key_tag IS NULL)),
     CHECK (subscription_id IS NOT NULL OR retry_at IS NOT NULL)
 );
 

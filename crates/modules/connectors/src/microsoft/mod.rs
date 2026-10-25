@@ -212,6 +212,9 @@ pub struct Microsoft {
     /// Where Graph posts change notifications, when this instance takes
     /// them ([`notification_url`]); `None`: its mailboxes are polled.
     notifications: Option<Url>,
+    /// The most messages Graph lists in a filtered delta round
+    /// ([`graph::FILTER_LIMIT`]; lower in tests).
+    filter_limit: u32,
 }
 
 impl Microsoft {
@@ -228,7 +231,22 @@ impl Microsoft {
             client_secret,
             endpoints,
             notifications: None,
+            filter_limit: graph::FILTER_LIMIT,
         })
+    }
+
+    /// This client, taking Graph to list at most `limit` messages in a
+    /// filtered delta round (tests: Graph's own is 5000).
+    #[cfg(test)]
+    #[must_use]
+    pub fn with_filter_limit(mut self, limit: u32) -> Self {
+        self.filter_limit = limit;
+        self
+    }
+
+    /// The most messages Graph lists in a filtered delta round.
+    pub fn filter_limit(&self) -> u32 {
+        self.filter_limit
     }
 
     /// This client, with Graph posting change notifications to `url`.

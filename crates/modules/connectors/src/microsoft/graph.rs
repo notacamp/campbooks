@@ -23,6 +23,11 @@ pub const LIST_ANSWER_BYTES: usize = 1024 * 1024;
 /// Folders asked for per page of a folder listing.
 pub const FOLDER_PAGE: u32 = 100;
 
+/// The most messages Graph lists in a delta round started with a
+/// `$filter` ("Applying `$filter` in a delta query returns only up to 5,000
+/// messages"): a round that lists this many may have left some out.
+pub const FILTER_LIMIT: u32 = 5_000;
+
 /// The longest delta token kept, in characters.
 pub const MAX_TOKEN: usize = 4096;
 
@@ -67,6 +72,53 @@ pub struct GraphFolder {
     pub name: String,
     /// How many folders it holds.
     pub children: u32,
+}
+
+/// One page of a folder listing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FolderPage {
+    /// Its folders, search folders and unusable ids left out.
+    pub folders: Vec<GraphFolder>,
+    /// Graph answered a whole page: there may be more.
+    pub full: bool,
+}
+
+/// A folder, as Graph answers it.
+#[derive(Deserialize)]
+struct FolderAnswer {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default, rename = "@odata.type")]
+    kind: Option<String>,
+    #[serde(default, rename = "displayName")]
+    display_name: Option<String>,
+    #[serde(default, rename = "childFolderCount")]
+    child_folder_count: Option<u32>,
+}
+
+impl FolderAnswer {
+    /// A search folder: a view of other folders' messages, never read.
+    fn searches(&self) -> bool {
+        self.kind
+            .as_deref()
+            .is_some_and(|kind| kind.to_ascii_lowercase().contains("mailsearchfolder"))
+    }
+
+    fn folder(self) -> Option<GraphFolder> {
+        let id = self.id.filter(|id| valid_id(id))?;
+        let name: String = self
+            .display_name
+            .unwrap_or_default()
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(255)
+            .collect();
+        Some(GraphFolder {
+            id,
+            name: name.trim().to_owned(),
+            children: self.child_folder_count.unwrap_or(0),
+        })
+    }
 }
 
 /// Where a folder's delta read starts.
@@ -188,51 +240,39 @@ impl Microsoft {
         Ok(body)
     }
 
-    /// The id of the well-known folder `name` (`inbox`, `sentitems`, …);
-    /// `None` when the mailbox has none.
+    /// The well-known folder `name` (`inbox`, `sentitems`, …); `None` when
+    /// Graph names none (the mailbox has none, or not this time).
     pub async fn well_known(
         &self,
         token: &str,
         name: &str,
-    ) -> Result<Option<String>, ProviderError> {
-        #[derive(Deserialize)]
-        struct Answer {
-            id: String,
-        }
+    ) -> Result<Option<GraphFolder>, ProviderError> {
         let mut url = self.graph_url(&["me", "mailFolders", name])?;
-        url.query_pairs_mut().append_pair("$select", "id");
+        url.query_pairs_mut()
+            .append_pair("$select", "id,displayName,childFolderCount");
         let body = match self.get(url, token, MAX_ANSWER_BYTES).await {
             Ok(body) => body,
             Err(ProviderError::NotFound) => return Ok(None),
             Err(other) => return Err(other),
         };
-        let answer: Answer = serde_json::from_slice(&body)
+        let answer: FolderAnswer = serde_json::from_slice(&body)
             .map_err(|e| ProviderError::Unexpected(unreadable("a Graph folder", &e)))?;
-        Ok(Some(answer.id).filter(|id| valid_id(id)))
+        Ok(answer.folder())
     }
 
     /// One page of the folders under `parent` (the mailbox's top level when
-    /// `None`), from the `skip`-th: at most [`FOLDER_PAGE`], hidden ones
-    /// left out.
+    /// `None`), by name, from the `skip`-th: at most [`FOLDER_PAGE`], hidden
+    /// ones and search folders (views of other folders) left out.
     pub async fn folders(
         &self,
         token: &str,
         parent: Option<&str>,
         skip: u32,
-    ) -> Result<Vec<GraphFolder>, ProviderError> {
+    ) -> Result<FolderPage, ProviderError> {
         #[derive(Deserialize)]
         struct Answer {
             #[serde(default)]
             value: Vec<FolderAnswer>,
-        }
-        #[derive(Deserialize)]
-        struct FolderAnswer {
-            #[serde(default)]
-            id: Option<String>,
-            #[serde(default, rename = "displayName")]
-            display_name: Option<String>,
-            #[serde(default, rename = "childFolderCount")]
-            child_folder_count: Option<u32>,
         }
         let mut url = match parent {
             None => self.graph_url(&["me", "mailFolders"])?,
@@ -241,29 +281,21 @@ impl Microsoft {
         url.query_pairs_mut()
             .append_pair("$top", &FOLDER_PAGE.to_string())
             .append_pair("$skip", &skip.to_string())
+            .append_pair("$orderby", "displayName")
             .append_pair("$select", "id,displayName,childFolderCount");
         let body = self.get(url, token, LIST_ANSWER_BYTES).await?;
         let answer: Answer = serde_json::from_slice(&body)
             .map_err(|e| ProviderError::Unexpected(unreadable("a Graph folder listing", &e)))?;
-        Ok(answer
-            .value
-            .into_iter()
-            .filter_map(|folder| {
-                let id = folder.id.filter(|id| valid_id(id))?;
-                let name: String = folder
-                    .display_name
-                    .unwrap_or_default()
-                    .chars()
-                    .filter(|c| !c.is_control())
-                    .take(255)
-                    .collect();
-                Some(GraphFolder {
-                    id,
-                    name: name.trim().to_owned(),
-                    children: folder.child_folder_count.unwrap_or(0),
-                })
-            })
-            .collect())
+        let full = answer.value.len() >= usize::try_from(FOLDER_PAGE).unwrap_or(usize::MAX);
+        Ok(FolderPage {
+            folders: answer
+                .value
+                .into_iter()
+                .filter(|folder| !folder.searches())
+                .filter_map(FolderAnswer::folder)
+                .collect(),
+            full,
+        })
     }
 
     /// One page of folder `folder`'s delta from `position`.
@@ -277,9 +309,12 @@ impl Microsoft {
         match position {
             Position::Start(since) => {
                 let since = since.to_rfc3339_opts(SecondsFormat::Secs, true);
+                // Newest first: Graph lists at most [`FILTER_LIMIT`] messages
+                // with a `$filter`, so those it leaves out are the oldest.
                 url.query_pairs_mut()
                     .append_pair("$select", SELECT)
-                    .append_pair("$filter", &format!("receivedDateTime ge {since}"));
+                    .append_pair("$filter", &format!("receivedDateTime ge {since}"))
+                    .append_pair("$orderby", "receivedDateTime desc");
             }
             Position::Skip(skip) => {
                 url.query_pairs_mut().append_pair("$skiptoken", skip);

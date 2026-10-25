@@ -63,6 +63,13 @@ pub const FETCH_CONCURRENCY: usize = 4;
 /// How deep the folder tree is read.
 pub const MAX_DEPTH: usize = 10;
 
+/// The most folders one listing walks (the largest `…__MAX_FOLDERS`): a
+/// mailbox with more is listed in part ([`Cursor::partial`]).
+pub const MAX_LISTED: usize = 1_000;
+
+/// The most listing requests one walk makes (pages and folders' children).
+pub const MAX_LIST_REQUESTS: usize = 200;
+
 /// The well-known folders read, by Graph's name, and their role.
 const READ: [(&str, Role); 5] = [
     ("inbox", Role::Inbox),
@@ -170,7 +177,7 @@ impl Reader<'_> {
         let mut cursor = self.cursor.clone();
         let mut phase = self.phase;
         if lists_folders(&cursor, self.now) {
-            let Some(listed) = self.list_folders().await? else {
+            let Some(listed) = self.list_folders(&cursor).await? else {
                 return Err(ProviderError::Unexpected(
                     "Graph named no Inbox for the mailbox".to_owned(),
                 )
@@ -188,6 +195,7 @@ impl Reader<'_> {
         let window = cursor.window_start.unwrap_or_else(|| self.floor());
         let mut out = Out::default();
         let mut more = false;
+        let mut dropped: Vec<String> = Vec::new();
         for n in 0..cursor.folders.len() {
             if out.fetched >= self.settings.run_budget_bytes {
                 more = true;
@@ -202,9 +210,11 @@ impl Reader<'_> {
             let starting = matches!(position, Position::Start(_));
             let page = match self.microsoft.delta(self.token, &folder.id, position).await {
                 Ok(Delta::Page(page)) => page,
-                // A folder gone since the listing: listed again next run.
+                // A folder gone since the listing: no longer read, and the
+                // folders listed again next run.
                 Err(ProviderError::NotFound) if starting => {
                     cursor.listed_at = None;
+                    dropped.push(folder.id.clone());
                     continue;
                 }
                 Ok(Delta::Expired) if starting => {
@@ -228,6 +238,11 @@ impl Reader<'_> {
                 }
                 Err(other) => return Err(other.into()),
             };
+            let listed = page
+                .items
+                .iter()
+                .filter(|item| item.state.is_some())
+                .count();
             let complete = self
                 .read_items(&cursor, &folder, page.items, &mut out)
                 .await?;
@@ -238,6 +253,12 @@ impl Reader<'_> {
                 break;
             }
             let at = &mut cursor.folders[n];
+            if starting {
+                at.listed = Some(0);
+            }
+            if let Some(count) = at.listed.as_mut() {
+                *count = count.saturating_add(u32::try_from(listed).unwrap_or(u32::MAX));
+            }
             match page.next {
                 Next::More(skip) => {
                     at.skip = Some(skip);
@@ -246,8 +267,17 @@ impl Reader<'_> {
                 Next::Done(delta) => {
                     at.skip = None;
                     at.delta = Some(delta);
+                    // A first round that listed as many as Graph lists with
+                    // a `$filter` may have left the oldest out.
+                    if let Some(count) = at.listed.take() {
+                        at.truncated = count >= self.microsoft.filter_limit();
+                    }
                 }
             }
+        }
+        if !dropped.is_empty() {
+            cursor.folders.retain(|f| !dropped.contains(&f.id));
+            cursor.partial = true;
         }
         // What left a folder and showed nowhere else this run.
         let left = std::mem::take(&mut out.removed);
@@ -273,8 +303,7 @@ impl Reader<'_> {
         }
         if phase != Phase::Incremental && !more && cursor.folders.iter().all(Folder::round_done) {
             if cursor.generation > 0 {
-                self.remove_unlisted(&mut out, window, cursor.generation)
-                    .await?;
+                self.remove_unlisted(&mut out, &cursor, window).await?;
             }
             cursor.window_start = None;
             phase = Phase::Incremental;
@@ -297,82 +326,136 @@ impl Reader<'_> {
     }
 
     /// The folders to read, Inbox first; `None` when Graph names no Inbox
-    /// (an answer not believed).
-    async fn list_folders(&self) -> Result<Option<Listing>, ProviderError> {
-        let mut roles: HashMap<String, Role> = HashMap::new();
+    /// and none was read before (an answer not believed).
+    ///
+    /// The well-known folders come by name and are always read, whatever the
+    /// folder cap; a well-known folder Graph does not name this time (a
+    /// passing 404) keeps the one read before, its role unchanged, and the
+    /// listing counts as partial. The member's folders come from the tree,
+    /// by name: those read before first, then the others, up to the cap.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one listing read top to bottom: well-known folders, the tree, the cap"
+    )]
+    async fn list_folders(&self, before: &Cursor) -> Result<Option<Listing>, ProviderError> {
+        let mut complete = true;
+        let mut known: Vec<(Folder, u32)> = Vec::new();
         for (name, role) in READ {
-            if let Some(id) = self.microsoft.well_known(self.token, name).await? {
-                roles.entry(id).or_insert(role);
+            match self.microsoft.well_known(self.token, name).await? {
+                Some(found) if !known.iter().any(|(f, _)| f.id == found.id) => {
+                    known.push((Folder::new(found.id, found.name, role), found.children));
+                }
+                Some(_) => {}
+                None => {
+                    // Gone for now, or the mailbox has none: the one read
+                    // before stays what it was.
+                    if let Some(old) = before.folders.iter().find(|f| f.role == role) {
+                        complete = false;
+                        known.push((old.clone(), 0));
+                    }
+                }
             }
         }
-        let Some(inbox) = roles
+        let Some(inbox) = known
             .iter()
-            .find(|(_, role)| **role == Role::Inbox)
-            .map(|(id, _)| id.clone())
+            .find(|(f, _)| f.role == Role::Inbox)
+            .map(|(f, _)| f.id.clone())
         else {
             return Ok(None);
         };
-        let mut skipped = Vec::new();
+        // Never read: those Graph names now, and those it named before.
+        let mut skipped: Vec<String> = before.skipped.clone();
         for name in NEVER_READ {
-            if let Some(id) = self.microsoft.well_known(self.token, name).await? {
-                roles.remove(&id);
-                skipped.push(id);
+            if let Some(found) = self.microsoft.well_known(self.token, name).await?
+                && !skipped.contains(&found.id)
+            {
+                skipped.push(found.id);
             }
         }
-        let max = usize::try_from(self.settings.max_folders).unwrap_or(usize::MAX);
-        let mut folders: Vec<Folder> = Vec::new();
-        // (parent, its shown path, depth), breadth first.
+        known.retain(|(f, _)| !skipped.contains(&f.id));
+        let mut present: HashSet<String> = known.iter().map(|(f, _)| f.id.clone()).collect();
+        let mut others: Vec<Folder> = Vec::new();
+        let mut requests = 0_usize;
+        // (parent, its shown path, depth), breadth first: the top level,
+        // and the well-known folders' own folders (the Inbox's shown
+        // without it).
         let mut queue: std::collections::VecDeque<(Option<String>, String, usize)> =
             std::collections::VecDeque::from([(None, String::new(), 0)]);
+        for (folder, children) in &known {
+            if *children > 0 {
+                let under = if folder.id == inbox {
+                    String::new()
+                } else {
+                    folder.display.clone()
+                };
+                queue.push_back((Some(folder.id.clone()), under, 1));
+            }
+        }
         'tree: while let Some((parent, path, depth)) = queue.pop_front() {
             let mut skip = 0_u32;
             loop {
+                if requests >= MAX_LIST_REQUESTS {
+                    complete = false;
+                    break 'tree;
+                }
+                requests += 1;
                 let page = self
                     .microsoft
                     .folders(self.token, parent.as_deref(), skip)
                     .await?;
-                let full = page.len() >= usize::try_from(graph::FOLDER_PAGE).unwrap_or(100);
-                for listed in page {
-                    if skipped.contains(&listed.id) || folders.iter().any(|f| f.id == listed.id) {
+                for listed in page.folders {
+                    if skipped.contains(&listed.id) || present.contains(&listed.id) {
                         continue;
                     }
-                    if folders.len() >= max {
+                    if present.len() >= MAX_LISTED {
+                        complete = false;
                         break 'tree;
                     }
+                    present.insert(listed.id.clone());
                     let display = if path.is_empty() {
                         listed.name.clone()
                     } else {
                         format!("{path}/{}", listed.name)
                     };
-                    let role = roles.get(&listed.id).copied().unwrap_or_else(|| {
-                        if marks::of_name(&display).is_some() {
-                            Role::Stream
-                        } else {
-                            Role::User
-                        }
-                    });
+                    let role = if marks::of_name(&display).is_some() {
+                        Role::Stream
+                    } else {
+                        Role::User
+                    };
                     if listed.children > 0 && depth < MAX_DEPTH {
-                        // The Inbox's own folders are shown without it.
-                        let under = if listed.id == inbox {
-                            String::new()
-                        } else {
-                            display.clone()
-                        };
-                        queue.push_back((Some(listed.id.clone()), under, depth + 1));
+                        queue.push_back((Some(listed.id.clone()), display.clone(), depth + 1));
                     }
-                    folders.push(Folder::new(listed.id, display, role));
+                    others.push(Folder::new(listed.id, display, role));
                 }
-                if !full {
+                if !page.full {
                     break;
                 }
                 skip = skip.saturating_add(graph::FOLDER_PAGE);
             }
         }
-        if !folders.iter().any(|f| f.id == inbox) {
-            return Ok(None);
-        }
+        // The cap: the folders read before keep their place ahead of new
+        // ones.
+        let max = usize::try_from(self.settings.max_folders).unwrap_or(usize::MAX);
+        let room = max.saturating_sub(known.len());
+        others.sort_by(|a, b| {
+            let is_new = |f: &Folder| before.folder(&f.id).is_none();
+            is_new(a)
+                .cmp(&is_new(b))
+                .then_with(|| a.role.cmp(&b.role))
+                .then_with(|| a.display.cmp(&b.display))
+        });
+        let capped = others.len() > room;
+        others.truncate(room);
+        let mut folders: Vec<Folder> = known.into_iter().map(|(f, _)| f).collect();
+        folders.extend(others);
         folders.sort_by(|a, b| a.role.cmp(&b.role).then_with(|| a.display.cmp(&b.display)));
-        Ok(Some(Listing { folders, skipped }))
+        Ok(Some(Listing {
+            folders,
+            skipped,
+            present,
+            complete,
+            capped,
+        }))
     }
 
     /// Read one delta page's `items` of `folder`: emit what changed, store
@@ -595,12 +678,16 @@ impl Reader<'_> {
     }
 
     /// The indexed messages of the window that this pass did not list:
-    /// removed.
+    /// removed, except where the pass cannot tell: a message in a folder
+    /// whose first round may have been cut short at Graph's `$filter` limit
+    /// ([`Folder::truncated`]), or in a folder not read while the listing
+    /// left some out ([`Cursor::partial`]). Those stay until a change or a
+    /// complete pass says otherwise.
     async fn remove_unlisted(
         &self,
         out: &mut Out,
+        cursor: &Cursor,
         window_start: DateTime<Utc>,
-        generation: i32,
     ) -> Result<(), ReadError> {
         let listed_now: Vec<Uuid> = out
             .index
@@ -621,21 +708,25 @@ impl Reader<'_> {
             })
             .collect();
         let mut tx = self.pool.begin_for(self.workspace).await?;
-        let gone: Vec<(Uuid, String)> = sqlx::query_as(
-            "SELECT id, provider_message_id FROM connectors.messages
+        let gone: Vec<(Uuid, String, Vec<String>)> = sqlx::query_as(
+            "SELECT id, provider_message_id, label_ids FROM connectors.messages
               WHERE stream_id = $1 AND internal_date >= $2 AND listed_generation < $3
                 AND NOT (id = ANY($4))
               ORDER BY internal_date",
         )
         .bind(self.stream)
         .bind(window_start)
-        .bind(generation)
+        .bind(cursor.generation)
         .bind(&listed_now)
         .fetch_all(&mut *tx)
         .await?;
         tx.commit().await?;
-        for (row, id) in gone {
-            if removed.contains(&row) {
+        for (row, id, tokens) in gone {
+            let certain = match state::folder_of(&tokens).and_then(|f| cursor.folder(f)) {
+                Some(folder) => !folder.truncated,
+                None => !cursor.partial,
+            };
+            if removed.contains(&row) || !certain {
                 continue;
             }
             out.changes.push(MessageChange::Remove {
@@ -650,41 +741,51 @@ impl Reader<'_> {
 /// The folders a listing found, and those never read.
 #[derive(Debug)]
 struct Listing {
+    /// The folders to read.
     folders: Vec<Folder>,
+    /// The folders never read.
     skipped: Vec<String>,
+    /// Every folder the listing saw, read or not.
+    present: HashSet<String>,
+    /// The listing saw every folder: one it did not see is gone.
+    complete: bool,
+    /// The folder cap left some out.
+    capped: bool,
 }
 
 /// Put `listed` in `cursor`, keeping each folder's position where its id
-/// and role are the same. Whether a folder that was read is gone (or its
-/// role changed): then a new pass is needed.
+/// and role are the same. Whether a folder that was read is gone, or its
+/// role changed: then a new pass is needed. A folder the listing did not
+/// see is gone only when the listing was complete; otherwise it is kept,
+/// as it was. One the cap left out is not gone either: it is no longer
+/// read.
 fn merge_folders(cursor: &mut Cursor, listed: Listing) -> bool {
     let before = std::mem::take(&mut cursor.folders);
     let mut changed = false;
+    let mut folders = listed.folders;
     for old in &before {
-        let kept = listed
-            .folders
-            .iter()
-            .any(|f| f.id == old.id && f.role == old.role);
         let read = old.skip.is_some() || old.delta.is_some();
-        if !kept && read {
-            changed = true;
+        if let Some(now) = folders.iter_mut().find(|f| f.id == old.id) {
+            if now.role == old.role {
+                now.skip.clone_from(&old.skip);
+                now.delta.clone_from(&old.delta);
+                now.listed = old.listed;
+                now.truncated = old.truncated;
+            } else if read {
+                changed = true;
+            }
+        } else if !listed.present.contains(&old.id) {
+            if listed.complete {
+                changed |= read;
+            } else {
+                folders.push(old.clone());
+            }
         }
     }
-    cursor.folders = listed
-        .folders
-        .into_iter()
-        .map(|mut folder| {
-            if let Some(old) = before
-                .iter()
-                .find(|old| old.id == folder.id && old.role == folder.role)
-            {
-                folder.skip.clone_from(&old.skip);
-                folder.delta.clone_from(&old.delta);
-            }
-            folder
-        })
-        .collect();
+    folders.sort_by(|a, b| a.role.cmp(&b.role).then_with(|| a.display.cmp(&b.display)));
+    cursor.folders = folders;
     cursor.skipped = listed.skipped;
+    cursor.partial = !listed.complete || listed.capped;
     changed
 }
 
@@ -698,6 +799,16 @@ mod tests {
         folder
     }
 
+    fn listing(folders: Vec<Folder>, complete: bool, capped: bool) -> Listing {
+        Listing {
+            present: folders.iter().map(|f| f.id.clone()).collect(),
+            folders,
+            skipped: vec!["dr".into()],
+            complete,
+            capped,
+        }
+    }
+
     #[test]
     fn a_listing_keeps_positions_and_notices_a_vanished_folder() {
         let mut cursor = Cursor {
@@ -707,25 +818,62 @@ mod tests {
             ],
             ..Cursor::default()
         };
-        let listing = Listing {
-            folders: vec![
+        let all = listing(
+            vec![
                 folder("in", Role::Inbox, None),
                 folder("cl", Role::User, None),
                 folder("new", Role::User, None),
             ],
-            skipped: vec!["dr".into()],
-        };
-        assert!(!merge_folders(&mut cursor, listing));
-        assert_eq!(cursor.folders[0].delta.as_deref(), Some("d1"));
-        assert_eq!(cursor.folders[1].delta.as_deref(), Some("d2"));
-        assert_eq!(cursor.folders[2].delta, None);
+            true,
+            false,
+        );
+        assert!(!merge_folders(&mut cursor, all));
+        let delta = |cursor: &Cursor, id: &str| cursor.folder(id).unwrap().delta.clone();
+        assert_eq!(delta(&cursor, "in").as_deref(), Some("d1"));
+        assert_eq!(delta(&cursor, "cl").as_deref(), Some("d2"));
+        assert_eq!(delta(&cursor, "new"), None);
         assert_eq!(cursor.skipped, ["dr"]);
-        // "Clients" is gone: a new pass.
-        let listing = Listing {
-            folders: vec![folder("in", Role::Inbox, None)],
-            skipped: Vec::new(),
+        assert!(!cursor.partial);
+        // "Clients" is gone from a complete listing: a new pass.
+        let gone = listing(vec![folder("in", Role::Inbox, None)], true, false);
+        assert!(merge_folders(&mut cursor, gone));
+        assert!(cursor.folder("cl").is_none());
+    }
+
+    #[test]
+    fn a_listing_left_short_never_takes_a_folder_for_gone() {
+        let read = || Cursor {
+            folders: vec![
+                folder("in", Role::Inbox, Some("d1")),
+                folder("cl", Role::User, Some("d2")),
+            ],
+            ..Cursor::default()
         };
-        assert!(merge_folders(&mut cursor, listing));
+        // Cut short (a walk past its bounds, a well-known folder not named):
+        // "Clients" is kept as it was.
+        let mut cursor = read();
+        let short = listing(vec![folder("in", Role::Inbox, None)], false, false);
+        assert!(!merge_folders(&mut cursor, short));
+        assert_eq!(cursor.folder("cl").unwrap().delta.as_deref(), Some("d2"));
+        assert!(cursor.partial);
+        // Seen but left out by the cap: no longer read, not gone.
+        let mut cursor = read();
+        let mut capped = listing(vec![folder("in", Role::Inbox, None)], true, true);
+        capped.present.insert("cl".into());
+        assert!(!merge_folders(&mut cursor, capped));
+        assert!(cursor.folder("cl").is_none());
+        assert!(cursor.partial);
+        // Its role changed (renamed into a stream folder): a new pass.
+        let mut cursor = read();
+        let renamed = listing(
+            vec![
+                folder("in", Role::Inbox, None),
+                folder("cl", Role::Stream, None),
+            ],
+            true,
+            false,
+        );
+        assert!(merge_folders(&mut cursor, renamed));
     }
 
     #[test]

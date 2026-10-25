@@ -93,6 +93,7 @@ async fn the_backfill_reads_every_folder_but_drafts_then_only_new_mail(db: PgPoo
     let filed = fake.deliver(&clients, &synthetic(3), hour_ago);
     let stream_mail = fake.deliver(&updates, &synthetic(4), hour_ago);
     let draft = fake.deliver("fld-drafts", &synthetic(5), hour_ago);
+    let search = fake.add_search_folder("Weekly digests", Some("fld-inbox"));
     let old = fake.deliver(
         "fld-inbox",
         &synthetic(6),
@@ -119,6 +120,13 @@ async fn the_backfill_reads_every_folder_but_drafts_then_only_new_mail(db: PgPoo
             .iter()
             .any(|c| c.contains("/mailFolders/fld-drafts/messages")),
         "Drafts' delta is never read"
+    );
+    assert!(
+        !kit.microsoft
+            .calls()
+            .iter()
+            .any(|c| c.contains(&format!("/mailFolders/{search}/messages"))),
+        "a search folder (a view of others) is never read"
     );
 
     let inbox_msg = upsert(&all, &inbox).unwrap();
@@ -434,4 +442,132 @@ async fn without_notifications_the_mailbox_is_polled(db: PgPool) {
         wait < TimeDelta::seconds(i64::from(poll.max_seconds)),
         "{wait}"
     );
+}
+
+/// The ids of the folders `kit`'s stream reads.
+async fn read_folders(kit: &Kit) -> Vec<String> {
+    kit.stream().await["cursor"]["folders"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["id"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_folder_cap_keeps_what_it_reads_and_takes_nothing_for_gone(db: PgPool) {
+    let mut config = Kit::microsoft_config();
+    config.microsoft.max_folders = Some("6".into());
+    let kit = Kit::with_config(db, config).await;
+    let at = kit.clock.now() - TimeDelta::hours(1);
+    let projects = kit.microsoft.add_folder("Projects", None);
+    let filed = kit.microsoft.deliver(&projects, &synthetic(1), at);
+    let (kit, ws, _) = connected_with(kit).await;
+    // Every well-known folder is read whatever the cap, and Projects in the
+    // one place left.
+    let read = read_folders(&kit).await;
+    for id in [
+        "fld-inbox",
+        "fld-sent",
+        "fld-junk",
+        "fld-deleted",
+        "fld-archive",
+        projects.as_str(),
+    ] {
+        assert!(read.iter().any(|r| r == id), "{id} in {read:?}");
+    }
+    // A new folder sorting first: Projects keeps its place, the new one
+    // waits, and nothing is taken for gone.
+    let first = kit.microsoft.add_folder("Aardvark", None);
+    let waiting = kit.microsoft.deliver(&first, &synthetic(2), at);
+    kit.clock.advance(crate::microsoft::read::FOLDERS_EVERY);
+    kit.next_run().await;
+    let read = read_folders(&kit).await;
+    assert!(
+        read.contains(&projects) && !read.contains(&first),
+        "{read:?}"
+    );
+    let stream = kit.stream().await;
+    assert_eq!(stream["cursor"]["partial"], true);
+    assert_eq!(stream["cursor"]["generation"], 0, "no pass");
+    // A pass now removes nothing it could not see.
+    kit.microsoft.expire_delta("fld-inbox");
+    kit.next_run().await;
+    kit.run_jobs().await;
+    let stream = kit.stream().await;
+    assert_eq!(stream["cursor"]["generation"], 1);
+    assert_eq!(stream["phase"], "incremental");
+    let all = changes(&kit, ws).await;
+    assert!(!removed(&all, &filed));
+    assert_eq!(upserts(&all, &waiting), 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_first_round_at_graphs_limit_removes_nothing_it_left_out(db: PgPool) {
+    let kit = Kit::with_filter_limit(db, Kit::microsoft_config(), Some(3)).await;
+    let ids: Vec<String> = (1..=5_i64)
+        .map(|n| {
+            let at = kit.clock.now() - TimeDelta::hours(n);
+            kit.microsoft
+                .deliver("fld-inbox", &synthetic(usize::try_from(n).unwrap()), at)
+        })
+        .collect();
+    let sent = kit.microsoft.deliver(
+        "fld-sent",
+        &synthetic(9),
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    let (kit, ws, _) = connected_with(kit).await;
+    // Graph lists the three newest only from now on; the Sent message is
+    // deleted while Graph forgets the Inbox's delta.
+    kit.microsoft.limit_filtered(Some(3));
+    kit.microsoft.delete(&sent);
+    kit.microsoft.expire_delta("fld-inbox");
+    kit.next_run().await;
+    kit.run_jobs().await;
+    let stream = kit.stream().await;
+    assert_eq!(stream["cursor"]["generation"], 1);
+    let inbox = stream["cursor"]["folders"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["id"] == "fld-inbox")
+        .unwrap()
+        .clone();
+    assert_eq!(inbox["truncated"], true);
+    let all = changes(&kit, ws).await;
+    // The two oldest were left out by Graph's limit, not deleted: kept.
+    for id in &ids {
+        assert!(!removed(&all, id), "{id}");
+    }
+    // Sent was listed whole: its deleted message is removed.
+    assert!(removed(&all, &sent));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_well_known_folder_graph_does_not_name_once_keeps_its_role(db: PgPool) {
+    let kit = Kit::with_microsoft(db).await;
+    let at = kit.clock.now() - TimeDelta::hours(1);
+    let archived = kit.microsoft.deliver("fld-archive", &synthetic(1), at);
+    let (kit, ws, _) = connected_with(kit).await;
+    kit.microsoft.hide_well_known("archive", true);
+    kit.clock.advance(crate::microsoft::read::FOLDERS_EVERY);
+    kit.next_run().await;
+    let stream = kit.stream().await;
+    let archive = stream["cursor"]["folders"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["id"] == "fld-archive")
+        .unwrap()
+        .clone();
+    assert_eq!(archive["role"], "archive");
+    assert_eq!(stream["cursor"]["generation"], 0, "no pass");
+    assert_eq!(stream["cursor"]["partial"], true);
+    assert!(!removed(&changes(&kit, ws).await, &archived));
+    // Named again: the listing is whole again.
+    kit.microsoft.hide_well_known("archive", false);
+    kit.clock.advance(crate::microsoft::read::FOLDERS_EVERY);
+    kit.next_run().await;
+    assert!(kit.stream().await["cursor"].get("partial").is_none());
 }

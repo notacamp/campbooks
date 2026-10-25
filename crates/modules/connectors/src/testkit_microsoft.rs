@@ -61,6 +61,8 @@ struct FakeFolder {
     id: String,
     name: String,
     parent: Option<String>,
+    /// A search folder (a view of other folders' messages).
+    search: bool,
 }
 
 /// A message of the fake mailbox.
@@ -114,6 +116,10 @@ struct State {
     subscriptions: Vec<FakeSubscription>,
     /// Subscribing answers 400 (Graph could not reach the URL).
     refuse_subscriptions: bool,
+    /// Well-known names answered 404 although the folder is there.
+    hidden_well_known: Vec<String>,
+    /// The most messages a first round lists.
+    filter_limit: Option<usize>,
 }
 
 /// Microsoft's token endpoint and Graph, faked.
@@ -136,6 +142,7 @@ impl FakeMicrosoft {
                 id: (*id).to_owned(),
                 name: (*name).to_owned(),
                 parent: None,
+                search: false,
             })
             .collect();
         let state = Arc::new(Mutex::new(State {
@@ -159,6 +166,8 @@ impl FakeMicrosoft {
             throttle_next: None,
             subscriptions: Vec::new(),
             refuse_subscriptions: false,
+            hidden_well_known: Vec::new(),
+            filter_limit: None,
         }));
         Mock::given(any())
             .respond_with(Responder(state.clone()))
@@ -259,8 +268,34 @@ impl FakeMicrosoft {
             id: id.clone(),
             name: name.to_owned(),
             parent: parent.map(ToOwned::to_owned),
+            search: false,
         });
         id
+    }
+
+    /// A search folder named `name` under `parent`: its id.
+    pub fn add_search_folder(&self, name: &str, parent: Option<&str>) -> String {
+        let id = self.add_folder(name, parent);
+        if let Some(folder) = self.lock().folders.iter_mut().find(|f| f.id == id) {
+            folder.search = true;
+        }
+        id
+    }
+
+    /// Graph names the well-known folder `name` again, or (`hidden`) answers
+    /// 404 for it while it is there (a passing fault).
+    pub fn hide_well_known(&self, name: &str, hidden: bool) {
+        let mut state = self.lock();
+        state.hidden_well_known.retain(|n| n != name);
+        if hidden {
+            state.hidden_well_known.push(name.to_owned());
+        }
+    }
+
+    /// A first round (with a `$filter`) lists at most `limit` messages, the
+    /// newest, from now on; all when `None`.
+    pub fn limit_filtered(&self, limit: Option<usize>) {
+        self.lock().filter_limit = limit;
     }
 
     /// Delete folder `id` (its messages go with it).
@@ -425,11 +460,15 @@ impl Respond for Responder {
                 delta(&mut state, id, &query, request)
             }
             ("GET", ["me", "mailFolders", name]) => {
-                match WELL_KNOWN.iter().find(|(known, _, _)| known == name) {
-                    Some((_, id, _)) if state.folders.iter().any(|f| f.id == *id) => {
-                        json(200, &serde_json::json!({"id": id}))
-                    }
-                    _ => graph_error(404, "ErrorItemNotFound"),
+                let hidden = state.hidden_well_known.iter().any(|h| h == name);
+                let found = WELL_KNOWN
+                    .iter()
+                    .find(|(known, _, _)| known == name)
+                    .and_then(|(_, id, _)| state.folders.iter().find(|f| f.id == *id))
+                    .filter(|_| !hidden);
+                match found {
+                    Some(folder) => json(200, &folder_json(&state, folder)),
+                    None => graph_error(404, "ErrorItemNotFound"),
                 }
             }
             ("GET", ["me", "messages", id]) => match state.messages.iter().find(|m| m.id == *id) {
@@ -466,22 +505,39 @@ fn folders(
 ) -> ResponseTemplate {
     let top: usize = query.get("$top").and_then(|t| t.parse().ok()).unwrap_or(10);
     let skip: usize = query.get("$skip").and_then(|t| t.parse().ok()).unwrap_or(0);
-    let value: Vec<serde_json::Value> = state
+    if query.get("$orderby").map(String::as_str) != Some("displayName") {
+        // Graph's order is not stable without one.
+        return graph_error(400, "OrderByRequired");
+    }
+    let mut under: Vec<&FakeFolder> = state
         .folders
         .iter()
         .filter(|f| f.parent.as_deref() == parent)
+        .collect();
+    under.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.id.cmp(&b.id)));
+    let value: Vec<serde_json::Value> = under
+        .into_iter()
         .skip(skip)
         .take(top)
-        .map(|f| {
-            let children = state
-                .folders
-                .iter()
-                .filter(|c| c.parent.as_deref() == Some(f.id.as_str()))
-                .count();
-            serde_json::json!({"id": f.id, "displayName": f.name, "childFolderCount": children})
-        })
+        .map(|f| folder_json(state, f))
         .collect();
     json(200, &serde_json::json!({"value": value}))
+}
+
+/// A folder as Graph answers it.
+fn folder_json(state: &State, folder: &FakeFolder) -> serde_json::Value {
+    let children = state
+        .folders
+        .iter()
+        .filter(|c| c.parent.as_deref() == Some(folder.id.as_str()))
+        .count();
+    let mut answer = serde_json::json!({
+        "id": folder.id, "displayName": folder.name, "childFolderCount": children
+    });
+    if folder.search {
+        answer["@odata.type"] = "#microsoft.graph.mailSearchFolder".into();
+    }
+    answer
 }
 
 /// A message as a delta page or a GET lists it.
@@ -561,8 +617,9 @@ fn delta(
             if query
                 .get("$select")
                 .is_none_or(|s| !s.contains("parentFolderId"))
+                || query.get("$orderby").map(String::as_str) != Some("receivedDateTime desc")
             {
-                return graph_error(400, "SelectRequired");
+                return graph_error(400, "SelectAndOrderRequired");
             }
             (since.or(Some(i64::MIN)), 0, 0)
         };
@@ -574,7 +631,15 @@ fn delta(
         .filter(|m| m.folder == folder && m.version > from)
         .filter(|m| since.is_none_or(|s| m.received.timestamp() >= s))
         .collect();
-    present.sort_by(|a, b| a.id.cmp(&b.id));
+    if round {
+        // `$orderby=receivedDateTime desc`, and at most the filter's limit.
+        present.sort_by(|a, b| b.received.cmp(&a.received).then_with(|| a.id.cmp(&b.id)));
+        if let Some(limit) = state.filter_limit {
+            present.truncate(limit);
+        }
+    } else {
+        present.sort_by(|a, b| a.id.cmp(&b.id));
+    }
     listed.extend(present.iter().map(|m| item(m)));
     if !round {
         let mut left: Vec<&str> = state

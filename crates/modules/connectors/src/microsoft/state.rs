@@ -59,6 +59,16 @@ pub struct Cursor {
     /// Messages that left a folder, still to be looked up (moved or gone).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub lookups: Vec<String>,
+    /// The last listing may have left folders out (the folder cap, a
+    /// listing cut short, a well-known folder Graph did not name this
+    /// time): a message whose folder is not read is never taken for gone.
+    #[serde(skip_serializing_if = "is_false")]
+    pub partial: bool,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref, reason = "serde's signature")]
+const fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 /// A folder the stream reads, and where its delta is.
@@ -77,6 +87,15 @@ pub struct Folder {
     /// Where the next round starts (`$deltatoken`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delta: Option<String>,
+    /// The messages its first round has listed so far, while one is under
+    /// way.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub listed: Option<u32>,
+    /// Its last first round listed as many messages as Graph lists with a
+    /// `$filter` at most: it may have left some out, so none of its messages
+    /// is taken for gone for not being listed.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub truncated: bool,
 }
 
 impl Folder {
@@ -88,6 +107,8 @@ impl Folder {
             role,
             skip: None,
             delta: None,
+            listed: None,
+            truncated: false,
         }
     }
 
@@ -127,6 +148,8 @@ impl Cursor {
         for folder in &mut self.folders {
             folder.skip = None;
             folder.delta = None;
+            folder.listed = None;
+            folder.truncated = false;
         }
         self.generation = self.generation.saturating_add(1);
         self.window_start = None;
@@ -137,6 +160,11 @@ impl Cursor {
 /// The token of folder `id`.
 pub fn folder_token(id: &str) -> String {
     format!("{FOLDER}{id}")
+}
+
+/// The folder a message's tokens put it in.
+pub fn folder_of(tokens: &[String]) -> Option<&str> {
+    tokens.iter().find_map(|t| t.strip_prefix(FOLDER))
 }
 
 /// The tokens of a message in folder `folder` (as `cursor` knows it) with

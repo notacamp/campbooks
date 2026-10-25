@@ -679,6 +679,10 @@ impl SyncStream {
     /// notifications where this instance takes them, then one page of every
     /// folder's delta. `None` once the run has ended without a page
     /// (waiting, trouble recorded). Nothing is written to Microsoft.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one run read top to bottom: budget, subscription, read"
+    )]
     async fn run_microsoft(
         &self,
         ctx: &mut JobContext,
@@ -711,8 +715,9 @@ impl SyncStream {
             return Ok(None);
         }
         let state = ctx.state().clone();
-        // Before the read: what changes after it is posted.
-        let notified = microsoft::subscriptions::ensure(
+        // Before the read: what changes after it is posted. Its calls are
+        // charged to the connection's budget as made.
+        let ensured = microsoft::subscriptions::ensure(
             ctx.pool(),
             &state.signer,
             &client,
@@ -725,6 +730,17 @@ impl SyncStream {
             now,
         )
         .await?;
+        if ensured.calls > 0
+            && let Err(err) = schedule::settle(ctx.pool(), &key, 0, ensured.calls, rate).await
+        {
+            tracing::warn!(
+                %workspace,
+                stream = %target.stream,
+                error = %campbooks_kernel::redact::error(&err),
+                "could not charge the Microsoft budget for a subscription"
+            );
+        }
+        let notified = ensured.live;
         let reader = microsoft::read::Reader {
             microsoft: &client,
             token,

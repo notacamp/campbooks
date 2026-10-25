@@ -3,16 +3,23 @@
 ### Requirement: Microsoft messages adapter
 The Microsoft adapter SHALL read a mailbox's Inbox, Sent Items, Junk Email,
 Deleted Items, Archive and the member's own folders through Microsoft Graph,
-never Drafts, Outbox, Conversation History, Sync Issues or a folder under
-them, at most `CAMPBOOKS_CONNECTORS__MICROSOFT__MAX_FOLDERS` (default 100).
+never Drafts, Outbox, Conversation History, Sync Issues, a folder under them
+or a search folder. The well-known folders SHALL be found by Graph's names
+and always read; the member's folders SHALL be listed by name, those already
+read keeping their place ahead of new ones, up to
+`CAMPBOOKS_CONNECTORS__MICROSOFT__MAX_FOLDERS` (default 100) in all. A folder
+SHALL be taken for gone only when a listing saw every folder and not that
+one; a folder the cap leaves out, or a listing cut short, SHALL never start a
+pass, and a well-known folder Graph does not name once SHALL keep its role.
 Each folder SHALL keep its own position in `/me/mailFolders/{id}/messages/delta`:
 a first round over the window (`CAMPBOOKS_CONNECTORS__MICROSOFT__BACKFILL_DAYS`,
-default 90), then only what changed, one page per folder per run and another
+default 90, newest first), then only what changed, one page per folder per run and another
 run at once while a folder has more. Messages SHALL be keyed by Graph's
 immutable ids, so a move keeps the message. A new message SHALL be downloaded
 as raw MIME from `/me/messages/{id}/$value` and stored like every adapter's,
 recorded as oversized above `CAMPBOOKS_CONNECTORS__MICROSOFT__MAX_MESSAGE_BYTES`
-(default 50 MiB) and with no download started once a run has fetched
+(default 50 MiB, at most 64 MiB, four downloads at once) and with no
+download started once a run has fetched
 `CAMPBOOKS_CONNECTORS__MICROSOFT__RUN_BUDGET_BYTES` (default 64 MiB); a known
 message whose folder, read state, flag or categories changed SHALL be
 emitted again without a download. Drafts SHALL be skipped. A known message
@@ -21,6 +28,10 @@ is a move. When Graph no longer has a folder's delta state (410,
 `syncStateNotFound`, `resyncRequired`, `syncStateInvalid`) or a tracked
 folder disappears, the stream SHALL read the window again in every folder
 and then remove the indexed messages of the window that pass did not list.
+A message SHALL be removed for not being listed only when the pass could
+see it: never when its folder's first round listed as many messages as Graph
+lists with a `$filter` (5000), nor when its folder is not read while the
+last listing left folders out.
 The upsert SHALL say in inbox for the Inbox and stream folders
 (`Campbooks/<Stream>`, under any parent), spam for Junk Email, trash for
 Deleted Items, read from `isRead`, starred for a flagged message, outbound
@@ -62,13 +73,25 @@ be built from the fixed Graph base with ids as path segments; of Graph's
 - **THEN** it is recorded as oversized and never downloaded again
 
 #### Scenario: Drafts are not read
-- **WHEN** the mailbox has a message in Drafts
-- **THEN** no run lists or downloads it
+- **WHEN** the mailbox has a message in Drafts, and a search folder under the Inbox
+- **THEN** no run lists or downloads the draft, and the search folder is never read
+
+#### Scenario: The folder cap
+- **WHEN** a mailbox at the folder cap gets a new folder whose name sorts first
+- **THEN** the well-known folders and the folders read so far are still read, the new one is not, and no message is taken for gone
+
+#### Scenario: Graph's listing limit
+- **WHEN** a pass reads a folder whose first round lists 5000 messages, Graph's most
+- **THEN** none of that folder's indexed messages the pass did not list is removed
+
+#### Scenario: A well-known folder not named once
+- **WHEN** Graph answers 404 once for the Archive's well-known name
+- **THEN** the Archive keeps its role, no pass starts, and its messages stay
 
 ### Requirement: Microsoft throttling
 Microsoft requests SHALL draw from a per-connection budget of
 `CAMPBOOKS_CONNECTORS__MICROSOFT__REQUESTS_PER_MINUTE` (default 600), shared
-by every process. A Graph answer 429, or 503 with `Retry-After`, SHALL make
+by every process, subscription calls included. A Graph answer 429, or 503 with `Retry-After`, SHALL make
 the connection `throttled` (`rate_limited`) and the stream wait the given
 time, at most an hour; a 503 without it and other 5xx SHALL count as a
 failed run with the usual backoff. Graph errors SHALL carry a status and a
@@ -91,7 +114,9 @@ Graph subscription to `me/messages` (`created,updated,deleted`) posting to
 created for about three days, one expiring within a day SHALL be renewed (a
 renewal Graph no longer knows creates a new one). Each subscription SHALL
 have its own random `clientState` of 256 bits, stored only as a keyed hash
-under the instance key and never logged. A failed creation SHALL be retried
+under the instance key, with that key's fingerprint, and never logged; a
+subscription whose hash was made under another key SHALL be made again with
+a fresh `clientState`, so a key rotation never silently ends notifications. A failed creation SHALL be retried
 no sooner than an hour later and never fail the run. While a subscription is
 live the stream's next poll SHALL be `CAMPBOOKS_CONNECTORS__POLL__MAX_SECONDS`
 away. Without notifications, or without such a URL, the stream SHALL be
@@ -106,14 +131,22 @@ asked for, and no subscription SHALL be made.
 - **WHEN** a run finds its subscription expiring within a day
 - **THEN** it renews it at Graph and keeps the same subscription
 
+#### Scenario: A key rotation
+- **WHEN** a run finds its subscription's `clientState` hashed under an earlier instance key
+- **THEN** it makes a new subscription with a fresh `clientState`, whose notifications verify
+
 #### Scenario: No public callback
 - **WHEN** notifications are on but `CAMPBOOKS_PUBLIC_URL` is `http://localhost:8080`
 - **THEN** the server starts, no subscription is made, and the stream is polled adaptively
 
 ### Requirement: The Microsoft notification callback does the least
 `POST /hooks/microsoft/mail` SHALL be public and outside the operation
-catalogue, and SHALL answer 404 unless Microsoft mail and notifications are
-on. With a `validationToken` of at most 1024 characters it SHALL answer it
+catalogue, and SHALL be mounted only while Microsoft mail and notifications
+are on (otherwise the path is the application's fallback). Before anything
+else it SHALL be rate limited: at most 500 posts a second in each process
+before the database is asked anything, then shared limits per client
+address (1200 a minute) and for the whole instance (30000 a minute),
+answering 429 over them. With a `validationToken` of at most 1024 characters it SHALL answer it
 as `text/plain` and do nothing else. Otherwise it SHALL read at most 64 KiB of
 JSON with at most 100 notifications, look their subscriptions up across
 workspaces in the maintenance scope (`FOR SELECT` on
@@ -146,6 +179,10 @@ no mail.
 #### Scenario: Too large
 - **WHEN** the body is larger than 64 KiB
 - **THEN** it is refused without being read in full
+
+#### Scenario: Over the limit
+- **WHEN** the instance's limit is spent and a valid notification arrives
+- **THEN** the answer is 429 and no subscription is looked up
 
 #### Scenario: A paused stream
 - **WHEN** a valid notification arrives for a connection that needs the member
@@ -212,7 +249,7 @@ instance secret key; either missing SHALL be a warning, never a stop, and so
 SHALL notifications without a usable public URL. Only a tenant that is not
 `common`, `organizations`, `consumers` or a tenant id, or a Microsoft
 adapter setting out of range (`…__BACKFILL_DAYS` 1 to 3650, `…__MAX_MESSAGE_BYTES`
-1 to 1 GiB, `…__RUN_BUDGET_BYTES` positive, `…__REQUESTS_PER_MINUTE` 1 to
+1 to 64 MiB, `…__RUN_BUDGET_BYTES` positive, `…__REQUESTS_PER_MINUTE` 1 to
 100000, `…__MAX_FOLDERS` 1 to 1000, `…__NOTIFICATIONS` a boolean), with the
 flag on, SHALL stop the server, naming the setting. No Microsoft setting
 SHALL be tied to the poll bounds.

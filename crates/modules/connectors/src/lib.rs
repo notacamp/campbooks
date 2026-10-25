@@ -97,8 +97,8 @@ pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 /// The public callback Microsoft Graph posts change notifications to
 /// (`POST /hooks/microsoft/mail`, campbooks-cloud#316), over `state` and
 /// `deps`, ready for the server to merge beside the module's API. Outside
-/// the operation catalogue; it answers 404 unless this instance takes
-/// Microsoft notifications.
+/// the operation catalogue; empty unless this instance takes Microsoft
+/// notifications.
 pub fn notifications_router(state: campbooks_kernel::AppState, deps: Deps) -> axum::Router {
     features::microsoft_notifications::router(state, deps)
 }

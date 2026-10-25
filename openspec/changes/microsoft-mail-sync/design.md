@@ -44,12 +44,17 @@ Per run, after the token and the budget:
 
 1. **Folders.** At a pass's start and every six hours: the well-known
    folders by name (`inbox`, `sentitems`, `junkemail`, `deleteditems`,
-   `archive`, and the never-read `drafts`, `outbox`, `conversationhistory`,
-   `syncissues`), then the folder tree from `/me/mailFolders` and
-   `childFolders`, at most `…__MAX_FOLDERS` (default 100). A folder's shown
-   name is its path (`Campbooks/Updates`), so a stream folder is recognised
-   by `marks::of_name` as IMAP's is. A tracked folder that disappears starts
-   a resync.
+   `archive`, always read, and the never-read `drafts`, `outbox`,
+   `conversationhistory`, `syncissues`), then the folder tree from
+   `/me/mailFolders` and `childFolders` (`$orderby=displayName`, search
+   folders left out), walked up to 1000 folders and 200 requests. The cap
+   (`…__MAX_FOLDERS`, default 100) keeps the folders read before ahead of new
+   ones. A folder's shown name is its path (`Campbooks/Updates`), so a stream
+   folder is recognised by `marks::of_name` as IMAP's is. A read folder that
+   is gone starts a resync, but only when the walk saw every folder; a
+   folder the cap leaves out is simply no longer read, a well-known folder
+   Graph does not name once keeps the one read before (its role unchanged),
+   and either makes the listing **partial**.
 2. **Delta.** One page per folder per run (`Prefer: odata.maxpagesize=50,
    IdType="ImmutableId"`). A folder without a position starts a round with
    `$filter=receivedDateTime ge <window start>`; a `@odata.nextLink`'s
@@ -67,9 +72,20 @@ Per run, after the token and the budget:
    `syncStateNotFound`, `resyncRequired`, `syncStateInvalid`) or a vanished
    folder starts a pass: every folder's position is dropped, the generation
    goes up, and when every folder has finished its round the indexed
-   messages of the window the pass did not list are removed (Gmail's rule).
+   messages of the window the pass did not list are removed (Gmail's rule),
+   except where the pass cannot tell. Graph lists at most 5000 messages in a
+   round with a `$filter` ("Applying `$filter` in a delta query returns only
+   up to 5,000 messages", the delta query guide), so first rounds ask for
+   `$orderby=receivedDateTime desc`, count what they list, and a folder whose
+   round reached the limit is **truncated**: none of its messages is removed
+   for not being listed. Nor is a message whose folder is not read while the
+   listing is partial. Such a message stays until a change at Microsoft
+   (`@removed`, looked up) or a complete pass says otherwise.
 5. **Byte budget.** A folder whose page could not be finished within the
    budget keeps its position and the run continues at once, as Gmail's does.
+   With four downloads in flight a run holds at most about the budget plus
+   four messages, each at most `…__MAX_MESSAGE_BYTES`, itself capped at
+   64 MiB.
 
 Graph errors carry a status and a sanitised code only. 429, and 503 with
 `Retry-After`, are `RateLimited` with the wait capped at an hour; the run's
@@ -93,11 +109,17 @@ stops the server.
 ### The subscription
 
 A run of a Microsoft stream, before it reads, makes sure the connection has
-a live subscription: none, or one expiring within a day, is created
+a live subscription (its calls charged to the connection's budget as made): none, or one expiring within a day, is created
 (`POST /subscriptions`, `created,updated,deleted` on `me/messages`, about
 three days, `clientState` = 256 random bits, lifecycle notifications to the
 same URL) or renewed (`PATCH`; a 404 creates a new one). A failed create is
-retried an hour later, and the stream is polled meanwhile. While the
+retried an hour later, and the stream is polled meanwhile. The row keeps,
+beside the `clientState`'s hash, the instance key's fingerprint
+(`Signer::sign` of nothing under its own context): a run that finds another
+fingerprint makes a new subscription with a fresh `clientState`, so a key
+rotation never leaves a subscription renewed forever whose notifications no
+longer verify once the old key retires. The old subscription lapses at
+Graph within three days, its posts answered 404. While the
 subscription is live the stream's next poll is the longest poll interval:
 `CAMPBOOKS_CONNECTORS__POLL__MAX_SECONDS`, so it stays within the poll bounds
 whatever they are. Renewal happens in those runs, so a subscription is
@@ -108,8 +130,13 @@ subscription is simply created again.
 ### The callback
 
 `POST /hooks/microsoft/mail` is public and outside the operation catalogue
-(no automation or assistant can call it). It answers 404 unless Microsoft
-mail and notifications are on. With `validationToken`, it answers the token
+(no automation or assistant can call it). It is mounted only while Microsoft
+mail and notifications are on, so with them off the path is the
+application's fallback. Every post is first rate limited: 500 a second per
+process, counted in memory, before the database is asked anything; then the
+kernel's shared `rate_limits`, per client address (1200 a minute, loose:
+Graph posts from many addresses) and for the whole instance (30000 a
+minute), as the identity endpoints do. Over them it answers 429. With `validationToken`, it answers the token
 as `text/plain` (at most 1024 characters) and does nothing else. Otherwise
 it reads at most 64 KiB of JSON with at most 100 notifications, and:
 
