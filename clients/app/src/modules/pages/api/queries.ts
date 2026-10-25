@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { api, errorStatus, operationKey, unwrap, unwrapEmpty } from "~/lib/api";
 
@@ -130,6 +131,10 @@ export type SyncBody = { state_vector: string; update?: string };
 
 /** The calls a page takes. Each answers what the server made of it. */
 export function usePageCalls(workspaceId: string) {
+  return useMemo(() => pageCalls(workspaceId), [workspaceId]);
+}
+
+function pageCalls(workspaceId: string) {
   const path = { workspace_id: workspaceId };
   const at = (page: string) => ({ path: { ...path, page_id: page } });
   const grantAt = (page: string, member: string) => ({

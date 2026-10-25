@@ -15,8 +15,17 @@ export interface Sections {
   shared: TreeNode[];
 }
 
-const byPosition = (a: PageSummary, b: PageSummary) =>
-  a.position.localeCompare(b.position) || a.id.localeCompare(b.id);
+/** Positions are fractional keys: compare them by code unit, as the server does, never by locale. */
+const compareKeys = (a: string, b: string): number => {
+  if (a === b) {
+    return 0;
+  }
+  return a < b ? -1 : 1;
+};
+
+/** Sibling order: by position, then by id. */
+export const byPosition = (a: PageSummary, b: PageSummary): number =>
+  compareKeys(a.position, b.position) || compareKeys(a.id, b.id);
 
 /**
  * The flat list as the sidebar shows it. A top-level page is in Workspace,

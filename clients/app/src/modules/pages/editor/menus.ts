@@ -12,8 +12,8 @@ export interface MenuBridge<TItem> {
   key: (event: KeyboardEvent) => boolean;
 }
 
-export const SLASH_KEY = new PluginKey("pagesSlashMenu");
-export const MENTION_KEY = new PluginKey("pagesMentionMenu");
+const SLASH_KEY = new PluginKey("pagesSlashMenu");
+const MENTION_KEY = new PluginKey("pagesMentionMenu");
 
 /**
  * The menu `/` opens at the start of a line or after a space: blocks to

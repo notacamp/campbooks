@@ -26,6 +26,7 @@ import {
   SuspendedAccounts,
   useMailboxConsent,
 } from "~/modules/identity";
+import { buildPagesRoutes, PAGES_SHORTCUTS } from "~/modules/pages";
 import { buildScheduleRoutes, SCHEDULE_SHORTCUTS } from "~/modules/schedule";
 import { buildSearchRoutes, SEARCH_SHORTCUTS } from "~/modules/search";
 import {
@@ -94,6 +95,7 @@ export function buildModuleRoutes<
         useConsent: useMailboxConsent,
         useSources: useConversationSources,
       }),
+      ...buildPagesRoutes(workspace),
       // `cargo xtask new-module` inserts above this line.
     ],
   } as const;
@@ -136,4 +138,5 @@ export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...CONNECTORS_SHORTCUTS,
   ...TASKS_SHORTCUTS,
   ...SCHEDULE_SHORTCUTS,
+  ...PAGES_SHORTCUTS,
 ];

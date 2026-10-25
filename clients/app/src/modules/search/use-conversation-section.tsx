@@ -78,7 +78,13 @@ export function useConversationSection({ query, setQuery }: MenuQuery): MenuSect
 
   const openHit = (hit: SearchHit) => {
     recent.remember(query);
-    void navigate({ to: `/w/${workspaceId}/inbox/${hitStream(hit)}/${hit.record.id}` });
+    // A page opens in Pages, not in the inbox.
+    void navigate({
+      to:
+        hit.record.type === "pages.page"
+          ? `/w/${workspaceId}/pages/${hit.record.id}`
+          : `/w/${workspaceId}/inbox/${hitStream(hit)}/${hit.record.id}`,
+    });
   };
   const options: MenuOption[] = hits.map((hit) => ({
     id: hit.record.id,
