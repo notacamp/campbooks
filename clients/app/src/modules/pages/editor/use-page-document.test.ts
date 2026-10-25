@@ -23,12 +23,15 @@ const quiet = () =>
     }),
   );
 
-const input = (sync: Mock<SyncFn>, revision = 1) => ({
+/** The calls object is the same across renders, as the app memoizes it. */
+const callsOf = (sync: Mock<SyncFn>) => ({ sync }) as never;
+
+const input = (calls: never, revision = 1) => ({
   pageId: "p1",
   update: toBase64(Y.encodeStateAsUpdate(server)),
   stateVector: toBase64(Y.encodeStateVector(server)),
   revision,
-  calls: { sync } as never,
+  calls,
 });
 
 describe("a page's document", () => {
@@ -41,19 +44,21 @@ describe("a page's document", () => {
 
   it("opens with what the server sent, once", () => {
     const sync = quiet();
+    const calls = callsOf(sync);
     const { result, rerender } = renderHook((props) => usePageDocument(props), {
-      initialProps: input(sync),
+      initialProps: input(calls),
     });
     expect(result.current.doc.getText("t").toJSON()).toBe("Hello");
     expect(result.current.state).toBe("saved");
     const first = result.current.doc;
-    rerender(input(sync));
+    rerender(input(calls));
     expect(result.current.doc).toBe(first);
   });
 
   it("sends typing and says saving, then saved when the server answers", async () => {
     const sync = quiet();
-    const { result } = renderHook(() => usePageDocument(input(sync)));
+    const calls = callsOf(sync);
+    const { result } = renderHook(() => usePageDocument(input(calls)));
     act(() => {
       result.current.doc.getText("t").insert(5, "!");
     });
@@ -68,11 +73,12 @@ describe("a page's document", () => {
 
   it("asks for what others wrote when the page's revision moves", async () => {
     const sync = quiet();
+    const calls = callsOf(sync);
     const { rerender } = renderHook((props) => usePageDocument(props), {
-      initialProps: input(sync, 1),
+      initialProps: input(calls, 1),
     });
     expect(sync).not.toHaveBeenCalled();
-    rerender(input(sync, 2));
+    rerender(input(calls, 2));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10);
     });

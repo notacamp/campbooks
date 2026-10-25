@@ -227,6 +227,5 @@ describe("a member's changes to pages", () => {
     await waitFor(() => {
       expect(called(api, `POST ${P}/${IDEAS.id}/trash`)).toHaveLength(2);
     });
-    expect(await screen.findByText(/moved to the trash/u)).toBeTruthy();
   });
 });

@@ -95,7 +95,7 @@ describe("the share menu", () => {
       "Sofia Pessoa",
     ]);
     const buttons = screen.getAllByRole("button", { name: "Share" });
-    fireEvent.click(buttons[buttons.length - 1] ?? document.body);
+    fireEvent.click(buttons.at(-1) ?? document.body);
     await waitFor(() => {
       expect(calls(mocked, `PUT ${P}/grants/${SOFIA.user_id}`)).toHaveLength(1);
     });
