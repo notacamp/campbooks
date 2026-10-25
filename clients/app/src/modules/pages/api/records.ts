@@ -2,7 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api, errorStatus, unwrap } from "~/lib/api";
 
-import type { MentionType } from "../types";
+import type { MentionType, PageSummary } from "../types";
+
+import { usePages } from "./queries";
 
 /** What a mention shows: the record's own current name, or that it cannot be opened. */
 export interface RecordLabel {
@@ -86,25 +88,44 @@ async function read(
       };
     }
     case "pages.page": {
-      const page = unwrap(
-        await api.GET("/api/v1/w/{workspace_id}/pages/{page_id}", {
-          params: { path: { ...workspace, page_id: id } },
-          signal,
-        }),
-      );
-      return { found: true, label: page.title, href: `/w/${workspaceId}/pages/${id}` };
+      // Never read here: `useRecordLabel` takes a page's name from the tree
+      // (metadata only), so a page of mentions downloads no page bodies.
+      return { found: false, label: "" };
     }
   }
 }
 
+/**
+ * A page mention's label from the tree the viewer may open (`pages.list`,
+ * titles and ids only): a page that is not in it is one they cannot open.
+ */
+export function pageLabel(
+  workspaceId: string,
+  id: string,
+  pages: readonly PageSummary[] | undefined,
+): RecordLabel {
+  if (pages === undefined) {
+    return { state: "loading", label: "" };
+  }
+  const page = pages.find((candidate) => candidate.id === id);
+  return page === undefined
+    ? NOT_OPEN
+    : { state: "ready", label: page.title, href: `/w/${workspaceId}/pages/${id}` };
+}
+
 /** The mention's label for the viewer, read when it is first shown and kept fresh by the cache. */
 export function useRecordLabel(workspaceId: string, type: MentionType, id: string): RecordLabel {
+  const tree = usePages(workspaceId);
   const query = useQuery({
     queryKey: ["pages", "mention", workspaceId, type, id],
     queryFn: ({ signal }) => read(workspaceId, type, id, signal),
+    enabled: type !== "pages.page",
     staleTime: 60_000,
     retry: (count, error) => errorStatus(error) !== 404 && errorStatus(error) !== 403 && count < 2,
   });
+  if (type === "pages.page") {
+    return tree.isError ? NOT_OPEN : pageLabel(workspaceId, id, tree.data);
+  }
   if (query.isPending) {
     return { state: "loading", label: "" };
   }
