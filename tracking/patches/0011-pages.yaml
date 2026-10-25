@@ -1,0 +1,195 @@
+# The pages module's tracked events (campbooks-cloud#363, OpenSpec change
+# add-pages-module): a page made, edited (title or icon), moved, shared with a
+# member, unshared, trashed, restored and deleted for good. Every mutating
+# operation, job, schedule and event handler of the module gets a Coverage
+# row. Never a title, an icon, a body, a mention or a file name: ids, enums
+# and times only. Edits to a page's body are not tracked (they are many, and
+# each would carry what the member wrote). Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0011-pages.yaml`.
+changelog:
+  - date: "2026-10-25"
+    plan_version: 11
+    change: "The pages module instrumented (campbooks-cloud#363): 8 events for a page made, edited (which fields), moved (where it was), shared with a member (their role, and the one they had), unshared, trashed, restored and deleted for good; records page and page_location; Coverage for every operation, job, schedule and handler of the module."
+    pr: "#672"
+
+events:
+  - name: "pages.page_created"
+    version: 1
+    module: "pages"
+    object: "page"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A page was made, at the top level of a place or under another page, with or without a body. Never its title."
+    fires_when: "pages.create makes it, in the transaction that inserts it."
+    added_in: 11
+    openspec_change: "add-pages-module"
+  - name: "pages.page_edited"
+    version: 1
+    module: "pages"
+    object: "page"
+    action: "edited"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A page's title or icon changed: which fields, never their values. Edits to the body are not tracked."
+    fires_when: "pages.update changes the title or the icon, in the transaction of the change; the same values again track nothing."
+    added_in: 11
+    openspec_change: "add-pages-module"
+  - name: "pages.page_moved"
+    version: 1
+    module: "pages"
+    object: "page"
+    action: "moved"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A page was moved or reordered: under another page, to another place, or among its siblings; before is where it was."
+    fires_when: "pages.move stores the page's new place, parent and position, in that transaction."
+    added_in: 11
+    openspec_change: "add-pages-module"
+  - name: "pages.page_shared"
+    version: 1
+    module: "pages"
+    object: "page"
+    action: "shared"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A page was shared with a member, or the member's role on it changed; previous_role is the role they had on it, if any."
+    fires_when: "pages.share stores the grant, in that transaction."
+    added_in: 11
+    openspec_change: "add-pages-module"
+  - name: "pages.page_unshared"
+    version: 1
+    module: "pages"
+    object: "page"
+    action: "unshared"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A page stopped being shared with a member."
+    fires_when: "pages.unshare removes the grant, in that transaction."
+    added_in: 11
+    openspec_change: "add-pages-module"
+  - name: "pages.page_trashed"
+    version: 1
+    module: "pages"
+    object: "page"
+    action: "trashed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A page was moved to the trash, with the pages under it."
+    fires_when: "pages.trash puts it in the trash, in that transaction; a page already in the trash tracks nothing."
+    added_in: 11
+    openspec_change: "add-pages-module"
+  - name: "pages.page_restored"
+    version: 1
+    module: "pages"
+    object: "page"
+    action: "restored"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A page in the trash was brought back, with the pages deleted with it."
+    fires_when: "pages.restore brings it back, in that transaction."
+    added_in: 11
+    openspec_change: "add-pages-module"
+  - name: "pages.page_purged"
+    version: 1
+    module: "pages"
+    object: "page"
+    action: "purged"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A page in the trash was deleted for good, by a member, with what was deleted with it. The pages the 30-day purge removes are not tracked."
+    fires_when: "pages.purge deletes it, in that transaction."
+    added_in: 11
+    openspec_change: "add-pages-module"
+
+properties:
+  - { event: "pages.page_created", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The new page." }
+  - { event: "pages.page_trashed", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page, in the trash." }
+  - { event: "pages.page_restored", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page, back." }
+  - { event: "pages.page_purged", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page as it was just before it was deleted." }
+  - { event: "pages.page_unshared", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page." }
+  - { event: "pages.page_edited", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page afterwards." }
+  - { event: "pages.page_edited", version: 1, property: "fields", type: "enum", list: true, of: "pages.page_field", required: true, classification: "operational", description: "The fields that changed (at least one)." }
+  - { event: "pages.page_moved", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page afterwards, where it now is." }
+  - { event: "pages.page_moved", version: 1, property: "before", type: "record", of: "pages.page_location", required: true, classification: "operational", description: "Where it was." }
+  - { event: "pages.page_shared", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page." }
+  - { event: "pages.page_shared", version: 1, property: "member", type: "id", required: true, classification: "pseudonymous", description: "The member it is shared with: their user id." }
+  - { event: "pages.page_shared", version: 1, property: "role", type: "enum", of: "pages.page_role", required: true, classification: "operational", description: "Their role on it now." }
+  - { event: "pages.page_shared", version: 1, property: "previous_role", type: "enum", of: "pages.page_role", required: false, classification: "operational", description: "The role they had on it, when it was shared with them already." }
+  - { event: "pages.page_unshared", version: 1, property: "member", type: "id", required: true, classification: "pseudonymous", description: "The member it is no longer shared with: their user id." }
+
+records:
+  - { record: "pages.page", field: "id", type: "id", required: true, classification: "id", description: "The page's id." }
+  - { record: "pages.page", field: "place", type: "enum", enum: "pages.place", required: true, classification: "operational", description: "Private or the workspace's." }
+  - { record: "pages.page", field: "parent", type: "id", required: false, classification: "id", description: "The page it is under, if any." }
+  - { record: "pages.page", field: "created_by", type: "id", required: true, classification: "pseudonymous", description: "The member who made it: their user id." }
+  - { record: "pages.page", field: "revision", type: "int", required: true, classification: "operational", description: "Grows with every change of the page." }
+  - { record: "pages.page_location", field: "place", type: "enum", enum: "pages.place", required: true, classification: "operational", description: "The place it was in." }
+  - { record: "pages.page_location", field: "parent", type: "id", required: false, classification: "id", description: "The page it was under, if any." }
+
+enums:
+  - { enum: "pages.place", value: "private", description: "Its creator's, and whoever it is shared with." }
+  - { enum: "pages.place", value: "workspace", description: "Every member's." }
+  - { enum: "pages.page_field", value: "title", description: "Its title." }
+  - { enum: "pages.page_field", value: "icon", description: "Its icon." }
+  - { enum: "pages.page_role", value: "reader", description: "Can read it." }
+  - { enum: "pages.page_role", value: "writer", description: "Can also write it." }
+  - { enum: "pages.page_role", value: "manager", description: "Can also share and delete it." }
+
+coverage:
+  - kind: "operation"
+    name: "pages.create"
+    events: [pages.page_created]
+  - kind: "operation"
+    name: "pages.update"
+    events: [pages.page_edited]
+  - kind: "operation"
+    name: "pages.move"
+    events: [pages.page_moved]
+  - kind: "operation"
+    name: "pages.share"
+    events: [pages.page_shared]
+  - kind: "operation"
+    name: "pages.unshare"
+    events: [pages.page_unshared]
+  - kind: "operation"
+    name: "pages.trash"
+    events: [pages.page_trashed]
+  - kind: "operation"
+    name: "pages.restore"
+    events: [pages.page_restored]
+  - kind: "operation"
+    name: "pages.purge"
+    events: [pages.page_purged]
+  - kind: "operation"
+    name: "pages.sync"
+    exemption: "a page's body is written by typing: many small edits, each carrying what the member wrote; the page's meta changes are tracked by the operations above"
+  - kind: "operation"
+    name: "pages.upload_file"
+    exemption: "a file put in a page's body; the file is held by the blob store and its name and bytes are content, so nothing is tracked"
+  - kind: "handler"
+    name: "pages.forget_member"
+    exemption: "cleanup after a member left: their grants on pages are deleted; the departure is tracked by workspaces"
+  - kind: "handler"
+    name: "pages.schedule_workspace_purge"
+    exemption: "projection of workspaces.workspace_deleted: it only schedules the purge"
+  - kind: "job"
+    name: "pages.purge_workspace"
+    exemption: "maintenance: a deleted workspace's pages and history deleted; the deletion is tracked by workspaces"
+  - kind: "job"
+    name: "pages.purge_trash"
+    exemption: "maintenance, no action of anyone: pages 30 days in the trash deleted for good"
+  - kind: "job"
+    name: "pages.compact"
+    exemption: "maintenance, no action of anyone: a page's saved edits folded into one snapshot"
+  - kind: "schedule"
+    name: "pages.dispatch_purge_trash"
+    exemption: "maintenance, no action of anyone: only enqueues the purge of each workspace's old trash, which tracks nothing"
