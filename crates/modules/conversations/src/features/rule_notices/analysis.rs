@@ -545,7 +545,7 @@ pub fn read(
             }
         }
     }
-    notices.sort_by(|a, b| b.evidence.received.cmp(&a.evidence.received));
+    notices.sort_by_key(|n| std::cmp::Reverse(n.evidence.received));
     Reading { notices, to_group }
 }
 
@@ -762,7 +762,7 @@ mod tests {
 
     /// A shop sending `mail`, newest first as the pass reads it.
     fn shop(mut mail: Vec<Mail>) -> Sender {
-        mail.sort_by(|a, b| b.sent_at.cmp(&a.sent_at));
+        mail.sort_by_key(|m| std::cmp::Reverse(m.sent_at));
         Sender {
             address: SHOP.to_owned(),
             machine: true,

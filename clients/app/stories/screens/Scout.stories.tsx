@@ -572,7 +572,7 @@ function kindsApi(notices: (typeof DEALS_NOTICE)[]): Record<string, MockRoute> {
     ...everywhere(),
     [`GET ${W}/rule-notices`]: { body: { notices } },
     ...Object.fromEntries(
-      notices.flatMap((notice) => [
+      notices.flatMap((notice): [string, MockRoute][] => [
         [`GET ${W}/rule-notices/${notice.id}`, { body: notice }],
         [`POST ${W}/rule-notices/${notice.id}/answer`, { status: 204 }],
         [`DELETE ${W}/rule-notices/${notice.id}/answer`, { status: 204 }],

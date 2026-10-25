@@ -572,8 +572,12 @@ async fn a_machine_sender_of_mixed_mail_defaults_to_mail_like_this_one(db: PgPoo
     let response = kit.get(&sam, &uri).await;
     assert_eq!(response.status, StatusCode::OK, "{:?}", response.json);
     let (all, default) = offered(&response.json);
-    // Each promotion's subject is its own template: nothing like it by that.
-    assert_eq!(all, ["sender", "sender_phrase"]);
+    // Each promotion's subject is its own template: by that, only this one.
+    assert_eq!(all, ["sender", "sender_phrase", "sender_template"]);
+    assert_eq!(
+        response.json["suggestions"][2]["preview"]["would_change"],
+        1
+    );
     assert_eq!(default.as_deref(), Some("sender_phrase"));
     let phrase = &response.json["suggestions"][1];
     assert_eq!(

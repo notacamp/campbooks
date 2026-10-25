@@ -963,8 +963,7 @@ async fn target(conn: &mut PgConnection, id: RuleNoticeId) -> Result<Target> {
 }
 
 /// Answer a suggestion: "Not now" hides it for a while, "Don't suggest
-/// this" for good (for that sender, kind and part of its mail). For you
-/// alone.
+/// this" for good (for that sender and kind). For you alone.
 #[utoipa::path(
     post,
     path = "/api/v1/w/{workspace_id}/rule-notices/{notice_id}/answer",

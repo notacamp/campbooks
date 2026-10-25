@@ -49,7 +49,12 @@ function exampleOf(notice: RuleNotice): string | undefined {
   if (example === "") {
     return undefined;
   }
-  const chars = [...example];
+  // Whole characters as a reader sees them, so an accent or emoji is never
+  // cut in two.
+  const chars = Array.from(
+    new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(example),
+    (part) => part.segment,
+  );
   if (chars.length <= EXAMPLE_CHARS) {
     return example;
   }
