@@ -24,7 +24,7 @@ use wiremock::{
 use campbooks_kernel::{db::BeginFor as _, tenancy::WorkspaceId};
 
 use crate::{
-    ActionSettings, ConversationsDeps,
+    ActionSettings, ConversationsDeps, MoveSettings,
     domain::{actions, conversation::summary},
     model::ConversationId,
     testkit::{Kit, sorting_deps},
@@ -156,6 +156,7 @@ async fn run_with(db: PgPool, enabled: bool, answering: Answering) -> Run {
         enabled,
         ..ActionSettings::default()
     };
+    deps.config.moves = MoveSettings { enabled };
     let kit = Kit::with_deps(db, deps).await;
     let (workspace, _inbox, sam) = kit.sams_inbox().await;
     let bodies = server
@@ -326,10 +327,12 @@ fn off_the_pass_asks_exactly_the_triage_questions() {
     .unwrap();
     let triage = triage_questions();
     assert_eq!(pass.0.asked(&triage, &envelope), triage);
-    let on = pass.with_actions(ActionSettings {
-        enabled: true,
-        ..ActionSettings::default()
-    });
+    let on = pass
+        .with_actions(ActionSettings {
+            enabled: true,
+            ..ActionSettings::default()
+        })
+        .with_moves(MoveSettings { enabled: true });
     let asked = on.0.asked(&triage, &envelope);
     assert_eq!(asked[..triage.len()], triage[..]);
     // No one but the sender is named: only `next_move` is asked, right
@@ -366,7 +369,8 @@ fn with_people_to_pick_awaited_is_asked_after_next_move() {
     .with_actions(ActionSettings {
         enabled: true,
         ..ActionSettings::default()
-    });
+    })
+    .with_moves(MoveSettings { enabled: true });
     let envelope: Envelope = serde_json::from_value(json!({
         "from": {"name": "Joao", "address": "joao@studio.example"},
         "to": [{"name": "Ana Costa", "address": "ana@studio.example"}],

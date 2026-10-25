@@ -155,9 +155,13 @@ async fn upgrade(db: &PgPool) {
 /// What the scheduler does every minute, then every job it causes.
 async fn tick(kit: &Kit) {
     let mut tx = kit.state.db.begin().await.unwrap();
-    jobs::enqueue(&mut tx, &DispatchNeedsBackfills, EnqueueOptions::default())
-        .await
-        .unwrap();
+    jobs::enqueue(
+        &mut tx,
+        &DispatchNeedsBackfills::default(),
+        EnqueueOptions::default(),
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     kit.run_jobs().await;
 }
@@ -873,9 +877,13 @@ async fn failed_jobs(db: &PgPool) {
 /// [`tick`], saying which job failed, if one did.
 async fn tick_reporting(kit: &Kit) {
     let mut tx = kit.state.db.begin().await.unwrap();
-    jobs::enqueue(&mut tx, &DispatchNeedsBackfills, EnqueueOptions::default())
-        .await
-        .unwrap();
+    jobs::enqueue(
+        &mut tx,
+        &DispatchNeedsBackfills::default(),
+        EnqueueOptions::default(),
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     campbooks_kernel::jobs::Worker::new(kit.state.clone())
         .run_until_idle()

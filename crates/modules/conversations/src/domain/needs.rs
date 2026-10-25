@@ -46,7 +46,7 @@
 
 use campbooks_ai::decide::signals::{
     email::{Envelope, Party, Recipient, triage},
-    facts::{self, dmarc_refused, sender_authenticated, sender_checks_failed},
+    facts::{self, addressed_to_inbox, dmarc_refused, sender_authenticated, sender_checks_failed},
     moves::{self, NextMove},
 };
 use campbooks_kernel::{Error, EventBus, Result, tenancy::UserId};
@@ -332,6 +332,23 @@ impl Need {
         self
     }
 
+    /// The need as a wait on `person`, which the member said has the move
+    /// (the answer to a question about a reply or an action, "Nudge Ana…"):
+    /// a wait Campbooks stands behind, whose nudge time is worked out as for
+    /// any wait ([`Self::armed`]).
+    #[must_use]
+    pub fn waiting_on(mut self, person: Awaited) -> Self {
+        self.reason = NeedReason::Waiting;
+        self.trust = NeedTrust::Sure;
+        self.basis = NeedBasis::Member;
+        self.question = NeedQuestion::NextMove;
+        self.awaited = Some(person);
+        self.due_on = None;
+        self.lapses_at = None;
+        self.urgent = false;
+        self
+    }
+
     /// Whether it is an ask that time alone turns into "Still needed?": a
     /// sure `do` or `reply` with no date of its own that no member
     /// confirmed.
@@ -449,12 +466,93 @@ fn may_ask(stream: Option<&str>, answers: &[Answer]) -> bool {
     }
 }
 
-/// Whether an answer the policy let act says "no" to `question`: the
-/// question is settled, and no suggestion reopens it.
-fn settled_no(answers: &[Answer], question: &str) -> bool {
-    answers
+/// How sure a "yes" to an ask question is: the need it raises is one
+/// Campbooks stands behind, or a question put to the member.
+///
+/// A taught rule's or the facts' answer is sure where the policy lets it act.
+/// A model's is sure only from the policy's sure bar for the question
+/// ([`Policy::sure_bar`]), when the message is not answered suspicious, and
+/// when the inbox was addressed in `To` (a copy of mail between others is not
+/// asked of the member on the model's word alone, unless the policy accepted
+/// `next_move` `recipient`); otherwise, from the check floor, it is a
+/// question, and below that nothing. An answer the policy let act saying
+/// "no" settles the question (the rules were sure: a notification asks
+/// nothing of you). Once someone else is accepted to have the move
+/// ([`moved_on`]), a model's yes is nothing.
+fn ask<'a>(
+    answers: &'a [Answer],
+    question: &str,
+    settings: &NeedSettings,
+    people: Option<&Envelope>,
+    moved_on: bool,
+) -> Option<(NeedTrust, &'a Answer)> {
+    let settled = answers
         .iter()
-        .any(|a| a.question == question && a.acted && !a.is_true())
+        .filter(|a| a.question == question && a.acted)
+        .min_by_key(|a| a.basis != NeedBasis::Rules);
+    if let Some(answer) = settled {
+        if !answer.is_true() {
+            return None;
+        }
+        if answer.basis != NeedBasis::Model {
+            return Some((NeedTrust::Sure, answer));
+        }
+    }
+    if moved_on {
+        return None;
+    }
+    let answer = answers
+        .iter()
+        .find(|a| a.question == question && a.basis == NeedBasis::Model && a.is_true())?;
+    let confidence = answer.confidence?;
+    if sure_enough(answers, question, confidence, settings, people) {
+        Some((NeedTrust::Sure, answer))
+    } else if confidence >= settings.check_floor() {
+        Some((NeedTrust::Check, answer))
+    } else {
+        None
+    }
+}
+
+/// Whether a model's "yes" to `question` at `confidence` may be shown as sure
+/// ([`ask`]).
+fn sure_enough(
+    answers: &[Answer],
+    question: &str,
+    confidence: f64,
+    settings: &NeedSettings,
+    people: Option<&Envelope>,
+) -> bool {
+    let Some(bar) = settings.policy.sure_bar(question) else {
+        return true;
+    };
+    if confidence < bar {
+        return false;
+    }
+    // The measured bar for a reply holds with the suspicious answer as a
+    // veto: a look-alike that asks for a transfer is not a reply to write.
+    if question == triage::NEEDS_REPLY
+        && answers
+            .iter()
+            .any(|a| a.question == triage::SUSPICIOUS && a.is_true())
+    {
+        return false;
+    }
+    // A fact of the headers, only ever lowering trust: the inbox is not in
+    // `To`, so the model's word that it is asked is not enough.
+    let copied = people.is_some_and(|envelope| addressed_to_inbox(envelope) == Some(false));
+    !copied || recipient_accepted(answers)
+}
+
+/// Whether the policy accepted the model's `next_move` answer `recipient`:
+/// the member is the one asked, whoever else the mail went to.
+fn recipient_accepted(answers: &[Answer]) -> bool {
+    answers.iter().any(|a| {
+        a.question == moves::question::NEXT_MOVE
+            && a.basis == NeedBasis::Model
+            && a.acted
+            && a.value.as_str() == Some(NextMove::Recipient.as_str())
+    })
 }
 
 /// The answer saying the message asks for a payment still owed, when one
@@ -530,7 +628,6 @@ pub fn raise_with(
     settings: &NeedSettings,
     look_ok: bool,
 ) -> Option<Need> {
-    let check_floor = settings.check_floor();
     let need = |reason, trust, basis, question, decision: &Answer| Need {
         message,
         reason,
@@ -572,8 +669,6 @@ pub fn raise_with(
     // The policy says someone else has the move: a model's own ask is not
     // the member's (a taught rule's still is).
     let moved_on = moved_on(answers);
-    let ours = |a: &&Answer| !(moved_on && a.basis == NeedBasis::Model);
-    let asks = accepted(answers, triage::ASKS_ACTION).filter(ours);
     let owed = owed(answers, settings).filter(|_| stream != Some(NEWSLETTERS));
     let raised = if let Some(owed) = owed {
         // Campbooks cannot see the bank: a payment still owed is always a
@@ -589,52 +684,43 @@ pub fn raise_with(
         // Money mail asks for nothing but a payment, and the money answer
         // says none is owed (a receipt, a payment confirmation): nothing.
         None
-    } else if let Some(reply) = accepted(answers, triage::NEEDS_REPLY).filter(ours) {
-        Some(need(
-            NeedReason::Reply,
-            NeedTrust::Sure,
-            reply.basis,
-            NeedQuestion::NeedsReply,
-            reply,
-        ))
-    } else if let Some(asks) = asks {
-        Some(need(
-            NeedReason::Do,
-            NeedTrust::Sure,
-            asks.basis,
-            NeedQuestion::AsksAction,
-            asks,
-        ))
     } else {
-        // A model suggestion the policy does not accept, put as a question,
-        // unless an answer that acted already said no: the rules were sure
-        // (a notification asks nothing of you), so there is nothing to ask.
-        [
-            (triage::NEEDS_REPLY, NeedQuestion::NeedsReply),
-            (triage::ASKS_ACTION, NeedQuestion::AsksAction),
-        ]
-        .into_iter()
-        .filter(|(id, _)| !moved_on && !settled_no(answers, id))
-        .find_map(|(id, question)| {
-            answers
-                .iter()
-                .find(|a| {
-                    a.question == id
-                        && a.basis == NeedBasis::Model
-                        && !a.acted
-                        && a.is_true()
-                        && a.confidence.is_some_and(|c| c >= check_floor)
-                })
-                .map(|a| {
-                    need(
-                        NeedReason::Review,
-                        NeedTrust::Check,
-                        NeedBasis::Model,
-                        question,
-                        a,
-                    )
-                })
-        })
+        // A reply, then an action: sure where Campbooks stands behind the
+        // answer, else a question to the member, unless an answer that
+        // acted already said no.
+        let reply = ask(answers, triage::NEEDS_REPLY, settings, people, moved_on);
+        let doing = ask(answers, triage::ASKS_ACTION, settings, people, moved_on);
+        match (reply, doing) {
+            (Some((NeedTrust::Sure, a)), _) => Some(need(
+                NeedReason::Reply,
+                NeedTrust::Sure,
+                a.basis,
+                NeedQuestion::NeedsReply,
+                a,
+            )),
+            (_, Some((NeedTrust::Sure, a))) => Some(need(
+                NeedReason::Do,
+                NeedTrust::Sure,
+                a.basis,
+                NeedQuestion::AsksAction,
+                a,
+            )),
+            (Some((NeedTrust::Check, a)), _) => Some(need(
+                NeedReason::Review,
+                NeedTrust::Check,
+                NeedBasis::Model,
+                NeedQuestion::NeedsReply,
+                a,
+            )),
+            (_, Some((NeedTrust::Check, a))) => Some(need(
+                NeedReason::Review,
+                NeedTrust::Check,
+                NeedBasis::Model,
+                NeedQuestion::AsksAction,
+                a,
+            )),
+            _ => None,
+        }
     };
     let raised = raised.map(|mut need| {
         need.urgent = answers.iter().any(|a| {
@@ -1023,6 +1109,8 @@ struct Row {
     nudge_at: Option<DateTime<Utc>>,
     nudges: i32,
     facts_version: i16,
+    verdict_awaited_name: Option<String>,
+    verdict_awaited_address: Option<String>,
 }
 
 impl Row {
@@ -1046,6 +1134,20 @@ impl Row {
         })
     }
 
+    /// The person the member said has the move on `message` (campbooks-cloud#372):
+    /// a "Not needed" that came with someone to wait on.
+    fn member_wait(&self, message: MessageId) -> Result<Option<Awaited>> {
+        Ok(
+            match (self.verdict_on(message)?, &self.verdict_awaited_address) {
+                (Some(NeedVerdict::NotNeeded), Some(address)) => Some(Awaited {
+                    name: self.verdict_awaited_name.clone().unwrap_or_default(),
+                    address: address.clone(),
+                }),
+                _ => None,
+            },
+        )
+    }
+
     fn verdict_on(&self, message: MessageId) -> Result<Option<NeedVerdict>> {
         match (&self.verdict, self.verdict_message_id) {
             (Some(verdict), Some(on)) if on == message => Ok(Some(verdict.parse()?)),
@@ -1061,7 +1163,7 @@ async fn current(conn: &mut PgConnection, conversation: ConversationId) -> Resul
         "SELECT message_id, reason, trust, basis, question, decision_id, due_on, lapses_at,
                 urgent, state, cleared_because, verdict, verdict_message_id, verdict_by,
                 latest_inbound_id, awaited_name, awaited_address, nudge_at, nudges,
-                facts_version
+                facts_version, verdict_awaited_name, verdict_awaited_address
            FROM conversations.needs WHERE conversation_id = $1 FOR UPDATE",
     )
     .bind(conversation)
@@ -1218,7 +1320,10 @@ type PeopleRow = (
 /// The people of `message` as the decide pass read them: its sender,
 /// recipients and list headers, and whose inbox it is. `None` once it is
 /// gone.
-async fn people(conn: &mut PgConnection, message: MessageId) -> Result<Option<Envelope>> {
+pub(crate) async fn people(
+    conn: &mut PgConnection,
+    message: MessageId,
+) -> Result<Option<Envelope>> {
     let row: Option<PeopleRow> = sqlx::query_as(
         "SELECT m.sender, m.recipients, m.headers, i.address, i.display_name
                FROM conversations.messages m
@@ -1343,12 +1448,9 @@ async fn candidate(
             move_asked = answers
                 .iter()
                 .any(|a| a.question == moves::question::NEXT_MOVE);
-            // Its people only matter to a wait, which needs a move answer.
-            let people = if move_asked {
-                people(tx, newest.id).await?
-            } else {
-                None
-            };
+            // Its people: for a wait (which needs a move answer), and for the
+            // inbox's place among them (a copy is not asked of its owner).
+            let people = people(tx, newest.id).await?;
             // Authentication is read only for mail a rule highlighted.
             let highlight = answers
                 .iter()
@@ -1377,10 +1479,12 @@ async fn candidate(
         Some(row) if reread && raised.is_none() && !settings.waits && row.need()?.is_wait() => {
             false
         }
-        Some(row) if reread && raised.is_none() => !matches!(
-            row.verdict_on(row.message_id)?,
-            Some(NeedVerdict::Confirmed | NeedVerdict::StillToPay)
-        ),
+        Some(row) if reread && raised.is_none() => {
+            !(matches!(
+                row.verdict_on(row.message_id)?,
+                Some(NeedVerdict::Confirmed | NeedVerdict::StillToPay)
+            ) || row.member_wait(row.message_id)?.is_some())
+        }
         // A newer message in the conversation was read again for whose move
         // it is and waits on nobody ("never mind, I sent it myself"): the
         // wait it followed is over, replaced by what that message says. A
@@ -1813,6 +1917,16 @@ async fn refresh_pass(
     let Some(need) = need else {
         return Ok(Pass::Done(Refreshed::Settled));
     };
+    // The member said someone else has the move: a wait on that person,
+    // whatever the answers raise now.
+    let member_wait = match row.as_ref() {
+        Some(row) => row.member_wait(need.message)?,
+        None => None,
+    };
+    let need = match member_wait.clone() {
+        Some(person) => need.waiting_on(person),
+        None => need,
+    };
     // Its dates, as Scout read them from its message's email.
     let read = dates(tx, need.message, need.reason).await?;
     let need = need.dated(read);
@@ -1826,6 +1940,15 @@ async fn refresh_pass(
         &need,
     )
     .await?;
+    // Its "Not needed" was the answer that made it a wait, not a clearing.
+    let since = if member_wait.is_some() {
+        Since {
+            verdict: None,
+            ..since
+        }
+    } else {
+        since
+    };
     let settled = match settle(need, since, clock) {
         // Its own message no longer raises it: cleared as replaced.
         Settled::Open(need) if withdrawn => Settled::Cleared(need, ClearCause::Superseded),
@@ -2108,6 +2231,37 @@ pub struct NeedView {
     /// `nudge` need only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nudges: Option<u32>,
+    /// What the email's people allow answering a question about a reply or an
+    /// action with (campbooks-cloud#372): present only for such a question
+    /// when the email went to people besides the inbox, and facts of its
+    /// headers only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unsure: Option<Unsure>,
+}
+
+/// The people of an email a question about a reply or an action is about,
+/// from its headers (campbooks-cloud#372). It lets the member say who has the
+/// move, not only whether the email needs them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct Unsure {
+    /// Who else the email went to, `To` before `Cc`, as the headers gave
+    /// them: without the inbox, the sender, and no-reply or service
+    /// addresses; at most six.
+    pub others: Vec<Address>,
+    /// Whether the inbox is in `To`; `false` when it is only copied, or not
+    /// named at all.
+    pub in_to: bool,
+    /// The one person it is natural to put the move on: the person the
+    /// model's `awaited` answer named, else the only other person in `To`.
+    /// None when there is no obvious one.
+    pub party: Option<Address>,
+    /// Whole days since the email was sent, when none of `others` wrote to
+    /// the inbox since; none when one did.
+    pub unanswered_days: Option<u32>,
+    /// How sure the model was of its reading, in percent.
+    pub confidence: Option<u32>,
+    /// The confidence from which Campbooks shows it as sure, in percent.
+    pub sure_bar: Option<u32>,
 }
 
 /// A conversation's ask that lapsed (campbooks-cloud#275): what it was and
@@ -2167,6 +2321,99 @@ const ATTACH: &str = "SELECT n.conversation_id, n.message_id, n.reason, n.trust,
                         AND NOT later.in_spam AND NOT later.in_trash \
                         AND (later.sent_at, later.id) > (m.sent_at, m.id))))";
 
+/// The people behind a question about a reply or an action on `message`
+/// (campbooks-cloud#372), read from its headers and the model's stored
+/// answers; `None` when the email went to nobody besides the inbox.
+async fn unsure(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    message: MessageId,
+    question: NeedQuestion,
+    sent_at: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+) -> Result<Option<Unsure>> {
+    let Some(envelope) = people(conn, message).await? else {
+        return Ok(None);
+    };
+    let others = facts::awaitable(&envelope);
+    if others.is_empty() {
+        return Ok(None);
+    }
+    let stored = answers(conn, message).await?;
+    let asked = stored
+        .iter()
+        .find(|a| a.basis == NeedBasis::Model && a.question == question.as_str() && a.is_true());
+    // Whole percents without a cast: the confidence rounded down (so "89"
+    // never reads as the bar it is under), the bar exactly.
+    let confidence = asked.and_then(|a| a.confidence).and_then(|c| {
+        (0..=100_u32)
+            .rev()
+            .find(|n| f64::from(*n) <= c * 100.0 + 1e-9)
+    });
+    let sure_bar = Policy::baseline()
+        .sure_bar(question.as_str())
+        .and_then(|bar| (0..=100_u32).find(|n| f64::from(*n) >= bar * 100.0 - 1e-9));
+    let in_to = addressed_to_inbox(&envelope).unwrap_or(true);
+    // The person the model named, when its option still names that address;
+    // else the only other person in `To`.
+    let named = stored
+        .iter()
+        .find(|a| a.question == moves::question::AWAITED && a.basis == NeedBasis::Model)
+        .and_then(|awaited| {
+            let label = awaited.value.as_str()?;
+            let person = moves::awaited_party(&envelope, label)?;
+            let described = option_description(&awaited.options, label)?;
+            moves::describes(described, &person).then_some(person)
+        });
+    let in_to_list: Vec<&Party> = others
+        .iter()
+        .filter(|p| {
+            envelope
+                .to
+                .iter()
+                .any(|t| t.address.trim().eq_ignore_ascii_case(p.address.trim()))
+        })
+        .collect();
+    let party = named.or_else(|| match in_to_list.as_slice() {
+        [only] => Some((*only).clone()),
+        _ => None,
+    });
+    let addresses: Vec<String> = others
+        .iter()
+        .map(|p| p.address.trim().to_lowercase())
+        .collect();
+    let answered: bool = match sent_at {
+        Some(sent) => {
+            sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM conversations.messages
+                  WHERE inbox_id = $1 AND direction = 'inbound' AND NOT in_spam
+                    AND sender_address = ANY($2) AND sent_at > $3)",
+            )
+            .bind(inbox)
+            .bind(addresses.as_slice())
+            .bind(sent)
+            .fetch_one(&mut *conn)
+            .await?
+        }
+        None => true,
+    };
+    let unanswered_days = sent_at
+        .filter(|_| !answered)
+        .map(|sent| u32::try_from((now - sent).num_days().max(0)).unwrap_or(u32::MAX));
+    let to_address = |p: &Party| Address {
+        name: Some(p.name.trim().to_owned()).filter(|n| !n.is_empty()),
+        address: p.address.trim().to_owned(),
+    };
+    Ok(Some(Unsure {
+        others: others.iter().map(to_address).collect(),
+        in_to,
+        party: party.as_ref().map(to_address),
+        unanswered_days,
+        confidence,
+        sure_bar,
+    }))
+}
+
 /// Fill in each summary's open [`NeedView`], or its [`LapsedNeed`] when its
 /// ask lapsed (an open need whose lapse time passed counts as lapsed before
 /// the clock has woken it).
@@ -2186,6 +2433,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
             continue;
         };
         let reason: NeedReason = row.reason.parse()?;
+        let trust: NeedTrust = row.trust.parse()?;
         let question: NeedQuestion = row.question.parse()?;
         let lapsed = row.state != "open" || row.lapses_at.is_some_and(|at| at <= now);
         if lapsed {
@@ -2224,7 +2472,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
         };
         summary.need = Some(NeedView {
             reason,
-            trust: row.trust.parse()?,
+            trust,
             basis: row.basis.parse()?,
             question,
             rule: reasons.first().map(|r| r.rule.clone()),
@@ -2245,7 +2493,21 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
                 }),
             nudges: matches!(reason, NeedReason::Waiting | NeedReason::Nudge)
                 .then(|| u32::try_from(row.nudges).unwrap_or_default()),
+            unsure: None,
         });
+        if trust == NeedTrust::Check
+            && reason == NeedReason::Review
+            && matches!(
+                question,
+                NeedQuestion::NeedsReply | NeedQuestion::AsksAction
+            )
+        {
+            let inbox = summary.inbox_id;
+            let unsure = unsure(conn, inbox, row.message_id, question, row.sent_at, now).await?;
+            if let Some(need) = summary.need.as_mut() {
+                need.unsure = unsure;
+            }
+        }
     }
     Ok(())
 }
@@ -2642,7 +2904,10 @@ mod tests {
     fn a_confident_model_suggestion_is_a_question() {
         let need = raised(&[
             stream(NeedBasis::Model, "primary", true),
-            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), false),
+            confident(
+                answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), false),
+                0.85,
+            ),
         ])
         .unwrap();
         assert_eq!(
@@ -2692,7 +2957,17 @@ mod tests {
     fn the_facts_no_beats_an_acted_model_yes() {
         // The model's "yes" to a reply is overruled; its unaccepted ask is
         // still a question.
-        let need = raised(&notification_answers()).unwrap();
+        // From 0.8 an ask is sure, so here it is the sender's own sentence
+        // that makes it a question: the inbox is only copied.
+        let people = joao_to_ana();
+        let need = raise_with(
+            MessageId::new(),
+            &notification_answers(),
+            Some(&people),
+            &settings(),
+            true,
+        )
+        .unwrap();
         assert_eq!(
             (need.reason, need.trust, need.question),
             (
@@ -2721,13 +2996,20 @@ mod tests {
 
     #[test]
     fn a_model_suggestion_alone_is_still_a_question() {
-        let need = raised(&[
-            stream(NeedBasis::Model, "primary", true),
-            confident(
-                answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), false),
-                0.84,
-            ),
-        ])
+        let people = joao_to_ana();
+        let need = raise_with(
+            MessageId::new(),
+            &[
+                stream(NeedBasis::Model, "primary", true),
+                confident(
+                    answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), false),
+                    0.84,
+                ),
+            ],
+            Some(&people),
+            &settings(),
+            true,
+        )
         .unwrap();
         assert_eq!(
             (need.reason, need.trust, need.question),
@@ -2737,6 +3019,176 @@ mod tests {
                 NeedQuestion::AsksAction
             )
         );
+    }
+
+    /// Mail from Ana Costa to Sam, the inbox, alone in `To`.
+    fn ana_to_sam() -> Envelope {
+        Envelope {
+            from: party("Ana Costa", "ana@studio.example"),
+            to: vec![party("Sam", "sam@example.com")],
+            recipient: Some(Recipient {
+                name: "Sam".into(),
+                addresses: vec!["sam@example.com".into()],
+                shared: false,
+            }),
+            ..Envelope::default()
+        }
+    }
+
+    fn model_yes(question: &str, confidence: f64) -> Answer {
+        confident(
+            answer(question, NeedBasis::Model, json!(true), true),
+            confidence,
+        )
+    }
+
+    fn raised_for(answers: &[Answer], people: &Envelope) -> Option<Need> {
+        raise_with(MessageId::new(), answers, Some(people), &settings(), true)
+    }
+
+    /// The 2026-10-25 report: a guess is never shown as sure.
+    #[test]
+    fn a_reply_is_sure_only_from_the_bar() {
+        let people = ana_to_sam();
+        let primary = stream(NeedBasis::Model, "primary", true);
+        let at = |confidence: f64| {
+            raised_for(
+                &[primary.clone(), model_yes(triage::NEEDS_REPLY, confidence)],
+                &people,
+            )
+        };
+        // The sure bar is 0.9: sure from there.
+        let sure = at(0.9).unwrap();
+        assert_eq!(
+            (sure.reason, sure.trust, sure.question),
+            (NeedReason::Reply, NeedTrust::Sure, NeedQuestion::NeedsReply)
+        );
+        // From the check floor it is a question to the member.
+        for confidence in [0.8, 0.85, 0.89] {
+            let question = at(confidence).unwrap();
+            assert_eq!(
+                (
+                    question.reason,
+                    question.trust,
+                    question.question,
+                    question.basis
+                ),
+                (
+                    NeedReason::Review,
+                    NeedTrust::Check,
+                    NeedQuestion::NeedsReply,
+                    NeedBasis::Model
+                ),
+                "{confidence}"
+            );
+        }
+        // Below it, whatever the operating point says: an honest empty.
+        for confidence in [0.51, 0.59, 0.7, 0.79] {
+            assert_eq!(at(confidence), None, "{confidence}");
+        }
+    }
+
+    #[test]
+    fn an_action_is_sure_from_0_8() {
+        let people = ana_to_sam();
+        let primary = stream(NeedBasis::Model, "primary", true);
+        let at = |confidence: f64| {
+            raised_for(
+                &[primary.clone(), model_yes(triage::ASKS_ACTION, confidence)],
+                &people,
+            )
+        };
+        let sure = at(0.8).unwrap();
+        assert_eq!(
+            (sure.reason, sure.trust, sure.question),
+            (NeedReason::Do, NeedTrust::Sure, NeedQuestion::AsksAction)
+        );
+        assert_eq!(at(0.79), None);
+        assert_eq!(at(0.6), None);
+    }
+
+    #[test]
+    fn a_suspicious_answer_vetoes_a_sure_reply_but_not_a_question() {
+        let people = ana_to_sam();
+        let answers = [
+            stream(NeedBasis::Model, "primary", true),
+            model_yes(triage::NEEDS_REPLY, 0.95),
+            // Below its operating point, so the warning is not raised.
+            confident(
+                answer(triage::SUSPICIOUS, NeedBasis::Model, json!(true), false),
+                0.52,
+            ),
+        ];
+        let need = raised_for(&answers, &people).unwrap();
+        assert_eq!(
+            (need.reason, need.trust),
+            (NeedReason::Review, NeedTrust::Check)
+        );
+    }
+
+    #[test]
+    fn a_copy_is_never_sure_on_the_models_word() {
+        let copied = joao_to_ana();
+        let alone = ana_to_sam();
+        let answers = [
+            stream(NeedBasis::Model, "primary", true),
+            model_yes(triage::NEEDS_REPLY, 0.97),
+        ];
+        assert_eq!(raised_for(&answers, &alone).unwrap().trust, NeedTrust::Sure);
+        // Only copied: a question, though the model was surer than the bar.
+        let question = raised_for(&answers, &copied).unwrap();
+        assert_eq!(
+            (question.reason, question.trust, question.question),
+            (
+                NeedReason::Review,
+                NeedTrust::Check,
+                NeedQuestion::NeedsReply
+            )
+        );
+        // Unless the policy accepted that the inbox's owner has the move.
+        let mut accepted = answers.to_vec();
+        accepted.push(next_move("recipient", 0.95, true));
+        assert_eq!(
+            raised_for(&accepted, &copied).unwrap().trust,
+            NeedTrust::Sure
+        );
+        // A move that was only recorded does not.
+        let mut recorded = answers.to_vec();
+        recorded.push(next_move("recipient", 0.95, false));
+        assert_eq!(
+            raised_for(&recorded, &copied).unwrap().trust,
+            NeedTrust::Check
+        );
+        // The inbox unknown: the fact is not there to lower trust.
+        assert_eq!(
+            raise(MessageId::new(), &answers, &settings(), true)
+                .unwrap()
+                .trust,
+            NeedTrust::Sure
+        );
+        // A rule the member taught still speaks for them.
+        let mut taught = answers.to_vec();
+        taught.push(answer(
+            triage::NEEDS_REPLY,
+            NeedBasis::Taught,
+            json!(true),
+            true,
+        ));
+        assert_eq!(raised_for(&taught, &copied).unwrap().trust, NeedTrust::Sure);
+    }
+
+    #[test]
+    fn a_guess_that_is_not_a_question_still_lets_a_wait_through() {
+        let people = joao_to_ana();
+        let mut answers = vec![
+            stream(NeedBasis::Model, "primary", true),
+            // 0.59: acted under the old policy, nothing under this one.
+            model_yes(triage::NEEDS_REPLY, 0.59),
+            next_move("someone_else", 0.9, false),
+        ];
+        answers.push(awaited(&people, "p1"));
+        let need = raised_for(&answers, &people).unwrap();
+        assert_eq!(need.reason, NeedReason::Waiting);
     }
 
     fn need(reason: NeedReason) -> Need {
@@ -3398,7 +3850,8 @@ mod tests {
             answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
         ];
         reply.extend(wait.clone());
-        assert_eq!(waits(&reply, &people).unwrap().reason, NeedReason::Reply);
+        // (The inbox is only copied, so the reply is a question.)
+        assert_eq!(waits(&reply, &people).unwrap().reason, NeedReason::Review);
         // List mail, sorted out of Primary, or a no-reply sender: no wait.
         let mut list = quiet();
         list.push(with_reason(
@@ -3435,12 +3888,13 @@ mod tests {
             (need.reason, need.trust),
             (NeedReason::Waiting, NeedTrust::Sure)
         );
-        // Not measured (not acted): the reply is raised as before.
+        // Not measured (not acted): the reply is raised as before, as a
+        // question since the inbox is only copied.
         let mut unmeasured = answers.to_vec();
         unmeasured[3].acted = false;
         assert_eq!(
             waits(&unmeasured, &people).unwrap().reason,
-            NeedReason::Reply
+            NeedReason::Review
         );
         // Accepted "nobody": no reply, no wait either.
         let mut nobody = answers.to_vec();

@@ -16,13 +16,27 @@
 //! Campbooks stands behind, stored as a correction confirming the money
 //! answer. Both are only for a Pay need (409 `not_a_payment`).
 //!
+//! A question about a reply or an action (`needs_reply`, `asks_action`) on
+//! mail that went to other people may be answered "someone else has the
+//! move" (campbooks-cloud#372): Not needed with `wait_on`, the address of
+//! one of the email's people (409 `not_a_party` if it is not). It files two
+//! corrections, `next_move` (from `recipient`, or what the model said, to
+//! `someone_else`) and `awaited` (to the option naming that person), and the
+//! conversation waits on that person from then on (`needs::Need::waiting_on`),
+//! a wait Campbooks stands behind. Reopen withdraws both and brings the
+//! question back.
+//!
 //! A wait on someone (campbooks-cloud#293) is resolved the same way: Done is
 //! "Heard from them" and files nothing; Not needed is "Not waiting", stored
 //! as a correction of the model's `next_move` answer (from what it said to
 //! [`NOT_WAITING`]).
 
 use axum::{Extension, Json, extract::State};
-use campbooks_ai::decide::signals::email::triage;
+use campbooks_ai::decide::signals::{
+    email::{Party, triage},
+    facts,
+    moves::{self, NextMove},
+};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     db::BeginFor as _,
@@ -42,7 +56,8 @@ use crate::{
         tracked,
     },
     model::{
-        ConversationId, CorrectionId, DecisionId, MessageId, NeedQuestion, NeedReason, NeedVerdict,
+        ConversationId, CorrectionId, DecisionId, MessageId, NeedBasis, NeedQuestion, NeedReason,
+        NeedVerdict,
     },
     scopes::ConversationsWrite,
     tracking,
@@ -50,6 +65,8 @@ use crate::{
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod unsure_tests;
 #[cfg(test)]
 mod waiting_tests;
 
@@ -61,6 +78,10 @@ pub const NOT_OWED: &str = "not_owed";
 /// marks it Not waiting: the model's choice was wrong (which option was
 /// right is the labeller's to say).
 pub const NOT_WAITING: &str = "not_waiting";
+
+/// What a correction of `next_move` says when the member answers that
+/// someone else on the email has the move.
+const SOMEONE_ELSE: &str = "someone_else";
 
 /// How a member resolves a need.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -78,11 +99,17 @@ pub enum Outcome {
 }
 
 /// A member's verdict on a need.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Resolve {
     /// Done, Not needed, or for a Pay need Already paid or Still to pay.
     pub outcome: Outcome,
+    /// With Not needed on a question about a reply or an action: the address
+    /// of the person on the email who has the move. The conversation then
+    /// waits on them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "ana@example.com")]
+    pub wait_on: Option<String>,
     /// The message the need the member saw comes from (`NeedView.message_id`):
     /// when the open need comes from another one, nothing is recorded (409
     /// `need_changed`).
@@ -123,7 +150,7 @@ pub struct Confirm {
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such conversation, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), or a paid answer for a need that is not Pay (`not_a_payment`).",
+        (status = CONFLICT, description = "It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), a paid answer for a need that is not Pay (`not_a_payment`), or a person to wait on who is not on the email (`not_a_party`).",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -147,6 +174,7 @@ pub async fn resolve(
         path.conversation_id,
         verdict,
         body.message_id,
+        body.wait_on.as_deref(),
     )
     .await
     .map(Json)
@@ -196,6 +224,7 @@ pub async fn confirm(
         path.conversation_id,
         NeedVerdict::Confirmed,
         body.message_id,
+        None,
     )
     .await
     .map(Json)
@@ -266,6 +295,17 @@ pub async fn reopen(
         tx.commit().await?;
         return Ok(Json(summary));
     }
+    // The second correction of "someone else has the move", read before the
+    // verdict goes (a runtime query: the column was added since the `.sqlx`
+    // cache).
+    let extra: Option<sqlx::types::Uuid> = sqlx::query_scalar::<_, Option<sqlx::types::Uuid>>(
+        "SELECT verdict_extra_correction_id FROM conversations.needs
+          WHERE conversation_id = $1 AND verdict_message_id = message_id",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .flatten();
     let withdrawn = sqlx::query_scalar!(
         r#"
         UPDATE conversations.needs n
@@ -285,6 +325,18 @@ pub async fn reopen(
     if let Some(correction) = withdrawn {
         withdraw(&mut tx, correction).await?;
     }
+    if let Some(extra) = extra {
+        withdraw(&mut tx, CorrectionId::from_uuid(extra)).await?;
+    }
+    sqlx::query(
+        "UPDATE conversations.needs
+            SET verdict_awaited_name = NULL, verdict_awaited_address = NULL,
+                verdict_extra_correction_id = NULL
+          WHERE conversation_id = $1",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
     needs::refresh(
         &mut tx,
         &state.events,
@@ -384,6 +436,7 @@ async fn judge(
     id: ConversationId,
     verdict: NeedVerdict,
     seen: MessageId,
+    wait_on: Option<&str>,
 ) -> Result<ConversationSummary> {
     let mut tx = state.db.begin_for(access.workspace).await?;
     lock_conversation(state, &mut tx, access, id).await?;
@@ -404,6 +457,19 @@ async fn judge(
     if need.message != seen {
         return Err(Error::Conflict(crate::MESSAGES.reason("need_changed")));
     }
+    // Someone else has the move: found among the email's own people.
+    let wait = match wait_on {
+        Some(address) => Some(
+            wait_target(
+                &mut tx,
+                (need.message, need.question.as_str(), need.trust.as_str()),
+                verdict,
+                address,
+            )
+            .await?,
+        ),
+        None => None,
+    };
     let paid_answer = matches!(verdict, NeedVerdict::AlreadyPaid | NeedVerdict::StillToPay);
     if paid_answer && need.reason != NeedReason::Pay.as_str() {
         return Err(Error::Conflict(crate::MESSAGES.reason("not_a_payment")));
@@ -462,9 +528,45 @@ async fn judge(
         NeedVerdict::NotNeeded => Some(no),
         NeedVerdict::Confirmed | NeedVerdict::StillToPay => Some(yes),
     };
-    let correction = match to {
-        Some(_) if about_time(&need.question) => None,
-        Some(to) => Some(
+    let mut extra = None;
+    let correction = match (to, &wait) {
+        // Someone else has the move: `next_move` and `awaited` are what the
+        // member corrected, not whether the email needs a reply.
+        (Some(_), Some(wait)) => {
+            let first = correct(
+                &mut tx,
+                access,
+                id,
+                need.message,
+                Correction {
+                    question: moves::question::NEXT_MOVE,
+                    from: &wait.moved_from,
+                    to: SOMEONE_ELSE,
+                    overridden: &need.basis,
+                    decision: wait.moved_decision,
+                },
+            )
+            .await?;
+            extra = Some(
+                correct(
+                    &mut tx,
+                    access,
+                    id,
+                    need.message,
+                    Correction {
+                        question: moves::question::AWAITED,
+                        from: &wait.awaited_from,
+                        to: &wait.label,
+                        overridden: &need.basis,
+                        decision: wait.awaited_decision,
+                    },
+                )
+                .await?,
+            );
+            Some(first)
+        }
+        (Some(_), None) if about_time(&need.question) => None,
+        (Some(to), None) => Some(
             correct(
                 &mut tx,
                 access,
@@ -481,7 +583,7 @@ async fn judge(
             .await?,
         ),
         // Done or Already paid file nothing: an earlier confirmation stays.
-        None => earlier_correction,
+        (None, _) => earlier_correction,
     };
     // Not needed after Still to pay (or a confirmation) on this message: the
     // earlier "owed" correction no longer holds, so the labels never say both.
@@ -504,6 +606,21 @@ async fn judge(
     )
     .execute(&mut *tx)
     .await?;
+    // Who the member said has the move, kept with the verdict (or cleared,
+    // for any other answer). A runtime query, so the columns added since need
+    // no entry in the `.sqlx` offline cache.
+    sqlx::query(
+        "UPDATE conversations.needs
+            SET verdict_awaited_name = $2, verdict_awaited_address = $3,
+                verdict_extra_correction_id = $4
+          WHERE conversation_id = $1",
+    )
+    .bind(id)
+    .bind(wait.as_ref().map(|w| w.party.name.trim().to_owned()))
+    .bind(wait.as_ref().map(|w| w.party.address.trim().to_owned()))
+    .bind(extra.map(|c| *c.as_uuid()))
+    .execute(&mut *tx)
+    .await?;
     needs::refresh(
         &mut tx,
         &state.events,
@@ -521,6 +638,68 @@ async fn judge(
     track(state, &mut tx, access, judged, &summary).await?;
     tx.commit().await?;
     Ok(summary)
+}
+
+/// The person a member said has the move, with what to file about it.
+struct WaitTarget {
+    /// Who, as the email's headers gave them.
+    party: Party,
+    /// The `awaited` option that names them.
+    label: String,
+    /// What `next_move` said before (`recipient` if it was not asked).
+    moved_from: String,
+    /// The `next_move` answer, if one was stored.
+    moved_decision: Option<DecisionId>,
+    /// What `awaited` said before (`none` if it was not asked).
+    awaited_from: String,
+    /// The `awaited` answer, if one was stored.
+    awaited_decision: Option<DecisionId>,
+}
+
+/// Find `address` among the people of the email a question about a reply or
+/// an action is about, and the stored answers to correct. Only Not needed on
+/// such a question may carry one (409 `no_open_need`), and only a person the
+/// email's headers name and facts let be awaited (409 `not_a_party`).
+async fn wait_target(
+    tx: &mut Transaction<'_, Postgres>,
+    (message, question, trust): (MessageId, &str, &str),
+    verdict: NeedVerdict,
+    address: &str,
+) -> Result<WaitTarget> {
+    let asks = question == NeedQuestion::NeedsReply.as_str()
+        || question == NeedQuestion::AsksAction.as_str();
+    if verdict != NeedVerdict::NotNeeded || trust != "check" || !asks {
+        return Err(Error::Conflict(crate::MESSAGES.reason("no_open_need")));
+    }
+    let not_a_party = || Error::Conflict(crate::MESSAGES.reason("not_a_party"));
+    let people = needs::people(&mut **tx, message)
+        .await?
+        .ok_or_else(not_a_party)?;
+    let label = moves::awaited_label(&people, address).ok_or_else(not_a_party)?;
+    let party = facts::awaitable(&people)
+        .into_iter()
+        .find(|p| p.address.trim().eq_ignore_ascii_case(address.trim()))
+        .ok_or_else(not_a_party)?;
+    let stored = needs::answers(&mut **tx, message).await?;
+    let model = |id: &str| {
+        stored
+            .iter()
+            .find(|a| a.question == id && a.basis == NeedBasis::Model)
+    };
+    let said = |id: &str, otherwise: &str| {
+        model(id)
+            .and_then(|a| a.value.as_str())
+            .unwrap_or(otherwise)
+            .to_owned()
+    };
+    Ok(WaitTarget {
+        party,
+        label,
+        moved_from: said(moves::question::NEXT_MOVE, NextMove::Recipient.as_str()),
+        moved_decision: model(moves::question::NEXT_MOVE).map(|a| a.id),
+        awaited_from: said(moves::question::AWAITED, moves::question::NONE),
+        awaited_decision: model(moves::question::AWAITED).map(|a| a.id),
+    })
 }
 
 /// Whether `question` is "Still needed?": it asks about time, not about

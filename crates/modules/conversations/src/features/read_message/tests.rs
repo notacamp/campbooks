@@ -872,7 +872,7 @@ async fn run_backfill(kit: &Kit, inbox: InboxId) {
     let mut tx = kit.state.db.begin().await.unwrap();
     jobs::enqueue(
         &mut tx,
-        &crate::features::backfill_needs::DispatchNeedsBackfills,
+        &crate::features::backfill_needs::DispatchNeedsBackfills::default(),
         EnqueueOptions::default(),
     )
     .await

@@ -165,6 +165,17 @@ pub fn awaited_party(envelope: &Envelope, label: &str) -> Option<Party> {
     awaitable(envelope).into_iter().nth(index)
 }
 
+/// The `awaited` option that names the person at `address` (compared
+/// without regard to case) among those who may be awaited ([`awaitable`]):
+/// the label a member's choice is filed under. `None` when that address is
+/// not one of them.
+pub fn awaited_label(envelope: &Envelope, address: &str) -> Option<String> {
+    awaitable(envelope)
+        .iter()
+        .position(|p| p.address.trim().eq_ignore_ascii_case(address.trim()))
+        .map(option_label)
+}
+
 /// Whether an `awaited` option's `description`, as it was asked, still names
 /// `person`'s address: the check that a stored `pN`, mapped back through
 /// today's headers ([`awaited_party`]), is the person the model was shown.
@@ -312,6 +323,28 @@ mod tests {
         );
         for off in ["none", "p3", "p0", "p01", "p", "q1", "", "p-1"] {
             assert!(awaited_party(&env, off).is_none(), "{off}");
+        }
+    }
+
+    #[test]
+    fn a_member_s_choice_is_filed_under_the_label_of_the_person() {
+        let env = envelope();
+        assert_eq!(
+            awaited_label(&env, "RUI@studio.example").as_deref(),
+            Some("p2")
+        );
+        assert_eq!(
+            awaited_label(&env, " ana@studio.example ").as_deref(),
+            Some("p1")
+        );
+        // The sender, the inbox and strangers are no options.
+        for off in [
+            "joao@studio.example",
+            "inbox@example.com",
+            "eve@x.example",
+            "",
+        ] {
+            assert_eq!(awaited_label(&env, off), None, "{off}");
         }
     }
 
