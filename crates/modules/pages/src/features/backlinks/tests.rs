@@ -107,7 +107,7 @@ async fn a_person_is_found_by_address_and_only_on_readable_pages(db: PgPool) {
     assert_eq!(for_ana.json["pages"].as_array().unwrap().len(), 2);
     // An address that is not one, and a kind of record a page cannot link to.
     assert_eq!(
-        kit.get(&ana, &backlinks(workspace, "person", "Jonas Weber"))
+        kit.get(&ana, &backlinks(workspace, "person", "Jonas%20Weber"))
             .await
             .status,
         StatusCode::BAD_REQUEST

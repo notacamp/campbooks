@@ -40,22 +40,8 @@ pub const MAX_TITLE: usize = 200;
 
 /// The icons a page may have, by name: the client draws each one.
 pub const ICONS: &[&str] = &[
-    "doc",
-    "book",
-    "checklist",
-    "calendar",
-    "people",
-    "star",
-    "bulb",
-    "folder",
-    "mail",
-    "wallet",
-    "flag",
-    "heart",
-    "pin",
-    "bolt",
-    "home",
-    "globe",
+    "document", "tasks", "schedule", "people", "star", "pin", "mail", "money", "home", "inbox",
+    "archive", "image", "travel", "dining", "parcel", "ticket",
 ];
 
 /// A closed set of words kept as text in the database and as `snake_case`
@@ -387,7 +373,7 @@ mod tests {
     #[test]
     fn icons_come_from_the_fixed_set() {
         assert_eq!(clean_icon(None).unwrap(), None);
-        assert_eq!(clean_icon(Some("book")).unwrap().as_deref(), Some("book"));
+        assert_eq!(clean_icon(Some("star")).unwrap().as_deref(), Some("star"));
         assert!(clean_icon(Some("rocket")).is_err());
     }
 

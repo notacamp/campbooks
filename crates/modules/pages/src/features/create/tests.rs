@@ -16,13 +16,13 @@ async fn a_new_page_is_private_and_its_creators_and_its_event_has_no_title(db: P
         .post(
             &ana,
             &Kit::pages(workspace),
-            Some(json!({"title": "  Weekly\tplan ", "icon": "book"})),
+            Some(json!({"title": "  Weekly\tplan ", "icon": "star"})),
         )
         .await;
     assert_eq!(made.status, StatusCode::CREATED, "{:?}", made.json);
     let page = &made.json;
     assert_eq!(page["title"], "Weekly plan");
-    assert_eq!(page["icon"], "book");
+    assert_eq!(page["icon"], "star");
     assert_eq!(page["place"], "private");
     assert_eq!(page["parent"], serde_json::Value::Null);
     assert_eq!(page["role"], "manager");

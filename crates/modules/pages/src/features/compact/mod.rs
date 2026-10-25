@@ -36,7 +36,7 @@ impl Job for Compact {
         if locked.is_none() {
             return Ok(());
         }
-        let loaded = store::load(&mut **tx, self.page).await?;
+        let loaded = store::load(tx, self.page).await?;
         if loaded.tail == 0 {
             return Ok(());
         }

@@ -18,12 +18,12 @@ async fn a_title_and_icon_change_together_and_the_event_holds_neither(db: PgPool
         .patch(
             &ana,
             &uri,
-            json!({"meta_revision": 1, "title": "Weekly plan", "icon": "checklist"}),
+            json!({"meta_revision": 1, "title": "Weekly plan", "icon": "tasks"}),
         )
         .await;
     assert_eq!(renamed.status, StatusCode::OK, "{:?}", renamed.json);
     assert_eq!(renamed.json["title"], "Weekly plan");
-    assert_eq!(renamed.json["icon"], "checklist");
+    assert_eq!(renamed.json["icon"], "tasks");
     assert_eq!(renamed.json["meta_revision"], 2);
 
     let events = kit.events("pages.page_changed").await;
@@ -37,7 +37,7 @@ async fn a_title_and_icon_change_together_and_the_event_holds_neither(db: PgPool
         .patch(
             &ana,
             &uri,
-            json!({"meta_revision": 2, "title": "Weekly plan", "icon": "checklist"}),
+            json!({"meta_revision": 2, "title": "Weekly plan", "icon": "tasks"}),
         )
         .await;
     assert_eq!(same.status, StatusCode::OK);
@@ -57,7 +57,7 @@ async fn a_stale_revision_a_bad_icon_and_a_reader_are_refused(db: PgPool) {
     let body =
         |revision: i64, icon: &str| json!({"meta_revision": revision, "title": "x", "icon": icon});
 
-    let stale = kit.patch(&ana, &uri, body(7, "book")).await;
+    let stale = kit.patch(&ana, &uri, body(7, "star")).await;
     assert_eq!(stale.status, StatusCode::CONFLICT);
     assert_eq!(stale.json["code"], "page_changed");
     let icon = kit.patch(&ana, &uri, body(1, "rocket")).await;
@@ -65,7 +65,7 @@ async fn a_stale_revision_a_bad_icon_and_a_reader_are_refused(db: PgPool) {
 
     // Not shared: not there. Shared as a reader: seen, not writable.
     assert_eq!(
-        kit.patch(&rui, &uri, body(1, "book")).await.status,
+        kit.patch(&rui, &uri, body(1, "star")).await.status,
         StatusCode::NOT_FOUND
     );
     kit.put(
@@ -75,7 +75,7 @@ async fn a_stale_revision_a_bad_icon_and_a_reader_are_refused(db: PgPool) {
     )
     .await;
     assert_eq!(
-        kit.patch(&rui, &uri, body(1, "book")).await.status,
+        kit.patch(&rui, &uri, body(1, "star")).await.status,
         StatusCode::FORBIDDEN
     );
     let still = kit.get(&ana, &uri).await;

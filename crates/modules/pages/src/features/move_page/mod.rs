@@ -95,12 +95,12 @@ pub async fn handler(
     if let Some(key) = &request.position {
         position::check(key)?;
     }
-    let Some(mover) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_page(&state, &mut tx, access, Action::Write, path.page_id, true).await?;
+    let Some(mover) = access.user else {
+        return Err(Error::Forbidden);
+    };
     expect_live(&row)?;
     expect_meta_revision(&row, request.meta_revision)?;
     let before_place = row.place()?;
@@ -161,7 +161,7 @@ pub async fn handler(
     .await?;
     let mut kinds = vec![PageChangeKind::Move];
     if place != before_place {
-        let moved: Vec<PageId> = below
+        let inside: Vec<PageId> = below
             .iter()
             .map(|(id, _)| *id)
             .filter(|id| *id != path.page_id)
@@ -169,11 +169,11 @@ pub async fn handler(
         sqlx::query(
             "UPDATE pages.pages SET place = $2, revision = revision + 1 WHERE id = ANY($1)",
         )
-        .bind(&moved)
+        .bind(&inside)
         .bind(place.as_str())
         .execute(&mut *tx)
         .await?;
-        for id in moved {
+        for id in inside {
             announce(&state, &mut tx, access, id, vec![PageChangeKind::Move]).await?;
         }
         kinds.push(PageChangeKind::Share);

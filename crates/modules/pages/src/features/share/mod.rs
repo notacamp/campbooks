@@ -77,12 +77,12 @@ pub async fn share(
     extract::Json(request): extract::Json<NewGrant>,
 ) -> Result<Json<GrantView>> {
     let access = &workspace.access;
-    let Some(sharer) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_page(&state, &mut tx, access, Action::Share, path.page_id, true).await?;
+    let Some(sharer) = access.user else {
+        return Err(Error::Forbidden);
+    };
     crate::domain::expect_live(&row)?;
     if path.member_id == sharer {
         return Err(Error::BadRequest(crate::MESSAGES.reason("share_yourself")));

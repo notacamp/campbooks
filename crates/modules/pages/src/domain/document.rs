@@ -1,7 +1,7 @@
 //! A page's body as a Yjs document (`yrs`), and the checks every update
 //! passes before anything is stored.
 //!
-//! The document is one XML fragment named `default` (what TipTap's
+//! The document is one XML fragment named `default` (what `TipTap`'s
 //! collaboration extension writes): blocks, with text and inline nodes
 //! inside. The server never trusts what a client sends. It applies an update
 //! to the page's document in memory, then reads the **whole result** against

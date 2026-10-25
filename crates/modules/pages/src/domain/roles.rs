@@ -11,7 +11,7 @@
 //! Workspace owners and admins get nothing on a private page. Seeing is the
 //! lowest role: no role means the page does not exist for the caller.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::BuildHasher};
 
 use campbooks_kernel::{
     Result,
@@ -49,34 +49,34 @@ impl Caller {
     }
 }
 
-fn raise(best: Option<Role>, role: Role) -> Option<Role> {
-    Some(best.map_or(role, |held| held.max(role)))
+fn raise(best: Option<Role>, role: Role) -> Role {
+    best.map_or(role, |held| held.max(role))
 }
 
 /// The role `caller` holds on `chain[0]`, whose ancestors follow it, given
 /// the caller's `grants`.
-pub fn role_in_chain(
+pub fn role_in_chain<S: BuildHasher>(
     chain: &[Node],
-    grants: &HashMap<PageId, Role>,
+    grants: &HashMap<PageId, Role, S>,
     caller: Caller,
 ) -> Option<Role> {
     let page = chain.first()?;
     let mut best: Option<Role> = None;
     match page.place {
         Place::Workspace => {
-            best = raise(best, Role::Writer);
+            best = Some(raise(best, Role::Writer));
             if caller.owner || page.created_by == caller.user {
-                best = raise(best, Role::Manager);
+                best = Some(raise(best, Role::Manager));
             }
         }
         Place::Private => {
             if chain.iter().any(|node| node.created_by == caller.user) {
-                best = raise(best, Role::Manager);
+                best = Some(raise(best, Role::Manager));
             }
         }
     }
     if let Some(granted) = chain.iter().find_map(|node| grants.get(&node.id)) {
-        best = raise(best, *granted);
+        best = Some(raise(best, *granted));
     }
     best
 }

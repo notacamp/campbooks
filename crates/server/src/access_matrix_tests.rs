@@ -616,6 +616,17 @@ impl World {
             .await
             .unwrap();
         tx.commit().await.unwrap();
+        // Their search index is built: a caller who reads pages hears of no
+        // backfill in progress.
+        sqlx::query(
+            "INSERT INTO search.backfills (workspace_id, group_type, state, index_version, finished_at)
+             VALUES ($1, 'pages.page', 'done', $2, now())",
+        )
+        .bind(self.a.as_uuid())
+        .bind(campbooks_search::domain::index::INDEX_VERSION)
+        .execute(&self.db)
+        .await
+        .unwrap();
         (page, trashed, blob.hash.to_string())
     }
 

@@ -57,12 +57,12 @@ pub async fn trash(
     extract::Path(path): extract::Path<PagePath>,
 ) -> Result<Json<PageSummary>> {
     let access = &workspace.access;
-    let Some(member) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_page(&state, &mut tx, access, Action::Delete, path.page_id, true).await?;
+    let Some(member) = access.user else {
+        return Err(Error::Forbidden);
+    };
     if row.is_trashed() {
         return Err(Error::Conflict(crate::MESSAGES.reason("page_trashed")));
     }
@@ -134,12 +134,12 @@ pub async fn restore(
     extract::Path(path): extract::Path<PagePath>,
 ) -> Result<Json<PageSummary>> {
     let access = &workspace.access;
-    let Some(member) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_page(&state, &mut tx, access, Action::Delete, path.page_id, true).await?;
+    let Some(member) = access.user else {
+        return Err(Error::Forbidden);
+    };
     expect_trash_root(&row)?;
     let back: Vec<PageId> = sqlx::query_scalar(
         "UPDATE pages.pages

@@ -23,6 +23,10 @@ use crate::{
     scopes::PagesRead,
 };
 
+/// A page that links to the record, as the query reads it: id, title, icon,
+/// place, edited at.
+type Candidate = (PageId, String, Option<String>, String, DateTime<Utc>);
+
 /// The most pages answered.
 const LIMIT: i64 = 100;
 
@@ -112,7 +116,7 @@ pub async fn handler(
         .await?
         .or_else(|| Error::NotFound)?;
     }
-    let candidates: Vec<(PageId, String, Option<String>, String, DateTime<Utc>)> = sqlx::query_as(
+    let candidates: Vec<Candidate> = sqlx::query_as(
         "SELECT p.id, p.title, p.icon, p.place, p.edited_at
            FROM pages.pages p
           WHERE p.trashed_at IS NULL

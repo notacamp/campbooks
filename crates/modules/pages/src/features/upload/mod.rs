@@ -82,12 +82,12 @@ pub async fn handler(
     bytes: Bytes,
 ) -> Result<(StatusCode, Json<UploadedFile>)> {
     let access = &workspace.access;
-    let Some(uploader) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     let row =
         access::require_page(&state, &mut tx, access, Action::Write, path.page_id, false).await?;
+    let Some(uploader) = access.user else {
+        return Err(Error::Forbidden);
+    };
     expect_live(&row)?;
     if bytes.is_empty() {
         return Err(Error::BadRequest(crate::MESSAGES.reason("file_empty")));

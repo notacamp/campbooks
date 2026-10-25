@@ -100,7 +100,7 @@ pub async fn handler(
     let mut tx = state.db.begin_for(access.workspace).await?;
     access::require_page(&state, &mut tx, access, Action::Read, path.page_id, false).await?;
     let hash: BlobHash = path.hash.parse().map_err(|_| Error::NotFound)?;
-    let held: Option<(i64, String)> = sqlx::query_as(
+    let stored: Option<(i64, String)> = sqlx::query_as(
         "SELECT size, content_type FROM pages.files WHERE page_id = $1 AND hash = $2",
     )
     .bind(path.page_id)
@@ -108,7 +108,7 @@ pub async fn handler(
     .fetch_optional(&mut *tx)
     .await?;
     tx.commit().await?;
-    let (size, content_type) = held.ok_or(Error::NotFound)?;
+    let (size, content_type) = stored.ok_or(Error::NotFound)?;
     let blob = BlobRef {
         hash,
         size: u64::try_from(size).unwrap_or(0),
@@ -120,8 +120,8 @@ pub async fn handler(
         .await?;
     let first = stream.next().await.transpose()?;
     let image = first.as_deref().and_then(raster);
-    let head = futures_util::stream::iter(first.map(Ok::<_, BlobError>));
-    let body = Body::from_stream(head.chain(stream));
+    let lead = futures_util::stream::iter(first.map(Ok::<_, BlobError>));
+    let body = Body::from_stream(lead.chain(stream));
     let headers = [
         (
             header::CONTENT_TYPE,

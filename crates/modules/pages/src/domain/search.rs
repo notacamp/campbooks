@@ -18,6 +18,9 @@ use super::{PageId, document, resources::PAGE_RECORD, store};
 /// The record type of a page's body, the entry of its group.
 pub const BODY_RECORD: &str = "pages.body";
 
+/// A page as the index needs it: title, edited at, trashed at, revision.
+type Head = (String, DateTime<Utc>, Option<DateTime<Utc>>, i64);
+
 /// The source, for the server to register.
 pub fn source() -> Arc<dyn SearchSource> {
     Arc::new(PageSource)
@@ -40,7 +43,7 @@ impl SearchSource for PageSource {
             let Ok(page) = id.parse::<PageId>() else {
                 return Ok(None);
             };
-            let row: Option<(String, DateTime<Utc>, Option<DateTime<Utc>>, i64)> = sqlx::query_as(
+            let row: Option<Head> = sqlx::query_as(
                 "SELECT title, edited_at, trashed_at, revision FROM pages.pages WHERE id = $1",
             )
             .bind(page)
