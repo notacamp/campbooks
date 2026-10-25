@@ -237,6 +237,13 @@ pub async fn execute_asking(
             }
         }
     };
+    issue(state, &ticket, now).await
+}
+
+/// Issues `ticket` within the account's link rate limit: the URL that starts
+/// the round trip.
+async fn issue(state: &AppState, ticket: &Ticket, now: DateTime<Utc>) -> Result<StartedLink> {
+    let account = ticket.account_id;
     state
         .rate_limits
         .check(
@@ -245,7 +252,7 @@ pub async fn execute_asking(
             &RateKey::text(&format!("account:{account}")),
         )
         .await?;
-    let (token, expires_at) = links::issue(&state.db, &ticket, now).await?;
+    let (token, expires_at) = links::issue(&state.db, ticket, now).await?;
     tracing::info!(
         purpose = ticket.purpose.as_str(),
         provider = ticket.provider.as_str(),
