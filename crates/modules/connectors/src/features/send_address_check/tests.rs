@@ -2,7 +2,8 @@
 //! against the fake servers: the code sent through the mailbox's own SMTP
 //! server, found in that connection's Inbox only, the address verified and
 //! sending let through; never verified by a lying server or another
-//! check's code; the message removed by its UID only, or left; the limits.
+//! check's code; the message removed by its UID only, or left; the limits;
+//! and what is tracked of it.
 
 use axum::http::StatusCode;
 use base64::Engine as _;
@@ -23,7 +24,11 @@ use crate::{
     testkit::{Caller, Kit},
     testkit_imap::{self, FakeServer, IMAP_HOST, SMTP_HOST, Script},
     testkit_imap_mailbox::Offers,
+    tracking_tests::{job, tracked, tracked_as},
 };
+
+const REQUESTED: &str = "connectors.address_check_requested";
+const SEND_COMPLETED: &str = "connectors.address_check_send_completed";
 
 /// Ana's mailbox `ana@bakery.example`, signed in as `ana` (so its address
 /// is not proven), connected: the check is sent once the jobs run.
@@ -371,6 +376,76 @@ async fn a_server_that_will_not_send_as_the_address_fails_the_check(db: PgPool) 
         .await
         .unwrap();
     assert_eq!(reason.as_deref(), Some("address_refused"));
+    // Tracked once, as the job, with the kind of failure and never the
+    // server's reply.
+    let ended = tracked(&m.kit, SEND_COMPLETED).await;
+    assert_eq!(ended.len(), 1);
+    tracked_as(
+        &ended[0],
+        SEND_COMPLETED,
+        m.ws,
+        &job("connectors.send_address_check"),
+        None,
+    );
+    assert_eq!(ended[0].body["outcome"], "failed");
+    assert_eq!(ended[0].body["reason"], "address_refused");
+    assert_eq!(ended[0].body["connection"]["id"], m.connection);
+    assert_eq!(ended[0].body["connection"]["address_verified"], false);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_check_sent_and_asked_for_again_is_tracked(db: PgPool) {
+    let m = mailbox(db, |_| {}, |_| {}).await;
+    let ana = json!({"type": "user", "id": "ana"});
+    // The connect's check went out: tracked as the job, on Ana's behalf.
+    // The connect itself is connectors.connection_added, not an ask.
+    assert!(tracked(&m.kit, REQUESTED).await.is_empty());
+    let sent = tracked(&m.kit, SEND_COMPLETED).await;
+    assert_eq!(sent.len(), 1);
+    tracked_as(
+        &sent[0],
+        SEND_COMPLETED,
+        m.ws,
+        &job("connectors.send_address_check"),
+        None,
+    );
+    assert_eq!(sent[0].envelope["on_behalf_of"], ana);
+    assert_eq!(sent[0].body["outcome"], "sent");
+    assert!(sent[0].body.get("reason").is_none());
+    let connection = &sent[0].body["connection"];
+    assert_eq!(connection["id"], m.connection);
+    assert_eq!(connection["provider"], "imap");
+    assert_eq!(connection["address_verified"], false);
+    assert!(connection.get("address").is_none());
+
+    // Asking while it is under way changes nothing, and tracks nothing.
+    let (status, json) = m.ask_again().await;
+    assert_eq!(status, StatusCode::ACCEPTED, "{json:?}");
+    assert!(tracked(&m.kit, REQUESTED).await.is_empty());
+
+    // Once it failed, asking again starts a new check: tracked once, as Ana.
+    m.fail_check().await;
+    let (status, json) = m.ask_again().await;
+    assert_eq!(status, StatusCode::ACCEPTED, "{json:?}");
+    let requested = tracked(&m.kit, REQUESTED).await;
+    assert_eq!(requested.len(), 1);
+    tracked_as(
+        &requested[0],
+        REQUESTED,
+        m.ws,
+        &ana,
+        Some("connectors.check_address"),
+    );
+    let connection = &requested[0].body["connection"];
+    assert_eq!(connection["id"], m.connection);
+    assert_eq!(connection["provider"], "imap");
+    assert_eq!(connection["address_verified"], false);
+
+    // Its message goes out too.
+    m.kit.run_jobs().await;
+    let sent = tracked(&m.kit, SEND_COMPLETED).await;
+    assert_eq!(sent.len(), 2);
+    assert_eq!(sent[1].body["outcome"], "sent");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -392,6 +467,8 @@ async fn an_address_is_checked_at_most_five_times_a_day(db: PgPool) {
     let (status, json) = m.ask_again().await;
     assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{json:?}");
     assert_eq!(json["code"], "rate_limited");
+    // Four asks started a check; the refused one tracks nothing.
+    assert_eq!(tracked(&m.kit, REQUESTED).await.len(), 4);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

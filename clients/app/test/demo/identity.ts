@@ -25,6 +25,7 @@ export const CONNECTION: Schema<"ConnectionView"> = {
   display_name: "Ana Duarte",
   granted_by: "0192f1a0-0000-7000-8000-0000000000a1",
   capabilities: ["messages"],
+  offers: ["calendar"],
   health: "ok",
   health_changed_at: "2026-10-13T09:00:00Z",
   health_reason: null,
@@ -66,6 +67,8 @@ export const ZOHO_CONNECTION: Schema<"ConnectionView"> = {
   id: "0192f1a0-0000-7000-8000-0000000000c2",
   provider: "zoho",
   address: "ana.duarte@example.net",
+  // Zoho Calendar is offered only while the server's adapter is on.
+  offers: [],
   health: "needs_reauth",
   health_reason: "grant_revoked",
 };
@@ -98,6 +101,7 @@ export const IMAP_CONNECTION: Schema<"ConnectionView"> = {
   ...CONNECTION,
   id: "0192f1a0-0000-7000-8000-0000000000c5",
   provider: "imap",
+  offers: [],
   address: "ana@bakery.example",
   address_verified: false,
   address_check: "checking",

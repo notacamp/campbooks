@@ -33,6 +33,14 @@ function Door({ leave }: { leave: (url: string) => void }) {
       >
         reconnect
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          consent.start({ purpose: "reconnect", connection: "c1", capabilities: ["calendar"] });
+        }}
+      >
+        add calendar
+      </button>
       <button type="button" onClick={consent.signInAgain}>
         again
       </button>
@@ -68,6 +76,25 @@ describe("useMailboxConsent", () => {
       sign_in: false,
       workspace_id: DUARTE.id,
       return_to: HERE,
+    });
+  });
+
+  it("asks for calendar access when a reconnect names it", async () => {
+    const api = mockApi({
+      [WAYS]: ways,
+      [LINK]: { status: 201, body: { url: "/auth/start/google?link=t3", expires_at: "x" } },
+    });
+    renderWithProviders(<Door leave={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "add calendar" }));
+    await waitFor(() => {
+      expect(api.calls.find((call) => call.route === LINK)?.body).toEqual({
+        purpose: "reconnect",
+        workspace_id: DUARTE.id,
+        connection_id: "c1",
+        capabilities: ["calendar"],
+        return_to: HERE,
+      });
     });
   });
 

@@ -49,11 +49,6 @@ fn main() -> ExitCode {
     let result = match cli.command {
         Command::Check => campbooks_tracking_plan::check(&root).map(|report| {
             let mut out = String::new();
-            for warning in &report.warnings {
-                out.push_str("warning: ");
-                out.push_str(warning);
-                out.push('\n');
-            }
             if report.problems.is_empty() {
                 out.push_str("tracking plan OK");
                 Ok(out)

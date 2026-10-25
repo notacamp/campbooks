@@ -72,6 +72,9 @@ export function useMailboxConsent(
             purpose: "reconnect",
             workspace_id: workspaceId,
             connection_id: request.connection,
+            ...(request.capabilities === undefined
+              ? {}
+              : { capabilities: [...request.capabilities] }),
             return_to: returnTo,
           },
       {

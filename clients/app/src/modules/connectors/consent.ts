@@ -11,7 +11,12 @@
  */
 export type ConsentStart =
   | { purpose: "connect"; provider: string; signIn: boolean }
-  | { purpose: "reconnect"; connection: string };
+  | {
+      purpose: "reconnect";
+      connection: string;
+      /** Besides the mailbox: what to ask for (`calendar`); what it already has is kept. */
+      capabilities?: readonly string[];
+    };
 
 /**
  * What disconnecting a mailbox does to how you sign in: `removed` when its
