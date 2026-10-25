@@ -45,7 +45,7 @@ also puts the longest overdue first, people before services and the unknown,
 ## Data ownership
 
 - **attention** owns the bands. Migration
-  `20261107000000_attention__bands.sql` adds to `attention.items`:
+  `20261107020000_attention__bands.sql` adds to `attention.items`:
   `warning boolean NOT NULL DEFAULT false`, `from_person boolean NULL`,
   `plan text NULL`, `plan_on date NULL` (catalog-only). The list reads them
   with a runtime query (no `.sqlx` entry), computes the band per row and
@@ -58,7 +58,7 @@ also puts the longest overdue first, people before services and the unknown,
   the need's question being `suspicious` (the client's test until now);
   `from_person` is `!facts::is_machine_sender` over the message's envelope
   (headers only, ADR 0018), `None` when the message cannot be read.
-  Migration `20261107000100_conversations__need_facts.sql` adds
+  Migration `20261107020100_conversations__need_facts.sql` adds
   `conversations.needs.facts_version smallint NOT NULL DEFAULT 0`.
 - **tasks** owns the plan: `tasks.task_changed` already carries `plan_on`;
   attention's view of the contract reads it now.

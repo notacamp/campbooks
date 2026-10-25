@@ -1,13 +1,13 @@
 import type { TFunction } from "i18next";
 
 import type { CalendarView, EventView } from "./api/types";
-import type { DueItem } from "./due";
+import type { TaskRow } from "./due";
 import {
   cityOf,
   clock,
   dayLong,
   dayOf,
-  daysBetween,
+  dayShort,
   inZone,
   lastDay,
   minutesOf,
@@ -37,8 +37,6 @@ export function providerName(
       return undefined;
   }
 }
-
-export const dueKeyOf = (item: Pick<DueItem, "id">) => `due:${item.id}`;
 
 /** "09:30 – 10:00", "All day", "From 15:00": the short time of an event. */
 export function whenLabel(t: T, locale: string, event: EventView): string {
@@ -107,55 +105,42 @@ export function metaLine(event: EventView, calendars: readonly CalendarView[]): 
   return calendars.find((calendar) => calendar.id === event.calendar_id)?.name ?? "";
 }
 
-/** "€84.20": an amount in minor units, in the member's language. */
-function money(locale: string, amount: { minor: number; currency: string }): string {
-  try {
-    return new Intl.NumberFormat(locale, { style: "currency", currency: amount.currency }).format(
-      amount.minor / 100,
-    );
-  } catch {
-    return `${(amount.minor / 100).toFixed(2)} ${amount.currency}`;
+/** "Pay · EDP bill", or "Do · Send the lease". */
+export function dueTitle(t: T, row: TaskRow): string {
+  return t(row.task.verb === "pay" ? "due.pay" : "due.do", { title: row.task.title });
+}
+
+/** "Due today", "Due 17:00", "Overdue · 2 days", "Planned", "Planned Fri". */
+export function dueWhen(t: T, locale: string, row: TaskRow, today: Ymd): string {
+  if (row.kind === "planned") {
+    return row.late > 0
+      ? t("due.plannedOn", { day: dayShort(locale, row.task.plan_on ?? today) })
+      : t("due.planned");
   }
-}
-
-/** "Pay · EDP bill · €84.20", or "Do · Send the signed lease". */
-export function dueTitle(t: T, locale: string, item: DueItem): string {
-  if (item.verb === "pay") {
-    return item.amount === undefined || item.amount === null
-      ? t("due.pay", { title: item.title })
-      : t("due.payAmount", { title: item.title, amount: money(locale, item.amount) });
+  if (row.late > 0) {
+    return t("due.overdue", { count: row.late });
   }
-  return t("due.do", { title: item.title });
-}
-
-/** The day a task is due. */
-function dueDay(item: DueItem): Ymd {
-  return dayOf(item.due);
-}
-
-/** Whether the task is due at a time of day, not just on a date. */
-function dueAtTime(item: DueItem): boolean {
-  return item.due.length > 10;
-}
-
-/** Days past due as of `today` (0 when it is not). */
-export function overdueDays(item: DueItem, today: Ymd): number {
-  return Math.max(daysBetween(dueDay(item), today), 0);
-}
-
-/** The day a Due row stands on: its day, or today once it is overdue. */
-export function dueStandsOn(item: DueItem, today: Ymd): Ymd {
-  return dueDay(item) < today ? today : dueDay(item);
-}
-
-/** "Due today", "Due 17:00", "Overdue · 2 days". */
-export function dueWhen(t: T, locale: string, item: DueItem, today: Ymd): string {
-  const late = overdueDays(item, today);
-  if (late > 0) {
-    return t("due.overdue", { count: late });
+  if (row.minute !== undefined) {
+    return t("due.at", { time: clock(locale, row.minute) });
   }
-  if (dueAtTime(item)) {
-    return t("due.at", { time: clock(locale, minutesOf(item.due)) });
+  return row.stands === today ? t("due.today") : t("due.label");
+}
+
+/** Whether `dueWhen` says only the row's kind again ("Due", "Planned") and not a day or time. */
+export function dueWhenIsKind(row: TaskRow, today: Ymd): boolean {
+  return (
+    row.late === 0 && (row.kind === "planned" || (row.minute === undefined && row.stands !== today))
+  );
+}
+
+/**
+ * The rest of a row's second line: a Planned row says when it is due ("Due
+ * Thu"); a Due row says "Planned" when it is also planned for its day; else "Task".
+ */
+export function dueMeta(t: T, locale: string, row: TaskRow): string {
+  const due = row.task.due_on ?? undefined;
+  if (row.kind === "planned" && due !== undefined) {
+    return t("due.dueOn", { day: dayShort(locale, due) });
   }
-  return dueDay(item) === today ? t("due.today") : t("due.label");
+  return t(row.alsoPlanned ? "due.metaPlanned" : "due.meta");
 }

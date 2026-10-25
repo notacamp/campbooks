@@ -4578,7 +4578,7 @@ export interface components {
          * @description How a suggestion picks the mail that looks the same.
          * @enum {string}
          */
-        Likeness: "sender" | "list" | "sender_template" | "domain_template" | "domain" | "impersonation";
+        Likeness: "sender" | "list" | "sender_phrase" | "sender_template" | "domain_template" | "domain" | "impersonation";
         /**
          * @description What the round trip is for.
          * @enum {string}
@@ -4974,6 +4974,23 @@ export interface components {
          * @enum {string}
          */
         NoticeKind: "keep_off_home" | "archive_on_arrival";
+        /** @description The part of a sender's mail a suggestion is about (campbooks-cloud#356). */
+        NoticePattern: {
+            /** @description One recent subject of that mail, as plain text. */
+            example: string;
+            /**
+             * @description What narrows a search for the sender's mail to it, in the search
+             *     grammar (`subject:"…"`); empty when no words of it can.
+             */
+            search: string;
+            /** @description What picks it out. */
+            source: components["schemas"]["NoticePatternSource"];
+        };
+        /**
+         * @description What picks out the part of a sender's mail a suggestion is about.
+         * @enum {string}
+         */
+        NoticePatternSource: "template" | "phrase";
         /**
          * @description How a member resolves a need.
          * @enum {string}
@@ -5899,7 +5916,10 @@ export interface components {
             actions: components["schemas"]["RuleAction"][];
             /** @description The rule's conditions. */
             conditions: components["schemas"]["RuleCondition"][];
-            /** @description Why, in numbers. */
+            /**
+             * @description Why, in numbers: the counts of the part of the sender's mail it is
+             *     about.
+             */
             evidence: components["schemas"]["NoticeEvidence"];
             /** @description The suggestion. */
             id: components["schemas"]["RuleNoticeId"];
@@ -5907,6 +5927,7 @@ export interface components {
             inbox_id: components["schemas"]["InboxId"];
             /** @description What Scout noticed. */
             kind: components["schemas"]["NoticeKind"];
+            pattern?: components["schemas"]["NoticePattern"] | null;
             /** @description The sender's address. */
             sender: string;
             /** @description The name the sender gives, as plain text. */

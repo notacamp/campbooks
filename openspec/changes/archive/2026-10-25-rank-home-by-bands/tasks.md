@@ -3,8 +3,8 @@
 ## 1. Facts
 - [x] 1.1 `conversations.need_changed` v1: optional `warning` and `from_person` on the need (`events.rs`, contract, `openapi/events.json`)
 - [x] 1.2 `refresh_pass` works them out (`question = suspicious`, `!facts::is_machine_sender` over the message's envelope)
-- [x] 1.3 Migration `20261107000100_conversations__need_facts.sql`: `needs.facts_version`; a need announced with older facts is announced again; the seed wakes every open need
-- [x] 1.4 Migration `20261107000000_attention__bands.sql`: `warning`, `from_person`, `plan`, `plan_on` on `attention.items`
+- [x] 1.3 Migration `20261107020100_conversations__need_facts.sql`: `needs.facts_version`; a need announced with older facts is announced again; the seed wakes every open need
+- [x] 1.4 Migration `20261107020000_attention__bands.sql`: `warning`, `from_person`, `plan`, `plan_on` on `attention.items`
 - [x] 1.5 `project_conversation_need` keeps `warning` and `from_person`; `project_task` keeps `plan` and `plan_on`
 
 ## 2. Bands

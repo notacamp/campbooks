@@ -26,11 +26,42 @@ function nameOf(notice: RuleNotice): string {
 
 /**
  * The search for the mail a notice counts: the sender's, in the notice's
- * window (`from:` and `newer_than:`, the search grammar's own operators).
+ * window (`from:` and `newer_than:`, the search grammar's own operators),
+ * narrowed to the kind of its mail a notice is about (`subject:"…"`, from
+ * the server) when it is about one.
  */
 function noticeQuery(notice: RuleNotice): string {
   const sender = /\s/u.test(notice.sender) ? `"${notice.sender}"` : notice.sender;
-  return `from:${sender} newer_than:${String(notice.evidence.window_days)}d`;
+  const query = `from:${sender} newer_than:${String(notice.evidence.window_days)}d`;
+  const narrow = notice.pattern?.search.trim() ?? "";
+  return narrow === "" ? query : `${query} ${narrow}`;
+}
+
+/** Longest example subject the sentence quotes, in characters. */
+const EXAMPLE_CHARS = 60;
+
+/**
+ * The real subject a notice about one kind of a sender's mail quotes, cut
+ * to fit the sentence; none for a notice about all of it.
+ */
+function exampleOf(notice: RuleNotice): string | undefined {
+  const example = notice.pattern?.example.trim() ?? "";
+  if (example === "") {
+    return undefined;
+  }
+  // Whole characters as a reader sees them, so an accent or emoji is never
+  // cut in two.
+  const chars = Array.from(
+    new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(example),
+    (part) => part.segment,
+  );
+  if (chars.length <= EXAMPLE_CHARS) {
+    return example;
+  }
+  // Cut at a space when there is one late enough, never mid-word.
+  const cut = chars.slice(0, EXAMPLE_CHARS - 1).join("");
+  const space = cut.lastIndexOf(" ");
+  return `${(space > EXAMPLE_CHARS / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
 /** What Scout noticed, as one sentence and its question, in the reader's words. */
@@ -38,6 +69,7 @@ function sentence(t: Translate, locale: string, notice: RuleNotice): string {
   const { evidence } = notice;
   const number = (n: number) => new Intl.NumberFormat(locale).format(n);
   const sender = noticeSender(notice);
+  const example = exampleOf(notice);
   const counts = {
     count: evidence.received,
     n: number(evidence.received),
@@ -45,16 +77,19 @@ function sentence(t: Translate, locale: string, notice: RuleNotice): string {
     days: number(evidence.window_days),
     opened: number(evidence.opened),
     archived: number(evidence.archived_unread),
+    example: example ?? "",
   };
+  // A notice about one kind of the sender's mail names it by a real subject.
+  const like = example === undefined ? "" : "Like";
   const cadence =
     evidence.cadence === undefined || evidence.cadence === null
       ? ""
       : ` ${t(`noticed.cadence.${evidence.cadence}`)}`;
   if (notice.kind === "archive_on_arrival") {
-    return `${t("noticed.archived", counts)}${cadence} ${t("noticed.archiveAsk")}`;
+    return `${t(`noticed.archived${like}`, counts)}${cadence} ${t("noticed.archiveAsk")}`;
   }
   const stream = ruleStream(notice.actions) ?? "updates";
-  return `${t("noticed.keepOffHome", counts)}${cadence} ${t("noticed.keepOffHomeAsk", {
+  return `${t(`noticed.keepOffHome${like}`, counts)}${cadence} ${t("noticed.keepOffHomeAsk", {
     stream: streamName(t, stream),
   })}`;
 }
@@ -62,8 +97,10 @@ function sentence(t: Translate, locale: string, notice: RuleNotice): string {
 /**
  * "Scout noticed" on Home, right after the first group (campbooks-cloud#169,
  * #274, #347): one suggestion at a time from `conversations.list_rule_notices`,
- * titled with "n of N", what Scout noticed in numbers in the body font, "See
- * the N emails" (the search for them), and one row of buttons of one style:
+ * titled with "n of N", what Scout noticed in numbers in the body font (for
+ * one kind of a sender's mail, #356, with a real subject of it as an
+ * example), "See the N emails" (the search for them, narrowed to that kind),
+ * and one row of buttons of one style:
  * the notice's own verb ("Archive them…"), Something else… (with the visor)
  * and Not now (with Undo), then More: Don't suggest this (with Undo) and Ask
  * Scout (the chat about the suggestion, where one is mounted). The row folds

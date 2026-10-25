@@ -255,7 +255,7 @@ async fn the_dispatcher_reads_only_due_clocks_in_the_maintenance_scope(db: PgPoo
 /// (campbooks-cloud#358), run again (as the migration's login).
 async fn seed_need_facts(db: &PgPool) {
     let migration = std::fs::read_to_string(format!(
-        "{}/../../../migrations/20261107000100_conversations__need_facts.sql",
+        "{}/../../../migrations/20261107020100_conversations__need_facts.sql",
         env!("CARGO_MANIFEST_DIR")
     ))
     .unwrap();
