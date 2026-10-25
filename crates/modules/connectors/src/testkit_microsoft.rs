@@ -1,5 +1,5 @@
 //! A fake Microsoft (on wiremock): the mail tenant's token endpoint (refresh
-//! only, rotating refresh tokens, as Microsoft does) and Graph `/me`, for one
+//! only, each refresh token spent once and rotated) and Graph `/me`, for one
 //! fictional account at a time. Faults are switched on one by one: a refresh
 //! refused with an answer of the test's choosing, throttling, access tokens
 //! that stop working.
@@ -201,6 +201,10 @@ fn refresh(state: &mut State, body: &[u8]) -> ResponseTemplate {
             &serde_json::json!({"error": "invalid_grant", "error_codes": [70000],
                                 "error_description": "AADSTS70000: The provided grant is invalid."}),
         );
+    }
+    // The refresh token used is spent: only the rotated one works next.
+    if let Some(used) = form.get("refresh_token") {
+        state.refresh_tokens.retain(|t| t != used);
     }
     let n = state.next_id;
     state.next_id += 1;

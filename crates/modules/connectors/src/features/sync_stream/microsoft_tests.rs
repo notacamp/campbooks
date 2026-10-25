@@ -34,13 +34,9 @@ async fn due(kit: &Kit) -> DateTime<Utc> {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_healthy_grant_waits_the_longest_interval_and_reads_nothing(db: PgPool) {
     let (kit, ws, ana) = connected(db).await;
-    // The stored access token is still valid: Microsoft is not asked.
-    assert_eq!(kit.microsoft.token_calls(), 0);
-    assert!(
-        kit.microsoft.calls().is_empty(),
-        "{:?}",
-        kit.microsoft.calls()
-    );
+    // The stored access token is still valid: Microsoft is not asked
+    // again (connecting read the mailbox, once).
+    assert_eq!(kit.microsoft.calls(), ["GET /v1.0/me"]);
     let max = i64::from(kit.deps.config.poll.max_seconds);
     assert_eq!(due(&kit).await, kit.clock.now() + TimeDelta::seconds(max));
     assert_eq!(connection(&kit, ws, &ana).await["health"], "ok");
@@ -58,13 +54,14 @@ async fn a_healthy_grant_waits_the_longest_interval_and_reads_nothing(db: PgPool
     assert_eq!(connection(&kit, ws, &ana).await["health"], "ok");
     kit.next_run().await;
     assert_eq!(kit.microsoft.token_calls(), 2, "the rotated token works");
-    assert!(
+    // No Graph call: nothing is read.
+    assert_eq!(
         kit.microsoft
             .calls()
             .iter()
-            .all(|call| call.ends_with("/oauth2/v2.0/token")),
-        "no Graph call: {:?}",
-        kit.microsoft.calls()
+            .filter(|call| call.contains("/v1.0/"))
+            .count(),
+        1
     );
 }
 
