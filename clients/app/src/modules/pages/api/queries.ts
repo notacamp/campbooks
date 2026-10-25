@@ -127,7 +127,10 @@ export function useRefreshPages(workspaceId: string) {
 }
 
 /** `sync`, as the editor's synchroniser calls it. */
-export interface SyncBody { state_vector: string; update?: string }
+export interface SyncBody {
+  state_vector: string;
+  update?: string;
+}
 
 /** The calls a page takes. Each answers what the server made of it. */
 export function usePageCalls(workspaceId: string) {

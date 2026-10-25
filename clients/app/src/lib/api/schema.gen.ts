@@ -4292,7 +4292,7 @@ export interface components {
             /** @description The member. */
             member: components["schemas"]["UserId"];
             /** @description Their role on the page and its sub-pages. */
-            role: components["schemas"]["Role"];
+            role: components["schemas"]["PageRole"];
         };
         /** @description Who to hand it to. */
         HandOffTo: {
@@ -5125,7 +5125,7 @@ export interface components {
         /** @description What the member may do. */
         NewGrant: {
             /** @description `reader`, `writer` or `manager`. */
-            role: components["schemas"]["Role"];
+            role: components["schemas"]["PageRole"];
         };
         /** @description A new page. */
         NewPage: {
@@ -5265,6 +5265,11 @@ export interface components {
              */
             position?: string | null;
         };
+        /**
+         * @description What a member can do with a page, lowest first.
+         * @enum {string}
+         */
+        PageRole: "reader" | "writer" | "manager";
         /** @description One page of the tree, as `pages.list` shows it. */
         PageSummary: {
             /** @description The member who made it. */
@@ -5291,7 +5296,7 @@ export interface components {
             /** @description Where it sits among its siblings: sort by it. */
             position: string;
             /** @description What the caller can do with it. */
-            role: components["schemas"]["Role"];
+            role: components["schemas"]["PageRole"];
             /** @description Its title (empty when it has none yet). */
             title: string;
             /**
@@ -5355,7 +5360,7 @@ export interface components {
              */
             revision: number;
             /** @description What the caller can do with it. */
-            role: components["schemas"]["Role"];
+            role: components["schemas"]["PageRole"];
             /** @description Its title. */
             title: string;
             /**

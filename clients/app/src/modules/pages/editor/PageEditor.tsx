@@ -87,9 +87,9 @@ export function PageEditor({
   const nameRef = useRef(slashName);
   const pagesRef = useRef(pages);
   const helpersRef = useRef<SlashHelpers>({
-    attach: () => undefined,
-    mention: () => undefined,
-    subPage: () => undefined,
+    attach: () => {},
+    mention: () => {},
+    subPage: () => {},
   });
   // The menus are built once; these read the latest of what they need when
   // they are called (never while rendering).

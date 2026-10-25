@@ -35,6 +35,6 @@ describe("a page mention's label", () => {
   });
 
   it("is loading until the tree is", () => {
-    expect(pageLabel("w1", "p1", undefined).state).toBe("loading");
+    expect(pageLabel("w1", "p1").state).toBe("loading");
   });
 });

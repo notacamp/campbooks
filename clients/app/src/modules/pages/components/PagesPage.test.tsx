@@ -124,7 +124,9 @@ describe("the pages tree", () => {
     renderPages();
     await screen.findByText(BUDGET.title);
     expect(screen.queryByRole("button", { name: `Add a sub-page to ${BUDGET.title}` })).toBeNull();
-    expect(screen.getByRole("button", { name: `Add a sub-page to ${HANDBOOK.title}` })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: `Add a sub-page to ${HANDBOOK.title}` }),
+    ).toBeTruthy();
   });
 
   it("makes a page with New page and opens it", async () => {
