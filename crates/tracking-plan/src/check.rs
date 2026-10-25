@@ -138,8 +138,10 @@ const RESERVED_NAMES: &[&str] = &[
 ];
 
 /// Modules that own events but are no crate under `crates/modules`: their
-/// events are generated into the kernel.
-pub const PLATFORM_MODULES: &[&str] = &["kernel", "server"];
+/// events are generated into the kernel. `bff` is the server's web
+/// backend-for-frontend (`crates/server/src/bff`), whose operations, jobs
+/// and events are all `bff.*`.
+pub const PLATFORM_MODULES: &[&str] = &["kernel", "server", "bff"];
 
 /// Every rule that reads the plan alone. `modules` are the module crates
 /// (directory names under `crates/modules`).
@@ -584,7 +586,7 @@ pub type Source = (String, String);
 
 /// The rules that read the code (`sources`: every Rust file under
 /// `crates/`): each live event is tracked outside generated code and tests
-/// in its module's crate (a `server` event in the server's), a planned one
+/// in its module's crate (a `server` or `bff` event in the server's), a planned one
 /// is not, and nothing implements `TrackedEvent` by hand.
 pub fn code(plan: &Plan, sources: &[Source]) -> Vec<String> {
     let mut problems = Vec::new();
@@ -648,7 +650,7 @@ const TOOL_DIR: &str = "crates/tracking-plan/";
 pub fn source_dir(module: &str) -> String {
     match module {
         "kernel" => "crates/kernel/".to_owned(),
-        "server" => "crates/server/".to_owned(),
+        "server" | "bff" => "crates/server/".to_owned(),
         module => format!("crates/modules/{module}/"),
     }
 }
@@ -978,6 +980,26 @@ mod tests {
         let mut planned = plan.clone();
         planned.events[0].status = "planned".into();
         assert!(code(&planned, &used)[0].contains("mark it live"));
+    }
+
+    #[test]
+    fn bff_events_are_generated_into_the_kernel_and_tracked_from_the_server() {
+        assert_eq!(crate_of("bff"), "kernel");
+        assert_eq!(source_dir("bff"), "crates/server/");
+        let mut plan = good();
+        plan.events[0].module = "bff".into();
+        plan.events[0].name = "bff.thing_made".into();
+        assert!(
+            !super::plan(&plan, &modules())
+                .iter()
+                .any(|p| p.contains("no module `bff`")),
+            "bff owns events"
+        );
+        let used = vec![(
+            "crates/server/src/bff/mod.rs".to_owned(),
+            "fn f() { track(&ThingMade {}); }".to_owned(),
+        )];
+        assert_eq!(code(&plan, &used), Vec::<String>::new());
     }
 
     #[test]

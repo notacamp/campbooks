@@ -50,6 +50,11 @@ dropdowns.
   `live` (older ones are `deprecated`).
 - Properties, fields and enum values are `snake_case`. Records and enums
   belong to the event's module (snapshots come from the module's own rows).
+- The platform modules `kernel`, `server` and `bff` (the web
+  backend-for-frontend, `crates/server/src/bff`) are no crate under
+  `crates/modules`: their types are generated into the kernel's
+  `tracking.gen.rs`, and `server` and `bff` events are tracked from
+  `crates/server/`.
 - Each change of the plan adds a Changelog row with the next plan version.
   The plan version is written into every event's envelope.
 
