@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Chip, ChipRow, Text } from "~/lib/ui";
+import { Chip, Text } from "~/lib/ui";
 
 import type { TaskView } from "../api/queries";
 import {
@@ -31,7 +31,8 @@ export interface HoldTimeProps {
  * Hold time: the first three free slots of the member's working hours until
  * the task is due (or in the next 7 days), with Length (15, 30 or 60
  * minutes) and Calendar. Picking a slot holds it. The same panel in the
- * task's detail, in Home's dialog and in the calendar's task sheet.
+ * task's detail, in Home's dialog and in the calendar's task sheet; its
+ * choices wrap rather than scroll, so a phone shows them all.
  */
 export function HoldTime({
   workspaceId,
@@ -58,7 +59,7 @@ export function HoldTime({
         <Text tone="secondary" size="sm">
           {t("hold.length")}
         </Text>
-        <ChipRow label={t("hold.length")}>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t("hold.length")}>
           {HOLD_LENGTHS.map((minutes) => (
             <Chip
               key={minutes}
@@ -70,14 +71,14 @@ export function HoldTime({
               {t("hold.minutes", { minutes })}
             </Chip>
           ))}
-        </ChipRow>
+        </div>
       </div>
       {calendars.length > 1 ? (
         <div className="flex flex-col gap-1">
           <Text tone="secondary" size="sm">
             {t("hold.calendar")}
           </Text>
-          <ChipRow label={t("hold.calendar")}>
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t("hold.calendar")}>
             {calendars.map((each) => (
               <Chip
                 key={each.id}
@@ -89,7 +90,7 @@ export function HoldTime({
                 {each.campbooks ? t("hold.campbooks") : each.name}
               </Chip>
             ))}
-          </ChipRow>
+          </div>
         </div>
       ) : null}
       <div className="flex flex-col gap-1">
@@ -103,7 +104,7 @@ export function HoldTime({
         ) : slots.length === 0 ? (
           <Text tone="secondary">{none}</Text>
         ) : (
-          <ChipRow label={t("hold.slots")}>
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t("hold.slots")}>
             {slots.map((slot) => (
               <Chip
                 key={slot.starts}
@@ -114,7 +115,7 @@ export function HoldTime({
                 {heldLabel(slot, i18n.language)}
               </Chip>
             ))}
-          </ChipRow>
+          </div>
         )}
       </div>
     </div>
