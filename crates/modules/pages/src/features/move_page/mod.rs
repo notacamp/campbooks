@@ -120,8 +120,11 @@ pub async fn handler(
         }
         None => request.place.unwrap_or(before_place),
     };
-    if place != before_place {
-        // Who reads it changes: that is sharing it.
+    // Who reads it changes with its place, and inside the private place with
+    // its parent too (what a page is under decides who holds it): that is
+    // sharing it. Reordering among the same siblings is only writing.
+    let reparented = request.parent != row.parent_id;
+    if place != before_place || (place == Place::Private && reparented) {
         access::require_page(&state, &mut tx, access, Action::Share, path.page_id, false).await?;
     }
 

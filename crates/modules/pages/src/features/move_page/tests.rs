@@ -171,3 +171,99 @@ async fn moving_between_places_needs_the_right_to_share_and_takes_sub_pages_alon
         .await;
     assert_eq!(child_now.json["place"], "private");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_writer_cannot_take_a_private_page_away_from_its_owner(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let (rui, rui_id) = kit.member("rui", workspace);
+    let uri = Kit::pages(workspace);
+    let top = kit.add(&ana, workspace, json!({"title": "P"})).await;
+    let sub = kit
+        .add(&ana, workspace, json!({"title": "S", "parent": top["id"]}))
+        .await;
+    let mine = kit.add(&rui, workspace, json!({"title": "R"})).await;
+    kit.put(
+        &ana,
+        &format!("{uri}/{}/grants/{rui_id}", top["id"].as_str().unwrap()),
+        json!({"role": "writer"}),
+    )
+    .await;
+    let refused = kit
+        .post(
+            &rui,
+            &format!("{uri}/{}/move", sub["id"].as_str().unwrap()),
+            Some(json!({"meta_revision": 1, "parent": mine["id"]})),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{:?}", refused.json);
+    let still = kit
+        .get(&ana, &format!("{uri}/{}", sub["id"].as_str().unwrap()))
+        .await;
+    assert_eq!(still.json["parent"], top["id"]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_writer_cannot_share_a_page_by_moving_it_under_a_shared_one(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let (rui, rui_id) = kit.member("rui", workspace);
+    let (carol, carol_id) = kit.member("carol", workspace);
+    let uri = Kit::pages(workspace);
+    let x = kit.add(&ana, workspace, json!({"title": "X"})).await;
+    let q = kit.add(&rui, workspace, json!({"title": "Q"})).await;
+    let x_uri = format!("{uri}/{}", x["id"].as_str().unwrap());
+    kit.put(
+        &ana,
+        &format!("{x_uri}/grants/{rui_id}"),
+        json!({"role": "writer"}),
+    )
+    .await;
+    kit.put(
+        &rui,
+        &format!("{uri}/{}/grants/{carol_id}", q["id"].as_str().unwrap()),
+        json!({"role": "reader"}),
+    )
+    .await;
+    let refused = kit
+        .post(
+            &rui,
+            &format!("{x_uri}/move"),
+            Some(json!({"meta_revision": 1, "parent": q["id"]})),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{:?}", refused.json);
+    assert_eq!(kit.get(&carol, &x_uri).await.status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_writer_may_reorder_among_the_same_siblings(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let (rui, rui_id) = kit.member("rui", workspace);
+    let uri = Kit::pages(workspace);
+    let top = kit.add(&ana, workspace, json!({"title": "P"})).await;
+    let first = kit
+        .add(&ana, workspace, json!({"title": "A", "parent": top["id"]}))
+        .await;
+    kit.add(&ana, workspace, json!({"title": "B", "parent": top["id"]}))
+        .await;
+    kit.put(
+        &ana,
+        &format!("{uri}/{}/grants/{rui_id}", top["id"].as_str().unwrap()),
+        json!({"role": "writer"}),
+    )
+    .await;
+    let moved = kit
+        .post(
+            &rui,
+            &format!("{uri}/{}/move", first["id"].as_str().unwrap()),
+            Some(json!({"meta_revision": 1, "parent": top["id"], "position": "a9"})),
+        )
+        .await;
+    assert_eq!(moved.status, StatusCode::OK, "{:?}", moved.json);
+    assert_eq!(moved.json["position"], "a9");
+}

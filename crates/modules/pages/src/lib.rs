@@ -46,6 +46,7 @@ pub fn module(deps: Deps) -> Module {
     let mut background = Background::new()
         .publishes::<events::PageChanged>()
         .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
+        .on_event::<features::forget_member::ForgetMember>()
         .job::<features::purge_workspace::PurgeWorkspace>()
         .job::<features::compact::Compact>()
         .job::<features::purge_trash::PurgeTrash>();
@@ -118,6 +119,7 @@ mod tests {
         let kinds = registry.kind_names();
         for kind in [
             "pages.schedule_workspace_purge",
+            "pages.forget_member",
             "pages.purge_workspace",
             "pages.compact",
             "pages.purge_trash",

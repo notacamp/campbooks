@@ -40,6 +40,19 @@ pub struct NewGrant {
     pub role: Role,
 }
 
+/// Hold the member's lock until the transaction ends.
+pub async fn lock_member(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    workspace: WorkspaceId,
+    member: UserId,
+) -> Result<()> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(format!("pages.member:{workspace}:{member}"))
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
 /// Share a page with a member, or change their role.
 #[utoipa::path(
     put,
@@ -87,6 +100,9 @@ pub async fn share(
     if path.member_id == sharer {
         return Err(Error::BadRequest(crate::MESSAGES.reason("share_yourself")));
     }
+    // One at a time per member with `pages.forget_member`, so a grant never
+    // outlives the membership it was checked against.
+    lock_member(&mut tx, access.workspace, path.member_id).await?;
     let member = state
         .membership
         .role_held(&mut tx, access.workspace, path.member_id)

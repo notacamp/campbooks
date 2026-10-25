@@ -80,6 +80,24 @@ impl DomainEvent for PageChanged {
     }
 }
 
+/// `workspaces.member_left`: a member was removed or left.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberLeft {
+    /// The workspace.
+    pub workspace: String,
+    /// The former member.
+    pub user: campbooks_kernel::tenancy::UserId,
+}
+
+impl DomainEvent for MemberLeft {
+    const NAME: &'static str = "workspaces.member_left";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 /// `workspaces.workspace_deleting`: the workspace is gone at once and its
 /// data is purged at `purge_after`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

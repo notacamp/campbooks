@@ -4,6 +4,7 @@ pub mod backlinks;
 pub mod compact;
 pub mod create;
 pub mod file;
+pub mod forget_member;
 pub mod get;
 pub mod list;
 pub mod move_page;

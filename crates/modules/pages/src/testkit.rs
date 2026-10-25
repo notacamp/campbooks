@@ -191,6 +191,15 @@ impl Kit {
         (self.idp.token(&claims), user)
     }
 
+    /// `sub` is no longer a member of `workspace`.
+    pub fn remove_member(&self, sub: &str, workspace: WorkspaceId) {
+        self.membership
+            .members
+            .lock()
+            .unwrap()
+            .remove(&(sub.to_owned(), workspace));
+    }
+
     /// A token for the already-registered member `sub` with only `scopes`.
     pub fn token_with(&self, sub: &str, scopes: &str) -> String {
         let mut claims = self.idp.claims(scopes);
