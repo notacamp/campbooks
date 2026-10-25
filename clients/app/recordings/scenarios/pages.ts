@@ -17,7 +17,8 @@ type Page = ScenarioContext["page"];
 const editorOf = (page: Page) => page.getByRole("textbox", { name: "Page text" });
 
 /** Wait until the top bar says the page is saved. */
-const savedOf = (page: Page) => page.getByRole("status").filter({ hasText: "Saved" }).first().waitFor();
+const savedOf = (page: Page) =>
+  page.getByRole("status").filter({ hasText: "Saved" }).first().waitFor();
 
 export default async function pages({ page }: ScenarioContext): Promise<void> {
   const phone = (page.viewportSize()?.width ?? 1440) < 768;

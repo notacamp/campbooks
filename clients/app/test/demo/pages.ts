@@ -92,7 +92,11 @@ export function documentOf(doc: Y.Doc): { update: string; state_vector: string }
   };
 }
 
-function block(name: string, attributes: Record<string, string | number | boolean>, ...inline: (string | Y.XmlElement)[]) {
+function block(
+  name: string,
+  attributes: Record<string, string | number | boolean>,
+  ...inline: (string | Y.XmlElement)[]
+) {
   const element = new Y.XmlElement(name);
   for (const [key, value] of Object.entries(attributes)) {
     element.setAttribute(key, value as string);
@@ -107,7 +111,11 @@ function block(name: string, attributes: Record<string, string | number | boolea
 }
 
 const mention = (type: string, id: string) => block("mention", { ref_type: type, ref_id: id });
-const wrap = (name: string, attributes: Record<string, string | number | boolean>, ...inside: Y.XmlElement[]) => {
+const wrap = (
+  name: string,
+  attributes: Record<string, string | number | boolean>,
+  ...inside: Y.XmlElement[]
+) => {
   const element = new Y.XmlElement(name);
   for (const [key, value] of Object.entries(attributes)) {
     element.setAttribute(key, value as string);
@@ -134,29 +142,41 @@ export function richDoc(threadId: string, taskId: string): Y.Doc {
     wrap("taskItem", { checked }, block("paragraph", {}, text));
   const item = (...inline: (string | Y.XmlElement)[]) =>
     wrap("listItem", {}, block("paragraph", {}, ...inline));
-  doc.getXmlFragment("default").push([
-    block("heading", { level: 1 }, "How we work"),
-    block("paragraph", {}, "Welcome to Acme Studio. This is how we work together."),
-    block("paragraph", {}, "Questions go to ", mention("workspaces.member", JONAS.user_id), " first."),
-    block("heading", { level: 2 }, "This week"),
-    wrap(
-      "taskList",
-      {},
-      todo("Book the venue", true),
-      todo("Send the agenda", false),
-      todo("Confirm the budget", false),
-    ),
-    wrap("callout", { tone: "info" }, block("paragraph", {}, "The kickoff is on Thursday at 10:00.")),
-    block("heading", { level: 2 }, "Linked from here"),
-    wrap(
-      "bulletList",
-      {},
-      item("Email: ", mention("conversations.conversation", threadId)),
-      item("Task: ", mention("tasks.task", taskId)),
-      item("Budget notes: ", mention("tasks.task", SECRET_TASK_ID)),
-    ),
-    block("paragraph", {}, "Notes from the kickoff go below."),
-  ]);
+  doc
+    .getXmlFragment("default")
+    .push([
+      block("heading", { level: 1 }, "How we work"),
+      block("paragraph", {}, "Welcome to Acme Studio. This is how we work together."),
+      block(
+        "paragraph",
+        {},
+        "Questions go to ",
+        mention("workspaces.member", JONAS.user_id),
+        " first.",
+      ),
+      block("heading", { level: 2 }, "This week"),
+      wrap(
+        "taskList",
+        {},
+        todo("Book the venue", true),
+        todo("Send the agenda", false),
+        todo("Confirm the budget", false),
+      ),
+      wrap(
+        "callout",
+        { tone: "info" },
+        block("paragraph", {}, "The kickoff is on Thursday at 10:00."),
+      ),
+      block("heading", { level: 2 }, "Linked from here"),
+      wrap(
+        "bulletList",
+        {},
+        item("Email: ", mention("conversations.conversation", threadId)),
+        item("Task: ", mention("tasks.task", taskId)),
+        item("Budget notes: ", mention("tasks.task", SECRET_TASK_ID)),
+      ),
+      block("paragraph", {}, "Notes from the kickoff go below."),
+    ]);
   return doc;
 }
 
@@ -166,11 +186,7 @@ export function viewOf(summary: Summary, lines: string[]): View {
 }
 
 /** The page as `pages.get` returns it, with `doc` as its body. */
-export function viewOfDoc(
-  summary: Summary,
-  doc: Y.Doc,
-  extra: Partial<View> = {},
-): View {
+export function viewOfDoc(summary: Summary, doc: Y.Doc, extra: Partial<View> = {}): View {
   return {
     ...summary,
     created_at: "2026-10-01T09:00:00Z",

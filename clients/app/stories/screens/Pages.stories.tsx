@@ -45,7 +45,7 @@ const ALL_PAGES = [HANDBOOK, ONBOARDING, HOLIDAYS, IDEAS, BUDGET, OLD_NOTES, MAD
 const MEMBERS = [...TEAM, JONAS];
 
 type Summary = (typeof PAGES)[number];
-type Grant = { member: string; role: "reader" | "writer" | "manager" };
+interface Grant { member: string; role: "reader" | "writer" | "manager" }
 
 /** What the server holds, from the start. */
 function fresh() {
@@ -370,7 +370,10 @@ function at(name: string, width: number, height: number) {
 // ticking, sharing and trashing (no `play`).
 
 /** The tree, nothing open. */
-export const TheTreeIdle: Story = { args: { path: PATH, api: pages() }, ...at("desktop", 1440, 900) };
+export const TheTreeIdle: Story = {
+  args: { path: PATH, api: pages() },
+  ...at("desktop", 1440, 900),
+};
 
 /** A rich page open beside the tree. */
 export const PageOpenIdle: Story = {
@@ -388,7 +391,10 @@ export const NewPageIdle: Story = {
 export const TrashIdle: Story = { args: { path: PATH, api: pages() }, ...at("desktop", 1440, 900) };
 
 /** The tree screen on a phone. */
-export const TheTreePhoneIdle: Story = { args: { path: PATH, api: pages() }, ...at("phone", 375, 812) };
+export const TheTreePhoneIdle: Story = {
+  args: { path: PATH, api: pages() },
+  ...at("phone", 375, 812),
+};
 
 /** A page open on a phone. */
 export const PageOpenPhoneIdle: Story = {

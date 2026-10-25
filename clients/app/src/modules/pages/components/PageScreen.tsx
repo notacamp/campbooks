@@ -23,7 +23,7 @@ import { useBacklinks, usePage } from "../api/queries";
 import { PageEditor } from "../editor/PageEditor";
 import type { SaveState } from "../editor/sync";
 import { usePageDocument } from "../editor/use-page-document";
-import { type PageSummary, type PageView } from "../types";
+import type { PageSummary, PageView } from "../types";
 
 import { IconPicker } from "./IconPicker";
 import { ShareMenu } from "./ShareMenu";
