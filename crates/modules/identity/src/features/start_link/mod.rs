@@ -160,15 +160,7 @@ pub async fn execute_asking(
 ) -> Result<StartedLink> {
     let (issuer, account) = super::account(deps, principal)?;
     let now = issuer.now();
-    let asked: Vec<String> = capabilities
-        .iter()
-        .chain(&input.capabilities)
-        .cloned()
-        .collect();
-    let capabilities = asked.as_slice();
-    if input.capabilities.iter().any(|name| name != "calendar") {
-        return Err(Error::BadRequest(MESSAGES.reason("link_incomplete")));
-    }
+    let capabilities = &asked_capabilities(&input, capabilities)?;
     let return_to = web::return_to(input.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
     let incomplete = || Error::BadRequest(MESSAGES.reason("link_incomplete"));
@@ -267,6 +259,15 @@ pub async fn execute_asking(
         ),
         expires_at,
     })
+}
+
+/// What a consent asks for besides the mailbox: the door's `capabilities` and
+/// the request's own, which may only name `calendar`.
+fn asked_capabilities(input: &StartLink, door: &[String]) -> Result<Vec<String>> {
+    if input.capabilities.iter().any(|name| name != "calendar") {
+        return Err(Error::BadRequest(MESSAGES.reason("link_incomplete")));
+    }
+    Ok(door.iter().chain(&input.capabilities).cloned().collect())
 }
 
 /// The capabilities of `asked` and `held` other than the mailbox, once each:
