@@ -33,9 +33,9 @@
 
 ## 5. Close
 
-- [ ] 5.1 OpenAPI, client types and tracking plan regenerated (no plan change), changelog entry file
-- [ ] 5.2 Gates green; UI verified at 375px and desktop; the recording left to the maintainer (`## Recording` in the PR)
-- [ ] 5.3 Change archived into `openspec/specs/`
+- [x] 5.1 OpenAPI, client types and tracking plan regenerated (no plan change), changelog entry file
+- [x] 5.2 Gates green; UI verified at 375px and desktop; the recording left to the maintainer (`## Recording` in the PR)
+- [x] 5.3 Change archived into `openspec/specs/`
 
 ## 6. Follow-up (not in this change)
 
