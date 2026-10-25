@@ -273,3 +273,38 @@ the same way it learns which connectors are offered.
   transaction. If it shows in Loki timings, debounce it like the event.
 - **Compaction races.** Snapshot and tail are read in one statement, and
   compaction deletes only `seq <= upto_seq` in its own transaction.
+
+## Deviations while building
+
+- **`meta_revision`.** `pages.update` and `pages.move` check a separate
+  `meta_revision` (title, icon, place, position), not `revision`, which grows
+  with every body change; otherwise typing would make renaming conflict.
+- **Two extra operations**, `pages.upload_file` (raw bytes, 20 MiB, held by
+  the page through `pages.files` and the kernel's blob references) and
+  `pages.get_file` (raster images inline by their first bytes, everything
+  else as an opaque download). A file block may only name a blob uploaded to
+  its page or by the caller.
+- **A `purge` kind** on `pages.page_changed`, so purging is announced as a
+  delete to the change feed and to search.
+- **Icons** are the design system's icon names (`document`, `tasks`, ...).
+- **Mentions** are read through each record's own HTTP read operation with
+  the viewer's token, not by importing other modules' hooks.
+- **`@tiptap/y-tiptap`** (TipTap 3's fork of y-prosemirror, same document
+  format) replaces `y-prosemirror`.
+- **Schedule.** The daily trash purge is scheduled only while pages are on;
+  compaction, the workspace purge and the departed-member handler stay
+  registered (they only act on rows that exist).
+- **`deny.toml`** ignores RUSTSEC-2026-0215 (smallstr, unmaintained, only
+  through `yrs`).
+- **Moving.** A move that changes the place, or the parent within the private
+  place, needs `Share` on the page as well as `Write` on the destination;
+  reordering among the same siblings needs only `Write`. In the workspace
+  place a parent change needs only `Write`, since every member reads every
+  workspace page. Left open on purpose: a manager grant on the new ancestor
+  makes that member manager of the moved page; trash is recoverable for 30
+  days.
+- **A departed member.** `pages.forget_member` deletes their grants (unless
+  they are a member again); their private pages stay, as does everything
+  they made in the workspace place. `pages.share` and the handler take the
+  same per-member advisory lock and the handler re-checks the membership, so
+  a share racing a departure leaves no grant behind (cloud #291).
