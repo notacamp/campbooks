@@ -61,6 +61,11 @@ mod testkit_imap;
 mod testkit_imap_mailbox;
 #[cfg(test)]
 mod testkit_zoho;
+/// The module's tracked events, generated from the tracking plan (ADR 0020).
+#[path = "tracking.gen.rs"]
+pub mod tracking;
+#[cfg(test)]
+mod tracking_tests;
 mod zoho;
 
 pub use deps::{CREDENTIALS_PURPOSE, Deps};

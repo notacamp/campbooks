@@ -28,8 +28,10 @@ use crate::{
         model::InvitationId,
         resources::INVITATION_RECORD,
         security::{self, SecurityKind},
+        tracked,
     },
     scopes::WorkspacesAdmin,
+    tracking,
 };
 
 /// Whom to invite.
@@ -148,6 +150,17 @@ pub async fn execute(state: &AppState, access: &Access, input: InviteMember) -> 
     if already_member {
         return Err(Error::Conflict(MESSAGES.reason("already_a_member")));
     }
+    // The pending invitations this one replaces, by id (for the tracked
+    // event), then gone.
+    let replaced: Vec<uuid::Uuid> = sqlx::query_scalar(
+        "SELECT id FROM workspaces.invitations
+          WHERE workspace_id = $1 AND email = $2 AND accepted_at IS NULL
+          ORDER BY id",
+    )
+    .bind(id)
+    .bind(&email)
+    .fetch_all(&mut *tx)
+    .await?;
     sqlx::query!(
         "DELETE FROM workspaces.invitations
           WHERE workspace_id = $1 AND email = $2 AND accepted_at IS NULL",
@@ -182,6 +195,18 @@ pub async fn execute(state: &AppState, access: &Access, input: InviteMember) -> 
         serde_json::json!({ "invitation": invitation_id, "role": input.role }),
     )
     .await?;
+    let invitation = tracked::invitation(&mut tx, invitation_id).await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::InvitationCreated {
+                workspace: id,
+                invitation,
+                replaced,
+            },
+        )
+        .await?;
     tx.commit().await?;
     Ok(Issued {
         invitation: InvitationView {

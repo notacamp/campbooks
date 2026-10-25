@@ -474,8 +474,9 @@ impl Kit {
         let door = Arc::new(FakeDoor::default());
         let outbound = Arc::new(FakeOutbound::default());
         let calendar = Arc::new(FakeCalendar::default());
-        let state = idp
-            .state(pool)
+        // Tracked events go to the outbox, so every test runs the tracking
+        // code and can read events back (`tracking_tests.rs`).
+        let state = testing::tracking_outbox(idp.state(pool))
             .with_blobs(blobs)
             .with_membership(membership.clone())
             .with_consent_door(door.clone())

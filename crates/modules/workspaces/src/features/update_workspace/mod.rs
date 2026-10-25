@@ -16,10 +16,12 @@ use crate::{
     domain::{
         access::{acting_user, authorize, lock_workspace, workspace_resource},
         model::{Accent, WorkspaceView, workspace_name},
+        tracked,
     },
     events::WorkspaceUpdated,
     features::get_workspace,
     scopes::WorkspacesAdmin,
+    tracking,
 };
 
 /// The settings to change; absent fields stay as they are.
@@ -102,6 +104,13 @@ pub async fn execute(
         .map(|(field, _)| field.to_owned())
         .collect();
     if !fields.is_empty() {
+        let changed_settings = [
+            (changed.name, tracking::WorkspaceSetting::Name),
+            (changed.accent, tracking::WorkspaceSetting::Accent),
+        ]
+        .into_iter()
+        .filter_map(|(changed, setting)| changed.then_some(setting))
+        .collect();
         state
             .events
             .publish(
@@ -110,6 +119,18 @@ pub async fn execute(
                     workspace: access.workspace.to_string(),
                     fields,
                     updated_by: actor,
+                },
+            )
+            .await?;
+        let workspace_snapshot = tracked::workspace(&mut tx, access.workspace).await?;
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::WorkspaceUpdated {
+                    workspace: access.workspace,
+                    workspace_snapshot,
+                    fields: changed_settings,
                 },
             )
             .await?;

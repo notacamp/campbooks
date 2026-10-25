@@ -1,0 +1,346 @@
+# The workspaces module's tracked events (campbooks-cloud#328, OpenSpec change
+# track-workspaces-events): every mutating operation, event handler and job of
+# the module gets a Coverage row. Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0005-workspaces.yaml`.
+changelog:
+  - date: "2026-10-25"
+    plan_version: 5
+    change: "The workspaces module instrumented (campbooks-cloud#328): 16 events for workspaces created, updated, deleted and purged, members joined, role changed, left, suspended and unsuspended, invitations created, signup requests filed, approved and rejected, and signup codes minted, revoked and redeemed; records workspace, member, invitation, signup_request and signup_code; Coverage for every operation, handler and job of the module; the conversations and identity exemptions name workspaces.workspace_deleted."
+    pr: "#657"
+
+events:
+  - name: "workspaces.workspace_created"
+    version: 1
+    module: "workspaces"
+    object: "workspace"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A workspace was created; its creator is its first owner. The snapshot is the new workspace, never its name."
+    fires_when: "workspaces.create creates it, in the transaction that inserts it (with the owner's member_joined)."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.workspace_updated"
+    version: 1
+    module: "workspaces"
+    object: "workspace"
+    action: "updated"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A workspace's settings changed: which ones, never their values (the accent is an enum and is in the snapshot)."
+    fires_when: "workspaces.update changes its name or its accent; the values it already has track nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.workspace_deleted"
+    version: 1
+    module: "workspaces"
+    object: "workspace"
+    action: "deleted"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A workspace was deleted: hidden at once, every module purges its data, and its own records are purged after the grace period. The snapshot carries when it was deleted and when it is purged."
+    fires_when: "workspaces.delete deletes it, in the transaction that publishes workspaces.workspace_deleting and schedules the purge."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.workspace_purged"
+    version: 1
+    module: "workspaces"
+    object: "workspace"
+    action: "purged"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A deleted workspace's records were hard-deleted at the end of its grace period. The snapshot is the workspace as it stood when purged."
+    fires_when: "The workspaces.purge_workspace job deletes the workspace's row, in that transaction; a workspace purged already, or no longer deleted, tracks nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.member_joined"
+    version: 1
+    module: "workspaces"
+    object: "member"
+    action: "joined"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A person became a member of a workspace: by creating it, or by accepting an invitation (which the event then carries, accepted)."
+    fires_when: "workspaces.create adds its creator as owner, or workspaces.accept_invitation adds the invitee; in the transaction that inserts the membership."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.member_role_changed"
+    version: 1
+    module: "workspaces"
+    object: "member"
+    action: "role_changed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member's role changed. The snapshot is the member afterwards; before is the role they had."
+    fires_when: "workspaces.change_role gives a member another role; giving the role they have tracks nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.member_left"
+    version: 1
+    module: "workspaces"
+    object: "member"
+    action: "left"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A person stopped being a member: they left, or a manager removed them. The snapshot is the membership as it stood when it ended."
+    fires_when: "workspaces.leave, or workspaces.remove_member (on oneself it is leaving), deletes the membership, in the transaction that publishes workspaces.member_left."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.member_suspended"
+    version: 1
+    module: "workspaces"
+    object: "member"
+    action: "suspended"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A member's account was suspended: whatever acts in their name in the workspace stops until it is lifted. Tracked in each workspace they belong to."
+    fires_when: "workspaces.announce_member_suspended announces identity.account_suspended in the workspace, in the transaction that publishes workspaces.member_suspended there; a change that leaves them as they were (a replay, an older change, a second suspension with no lift between) tracks nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.member_unsuspended"
+    version: 1
+    module: "workspaces"
+    object: "member"
+    action: "unsuspended"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A member's suspension was lifted. Tracked in each workspace they belong to."
+    fires_when: "workspaces.announce_member_unsuspended announces identity.account_unsuspended in the workspace, likewise; a lift that leaves them as they were (a replay, an older change) tracks nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.invitation_created"
+    version: 1
+    module: "workspaces"
+    object: "invitation"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "Someone was invited to a workspace. The invitation is named by its id; the invited address never appears."
+    fires_when: "workspaces.invite_member stores the invitation, replacing any pending one to the same address."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.signup_request_filed"
+    version: 1
+    module: "workspaces"
+    object: "signup_request"
+    action: "filed"
+    scope: "instance"
+    status: "live"
+    actor_types: [user]
+    description: "A person with no workspace asked to create one on an instance whose signup needs approval."
+    fires_when: "workspaces.create under the approval policy files the person's first request; asking again tracks nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.signup_request_approved"
+    version: 1
+    module: "workspaces"
+    object: "signup_request"
+    action: "approved"
+    scope: "instance"
+    status: "live"
+    actor_types: [admin]
+    description: "An administrator approved a signup request: the person may create a workspace."
+    fires_when: "workspaces.admin_approve_signup_request approves a request that was not approved; a retry tracks nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.signup_request_rejected"
+    version: 1
+    module: "workspaces"
+    object: "signup_request"
+    action: "rejected"
+    scope: "instance"
+    status: "live"
+    actor_types: [admin]
+    description: "An administrator turned a signup request down. Whether they gave a reason is kept, never the reason."
+    fires_when: "workspaces.admin_reject_signup_request rejects a request that was not rejected; a retry tracks nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.signup_code_minted"
+    version: 1
+    module: "workspaces"
+    object: "signup_code"
+    action: "minted"
+    scope: "instance"
+    status: "live"
+    actor_types: [admin]
+    description: "An administrator minted a signup code. The code and its label never appear."
+    fires_when: "workspaces.admin_mint_signup_code stores it."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.signup_code_revoked"
+    version: 1
+    module: "workspaces"
+    object: "signup_code"
+    action: "revoked"
+    scope: "instance"
+    status: "live"
+    actor_types: [admin]
+    description: "An administrator revoked a signup code: it can no longer be redeemed."
+    fires_when: "workspaces.admin_revoke_signup_code revokes a code that was not revoked; a retry tracks nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+  - name: "workspaces.signup_code_redeemed"
+    version: 1
+    module: "workspaces"
+    object: "signup_code"
+    action: "redeemed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A use of a minted signup code was spent creating a workspace: the event belongs to the workspace it opened."
+    fires_when: "workspaces.create spends the code, in the transaction that creates the workspace. A code from the instance's configuration is not a minted one and tracks nothing."
+    added_in: 5
+    openspec_change: "track-workspaces-events"
+
+properties:
+  - { event: "workspaces.workspace_created", version: 1, property: "workspace_snapshot", type: "record", of: "workspaces.workspace", required: true, classification: "operational", description: "The new workspace." }
+  - { event: "workspaces.workspace_updated", version: 1, property: "workspace_snapshot", type: "record", of: "workspaces.workspace", required: true, classification: "operational", description: "The workspace afterwards." }
+  - { event: "workspaces.workspace_updated", version: 1, property: "fields", type: "enum", list: true, of: "workspaces.workspace_setting", required: true, classification: "operational", description: "The settings that changed." }
+  - { event: "workspaces.workspace_deleted", version: 1, property: "workspace_snapshot", type: "record", of: "workspaces.workspace", required: true, classification: "operational", description: "The workspace, deleted." }
+  - { event: "workspaces.workspace_purged", version: 1, property: "workspace_snapshot", type: "record", of: "workspaces.workspace", required: true, classification: "operational", description: "The workspace as it stood when purged." }
+  - { event: "workspaces.member_joined", version: 1, property: "member", type: "record", of: "workspaces.member", required: true, classification: "operational", description: "The new member." }
+  - { event: "workspaces.member_joined", version: 1, property: "via", type: "enum", of: "workspaces.joined_via", required: true, classification: "operational", description: "How they joined." }
+  - { event: "workspaces.member_joined", version: 1, property: "invitation", type: "record", of: "workspaces.invitation", required: false, classification: "operational", description: "The invitation they accepted, when they joined by one." }
+  - { event: "workspaces.member_role_changed", version: 1, property: "member", type: "record", of: "workspaces.member", required: true, classification: "operational", description: "The member with their new role." }
+  - { event: "workspaces.member_role_changed", version: 1, property: "before", type: "enum", of: "workspaces.role", required: true, classification: "operational", description: "The role they had." }
+  - { event: "workspaces.member_left", version: 1, property: "member", type: "record", of: "workspaces.member", required: true, classification: "operational", description: "The membership as it stood when it ended." }
+  - { event: "workspaces.member_left", version: 1, property: "how", type: "enum", of: "workspaces.departure", required: true, classification: "operational", description: "Whether they left or were removed." }
+  - { event: "workspaces.member_left", version: 1, property: "mail", type: "enum", of: "workspaces.mail_choice", required: true, classification: "operational", description: "What becomes of the mail of the mailboxes they connected." }
+  - { event: "workspaces.member_suspended", version: 1, property: "member", type: "record", of: "workspaces.member", required: true, classification: "operational", description: "The member, suspended." }
+  - { event: "workspaces.member_unsuspended", version: 1, property: "member", type: "record", of: "workspaces.member", required: true, classification: "operational", description: "The member, no longer suspended." }
+  - { event: "workspaces.invitation_created", version: 1, property: "invitation", type: "record", of: "workspaces.invitation", required: true, classification: "operational", description: "The new invitation." }
+  - { event: "workspaces.invitation_created", version: 1, property: "replaced", type: "id", list: true, required: true, classification: "id", description: "The pending invitations to the same address it replaced (deleted), by id; usually none." }
+  - { event: "workspaces.signup_request_filed", version: 1, property: "signup_request", type: "record", of: "workspaces.signup_request", required: true, classification: "operational", description: "The new request." }
+  - { event: "workspaces.signup_request_approved", version: 1, property: "signup_request", type: "record", of: "workspaces.signup_request", required: true, classification: "operational", description: "The request, approved." }
+  - { event: "workspaces.signup_request_approved", version: 1, property: "before", type: "enum", of: "workspaces.signup_request_status", required: true, classification: "operational", description: "Where it stood before." }
+  - { event: "workspaces.signup_request_rejected", version: 1, property: "signup_request", type: "record", of: "workspaces.signup_request", required: true, classification: "operational", description: "The request, rejected." }
+  - { event: "workspaces.signup_request_rejected", version: 1, property: "before", type: "enum", of: "workspaces.signup_request_status", required: true, classification: "operational", description: "Where it stood before." }
+  - { event: "workspaces.signup_code_minted", version: 1, property: "signup_code", type: "record", of: "workspaces.signup_code", required: true, classification: "operational", description: "The new code, without the code itself or its label." }
+  - { event: "workspaces.signup_code_revoked", version: 1, property: "signup_code", type: "record", of: "workspaces.signup_code", required: true, classification: "operational", description: "The code, revoked." }
+  - { event: "workspaces.signup_code_redeemed", version: 1, property: "signup_code", type: "record", of: "workspaces.signup_code", required: true, classification: "operational", description: "The code after the use was spent." }
+
+records:
+  - { record: "workspaces.workspace", field: "id", type: "id", required: true, classification: "id", description: "The workspace's id." }
+  - { record: "workspaces.workspace", field: "kind", type: "enum", enum: "workspaces.kind", required: true, classification: "operational", description: "What it is for." }
+  - { record: "workspaces.workspace", field: "accent", type: "enum", enum: "workspaces.accent", required: true, classification: "operational", description: "Its colour preset." }
+  - { record: "workspaces.workspace", field: "member_count", type: "int", required: true, classification: "operational", description: "How many members it has." }
+  - { record: "workspaces.workspace", field: "created_at", type: "timestamp", required: true, classification: "operational", description: "When it was created." }
+  - { record: "workspaces.workspace", field: "deleted_at", type: "timestamp", required: false, classification: "operational", description: "When it was deleted, if it was." }
+  - { record: "workspaces.workspace", field: "purge_after", type: "timestamp", required: false, classification: "operational", description: "When a deleted workspace's records are purged." }
+  - { record: "workspaces.member", field: "user_id", type: "id", required: true, classification: "pseudonymous", description: "The member: their user id." }
+  - { record: "workspaces.member", field: "role", type: "enum", enum: "workspaces.role", required: true, classification: "operational", description: "Their role." }
+  - { record: "workspaces.member", field: "suspended", type: "bool", required: true, classification: "operational", description: "Whether their account is suspended, as this module last announced it." }
+  - { record: "workspaces.member", field: "joined_at", type: "timestamp", required: true, classification: "operational", description: "When they joined." }
+  - { record: "workspaces.invitation", field: "id", type: "id", required: true, classification: "id", description: "The invitation's id." }
+  - { record: "workspaces.invitation", field: "role", type: "enum", enum: "workspaces.role", required: true, classification: "operational", description: "The role the invitee gets on accepting (admin or member)." }
+  - { record: "workspaces.invitation", field: "state", type: "enum", enum: "workspaces.invitation_state", required: true, classification: "operational", description: "Where it stands." }
+  - { record: "workspaces.invitation", field: "invited_by", type: "id", required: true, classification: "pseudonymous", description: "Who invited: their user id." }
+  - { record: "workspaces.invitation", field: "created_at", type: "timestamp", required: true, classification: "operational", description: "When it was sent." }
+  - { record: "workspaces.invitation", field: "expires_at", type: "timestamp", required: true, classification: "operational", description: "When it stops working." }
+  - { record: "workspaces.invitation", field: "accepted_at", type: "timestamp", required: false, classification: "operational", description: "When it was accepted." }
+  - { record: "workspaces.invitation", field: "accepted_by", type: "id", required: false, classification: "pseudonymous", description: "Who accepted it: their user id." }
+  - { record: "workspaces.signup_request", field: "user_id", type: "id", required: true, classification: "pseudonymous", description: "The requesting user (also the request's id)." }
+  - { record: "workspaces.signup_request", field: "status", type: "enum", enum: "workspaces.signup_request_status", required: true, classification: "operational", description: "Where it stands." }
+  - { record: "workspaces.signup_request", field: "with_reason", type: "bool", required: true, classification: "operational", description: "Whether the administrator gave a reason (never the reason)." }
+  - { record: "workspaces.signup_request", field: "requested_at", type: "timestamp", required: true, classification: "operational", description: "When they first asked." }
+  - { record: "workspaces.signup_request", field: "decided_at", type: "timestamp", required: false, classification: "operational", description: "When an administrator decided." }
+  - { record: "workspaces.signup_code", field: "id", type: "id", required: true, classification: "id", description: "The code's id (never the code)." }
+  - { record: "workspaces.signup_code", field: "state", type: "enum", enum: "workspaces.signup_code_state", required: true, classification: "operational", description: "What it can still do." }
+  - { record: "workspaces.signup_code", field: "max_uses", type: "int", required: true, classification: "operational", description: "How many times it can be redeemed." }
+  - { record: "workspaces.signup_code", field: "uses", type: "int", required: true, classification: "operational", description: "How many times it was." }
+  - { record: "workspaces.signup_code", field: "expires_at", type: "timestamp", required: false, classification: "operational", description: "After this it cannot be redeemed." }
+  - { record: "workspaces.signup_code", field: "created_at", type: "timestamp", required: true, classification: "operational", description: "When it was minted." }
+  - { record: "workspaces.signup_code", field: "revoked_at", type: "timestamp", required: false, classification: "operational", description: "When it was revoked." }
+
+enums:
+  - { enum: "workspaces.kind", value: "business", description: "A business: a company, a freelancer, a team." }
+  - { enum: "workspaces.kind", value: "personal", description: "A household or one person's own affairs." }
+  - { enum: "workspaces.accent", value: "business", description: "The business preset." }
+  - { enum: "workspaces.accent", value: "personal", description: "The personal preset." }
+  - { enum: "workspaces.accent", value: "forest", description: "The forest preset." }
+  - { enum: "workspaces.workspace_setting", value: "name", description: "Its name (never the value)." }
+  - { enum: "workspaces.workspace_setting", value: "accent", description: "Its colour preset." }
+  - { enum: "workspaces.role", value: "owner", description: "An owner: everything, including deleting the workspace." }
+  - { enum: "workspaces.role", value: "admin", description: "An admin: settings, invitations and members (not owners)." }
+  - { enum: "workspaces.role", value: "member", description: "A member." }
+  - { enum: "workspaces.joined_via", value: "created", description: "They created the workspace (its first owner)." }
+  - { enum: "workspaces.joined_via", value: "invitation", description: "They accepted an invitation." }
+  - { enum: "workspaces.departure", value: "left", description: "They left." }
+  - { enum: "workspaces.departure", value: "removed", description: "An owner or admin removed them." }
+  - { enum: "workspaces.mail_choice", value: "delete", description: "Deleted with their connections (always when they leave)." }
+  - { enum: "workspaces.mail_choice", value: "keep", description: "Kept as read-only history for the workspace." }
+  - { enum: "workspaces.invitation_state", value: "pending", description: "It can be accepted." }
+  - { enum: "workspaces.invitation_state", value: "accepted", description: "It was accepted." }
+  - { enum: "workspaces.invitation_state", value: "expired", description: "It can no longer be accepted." }
+  - { enum: "workspaces.signup_request_status", value: "pending", description: "Waiting for an administrator." }
+  - { enum: "workspaces.signup_request_status", value: "approved", description: "Approved: the person may create a workspace." }
+  - { enum: "workspaces.signup_request_status", value: "rejected", description: "Turned down." }
+  - { enum: "workspaces.signup_code_state", value: "active", description: "It can be redeemed." }
+  - { enum: "workspaces.signup_code_state", value: "used_up", description: "Every use is spent." }
+  - { enum: "workspaces.signup_code_state", value: "expired", description: "Its expiry has passed." }
+  - { enum: "workspaces.signup_code_state", value: "revoked", description: "An administrator revoked it." }
+
+coverage:
+  - kind: "operation"
+    name: "workspaces.create"
+    events: [workspaces.workspace_created, workspaces.member_joined, workspaces.signup_code_redeemed, workspaces.signup_request_filed]
+  - kind: "operation"
+    name: "workspaces.update"
+    events: [workspaces.workspace_updated]
+  - kind: "operation"
+    name: "workspaces.delete"
+    events: [workspaces.workspace_deleted]
+  - kind: "operation"
+    name: "workspaces.invite_member"
+    events: [workspaces.invitation_created]
+  - kind: "operation"
+    name: "workspaces.accept_invitation"
+    events: [workspaces.member_joined]
+  - kind: "operation"
+    name: "workspaces.change_role"
+    events: [workspaces.member_role_changed]
+  - kind: "operation"
+    name: "workspaces.remove_member"
+    events: [workspaces.member_left]
+  - kind: "operation"
+    name: "workspaces.leave"
+    events: [workspaces.member_left]
+  - kind: "operation"
+    name: "workspaces.admin_approve_signup_request"
+    events: [workspaces.signup_request_approved]
+  - kind: "operation"
+    name: "workspaces.admin_reject_signup_request"
+    events: [workspaces.signup_request_rejected]
+  - kind: "operation"
+    name: "workspaces.admin_mint_signup_code"
+    events: [workspaces.signup_code_minted]
+  - kind: "operation"
+    name: "workspaces.admin_revoke_signup_code"
+    events: [workspaces.signup_code_revoked]
+  - kind: "handler"
+    name: "workspaces.announce_member_suspended"
+    events: [workspaces.member_suspended]
+  - kind: "handler"
+    name: "workspaces.announce_member_unsuspended"
+    events: [workspaces.member_unsuspended]
+  - kind: "job"
+    name: "workspaces.purge_workspace"
+    events: [workspaces.workspace_purged]
+  # Other modules' rows naming the deletion: the tracked event, not the domain
+  # event (workspaces.workspace_deleting) it is published with.
+  - kind: "handler"
+    name: "conversations.schedule_workspace_purge"
+    exemption: "projection of workspaces.workspace_deleted: it only schedules the purge"
+  - kind: "handler"
+    name: "identity.remove_workspace_clients"
+    exemption: "consequence of workspaces.workspace_deleted (tracked by workspaces): the deleted workspace's apps and their access go with it"

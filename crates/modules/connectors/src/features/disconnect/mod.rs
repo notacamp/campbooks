@@ -31,6 +31,7 @@ use crate::{
     events::CONNECTION_RECORD,
     features::start_connection::acting_member,
     scopes::ConnectorsWrite,
+    tracking,
 };
 
 /// What to do with the mail.
@@ -122,7 +123,15 @@ pub async fn execute(
         forbidden,
     )
     .await?;
-    removal::delete(&mut tx, state, access.workspace, id, mail).await?;
+    removal::delete(
+        &mut tx,
+        state,
+        access.workspace,
+        id,
+        mail,
+        Some(tracking::RemovalCause::Disconnected),
+    )
+    .await?;
     tx.commit().await?;
     tracing::info!(workspace = %access.workspace, %user, connection = %id, ?mail, "disconnected");
     Ok(())
