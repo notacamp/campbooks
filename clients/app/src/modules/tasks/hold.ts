@@ -119,7 +119,11 @@ export function holdSlots(free: readonly FreeSlot[], minutes: number, now: Date)
 export function heldLabel(hold: { starts: string; ends: string }, locale: string): string {
   const starts = new Date(hold.starts);
   const weekday = new Intl.DateTimeFormat(locale, { weekday: "short" }).format(starts);
-  const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" });
+  const time = new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
   return `${weekday} ${time.format(starts)}–${time.format(new Date(hold.ends))}`;
 }
 

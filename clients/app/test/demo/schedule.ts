@@ -156,7 +156,7 @@ const HOLD: Event = {
   ...base,
   id: id(12),
   kind: "hold",
-  title: "Held · Quote for Marta Lopes",
+  title: "Quote for Marta Lopes",
   starts: "2026-10-27T11:00:00+00:00",
   ends: "2026-10-27T12:30:00+00:00",
   origin: "member",

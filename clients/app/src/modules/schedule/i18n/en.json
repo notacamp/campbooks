@@ -239,5 +239,6 @@
     "remove": "Remove event",
     "push": "Add to my calendar",
     "openEmail": "Open the email"
-  }
+  },
+  "heldTitle": "Held · {{title}}"
 }
