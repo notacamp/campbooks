@@ -10,6 +10,7 @@ import {
   FoundReading,
   FoundStrip,
   KindChip,
+  KindDot,
   KindIcon,
   MonthGrid,
   WeekGrid,
@@ -35,7 +36,10 @@ export const Kinds: Story = {
       {CALENDAR_KINDS.map((kind) => (
         <div key={kind} className="flex items-center gap-3">
           <KindIcon kind={kind} />
+          <KindIcon kind={kind} size="md" />
           <KindChip kind={kind}>{kind}</KindChip>
+          <KindDot kind={kind} />
+          <KindDot kind={kind} hollow label="Only you see it" />
         </div>
       ))}
     </div>

@@ -150,5 +150,17 @@
   },
   "tasksElsewhere_one": "Encore {{count}} dans Tâches",
   "tasksElsewhere_other": "Encore {{count}} dans Tâches",
-  "openTasks": "Ouvrir Tâches"
+  "openTasks": "Ouvrir Tâches",
+  "calendar": {
+    "nextUp": "À suivre",
+    "next": "Ensuite : {{title}} à {{time}}.",
+    "more_one": "Encore {{count}} dans votre agenda aujourd’hui.",
+    "more_other": "Encore {{count}} dans votre agenda aujourd’hui.",
+    "join": "Rejoindre",
+    "openInCalendar": "Ouvrir dans l’Agenda",
+    "openEmail": "Ouvrir l’e-mail",
+    "comingTitle": "À venir",
+    "comingSub": "Les 7 prochains jours.",
+    "openCalendar": "Ouvrir l’Agenda"
+  }
 }

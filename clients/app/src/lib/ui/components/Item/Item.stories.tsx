@@ -303,3 +303,48 @@ export const WhyItsHere: Story = {
     await expect(why).toHaveTextContent("In Today: Pedro has waited 4 days.");
   },
 };
+
+/**
+ * An event among Home's rows (campbooks-cloud#359): the kind's square in
+ * place of an avatar, the kind and when it starts first, the time at the end.
+ */
+export const Event: Story = {
+  args: {
+    kind: "meeting",
+    eyebrow: { kind: "Meeting", reason: "In 20 min" },
+    who: "Call with Marta Silva",
+    what: "meet.example.com",
+    avatar: undefined,
+    due: "11:20 – 11:50",
+    tags: [],
+    selected: true,
+    actions: (
+      <ItemActions
+        label="Actions for Call with Marta Silva"
+        own={[
+          { id: "join", label: "Join", key: "item.choice1" },
+          { id: "email", label: "Open email", key: "item.choice2" },
+        ]}
+        universal={[{ id: "calendar", label: "Open in Calendar", key: "list.open" }]}
+        onAction={fn()}
+      />
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const row = within(canvasElement).getByRole("button", { name: /Call with Marta Silva/u });
+    await expect(row).toHaveTextContent(/Meeting · In 20 min.*Call with Marta Silva/u);
+  },
+};
+
+/** Held time: the neutral square, "Held" and its time. */
+export const HeldTime: Story = {
+  args: {
+    kind: "hold",
+    eyebrow: { kind: "Held", reason: "15:00" },
+    who: "Send the signed lease to Ana",
+    what: "Campbooks",
+    avatar: undefined,
+    due: "15:00 – 15:30",
+    tags: [],
+  },
+};

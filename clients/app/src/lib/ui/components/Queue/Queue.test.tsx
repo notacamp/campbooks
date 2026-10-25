@@ -86,6 +86,16 @@ describe("Queue (home)", () => {
     expect(container.querySelector("[data-signal]")).toBeNull();
   });
 
+  it("heads a group of events with its name alone", () => {
+    renderUi(
+      <QueueGroup name="Next up">
+        <p>events</p>
+      </QueueGroup>,
+    );
+
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Next up");
+  });
+
   it("drops the visor in the compact hero", () => {
     const { container } = renderUi(<PageHero compact title="5 things need you" />);
 
