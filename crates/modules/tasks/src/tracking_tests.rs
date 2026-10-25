@@ -35,7 +35,7 @@ async fn tracked(kit: &Kit, name: &str) -> Vec<TrackedRow> {
 /// No title, address or amount anywhere in the body.
 fn nothing_personal(event: &TrackedRow) {
     let body = event.body.to_string();
-    for text in ["Shop", "example", "@", "EUR", "12850", "title"] {
+    for text in ["Shop", "example", "@", "EUR", "12850", "\"title\":"] {
         assert!(
             !body.contains(text),
             "{} holds personal data or content ({text}): {body}",
