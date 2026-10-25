@@ -21,6 +21,7 @@ use crate::{
     deps::Deps,
     domain::{model::ConnectionId, removal},
     events::MemberLeft,
+    tracking,
 };
 
 /// Disconnects a departed member's connections.
@@ -74,7 +75,15 @@ impl EventConsumer for RevokeDepartedGrants {
         }
         let tx = ctx.tx().await?;
         for id in granted {
-            removal::delete(tx, &state, workspace, id, event.payload.mail).await?;
+            removal::delete(
+                tx,
+                &state,
+                workspace,
+                id,
+                event.payload.mail,
+                Some(tracking::RemovalCause::MemberLeft),
+            )
+            .await?;
         }
         Ok(())
     }

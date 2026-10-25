@@ -15,6 +15,7 @@ use crate::{
     domain::{marks::MarkIds, model::StreamId, schedule},
     events::ChangesRequested,
     testkit::{Kit, assert_contract, synthetic},
+    tracking_tests::{job, tracked, tracked_as},
 };
 
 /// A connected workspace whose mailbox holds `labels.len()` messages, synced.
@@ -348,6 +349,22 @@ async fn changes_before_a_run_are_merged(db: PgPool) {
     // One call: INBOX was put back (already there) with UNREAD taken off.
     assert_eq!(kit.google.writes().len(), 1, "{:?}", kit.google.writes());
     assert_eq!(kit.google.labels_of(&m.ids[0]), labels(&["INBOX"]));
+    // One summary of the run's push, counted by end.
+    let made = tracked(&kit, "connectors.outbound_changes_made").await;
+    assert_eq!(made.len(), 1);
+    tracked_as(
+        &made[0],
+        "connectors.outbound_changes_made",
+        m.ws,
+        &job("connectors.sync_stream"),
+        None,
+    );
+    assert_eq!(made[0].body["stream_id"], m.stream.to_string());
+    assert_eq!(made[0].body["provider"], "google");
+    assert_eq!(made[0].body["applied"], 2);
+    assert_eq!(made[0].body["superseded"], 1);
+    assert_eq!(made[0].body["skipped"], 0);
+    assert_eq!(made[0].body["failed"], 0);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -558,6 +575,11 @@ async fn a_message_that_refuses_changes_fails_alone(db: PgPool) {
     // Said once: the next run is quiet.
     m.run(&kit).await;
     assert_eq!(kit.batches(m.ws).await.len(), batches + 1);
+    // One summary of the push; the quiet run made none.
+    let made = tracked(&kit, "connectors.outbound_changes_made").await;
+    assert_eq!(made.len(), 1);
+    assert_eq!(made[0].body["applied"], 2);
+    assert_eq!(made[0].body["failed"], 1);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

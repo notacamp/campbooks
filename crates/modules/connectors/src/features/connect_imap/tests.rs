@@ -19,6 +19,7 @@ use crate::{
     imap::{Security, Servers},
     testkit::{Caller, Kit, assert_contract},
     testkit_imap::{self, FakeServer, IMAP_HOST, SMTP_HOST, Script},
+    tracking_tests::{tracked, tracked_as},
 };
 
 fn connect_uri(ws: WorkspaceId) -> String {
@@ -93,6 +94,22 @@ async fn an_app_password_connects_a_mailbox(db: PgPool) {
         !connection.to_string().contains("abcd efgh"),
         "{connection}"
     );
+    // Tracked as the member's, without the address, host or password.
+    let added = tracked(&kit, "connectors.connection_added").await;
+    assert_eq!(added.len(), 1);
+    tracked_as(
+        &added[0],
+        "connectors.connection_added",
+        ws,
+        &serde_json::json!({"type": "user", "id": "ana"}),
+        Some("connectors.connect_imap"),
+    );
+    assert_eq!(added[0].body["connection"]["id"], connection["id"]);
+    assert_eq!(added[0].body["connection"]["provider"], "imap");
+    assert_eq!(added[0].body["connection"]["address_verified"], true);
+    assert_eq!(added[0].body["connection"]["mailboxes"], 1);
+    let body = added[0].body.to_string();
+    assert!(!body.contains("yahoo") && !body.contains("abcd"), "{body}");
 
     // Both servers were signed in to, over TLS, and nothing was sent.
     assert!(imap.seen().listed);

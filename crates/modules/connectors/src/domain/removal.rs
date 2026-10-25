@@ -13,9 +13,9 @@ use uuid::Uuid;
 use super::{
     credentials,
     model::{ConnectionId, InboxId, MailChoice, Provider},
-    schedule,
+    schedule, tracked,
 };
-use crate::{deps::Deps, events::ConnectionRemoved};
+use crate::{deps::Deps, events::ConnectionRemoved, tracking};
 
 /// The blob owner type of a connection (its account document).
 pub const CONNECTION_OWNER: &str = "connectors.connection";
@@ -91,14 +91,17 @@ pub async fn revoke(state: &AppState, deps: &Deps, workspace: WorkspaceId, id: C
 
 /// Delete connection `id` and everything it holds, in `tx`, and publish
 /// [`ConnectionRemoved`] with `mail`: the conversations module then deletes
-/// the inboxes it fed, or keeps them read-only. Returns `false` if it was
-/// gone already.
+/// the inboxes it fed, or keeps them read-only. With a `cause`, the removal
+/// is tracked (`connectors.connection_removed`, the connection as it
+/// stood); a deleted workspace's connections are not. Returns `false` if it
+/// was gone already.
 pub async fn delete(
     tx: &mut Transaction<'_, Postgres>,
     state: &AppState,
     workspace: WorkspaceId,
     id: ConnectionId,
     mail: MailChoice,
+    cause: Option<tracking::RemovalCause>,
 ) -> Result<bool> {
     let workspace_key = workspace.to_string();
     // Lock the connection and its streams first: a sync writing to a stream
@@ -118,6 +121,11 @@ pub async fn delete(
     )
     .fetch_all(&mut **tx)
     .await?;
+    // The connection as it stands, locked, for the record of its removal.
+    let snapshot = match (cause, &removed) {
+        (Some(_), Some(_)) => Some(tracked::connection(&mut **tx, id).await?),
+        _ => None,
+    };
     let inbox_ids = sqlx::query_scalar!(
         r#"SELECT inbox_id AS "inbox_id!: InboxId" FROM connectors.streams
             WHERE connection_id = $1 AND inbox_id IS NOT NULL ORDER BY inbox_id"#,
@@ -183,6 +191,20 @@ pub async fn delete(
     }
     schedule::forget_budget(tx, &schedule::connection_budget(id)).await?;
     schedule::forget_budget(tx, &schedule::calendar_budget(id)).await?;
+    if let (Some(cause), Some(connection)) = (cause, snapshot) {
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::ConnectionRemoved {
+                    workspace,
+                    connection,
+                    cause,
+                    mail: tracked::mail_choice(mail),
+                },
+            )
+            .await?;
+    }
     state
         .events
         .publish(

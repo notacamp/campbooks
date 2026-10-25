@@ -1,0 +1,312 @@
+# The connectors module's tracked events (campbooks-cloud#329, OpenSpec change
+# track-connectors-events): connections added, reconnected, removed, their
+# health and sync requests; one summary per sync run and per run's outbound
+# changes; calendar changes and sends as they end. Every mutating operation,
+# job, schedule and event handler of the module gets a Coverage row. Applied
+# with `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0006-connectors.yaml`.
+changelog:
+  - date: "2026-10-25"
+    plan_version: 6
+    change: "The connectors module instrumented (campbooks-cloud#329): 10 events for connections added, reconnected, removed, their health changed and a sync asked for, sync runs (one summary per run, with counts), the outbound changes a run made (counts by end), calendar changes completed, and sends succeeded or failed; records connection, stream and send; Coverage for every operation, job, schedule and handler of the module; the identity operations that hand it a grant name the connection events."
+    pr: ""
+
+events:
+  - name: "connectors.connection_added"
+    version: 1
+    module: "connectors"
+    object: "connection"
+    action: "added"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, anonymous]
+    description: "A member connected an outside account: a new connection, with its streams. Never its address or display name."
+    fires_when: "connectors.connect_imap, or the grant-intake port (identity.finish_sign_in connecting through the front door, identity.adopt_held_grant), stores a grant for an account the workspace had no connection of, in the transaction that stores its credentials."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+  - name: "connectors.connection_reconnected"
+    version: 1
+    module: "connectors"
+    object: "connection"
+    action: "reconnected"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, anonymous]
+    description: "A member gave a grant again for the account of their existing connection (a reconnect, a consent extending it, an IMAP password given again): its health is ok and its paused streams resume."
+    fires_when: "The same seam as connectors.connection_added finds the member's connection of that account and refreshes it, in the transaction that stores its credentials."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+  - name: "connectors.connection_removed"
+    version: 1
+    module: "connectors"
+    object: "connection"
+    action: "removed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, system]
+    description: "A connection was deleted with its credentials and streams; the cause says why and mail what becomes of the mail it brought in. The snapshot is the connection as it stood."
+    fires_when: "connectors.disconnect (disconnected), or connectors.revoke_departed_grants on workspaces.member_left (member_left), deletes it, in that transaction; one gone already tracks nothing. A deleted workspace's connections are not tracked (workspaces.workspace_deleted is)."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+  - name: "connectors.connection_health_changed"
+    version: 1
+    module: "connectors"
+    object: "connection"
+    action: "health_changed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A connection's health or its reason changed: it needs the member again (needs_reauth), the provider slowed it down (throttled), its runs keep failing (failing), or a good run made it ok again. Reconnecting is connectors.connection_reconnected."
+    fires_when: "A run of connectors.sync_stream, connectors.send_message or an IMAP IDLE session sets another health or reason, in the transaction that sets it; the same health and reason again tracks nothing."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+  - name: "connectors.connection_sync_requested"
+    version: 1
+    module: "connectors"
+    object: "connection"
+    action: "sync_requested"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, client, assistant, automation]
+    description: "Someone asked for a connection's streams to run now."
+    fires_when: "connectors.sync_now schedules at least one of its streams to run now, in that transaction; a connection with no stream to run tracks nothing."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+  - name: "connectors.stream_synced"
+    version: 1
+    module: "connectors"
+    object: "stream"
+    action: "synced"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "One run of a stream (mail or calendar) read the provider and stored what changed: one summary per run, with counts, never the messages or events."
+    fires_when: "A run of connectors.sync_stream stores at least one batch of changes or moves the stream's phase (the first sync done, a resync begun), in the job's transaction that advances its cursor; a run that found nothing tracks nothing."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+  - name: "connectors.outbound_changes_made"
+    version: 1
+    module: "connectors"
+    object: "outbound_changes"
+    action: "made"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A run made members' changes to their conversations (read, starred, archived, labelled, moved) at the provider: one summary per run, with counts by how they ended."
+    fires_when: "A run of connectors.sync_stream records the end of at least one outbound change (applied, superseded, skipped or failed), in the transaction that records it; changes left pending for a later run are not counted."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+  - name: "connectors.calendar_change_completed"
+    version: 1
+    module: "connectors"
+    object: "calendar_change"
+    action: "completed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A member's change to a provider calendar's event ended: written at the provider, superseded by a change made there, skipped, or failed. The ids are the schedule module's."
+    fires_when: "A calendar run of connectors.sync_stream ends it, or connectors.record_calendar_change ends it at once (it does not stand, the connection is gone or waits for the member), in the transaction that publishes connectors.calendar_change_completed."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+  - name: "connectors.send_succeeded"
+    version: 1
+    module: "connectors"
+    object: "send"
+    action: "succeeded"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "The provider has a message a member sent: sent now, or an earlier attempt found by its lookup."
+    fires_when: "connectors.send_message marks the send sent, in the transaction that announces it; a send settled already tracks nothing."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+  - name: "connectors.send_failed"
+    version: 1
+    module: "connectors"
+    object: "send"
+    action: "failed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A send failed for good; error is the kind of failure, never the provider's words."
+    fires_when: "connectors.send_message marks the send failed (refused, too large, not connected, the grant gone, no longer standing, out of attempts), in the transaction that announces it; a send settled already tracks nothing."
+    added_in: 6
+    openspec_change: "track-connectors-events"
+
+properties:
+  - { event: "connectors.connection_added", version: 1, property: "connection", type: "record", of: "connectors.connection", required: true, classification: "operational", description: "The new connection." }
+  - { event: "connectors.connection_reconnected", version: 1, property: "connection", type: "record", of: "connectors.connection", required: true, classification: "operational", description: "The connection afterwards." }
+  - { event: "connectors.connection_reconnected", version: 1, property: "before_health", type: "enum", of: "connectors.health", required: true, classification: "operational", description: "Its health before." }
+  - { event: "connectors.connection_reconnected", version: 1, property: "capabilities_added", type: "enum", list: true, of: "connectors.capability", required: true, classification: "operational", description: "The capabilities it did not have before; usually none." }
+  - { event: "connectors.connection_reconnected", version: 1, property: "mailboxes_added", type: "int", required: true, classification: "operational", description: "Mailboxes the grant reaches that it did not read before; usually none." }
+  - { event: "connectors.connection_removed", version: 1, property: "connection", type: "record", of: "connectors.connection", required: true, classification: "operational", description: "The connection as it stood when it was removed." }
+  - { event: "connectors.connection_removed", version: 1, property: "cause", type: "enum", of: "connectors.removal_cause", required: true, classification: "operational", description: "Why it was removed." }
+  - { event: "connectors.connection_removed", version: 1, property: "mail", type: "enum", of: "connectors.mail_choice", required: true, classification: "operational", description: "What becomes of the mail it brought in." }
+  - { event: "connectors.connection_health_changed", version: 1, property: "connection", type: "record", of: "connectors.connection", required: true, classification: "operational", description: "The connection with its new health and reason." }
+  - { event: "connectors.connection_health_changed", version: 1, property: "before", type: "enum", of: "connectors.health", required: true, classification: "operational", description: "Its health before (the same when only the reason changed)." }
+  - { event: "connectors.connection_sync_requested", version: 1, property: "connection", type: "record", of: "connectors.connection", required: true, classification: "operational", description: "The connection." }
+  - { event: "connectors.connection_sync_requested", version: 1, property: "streams", type: "int", required: true, classification: "operational", description: "How many of its streams were set to run now (at least 1)." }
+  - { event: "connectors.stream_synced", version: 1, property: "stream", type: "record", of: "connectors.stream", required: true, classification: "operational", description: "The stream after the run." }
+  - { event: "connectors.stream_synced", version: 1, property: "provider", type: "enum", of: "connectors.provider", required: true, classification: "operational", description: "Its connection's provider." }
+  - { event: "connectors.stream_synced", version: 1, property: "before_phase", type: "enum", of: "connectors.phase", required: true, classification: "operational", description: "Its phase before the run." }
+  - { event: "connectors.stream_synced", version: 1, property: "changes", type: "int", required: true, classification: "operational", description: "Changes the run stored: messages added, changed or removed (mail), events changed or removed (calendar)." }
+  - { event: "connectors.stream_synced", version: 1, property: "batches", type: "int", required: true, classification: "operational", description: "Batches the run stored and announced." }
+  - { event: "connectors.outbound_changes_made", version: 1, property: "stream_id", type: "id", required: true, classification: "id", description: "The stream whose run made them." }
+  - { event: "connectors.outbound_changes_made", version: 1, property: "connection_id", type: "id", required: true, classification: "id", description: "Its connection." }
+  - { event: "connectors.outbound_changes_made", version: 1, property: "provider", type: "enum", of: "connectors.provider", required: true, classification: "operational", description: "The provider they were made at." }
+  - { event: "connectors.outbound_changes_made", version: 1, property: "applied", type: "int", required: true, classification: "operational", description: "Changes made at the provider." }
+  - { event: "connectors.outbound_changes_made", version: 1, property: "superseded", type: "int", required: true, classification: "operational", description: "Changes overtaken by a later one, of a member or at the provider." }
+  - { event: "connectors.outbound_changes_made", version: 1, property: "skipped", type: "int", required: true, classification: "operational", description: "Changes with nothing to do at the provider." }
+  - { event: "connectors.outbound_changes_made", version: 1, property: "failed", type: "int", required: true, classification: "operational", description: "Changes the provider refused, or that met trouble too often." }
+  - { event: "connectors.calendar_change_completed", version: 1, property: "request_id", type: "id", required: true, classification: "id", description: "The schedule module's request." }
+  - { event: "connectors.calendar_change_completed", version: 1, property: "calendar_id", type: "id", required: true, classification: "id", description: "The schedule module's calendar." }
+  - { event: "connectors.calendar_change_completed", version: 1, property: "event_id", type: "id", required: true, classification: "id", description: "The schedule module's event." }
+  - { event: "connectors.calendar_change_completed", version: 1, property: "stream_id", type: "id", required: false, classification: "id", description: "The calendar stream that made or ended it, when it was recorded for one." }
+  - { event: "connectors.calendar_change_completed", version: 1, property: "change", type: "enum", of: "connectors.calendar_change", required: false, classification: "operational", description: "The kind of change, when it is one the plan names." }
+  - { event: "connectors.calendar_change_completed", version: 1, property: "outcome", type: "enum", of: "connectors.calendar_outcome", required: true, classification: "operational", description: "How it ended." }
+  - { event: "connectors.calendar_change_completed", version: 1, property: "reason", type: "enum", of: "connectors.calendar_reason", required: false, classification: "operational", description: "Why, when it was not applied." }
+  - { event: "connectors.send_succeeded", version: 1, property: "send", type: "record", of: "connectors.send", required: true, classification: "operational", description: "The send, sent." }
+  - { event: "connectors.send_failed", version: 1, property: "send", type: "record", of: "connectors.send", required: true, classification: "operational", description: "The send, failed." }
+  - { event: "connectors.send_failed", version: 1, property: "error", type: "enum", of: "connectors.send_error", required: true, classification: "operational", description: "The kind of failure." }
+
+records:
+  - { record: "connectors.connection", field: "id", type: "id", required: true, classification: "id", description: "The connection's id." }
+  - { record: "connectors.connection", field: "provider", type: "enum", enum: "connectors.provider", required: true, classification: "operational", description: "The provider." }
+  - { record: "connectors.connection", field: "granted_by", type: "id", required: true, classification: "pseudonymous", description: "The member who granted it: their user id." }
+  - { record: "connectors.connection", field: "capabilities", type: "enum", list: true, enum: "connectors.capability", required: true, classification: "operational", description: "What it lets Campbooks do." }
+  - { record: "connectors.connection", field: "health", type: "enum", enum: "connectors.health", required: true, classification: "operational", description: "How it is doing." }
+  - { record: "connectors.connection", field: "health_reason", type: "enum", enum: "connectors.health_reason", required: false, classification: "operational", description: "Why, when it is not ok." }
+  - { record: "connectors.connection", field: "address_verified", type: "bool", required: true, classification: "operational", description: "Whether the provider verified the account's address (never the address)." }
+  - { record: "connectors.connection", field: "mailboxes", type: "int", required: true, classification: "operational", description: "Mailboxes it reads: its messages streams." }
+  - { record: "connectors.connection", field: "created_at", type: "timestamp", required: true, classification: "operational", description: "When it was connected." }
+  - { record: "connectors.connection", field: "health_changed_at", type: "timestamp", required: true, classification: "operational", description: "Since when it has had this health." }
+  - { record: "connectors.stream", field: "id", type: "id", required: true, classification: "id", description: "The stream's id." }
+  - { record: "connectors.stream", field: "connection_id", type: "id", required: true, classification: "id", description: "Its connection." }
+  - { record: "connectors.stream", field: "capability", type: "enum", enum: "connectors.capability", required: true, classification: "operational", description: "What it reads." }
+  - { record: "connectors.stream", field: "inbox_id", type: "id", required: false, classification: "id", description: "The conversations inbox it feeds (messages)." }
+  - { record: "connectors.stream", field: "phase", type: "enum", enum: "connectors.phase", required: true, classification: "operational", description: "Where it is in its reading." }
+  - { record: "connectors.stream", field: "paused", type: "bool", required: true, classification: "operational", description: "Paused until the member connects again." }
+  - { record: "connectors.stream", field: "last_synced_at", type: "timestamp", required: false, classification: "operational", description: "When a run last finished." }
+  - { record: "connectors.stream", field: "last_change_at", type: "timestamp", required: false, classification: "operational", description: "When a run last found a change." }
+  - { record: "connectors.send", field: "id", type: "id", required: true, classification: "id", description: "The send's id (minted by conversations)." }
+  - { record: "connectors.send", field: "inbox_id", type: "id", required: true, classification: "id", description: "The inbox it is sent from." }
+  - { record: "connectors.send", field: "stream_id", type: "id", required: false, classification: "id", description: "The stream it goes through, while the inbox has one." }
+  - { record: "connectors.send", field: "provider", type: "enum", enum: "connectors.provider", required: false, classification: "operational", description: "The provider it goes through, while the inbox has a connection." }
+  - { record: "connectors.send", field: "state", type: "enum", enum: "connectors.send_state", required: true, classification: "operational", description: "Where it stands." }
+  - { record: "connectors.send", field: "attempts", type: "int", required: true, classification: "operational", description: "Calls made to the provider." }
+  - { record: "connectors.send", field: "sent_copy", type: "enum", enum: "connectors.sent_copy", required: false, classification: "operational", description: "What becomes of its copy in Sent (IMAP only)." }
+  - { record: "connectors.send", field: "created_at", type: "timestamp", required: true, classification: "operational", description: "When it was asked for." }
+
+enums:
+  - { enum: "connectors.provider", value: "google", description: "Google: Gmail and Google Calendar." }
+  - { enum: "connectors.provider", value: "zoho", description: "Zoho: Zoho Mail and Zoho Calendar." }
+  - { enum: "connectors.provider", value: "imap", description: "Any mailbox over IMAP and SMTP, with its password." }
+  - { enum: "connectors.capability", value: "messages", description: "Read and tidy mail." }
+  - { enum: "connectors.capability", value: "calendar", description: "Calendars and events." }
+  - { enum: "connectors.capability", value: "files", description: "Files (not offered yet)." }
+  - { enum: "connectors.capability", value: "bank", description: "Bank data (not offered yet)." }
+  - { enum: "connectors.health", value: "ok", description: "Syncing normally." }
+  - { enum: "connectors.health", value: "needs_reauth", description: "The grant stopped working: the member must connect again; its streams are paused." }
+  - { enum: "connectors.health", value: "throttled", description: "The provider asked to slow down; syncing resumes on its own." }
+  - { enum: "connectors.health", value: "failing", description: "Several runs in a row failed; syncing keeps retrying." }
+  - { enum: "connectors.health_reason", value: "grant_revoked", description: "The provider says the grant was revoked or expired." }
+  - { enum: "connectors.health_reason", value: "access_refused", description: "The provider refused the access token run after run although it refreshes." }
+  - { enum: "connectors.health_reason", value: "credentials_unreadable", description: "The stored credentials no longer open (the instance's secret key changed)." }
+  - { enum: "connectors.health_reason", value: "unknown_data_centre", description: "The grant's Zoho data centre is not one this instance knows." }
+  - { enum: "connectors.health_reason", value: "imap_settings_missing", description: "An IMAP connection's servers are not stored." }
+  - { enum: "connectors.health_reason", value: "imap_login_refused", description: "The IMAP server refused the password too many times in a row." }
+  - { enum: "connectors.health_reason", value: "rate_limited", description: "The provider rate limited the runs." }
+  - { enum: "connectors.health_reason", value: "provider_errors", description: "The provider failed run after run." }
+  - { enum: "connectors.health_reason", value: "other", description: "A reason this plan does not know yet." }
+  - { enum: "connectors.phase", value: "backfill", description: "Reading the initial window." }
+  - { enum: "connectors.phase", value: "incremental", description: "Following changes from the cursor." }
+  - { enum: "connectors.phase", value: "resync", description: "Re-reading the window after the provider forgot the cursor." }
+  - { enum: "connectors.removal_cause", value: "disconnected", description: "The member who connected it disconnected it (connectors.disconnect)." }
+  - { enum: "connectors.removal_cause", value: "member_left", description: "The member who connected it left the workspace or was removed (workspaces.member_left)." }
+  - { enum: "connectors.mail_choice", value: "delete", description: "The inboxes it fed are deleted." }
+  - { enum: "connectors.mail_choice", value: "keep", description: "The inboxes it fed are kept, read-only." }
+  - { enum: "connectors.send_state", value: "pending", description: "Not settled yet." }
+  - { enum: "connectors.send_state", value: "sent", description: "The provider has it." }
+  - { enum: "connectors.send_state", value: "failed", description: "It failed for good." }
+  - { enum: "connectors.sent_copy", value: "pending", description: "The stream's next run appends it to Sent." }
+  - { enum: "connectors.sent_copy", value: "appended", description: "Appended to Sent." }
+  - { enum: "connectors.sent_copy", value: "found", description: "Already in Sent." }
+  - { enum: "connectors.sent_copy", value: "provider", description: "The SMTP server keeps one itself." }
+  - { enum: "connectors.sent_copy", value: "skipped", description: "No copy is made." }
+  - { enum: "connectors.sent_copy", value: "failed", description: "Appending it kept failing." }
+  - { enum: "connectors.send_error", value: "unavailable", description: "The provider could not be reached, or the send no longer stands; nothing was sent." }
+  - { enum: "connectors.send_error", value: "not_connected", description: "The inbox's connection is gone, or its provider is not configured." }
+  - { enum: "connectors.send_error", value: "needs_reauth", description: "The connection needs the member again." }
+  - { enum: "connectors.send_error", value: "too_large", description: "Too large for the provider." }
+  - { enum: "connectors.send_error", value: "rejected", description: "The provider refused it." }
+  - { enum: "connectors.send_error", value: "unknown_outcome", description: "It may have been sent: an attempt ended with no clear answer." }
+  - { enum: "connectors.send_error", value: "other", description: "A reason this plan does not know yet." }
+  - { enum: "connectors.calendar_change", value: "create", description: "Create an event." }
+  - { enum: "connectors.calendar_change", value: "update", description: "Change an event." }
+  - { enum: "connectors.calendar_change", value: "update_occurrence", description: "Change one occurrence of a repeating event." }
+  - { enum: "connectors.calendar_change", value: "delete", description: "Delete an event." }
+  - { enum: "connectors.calendar_change", value: "respond", description: "Answer an invitation." }
+  - { enum: "connectors.calendar_outcome", value: "applied", description: "Written at the provider." }
+  - { enum: "connectors.calendar_outcome", value: "superseded", description: "The event had changed at the provider first." }
+  - { enum: "connectors.calendar_outcome", value: "skipped", description: "Nothing was written." }
+  - { enum: "connectors.calendar_outcome", value: "failed", description: "It failed." }
+  - { enum: "connectors.calendar_reason", value: "changed_at_provider", description: "The event changed at the provider." }
+  - { enum: "connectors.calendar_reason", value: "unverified", description: "The schedule module's records did not confirm the request." }
+  - { enum: "connectors.calendar_reason", value: "not_connected", description: "The connection is gone, or its calendar is not offered." }
+  - { enum: "connectors.calendar_reason", value: "needs_reauth", description: "The grant needs the member again." }
+  - { enum: "connectors.calendar_reason", value: "rejected", description: "The provider refused it, or its document was not sound." }
+  - { enum: "connectors.calendar_reason", value: "not_found", description: "The event is not at the provider." }
+  - { enum: "connectors.calendar_reason", value: "unavailable", description: "The provider could not be reached in time." }
+  - { enum: "connectors.calendar_reason", value: "api_not_enabled", description: "The calendar API is not enabled for this instance's app." }
+  - { enum: "connectors.calendar_reason", value: "too_many_attempts", description: "It was tried the most times allowed." }
+
+coverage:
+  - kind: "operation"
+    name: "connectors.connect_imap"
+    events: [connectors.connection_added, connectors.connection_reconnected]
+  - kind: "operation"
+    name: "connectors.disconnect"
+    events: [connectors.connection_removed]
+  - kind: "operation"
+    name: "connectors.sync_now"
+    events: [connectors.connection_sync_requested]
+  - kind: "operation"
+    name: "connectors.start_connection"
+    exemption: "only starts a consent through the identity module's front door; nothing of connectors changes, and the connection it becomes is tracked as connectors.connection_added or connectors.connection_reconnected"
+  - kind: "job"
+    name: "connectors.sync_stream"
+    events: [connectors.stream_synced, connectors.outbound_changes_made, connectors.calendar_change_completed, connectors.connection_health_changed]
+  - kind: "job"
+    name: "connectors.send_message"
+    events: [connectors.send_succeeded, connectors.send_failed, connectors.connection_health_changed]
+  - kind: "job"
+    name: "connectors.retag_bindings"
+    exemption: "maintenance, no action of anyone: MACs of pending changes re-tagged after a key rotation"
+  - kind: "schedule"
+    name: "connectors.dispatch_due"
+    exemption: "maintenance, no action of anyone: only enqueues the runs that are due, which track"
+  - kind: "handler"
+    name: "connectors.revoke_departed_grants"
+    events: [connectors.connection_removed]
+  - kind: "handler"
+    name: "connectors.record_calendar_change"
+    events: [connectors.calendar_change_completed]
+  - kind: "handler"
+    name: "connectors.queue_send"
+    exemption: "records the send conversations asked for (tracked there); its outcome is connectors.send_succeeded or connectors.send_failed"
+  - kind: "handler"
+    name: "connectors.request_changes"
+    exemption: "records the changes conversations asked for (tracked there as the conversation's changes) for the stream's next run, which tracks connectors.outbound_changes_made"
+  - kind: "handler"
+    name: "connectors.apply_calendar_sync"
+    exemption: "projection of the schedule module's calendar switched on or off (tracked there): which calendars the stream reads"
+  - kind: "handler"
+    name: "connectors.revoke_workspace_grants"
+    exemption: "consequence of workspaces.workspace_deleted (tracked by workspaces): the deleted workspace's connections go with it"
+  # Identity's operations hand grants to connectors through the grant-intake
+  # port: the connection they become is tracked here.
+  - kind: "operation"
+    name: "identity.finish_sign_in"
+    events: [identity.sign_in_succeeded, identity.sign_in_failed, identity.way_in_added, identity.way_in_removed, connectors.connection_added, connectors.connection_reconnected]
+  - kind: "operation"
+    name: "identity.adopt_held_grant"
+    events: [identity.held_grant_adopted, connectors.connection_added, connectors.connection_reconnected]

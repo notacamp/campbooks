@@ -74,7 +74,7 @@ impl EventConsumer for RevokeWorkspaceGrants {
         }
         let tx = ctx.tx().await?;
         for id in all {
-            removal::delete(tx, &state, workspace, id, MailChoice::Delete).await?;
+            removal::delete(tx, &state, workspace, id, MailChoice::Delete, None).await?;
         }
         // Sends still open will never go out.
         let sends = sqlx::query_scalar!(

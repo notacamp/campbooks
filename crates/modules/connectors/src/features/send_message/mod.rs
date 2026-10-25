@@ -53,7 +53,7 @@ use crate::{
         credentials::{self, TokenError},
         destinations, emit, health,
         model::{ConnectionId, Health, InboxId, Provider, SendId, StreamId},
-        schedule,
+        schedule, tracked,
     },
     events::{SendCompleted, SendOutcome},
     gmail::{self, compose},
@@ -61,7 +61,7 @@ use crate::{
     imap,
     mail::{self, Fetched},
     provider::{HTTP_TIMEOUT, ProviderError},
-    zoho,
+    tracking, zoho,
 };
 
 mod via_imap;
@@ -448,12 +448,12 @@ impl SendMessage {
         match credentials::access_token(ctx.pool(), &self.deps, workspace, connection).await {
             Ok(token) => Ok(Some(token)),
             Err(TokenError::NeedsReauth(reason)) => {
-                let events = ctx.state().events.clone();
+                let state = ctx.state().clone();
                 if let Some(granted_by) = target.granted_by {
                     health::needs_reauth(
                         ctx.tx().await?,
-                        &events,
-                        &workspace.to_string(),
+                        &state,
+                        workspace,
                         connection,
                         granted_by,
                         reason,
@@ -596,6 +596,17 @@ impl SendMessage {
                     outcome: SendOutcome::Sent,
                     provider_message_id: accepted.id,
                     reason: None,
+                },
+            )
+            .await?;
+        let snapshot = tracked::send(&mut **tx, *send.as_uuid()).await?;
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::SendSucceeded {
+                    workspace,
+                    send: snapshot,
                 },
             )
             .await?;
@@ -976,6 +987,18 @@ async fn fail(
                 outcome: SendOutcome::Failed,
                 provider_message_id: None,
                 reason: Some(reason.to_owned()),
+            },
+        )
+        .await?;
+    let snapshot = tracked::send(&mut **tx, *send.as_uuid()).await?;
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::SendFailed {
+                workspace,
+                send: snapshot,
+                error: tracked::send_error(reason),
             },
         )
         .await?;

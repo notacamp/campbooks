@@ -36,9 +36,10 @@ use crate::{
     domain::{
         credentials::{self, TokenError},
         health,
-        model::{Capability, ConnectionId, Provider, StreamId},
+        model::{Capability, ConnectionId, Phase, Provider, StreamId},
         removal::{BATCH_OWNER, CONNECTION_OWNER},
         schedule::{self, LEASE, Rate, SYNC_STREAM, SyncStreamPayload},
+        tracked,
     },
     events::{
         ACCOUNT_CONTENT_TYPE, AccountDocument, CalendarChangeCompleted, CalendarChanged,
@@ -47,6 +48,7 @@ use crate::{
     google::CalendarError,
     metrics::{self, SyncOutcome},
     provider::ProviderError,
+    tracking,
 };
 
 /// What a run's push did.
@@ -441,6 +443,28 @@ impl SyncStream {
         .bind(stop.is_some())
         .execute(&mut **tx)
         .await?;
+        // One summary per run, only when it stored something or moved on.
+        if batches > 0 || target.phase != Phase::Incremental {
+            let changes: usize = done
+                .iter()
+                .flat_map(|read| read.batches.iter().map(|(_, count)| *count))
+                .sum();
+            let (stream, provider) = tracked::stream(&mut **tx, target.stream).await?;
+            state
+                .tracker
+                .track(
+                    tx,
+                    &tracking::StreamSynced {
+                        workspace,
+                        stream,
+                        provider,
+                        before_phase: tracked::phase(target.phase),
+                        changes: i64::try_from(changes).unwrap_or(i64::MAX),
+                        batches: i64::try_from(batches).unwrap_or(i64::MAX),
+                    },
+                )
+                .await?;
+        }
         if let Some(stop) = stop {
             // What was read is applied above; the trouble sets the next run.
             return match stop {
@@ -821,6 +845,22 @@ pub(super) async fn announce(
                 provider_event_id: written.map(|w| w.provider_event_id.clone()),
                 etag: written.and_then(|w| w.etag.clone()),
                 reason,
+            },
+        )
+        .await?;
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::CalendarChangeCompleted {
+                workspace,
+                request_id: row.request_id,
+                calendar_id: row.calendar_id,
+                event_id: row.event_id,
+                stream_id: Some(*row.stream_id.as_uuid()),
+                change: tracked::calendar_change(&row.change),
+                outcome: tracked::calendar_outcome(outcome),
+                reason: reason.map(tracked::calendar_reason),
             },
         )
         .await?;

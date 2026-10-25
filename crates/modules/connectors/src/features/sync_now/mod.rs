@@ -22,10 +22,11 @@ use crate::{
     domain::{
         connections,
         model::{ConnectionId, ConnectionPath, Health, StreamId},
-        schedule,
+        schedule, tracked,
     },
     events::CONNECTION_RECORD,
     scopes::ConnectorsWrite,
+    tracking,
 };
 
 /// What was scheduled.
@@ -116,6 +117,20 @@ pub async fn execute(
     .await?;
     for &stream in &streams {
         schedule::run_now(&mut tx, access.workspace, stream, now).await?;
+    }
+    if !streams.is_empty() {
+        let snapshot = tracked::connection(&mut tx, id).await?;
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::ConnectionSyncRequested {
+                    workspace: access.workspace,
+                    connection: snapshot,
+                    streams: i64::try_from(streams.len()).unwrap_or(i64::MAX),
+                },
+            )
+            .await?;
     }
     tx.commit().await?;
     Ok(SyncScheduled {
