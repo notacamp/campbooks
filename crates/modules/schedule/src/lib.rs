@@ -41,6 +41,13 @@ mod features;
 pub mod inbound;
 pub mod model;
 pub mod scopes;
+#[cfg(test)]
+mod testkit;
+/// The module's tracked events, generated from the tracking plan (ADR 0020).
+#[path = "tracking.gen.rs"]
+pub mod tracking;
+#[cfg(test)]
+mod tracking_tests;
 
 pub use features::{
     calendar_requests::calendar_requests, free_slots::availability, time_zones::time_zones,

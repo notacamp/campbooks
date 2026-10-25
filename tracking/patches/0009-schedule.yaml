@@ -1,0 +1,402 @@
+# The schedule module's tracked events (campbooks-cloud#349, OpenSpec change
+# track-schedule-events): events of a calendar made, edited, moved,
+# cancelled, deleted, restored, answered, added to a provider calendar and
+# taken away again; calendars added by a grant, turned on and off,
+# recoloured and removed with their connection; settings updated; one
+# summary per batch of a provider's changes applied. How a change ends at
+# the provider is connectors' (connectors.calendar_change_completed). Every
+# mutating operation, job and event handler of the module gets a Coverage
+# row. Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0009-schedule.yaml`.
+changelog:
+  - date: "2026-10-25"
+    plan_version: 9
+    change: "The schedule module instrumented (campbooks-cloud#349): 16 events for events of a calendar created, edited (which fields), moved (the times before), cancelled by a later email, deleted, restored, answered (the answer before), pushed to a provider calendar and unpushed, calendars added by a grant, enabled, disabled, recoloured and removed with their connection, settings updated (which settings), and one summary per batch of a provider's changes applied (counts); records calendar_event, calendar_event_times, calendar and settings; Coverage for every operation, job and handler of the module, apply_outcome and release_delete naming connectors.calendar_change_completed."
+    pr: "#663"
+
+events:
+  - name: "schedule.calendar_event_created"
+    version: 1
+    module: "schedule"
+    object: "calendar_event"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation, system]
+    description: "An event was added to a member's calendar: made by the member, or read by Scout from an email in their own inbox. Never its title, place or notes."
+    fires_when: "schedule.create_event makes it, or schedule.add_read_items adds an item of a read to the inbox owner's Campbooks calendar, in the transaction that inserts it. The provider's events are counted by schedule.provider_changes_applied."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_event_edited"
+    version: 1
+    module: "schedule"
+    object: "calendar_event"
+    action: "edited"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation, system]
+    description: "An event changed other than in its times: which fields, never their values (the kind is in the snapshot, and before_kind when it changed). A change of times is schedule.calendar_event_moved."
+    fires_when: "schedule.update_event changes at least one field other than the times (of an event, or of one occurrence: its exception), or schedule.add_read_items changes an event a later email updates or links an invitation already on a calendar to its email, in the transaction of the change; the same values again track nothing."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_event_moved"
+    version: 1
+    module: "schedule"
+    object: "calendar_event"
+    action: "moved"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation, system]
+    description: "An event's start or end changed (or it became all-day, or timed); before is its times as they were."
+    fires_when: "schedule.update_event, or schedule.add_read_items for a later email that updates it, changes its times, in the transaction of the change; the same times again track nothing."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_event_cancelled"
+    version: 1
+    module: "schedule"
+    object: "calendar_event"
+    action: "cancelled"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "An event Scout added was cancelled by a later email: it stays, cancelled."
+    fires_when: "schedule.add_read_items applies an item that cancels an earlier one whose event stands, in the transaction that cancels it; one cancelled or deleted already tracks nothing."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_event_deleted"
+    version: 1
+    module: "schedule"
+    object: "calendar_event"
+    action: "deleted"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A member deleted an event (a series whole). It is hidden at once and can be undone for a short time; on a provider calendar the delete reaches the provider after that (connectors.calendar_change_completed)."
+    fires_when: "schedule.delete_event marks it deleted, in that transaction."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_event_restored"
+    version: 1
+    module: "schedule"
+    object: "calendar_event"
+    action: "restored"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A deleted event was brought back (the undo of a delete). remade_at_provider says the delete had reached the provider, so the event is made there again."
+    fires_when: "schedule.restore_event brings it back, in that transaction."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_event_responded"
+    version: 1
+    module: "schedule"
+    object: "calendar_event"
+    action: "responded"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A member answered an invitation (accepted, maybe, declined, or back to not answered); before is the answer they had."
+    fires_when: "schedule.respond_event stores another answer than the one the event had, in that transaction; the same answer again tracks nothing."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_event_pushed"
+    version: 1
+    module: "schedule"
+    object: "calendar_event"
+    action: "pushed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation, system]
+    description: "An event of a member's Campbooks calendar was copied to one of their provider calendars (Add to my calendar); the snapshot is the copy, whose pushed_from_id is the Campbooks event, now hidden."
+    fires_when: "schedule.push_event, or schedule.add_read_items for a kind the member set an also-add-to calendar for, makes the copy and asks connectors to make it there, in that transaction."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_event_unpushed"
+    version: 1
+    module: "schedule"
+    object: "calendar_event"
+    action: "unpushed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A copy on a provider calendar was taken away again; the snapshot is the Campbooks event, shown again."
+    fires_when: "schedule.unpush_event deletes the copy and asks connectors to delete it there, in that transaction."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_added"
+    version: 1
+    module: "schedule"
+    object: "calendar"
+    action: "added"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A calendar grant brought the member a calendar of the provider account: the primary one is on, the others wait for the member. Never its name or colour."
+    fires_when: "schedule.grant_calendars makes a calendar the module did not have, in the job's transaction; one per calendar."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_enabled"
+    version: 1
+    module: "schedule"
+    object: "calendar"
+    action: "enabled"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member turned a calendar on: its events sync and show."
+    fires_when: "schedule.update_calendar sets syncing on a calendar that was off, in that transaction."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_disabled"
+    version: 1
+    module: "schedule"
+    object: "calendar"
+    action: "disabled"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member turned a calendar off: its events stop syncing and show nothing."
+    fires_when: "schedule.update_calendar clears syncing on a calendar that was on, in that transaction."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_recoloured"
+    version: 1
+    module: "schedule"
+    object: "calendar"
+    action: "recoloured"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member changed a calendar's colour (or cleared it). Never the colour."
+    fires_when: "schedule.update_calendar stores another colour than the calendar had, in that transaction."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.calendar_removed"
+    version: 1
+    module: "schedule"
+    object: "calendar"
+    action: "removed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A provider calendar was deleted with its events because its connection was removed (connectors.connection_removed); the snapshot is the calendar as it stood."
+    fires_when: "schedule.forget_connection deletes it, in the job's transaction; one per calendar. A departed member's and a deleted workspace's calendars are not tracked (workspaces.member_left, workspaces.workspace_deleted are)."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.settings_updated"
+    version: 1
+    module: "schedule"
+    object: "settings"
+    action: "updated"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member changed their calendar settings: which ones, never their values (no time zone, no hours)."
+    fires_when: "schedule.update_settings changes at least one setting, in that transaction; the same values again track nothing."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+  - name: "schedule.provider_changes_applied"
+    version: 1
+    module: "schedule"
+    object: "provider_changes"
+    action: "applied"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A batch of a provider calendar's changes was applied to the member's calendar: one summary per batch, with counts, never the events. connectors.stream_synced is the run that read it."
+    fires_when: "schedule.apply_calendar_changes creates, changes or cancels at least one event, in the job's transaction; a batch for a calendar that is off, or one that changes nothing, tracks nothing."
+    added_in: 9
+    openspec_change: "track-schedule-events"
+
+properties:
+  - { event: "schedule.calendar_event_created", version: 1, property: "calendar_event", type: "record", of: "schedule.calendar_event", required: true, classification: "operational", description: "The new event." }
+  - { event: "schedule.calendar_event_edited", version: 1, property: "calendar_event", type: "record", of: "schedule.calendar_event", required: true, classification: "operational", description: "The event afterwards." }
+  - { event: "schedule.calendar_event_edited", version: 1, property: "fields", type: "enum", list: true, of: "schedule.event_field", required: true, classification: "operational", description: "The fields that changed (at least one)." }
+  - { event: "schedule.calendar_event_edited", version: 1, property: "before_kind", type: "enum", of: "schedule.event_kind", required: false, classification: "operational", description: "Its kind before, when the kind changed." }
+  - { event: "schedule.calendar_event_moved", version: 1, property: "calendar_event", type: "record", of: "schedule.calendar_event", required: true, classification: "operational", description: "The event afterwards, with its new times." }
+  - { event: "schedule.calendar_event_moved", version: 1, property: "before", type: "record", of: "schedule.calendar_event_times", required: true, classification: "operational", description: "Its times before." }
+  - { event: "schedule.calendar_event_cancelled", version: 1, property: "calendar_event", type: "record", of: "schedule.calendar_event", required: true, classification: "operational", description: "The event, cancelled." }
+  - { event: "schedule.calendar_event_deleted", version: 1, property: "calendar_event", type: "record", of: "schedule.calendar_event", required: true, classification: "operational", description: "The event, deleted (deleted_at set)." }
+  - { event: "schedule.calendar_event_restored", version: 1, property: "calendar_event", type: "record", of: "schedule.calendar_event", required: true, classification: "operational", description: "The event, back." }
+  - { event: "schedule.calendar_event_restored", version: 1, property: "remade_at_provider", type: "bool", required: true, classification: "operational", description: "Whether the delete had reached the provider, so the event is asked to be made there again." }
+  - { event: "schedule.calendar_event_responded", version: 1, property: "calendar_event", type: "record", of: "schedule.calendar_event", required: true, classification: "operational", description: "The event with the new answer." }
+  - { event: "schedule.calendar_event_responded", version: 1, property: "before", type: "enum", of: "schedule.response", required: true, classification: "operational", description: "The answer before (needs_action when there was none)." }
+  - { event: "schedule.calendar_event_pushed", version: 1, property: "calendar_event", type: "record", of: "schedule.calendar_event", required: true, classification: "operational", description: "The copy on the provider calendar." }
+  - { event: "schedule.calendar_event_unpushed", version: 1, property: "calendar_event", type: "record", of: "schedule.calendar_event", required: true, classification: "operational", description: "The Campbooks event, shown again." }
+  - { event: "schedule.calendar_event_unpushed", version: 1, property: "copy_id", type: "id", required: true, classification: "id", description: "The copy that was taken away." }
+  - { event: "schedule.calendar_event_unpushed", version: 1, property: "copy_calendar_id", type: "id", required: true, classification: "id", description: "The provider calendar it was taken away from." }
+  - { event: "schedule.calendar_added", version: 1, property: "calendar", type: "record", of: "schedule.calendar", required: true, classification: "operational", description: "The new calendar." }
+  - { event: "schedule.calendar_enabled", version: 1, property: "calendar", type: "record", of: "schedule.calendar", required: true, classification: "operational", description: "The calendar, on." }
+  - { event: "schedule.calendar_disabled", version: 1, property: "calendar", type: "record", of: "schedule.calendar", required: true, classification: "operational", description: "The calendar, off." }
+  - { event: "schedule.calendar_recoloured", version: 1, property: "calendar", type: "record", of: "schedule.calendar", required: true, classification: "operational", description: "The calendar afterwards." }
+  - { event: "schedule.calendar_removed", version: 1, property: "calendar", type: "record", of: "schedule.calendar", required: true, classification: "operational", description: "The calendar as it stood when it was removed." }
+  - { event: "schedule.calendar_removed", version: 1, property: "calendar_events", type: "int", required: true, classification: "operational", description: "Events deleted with it." }
+  - { event: "schedule.settings_updated", version: 1, property: "settings", type: "record", of: "schedule.settings", required: true, classification: "operational", description: "The settings afterwards." }
+  - { event: "schedule.settings_updated", version: 1, property: "fields", type: "enum", list: true, of: "schedule.settings_field", required: true, classification: "operational", description: "The settings that changed (at least one)." }
+  - { event: "schedule.provider_changes_applied", version: 1, property: "calendar", type: "record", of: "schedule.calendar", required: true, classification: "operational", description: "The calendar the batch was for." }
+  - { event: "schedule.provider_changes_applied", version: 1, property: "created", type: "int", required: true, classification: "operational", description: "Events new to the member's calendar." }
+  - { event: "schedule.provider_changes_applied", version: 1, property: "changed", type: "int", required: true, classification: "operational", description: "Events that changed." }
+  - { event: "schedule.provider_changes_applied", version: 1, property: "cancelled", type: "int", required: true, classification: "operational", description: "Events cancelled or removed at the provider (series counted once)." }
+  - { event: "schedule.provider_changes_applied", version: 1, property: "full", type: "bool", required: true, classification: "operational", description: "Whether it was a full read (what it did not list is gone)." }
+
+records:
+  - { record: "schedule.calendar_event", field: "id", type: "id", required: true, classification: "id", description: "The event's id." }
+  - { record: "schedule.calendar_event", field: "calendar_id", type: "id", required: true, classification: "id", description: "Its calendar." }
+  - { record: "schedule.calendar_event", field: "member_id", type: "id", required: true, classification: "pseudonymous", description: "The member whose calendar it is: their user id." }
+  - { record: "schedule.calendar_event", field: "calendar_source", type: "enum", enum: "schedule.calendar_source", required: true, classification: "operational", description: "Where its calendar lives." }
+  - { record: "schedule.calendar_event", field: "provider", type: "enum", enum: "schedule.provider", required: false, classification: "operational", description: "Its calendar's provider, when it is a provider calendar." }
+  - { record: "schedule.calendar_event", field: "kind", type: "enum", enum: "schedule.event_kind", required: true, classification: "operational", description: "What kind of dated thing it is." }
+  - { record: "schedule.calendar_event", field: "origin", type: "enum", enum: "schedule.event_origin", required: true, classification: "operational", description: "Who made it." }
+  - { record: "schedule.calendar_event", field: "found_by", type: "enum", enum: "schedule.found_by", required: false, classification: "operational", description: "How Scout found it, when Scout added it." }
+  - { record: "schedule.calendar_event", field: "status", type: "enum", enum: "schedule.event_status", required: true, classification: "operational", description: "Whether it stands." }
+  - { record: "schedule.calendar_event", field: "all_day", type: "bool", required: true, classification: "operational", description: "Whether it lasts whole days." }
+  - { record: "schedule.calendar_event", field: "starts_at", type: "timestamp", required: false, classification: "operational", description: "When it starts (a timed event)." }
+  - { record: "schedule.calendar_event", field: "ends_at", type: "timestamp", required: false, classification: "operational", description: "When it ends (a timed event)." }
+  - { record: "schedule.calendar_event", field: "starts_on", type: "date", required: false, classification: "operational", description: "The day it starts (an all-day event)." }
+  - { record: "schedule.calendar_event", field: "ends_on", type: "date", required: false, classification: "operational", description: "The day after it ends (an all-day event; exclusive, as the providers write it)." }
+  - { record: "schedule.calendar_event", field: "recurring", type: "bool", required: true, classification: "operational", description: "Whether it is a series (it repeats; occurrences are not stored)." }
+  - { record: "schedule.calendar_event", field: "series_id", type: "id", required: false, classification: "id", description: "An exception: the series of which it changes one occurrence." }
+  - { record: "schedule.calendar_event", field: "busy", type: "bool", required: true, classification: "operational", description: "Whether it counts when free time is worked out." }
+  - { record: "schedule.calendar_event", field: "response", type: "enum", enum: "schedule.response", required: false, classification: "operational", description: "The member's answer, when it is an invitation." }
+  - { record: "schedule.calendar_event", field: "pending_change", type: "enum", enum: "schedule.calendar_change", required: false, classification: "operational", description: "The member's change still waiting for the provider, if any." }
+  - { record: "schedule.calendar_event", field: "notice", type: "enum", enum: "schedule.event_notice", required: false, classification: "operational", description: "Why it does not show what the member last asked for, if so." }
+  - { record: "schedule.calendar_event", field: "at_provider", type: "bool", required: true, classification: "operational", description: "Whether the provider has it (never its provider id)." }
+  - { record: "schedule.calendar_event", field: "source_message_id", type: "id", required: false, classification: "id", description: "The email it was read from or made from (a conversations message id)." }
+  - { record: "schedule.calendar_event", field: "pushed_from_id", type: "id", required: false, classification: "id", description: "A copy made by Add to my calendar: the Campbooks event it copies." }
+  - { record: "schedule.calendar_event", field: "pushed_to_id", type: "id", required: false, classification: "id", description: "A Campbooks event added to a provider calendar: its copy there (this one is hidden while it stands)." }
+  - { record: "schedule.calendar_event", field: "deleted_at", type: "timestamp", required: false, classification: "operational", description: "When the member deleted it, while the delete can be undone." }
+  - { record: "schedule.calendar_event", field: "created_at", type: "timestamp", required: true, classification: "operational", description: "When it was stored." }
+  - { record: "schedule.calendar_event", field: "updated_at", type: "timestamp", required: true, classification: "operational", description: "When it last changed." }
+  - { record: "schedule.calendar_event_times", field: "all_day", type: "bool", required: true, classification: "operational", description: "Whether it lasted whole days." }
+  - { record: "schedule.calendar_event_times", field: "starts_at", type: "timestamp", required: false, classification: "operational", description: "When it started (a timed event)." }
+  - { record: "schedule.calendar_event_times", field: "ends_at", type: "timestamp", required: false, classification: "operational", description: "When it ended (a timed event)." }
+  - { record: "schedule.calendar_event_times", field: "starts_on", type: "date", required: false, classification: "operational", description: "The day it started (an all-day event)." }
+  - { record: "schedule.calendar_event_times", field: "ends_on", type: "date", required: false, classification: "operational", description: "The day after it ended (an all-day event)." }
+  - { record: "schedule.calendar", field: "id", type: "id", required: true, classification: "id", description: "The calendar's id." }
+  - { record: "schedule.calendar", field: "member_id", type: "id", required: true, classification: "pseudonymous", description: "The member whose calendar it is: their user id." }
+  - { record: "schedule.calendar", field: "source", type: "enum", enum: "schedule.calendar_source", required: true, classification: "operational", description: "Where it lives." }
+  - { record: "schedule.calendar", field: "provider", type: "enum", enum: "schedule.provider", required: false, classification: "operational", description: "Its provider, when it is a provider calendar." }
+  - { record: "schedule.calendar", field: "connection_id", type: "id", required: false, classification: "id", description: "The connection it comes through (a connectors id), when it is a provider calendar." }
+  - { record: "schedule.calendar", field: "syncing", type: "bool", required: true, classification: "operational", description: "Whether it is on: its events sync and show." }
+  - { record: "schedule.calendar", field: "writable", type: "bool", required: true, classification: "operational", description: "Whether events may be made on it." }
+  - { record: "schedule.calendar", field: "primary", type: "bool", required: true, classification: "operational", description: "Whether it is its account's primary calendar." }
+  - { record: "schedule.calendar", field: "created_at", type: "timestamp", required: true, classification: "operational", description: "When it was added." }
+  - { record: "schedule.settings", field: "member_id", type: "id", required: true, classification: "pseudonymous", description: "The member: their user id." }
+  - { record: "schedule.settings", field: "time_zone_set", type: "bool", required: true, classification: "operational", description: "Whether they have a time zone (else UTC is used). Never the zone." }
+  - { record: "schedule.settings", field: "working_hours_set", type: "bool", required: true, classification: "operational", description: "Whether they set working hours (else Monday to Friday, 09:00 to 18:00). Never the hours." }
+  - { record: "schedule.settings", field: "working_days", type: "int", required: true, classification: "operational", description: "Weekdays with working hours in force." }
+  - { record: "schedule.settings", field: "scout_kinds", type: "enum", list: true, enum: "schedule.event_kind", required: true, classification: "operational", description: "The kinds Scout adds from email." }
+  - { record: "schedule.settings", field: "also_add_to_kinds", type: "enum", list: true, enum: "schedule.event_kind", required: true, classification: "operational", description: "The kinds also added to a provider calendar (never which calendar)." }
+
+enums:
+  - { enum: "schedule.event_kind", value: "charge", description: "Money is taken on a date." }
+  - { enum: "schedule.event_kind", value: "appointment", description: "An appointment or a booked slot." }
+  - { enum: "schedule.event_kind", value: "meeting", description: "A meeting with other people." }
+  - { enum: "schedule.event_kind", value: "travel", description: "A trip: a flight, a train, a bus, a rental car." }
+  - { enum: "schedule.event_kind", value: "stay", description: "A stay: a hotel or a rental." }
+  - { enum: "schedule.event_kind", value: "show", description: "A ticketed event." }
+  - { enum: "schedule.event_kind", value: "reservation", description: "A table or a visit booked." }
+  - { enum: "schedule.event_kind", value: "delivery", description: "A parcel arriving." }
+  - { enum: "schedule.event_kind", value: "expiry", description: "Something that stops being valid on a date." }
+  - { enum: "schedule.event_kind", value: "hold", description: "Time held for a task." }
+  - { enum: "schedule.event_kind", value: "none", description: "No kind: a provider event nobody typed." }
+  - { enum: "schedule.event_origin", value: "provider", description: "It came from a provider calendar." }
+  - { enum: "schedule.event_origin", value: "member", description: "The member made it." }
+  - { enum: "schedule.event_origin", value: "scout", description: "Scout read it from an email." }
+  - { enum: "schedule.found_by", value: "structured", description: "Read from the sender's own calendar data, without a model." }
+  - { enum: "schedule.found_by", value: "model", description: "Read from the email's prose by Scout's read." }
+  - { enum: "schedule.event_status", value: "confirmed", description: "It stands." }
+  - { enum: "schedule.event_status", value: "tentative", description: "It may happen." }
+  - { enum: "schedule.event_status", value: "cancelled", description: "It will not happen." }
+  - { enum: "schedule.response", value: "needs_action", description: "Not answered." }
+  - { enum: "schedule.response", value: "accepted", description: "Going." }
+  - { enum: "schedule.response", value: "tentative", description: "Maybe." }
+  - { enum: "schedule.response", value: "declined", description: "Not going." }
+  - { enum: "schedule.event_notice", value: "kept_theirs", description: "It changed at the provider meanwhile: the provider's version was kept." }
+  - { enum: "schedule.event_notice", value: "not_saved", description: "The provider did not take the member's change." }
+  - { enum: "schedule.calendar_source", value: "campbooks", description: "The member's own Campbooks calendar: no provider sees it." }
+  - { enum: "schedule.calendar_source", value: "provider", description: "A calendar of a connected provider account." }
+  - { enum: "schedule.provider", value: "google", description: "Google Calendar." }
+  - { enum: "schedule.provider", value: "zoho", description: "Zoho Calendar." }
+  - { enum: "schedule.calendar_change", value: "create", description: "Make the event at the provider." }
+  - { enum: "schedule.calendar_change", value: "update", description: "Change the event there." }
+  - { enum: "schedule.calendar_change", value: "update_occurrence", description: "Change one occurrence of a series there." }
+  - { enum: "schedule.calendar_change", value: "delete", description: "Delete the event there." }
+  - { enum: "schedule.calendar_change", value: "respond", description: "Send the member's answer." }
+  - { enum: "schedule.event_field", value: "title", description: "Its title." }
+  - { enum: "schedule.event_field", value: "kind", description: "Its kind." }
+  - { enum: "schedule.event_field", value: "place", description: "Where it is." }
+  - { enum: "schedule.event_field", value: "notes", description: "Its notes." }
+  - { enum: "schedule.event_field", value: "time_zone", description: "The time zone it is written in." }
+  - { enum: "schedule.event_field", value: "busy", description: "Whether it counts for free time." }
+  - { enum: "schedule.event_field", value: "status", description: "Whether it stands (a later email confirming it)." }
+  - { enum: "schedule.event_field", value: "source", description: "The email it is linked to." }
+  - { enum: "schedule.settings_field", value: "time_zone", description: "The time zone, chosen by the member." }
+  - { enum: "schedule.settings_field", value: "device_time_zone", description: "The time zone, taken from the device because the member had none." }
+  - { enum: "schedule.settings_field", value: "working_hours", description: "The working hours." }
+  - { enum: "schedule.settings_field", value: "scout_kinds", description: "The kinds Scout adds." }
+  - { enum: "schedule.settings_field", value: "also_add_to", description: "Per kind, the calendar an event is also added to." }
+
+coverage:
+  - kind: "operation"
+    name: "schedule.create_event"
+    events: [schedule.calendar_event_created]
+  - kind: "operation"
+    name: "schedule.update_event"
+    events: [schedule.calendar_event_edited, schedule.calendar_event_moved]
+  - kind: "operation"
+    name: "schedule.delete_event"
+    events: [schedule.calendar_event_deleted]
+  - kind: "operation"
+    name: "schedule.restore_event"
+    events: [schedule.calendar_event_restored]
+  - kind: "operation"
+    name: "schedule.respond_event"
+    events: [schedule.calendar_event_responded]
+  - kind: "operation"
+    name: "schedule.push_event"
+    events: [schedule.calendar_event_pushed]
+  - kind: "operation"
+    name: "schedule.unpush_event"
+    events: [schedule.calendar_event_unpushed]
+  - kind: "operation"
+    name: "schedule.update_calendar"
+    events: [schedule.calendar_enabled, schedule.calendar_disabled, schedule.calendar_recoloured]
+  - kind: "operation"
+    name: "schedule.update_settings"
+    events: [schedule.settings_updated]
+  - kind: "handler"
+    name: "schedule.grant_calendars"
+    events: [schedule.calendar_added]
+  - kind: "handler"
+    name: "schedule.apply_calendar_changes"
+    events: [schedule.provider_changes_applied]
+  # How a member's change ended at the provider is tracked by connectors in
+  # the transaction that publishes it; this handler applies that ending.
+  - kind: "handler"
+    name: "schedule.apply_outcome"
+    events: [connectors.calendar_change_completed]
+  - kind: "handler"
+    name: "schedule.add_read_items"
+    events: [schedule.calendar_event_created, schedule.calendar_event_edited, schedule.calendar_event_moved, schedule.calendar_event_cancelled, schedule.calendar_event_pushed]
+  - kind: "handler"
+    name: "schedule.forget_connection"
+    events: [schedule.calendar_removed]
+  - kind: "handler"
+    name: "schedule.forget_member"
+    exemption: "consequence of workspaces.member_left, tracked there: the departed member's calendars, events and settings go"
+  - kind: "handler"
+    name: "schedule.schedule_workspace_purge"
+    exemption: "projection of workspaces.workspace_deleted: it only schedules the purge"
+  # The member's delete is schedule.calendar_event_deleted; this asks for it
+  # at the provider once the undo window passed, and connectors tracks how it
+  # ends.
+  - kind: "job"
+    name: "schedule.release_delete"
+    events: [connectors.calendar_change_completed]
+  - kind: "job"
+    name: "schedule.purge_workspace"
+    exemption: "maintenance: a deleted workspace's calendars and events deleted; the deletion is tracked by workspaces"
+  - kind: "job"
+    name: "schedule.retag_bindings"
+    exemption: "maintenance, no action of anyone: MACs of waiting calendar change requests re-tagged after a key rotation"

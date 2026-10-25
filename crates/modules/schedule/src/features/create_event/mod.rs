@@ -20,7 +20,7 @@ use crate::{
         moment::{Moment, Span},
         ops, outbound, publish,
         rows::{CalendarRow, calendar_of, ensure_campbooks_calendar, event_of},
-        settings,
+        settings, tracked,
         views::{EventView, event_view},
         write::{MAX_NOTES, MAX_PLACE, MAX_TITLE, NewRow, insert, tidy},
     },
@@ -208,6 +208,7 @@ pub async fn handler(
         .await?;
     }
     publish::created(&state, &mut tx, access.workspace, member, &row).await?;
+    tracked::created(&state, &mut tx, access.workspace, id).await?;
     let row = event_of(&mut tx, member, id).await?;
     tx.commit().await?;
     let view = event_view(&row, settings.zone(), None).ok_or(Error::NotFound)?;

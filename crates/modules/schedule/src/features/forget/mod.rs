@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 
 use crate::{
-    domain::{blobs::CALENDAR_REF_OWNER, outbound::BLOB_OWNER},
+    domain::{blobs::CALENDAR_REF_OWNER, outbound::BLOB_OWNER, tracked},
     inbound::{ConnectionRemoved, MemberLeft, WorkspaceDeleting},
+    tracking,
 };
 
 /// `workspaces.member_left` → delete what the member had.
@@ -99,8 +100,14 @@ impl EventHandler for ForgetConnection {
 
     async fn handle(ctx: &mut JobContext, event: Event<ConnectionRemoved>) -> Result<(), JobError> {
         let removed = event.payload;
+        let workspace: WorkspaceId = removed
+            .workspace
+            .parse()
+            .map_err(|_| JobError::fatal("connection_removed names an invalid workspace"))?;
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
+        // The calendars as they stand, for the record of their removal.
+        let standing = tracked::calendars_of_connection(tx, removed.connection).await?;
         // Campbooks events that were added to these calendars are theirs
         // again: their copy goes with the calendar.
         sqlx::query(
@@ -133,6 +140,21 @@ impl EventHandler for ForgetConnection {
             .blobs
             .detach_owners(tx, &removed.workspace, CALENDAR_REF_OWNER, &calendar_ids)
             .await?;
+        for (calendar, calendar_events) in standing {
+            if calendar_ids.contains(&calendar.id) {
+                state
+                    .tracker
+                    .track(
+                        tx,
+                        &tracking::CalendarRemoved {
+                            workspace,
+                            calendar,
+                            calendar_events,
+                        },
+                    )
+                    .await?;
+            }
+        }
         let calendars = calendar_ids.len();
         tracing::info!(calendars, "the calendars of a removed connection deleted");
         Ok(())
