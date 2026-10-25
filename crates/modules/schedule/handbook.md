@@ -49,7 +49,7 @@ Something the member has to do by a date, such as pay by Friday, sign, submit, o
 - A series is changed one occurrence at a time. The whole series is not changed from here.
 - A change to a provider event is saved first and sent to the provider after. It shows as waiting until the provider takes it. If the event changed at the provider meanwhile, the provider's version is kept and the event says so.
 - A delete can be undone for a short time. Within that time the provider does not hear of it.
-- Answering an invitation (accept, maybe, decline) is also written to the provider.
+- Answering an invitation (accept, maybe, decline) is also written to the provider, once its short undo time has passed. Until it is answered, the invitation is also on Home as a Decide need.
 
 ### Time zone and working hours
 

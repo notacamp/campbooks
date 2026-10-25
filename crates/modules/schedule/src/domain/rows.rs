@@ -77,6 +77,12 @@ pub struct EventRow {
     pub item_keys: Vec<String>,
     pub source_conversation: Option<Uuid>,
     pub quote: Option<String>,
+    pub organizer_name: Option<String>,
+    pub organizer_address: Option<String>,
+    pub organizer_self: bool,
+    pub organizer_person: Option<bool>,
+    pub invitation_revision: i64,
+    pub invitation_open: bool,
 }
 
 /// The columns of [`EventRow`], for `SELECT` (table alias `e`).
@@ -85,7 +91,9 @@ pub const EVENT_COLUMNS: &str = "e.id, e.calendar_id, e.kind, e.title, e.starts_
      e.provider_event_id, e.etag, e.outbound_pending, e.recurrence, e.series_id, \
      e.original_start, e.source_type, e.source_id, e.origin, e.found_by, e.pushed_from, \
      e.item_key, e.ical_uid, e.response, e.notice, e.deleted_at, e.undo_token, e.pushed_to, \
-     e.busy, e.provider_version, e.item_keys, e.source_conversation, e.quote";
+     e.busy, e.provider_version, e.item_keys, e.source_conversation, e.quote, \
+     e.organizer_name, e.organizer_address, e.organizer_self, e.organizer_person, \
+     e.invitation_revision, e.invitation_open";
 
 impl EventRow {
     /// When it starts and ends.
