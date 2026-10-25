@@ -1,11 +1,13 @@
 //! The module's vocabulary and what its features share: a task as the API
 //! shows it, its history, and the one way a change is finished (history, then
-//! `tasks.task_changed`, in the change's own transaction).
+//! `tasks.task_changed`, and its tracked events, in the change's own
+//! transaction).
 
 use std::str::FromStr;
 
 pub mod access;
 pub mod resources;
+mod tracked;
 
 use campbooks_kernel::{
     AppState, Error, RecordRef, Result, define_id,
@@ -460,11 +462,15 @@ pub struct Outcome {
     pub previous_assignee: Option<UserId>,
     /// The member who had handed it off before this change, if any.
     pub previous_handed_by: Option<UserId>,
+    /// The task as it was before the change (none for a new one): what its
+    /// tracked event says changed.
+    pub before: Option<TaskRow>,
 }
 
 /// Finish a change to task `id` made in `tx`: append the history entry,
-/// publish `tasks.task_changed` and return the task as it is now. The caller
-/// has already written the row (bumping `revision`).
+/// publish `tasks.task_changed`, track what changed (ADR 0020) and return the
+/// task as it is now. The caller has already written the row (bumping
+/// `revision`).
 pub async fn finish(
     state: &AppState,
     tx: &mut Transaction<'_, Postgres>,
@@ -510,5 +516,14 @@ pub async fn finish(
         source: row.source(),
     };
     state.events.publish(tx, &event).await?;
+    tracked::track(
+        state,
+        tx,
+        access.workspace,
+        outcome.change,
+        outcome.before.as_ref(),
+        &row,
+    )
+    .await?;
     row.view(Utc::now(), today)
 }

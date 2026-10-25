@@ -152,6 +152,7 @@ pub async fn handler(
             },
             previous_assignee: None,
             previous_handed_by: None,
+            before: None,
         },
         today,
     )

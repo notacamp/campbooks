@@ -20,6 +20,9 @@ pub mod events;
 mod features;
 pub mod inbound;
 pub mod scopes;
+/// The module's tracked events, generated from the tracking plan (ADR 0020).
+#[path = "tracking.gen.rs"]
+pub mod tracking;
 
 pub use domain::resources::visibility;
 pub use features::open_tasks::open_tasks;
@@ -67,6 +70,8 @@ fn router() -> OpenApiRouter<AppState> {
 
 #[cfg(test)]
 mod testkit;
+#[cfg(test)]
+mod tracking_tests;
 
 #[cfg(test)]
 mod tests {
