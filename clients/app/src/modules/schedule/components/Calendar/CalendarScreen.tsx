@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -21,6 +21,7 @@ import {
 
 import { useCalendars, useEventActions, useEvents, useScheduleSettings } from "../../api/queries";
 import type { NewEvent } from "../../api/types";
+import { useClock } from "../../clock";
 import { useTaskRows } from "../../due";
 import { eventKey, type T } from "../../labels";
 import {
@@ -76,23 +77,6 @@ function subscribePhone(change: () => void): () => void {
 
 const isPhone = () =>
   typeof globalThis.matchMedia === "function" && globalThis.matchMedia(PHONE).matches;
-
-/** The time, ticking once a minute (the line in the week, "Today"). */
-function useClock(fixed: Date | undefined): Date {
-  const [now, setNow] = useState(() => fixed ?? new Date());
-  useEffect(() => {
-    if (fixed !== undefined) {
-      return;
-    }
-    const id = setInterval(() => {
-      setNow(new Date());
-    }, 60_000);
-    return () => {
-      clearInterval(id);
-    };
-  }, [fixed]);
-  return fixed ?? now;
-}
 
 /**
  * The Calendar place: Agenda, Week or Month of the member's events (what

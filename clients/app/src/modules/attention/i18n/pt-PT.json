@@ -150,5 +150,17 @@
   },
   "tasksElsewhere_one": "Mais {{count}} em Tarefas",
   "tasksElsewhere_other": "Mais {{count}} em Tarefas",
-  "openTasks": "Abrir Tarefas"
+  "openTasks": "Abrir Tarefas",
+  "calendar": {
+    "nextUp": "A seguir",
+    "next": "A seguir: {{title}} às {{time}}.",
+    "more_one": "Mais {{count}} no seu calendário hoje.",
+    "more_other": "Mais {{count}} no seu calendário hoje.",
+    "join": "Entrar",
+    "openInCalendar": "Abrir no Calendário",
+    "openEmail": "Abrir o email",
+    "comingTitle": "Próximos dias",
+    "comingSub": "Os próximos 7 dias.",
+    "openCalendar": "Abrir o Calendário"
+  }
 }

@@ -68,7 +68,8 @@ export interface QueueGroupProps {
   /** `danger`: the name in the danger colour (Now). */
   tone?: "danger" | undefined;
   name: string;
-  count: number;
+  /** How many items it holds; none for a group that holds only events (Next up, a Today of events). */
+  count?: number | undefined;
   /** One action for the whole group, at the end of its heading ("All 3 already paid"). */
   action?: ReactNode | undefined;
   /** A muted line under the heading, saying why the group is as it is. */
@@ -89,7 +90,13 @@ export function QueueGroup({ signal, tone, name, count, action, note, children }
       <div className={styles["groupHead"]}>
         <h2 className={styles["groupTitle"]} data-tone={tone}>
           {signal === undefined ? null : <Dot signal={signal} />}
-          {name} <span className={styles["count"]}>{count}</span>
+          {name}
+          {count === undefined ? null : (
+            <>
+              {" "}
+              <span className={styles["count"]}>{count}</span>
+            </>
+          )}
         </h2>
         {action === undefined ? null : <div className={styles["groupAction"]}>{action}</div>}
       </div>

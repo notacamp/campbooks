@@ -238,5 +238,13 @@
     "remove": "Retirer l’événement",
     "push": "Ajouter à mon agenda",
     "openEmail": "Ouvrir l’e-mail"
+  },
+  "home": {
+    "now": "Maintenant",
+    "started": "Commencé il y a {{minutes}} min",
+    "inMinutes": "Dans {{minutes}} min",
+    "inHours": "Dans {{hours}} h",
+    "inHoursMinutes": "Dans {{hours}} h {{minutes}} min",
+    "addNamed": "Ajouter à mon agenda : {{title}}"
   }
 }

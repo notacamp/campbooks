@@ -12,6 +12,25 @@
   color: var(--kind);
 }
 
+.kindIcon[data-size="md"] {
+  width: var(--size-avatar-md);
+  height: var(--size-avatar-md);
+}
+
+/* A kind as a dot before a line; a ring when only the member sees it. */
+.kindDot {
+  flex: none;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: var(--radius-full);
+  background: var(--kind);
+}
+
+.kindDot[data-hollow] {
+  background: none;
+  box-shadow: inset 0 0 0 calc(var(--border-width) * 1.5) var(--kind);
+}
+
 /* A kind as a label: the chip at the top of the event sheet. */
 .kindChip {
   display: inline-flex;

@@ -13,6 +13,7 @@ import {
   FoundReading,
   FoundStrip,
   KIND_ICONS,
+  KindDot,
   MonthGrid,
   SourceLink,
   ViewTabs,
@@ -24,6 +25,22 @@ import { CALENDAR_KINDS } from "../../tokens/tokens";
 describe("kinds", () => {
   it("has an icon for every kind", () => {
     expect(Object.keys(KIND_ICONS).toSorted()).toEqual([...CALENDAR_KINDS].toSorted());
+  });
+});
+
+describe("KindDot", () => {
+  it("is decorative when filled, and says what a ring means", () => {
+    const { container } = renderUi(
+      <>
+        <KindDot kind="charge" />
+        <KindDot kind="delivery" hollow label="Only you see it" />
+      </>,
+    );
+
+    expect(container.querySelector("[data-kind='charge']")).toHaveAttribute("aria-hidden", "true");
+    const ring = screen.getByRole("img", { name: "Only you see it" });
+    expect(ring).toHaveAttribute("data-hollow", "true");
+    expect(ring).toHaveAttribute("data-kind", "delivery");
   });
 });
 

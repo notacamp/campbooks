@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from "react";
 
 import { FoundInMessage } from "./components/Found/FoundInMessage";
 
+export { useHomeDay, type DayEvent, type DayLine } from "./home";
 export { buildScheduleRoutes } from "./routes";
 export { SCHEDULE_SHORTCUTS } from "./shortcuts";
 

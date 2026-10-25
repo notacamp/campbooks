@@ -1,7 +1,8 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
-import type { Signal } from "../../tokens/tokens";
+import type { CalendarKind, Signal } from "../../tokens/tokens";
 import { Avatar, type AvatarProps } from "../Avatar/Avatar";
+import { KindIcon } from "../Calendar/Calendar";
 import { Dot } from "../Dot/Dot";
 import { Icon, type IconName } from "../Icon/Icon";
 import { Tag } from "../Tag/Tag";
@@ -14,9 +15,9 @@ import styles from "./Item.module.css";
  * where it is ("Reply · Pedro has waited 4 days").
  */
 export interface ItemEyebrow {
-  /** The kind's signal colour, drawn as a dot before it. */
-  signal: Signal;
-  /** The kind: "Reply", "Pay task". */
+  /** The kind's signal colour, drawn as a dot before it; none for an event (its square carries the colour). */
+  signal?: Signal | undefined;
+  /** The kind: "Reply", "Pay task", "Meeting". */
   kind: string;
   /** Why it is here, in a sentence: "Overdue · 2 days". */
   reason: string;
@@ -33,7 +34,13 @@ export interface ItemProps {
   what: string;
   /** The sender's own words, on one line under it while closed (quoted, plain text). */
   excerpt?: string | undefined;
-  avatar: Pick<AvatarProps, "name" | "kind" | "initials">;
+  /** Who it is from, as an avatar; the row's `who` when omitted. */
+  avatar?: Pick<AvatarProps, "name" | "kind" | "initials"> | undefined;
+  /**
+   * An event rather than a need: its kind's icon on a square in the kind's
+   * colour takes the avatar's place, as the calendar draws it.
+   */
+  kind?: CalendarKind | undefined;
   /** When: "Thu", "Today", "Fri · €148.00". */
   due?: string | undefined;
   /** Due soon: drawn in the danger colour. */
@@ -82,6 +89,7 @@ export function Item({
   what,
   excerpt,
   avatar,
+  kind,
   due,
   soon = false,
   age,
@@ -102,11 +110,15 @@ export function Item({
   }
   const content = (
     <>
-      <Avatar {...avatar} />
+      {kind === undefined ? (
+        <Avatar {...(avatar ?? { name: who })} />
+      ) : (
+        <KindIcon kind={kind} size="md" />
+      )}
       {eyebrow === undefined ? null : (
         <>
           <span className={styles["eyebrow"]}>
-            <Dot signal={eyebrow.signal} />
+            {eyebrow.signal === undefined ? null : <Dot signal={eyebrow.signal} />}
             {eyebrow.kind} <span aria-hidden="true">·</span>{" "}
             <span
               className={styles["eyebrowReason"]}

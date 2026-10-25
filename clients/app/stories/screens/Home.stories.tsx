@@ -27,17 +27,22 @@ import {
   TIAGO_DETAIL,
   WAITING,
 } from "../../test/demo/attention";
-import { INBOX, STREAM_COUNTS, W } from "../../test/demo/conversations";
+import { INBOX, NOW, STREAM_COUNTS, W } from "../../test/demo/conversations";
 import {
+  HOME_CALENDARS,
   HOME_COUNTS,
+  HOME_DUE,
+  HOME_EVENTS,
   HOME_ITEMS,
   HOME_NEEDS,
+  HOME_SETTINGS,
   HOME_TASKS,
   HOME_TASKS_ELSEWHERE,
 } from "../../test/demo/home";
 import { DUARTE, SESSION } from "../../test/demo/workspaces";
 
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
+import { pinClock, scheduleApi } from "./schedule-mock";
 
 // Home with mail connected: what needs you, against fictional demo data.
 // Every state, tested with axe in light and dark.
@@ -508,5 +513,85 @@ export const WhyItsHere: Story = {
     await userEvent.click(await canvas.findByText("Tiago Nunes is waiting for your reply"));
     const why = await canvas.findByRole("region", { name: "Why it’s here" });
     await expect(why).toHaveTextContent("In Today: Tiago has waited 4 days.");
+  },
+};
+
+// Your calendar on Home (campbooks-cloud#359), on the demo's Tuesday 13
+// October at 15:00 UTC, 11:00 on Sam's New York calendar: a call in 20
+// minutes with a web address, lunch, time held for the lease, a key
+// handover read from Marta's email; Coming up with a delivery and a train
+// only Sam sees, a charge, a task due Friday and a renewal.
+function yourDay(): Record<string, MockRoute> {
+  const schedule = scheduleApi(HOME_EVENTS, { calendars: HOME_CALENDARS });
+  return {
+    ...morning(),
+    ...schedule.routes,
+    [`GET ${W}/schedule/settings`]: { body: HOME_SETTINGS },
+    [`GET ${W}/tasks`]: { body: { tasks: [...HOME_TASKS, HOME_DUE] } },
+  };
+}
+
+const onDemoDay: Pick<Story, "beforeEach"> = {
+  beforeEach: () => pinClock(NOW.toISOString()),
+};
+
+/** Next up above Now, today's events at the end of Today, Coming up in the aside. */
+export const YourDay: Story = {
+  ...onDemoDay,
+  args: { path: PATH, api: yourDay() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole("heading", { level: 2, name: "Next up" })).toBeVisible();
+    await expect(canvas.getByText("In 20 min")).toBeVisible();
+    await expect(await canvas.findByRole("heading", { level: 2, name: "Coming up" })).toBeVisible();
+    // The events are not counted: still ten things need you.
+    await expect(
+      canvas.getByRole("heading", { level: 1, name: "10 things need you" }),
+    ).toBeVisible();
+  },
+};
+
+/** Next up selected: Join on 1, Open in Calendar on Enter. */
+export const NextUpSelected: Story = {
+  ...onDemoDay,
+  args: { path: PATH, api: yourDay() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByText("Kitchen plan call with Marta Ferreira"));
+    await expect(
+      await canvas.findByRole("group", {
+        name: "Actions for Kitchen plan call with Marta Ferreira",
+      }),
+    ).toBeVisible();
+  },
+};
+
+/** "Add to my calendar" on the delivery only Sam sees: the toast says where, with Undo. */
+export const AddToMyCalendar: Story = {
+  ...onDemoDay,
+  args: { path: PATH, api: yourDay() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole("button", {
+        name: "Add to my calendar: Furniture delivery, 2 of 3 parcels",
+      }),
+    );
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByText("Added to Work")).toBeVisible();
+  },
+};
+
+/** The same day on a phone: the aside stacks under the list, nothing scrolls sideways. */
+export const YourDayPhone: Story = {
+  ...onDemoDay,
+  args: { path: PATH, api: yourDay() },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole("heading", { level: 2, name: "Coming up" });
+    await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
+      globalThis.innerWidth,
+    );
   },
 };

@@ -238,5 +238,13 @@
     "remove": "Quitar evento",
     "push": "Añadir a mi calendario",
     "openEmail": "Abrir el correo"
+  },
+  "home": {
+    "now": "Ahora",
+    "started": "Empezó hace {{minutes}} min",
+    "inMinutes": "En {{minutes}} min",
+    "inHours": "En {{hours}} h",
+    "inHoursMinutes": "En {{hours}} h {{minutes}} min",
+    "addNamed": "Añadir a mi calendario: {{title}}"
   }
 }
