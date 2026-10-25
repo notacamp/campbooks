@@ -4,18 +4,15 @@
 //! registry holds. The plan tool checks operations from the committed
 //! documents; only the server knows its background work.
 //!
-//! Mutating operations and background kinds with no row are reported as
-//! warnings until every module is instrumented (campbooks-cloud#332), which
-//! turns [`REQUIRE_FULL_COVERAGE`] on.
+//! Coverage is required, with no baseline: a mutating operation, job,
+//! schedule or event handler with no row fails the test, the kernel's own
+//! maintenance included. Add the row in the same PR as the work it covers
+//! (`docs/tracking.md`, "Coverage").
 
 use std::collections::BTreeSet;
 
 use campbooks_kernel::operations::Catalogue;
 use serde_json::Value;
-
-/// Whether a mutating operation, job, schedule or handler with no Coverage
-/// row fails the test (campbooks-cloud#332).
-const REQUIRE_FULL_COVERAGE: bool = false;
 
 /// The plan's mirror, as generated from the workbook.
 fn plan() -> Value {
@@ -85,23 +82,20 @@ fn coverage_names_what_the_server_composes() {
     for handler in &handlers {
         note("handler", handler);
     }
-    if !missing.is_empty() {
-        eprintln!(
-            "warning: {} mutating operation(s), job(s), schedule(s) and handler(s) have no \
-             Coverage row yet (required once campbooks-cloud#332 lands):",
-            missing.len()
-        );
-        for item in &missing {
-            eprintln!("  - {item}");
-        }
-    }
-    if REQUIRE_FULL_COVERAGE {
-        assert!(
-            missing.is_empty(),
-            "every mutating operation, job, schedule and handler needs a Coverage row: \
-             {missing:?}"
-        );
-    }
+    assert!(
+        missing.is_empty(),
+        "{} mutating operation(s), job(s), schedule(s) and handler(s) have no Coverage row. \
+         Add one for each to tracking/tracking-plan.xlsx, as a patch under tracking/patches/, \
+         naming the events it tracks or an exemption saying why it tracks none, then run \
+         `cargo run -p campbooks-tracking-plan -- apply <patch>` (docs/tracking.md, \
+         \"Coverage\"):\n{}",
+        missing.len(),
+        missing
+            .iter()
+            .map(|item| format!("  - {item}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }
 
 #[test]

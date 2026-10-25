@@ -706,10 +706,10 @@ pub fn without_tests(text: &str) -> String {
     out
 }
 
-/// The Coverage rows of kind `operation` whose `operationId` is in neither
-/// document, and the mutating operations that no row names (warnings until
-/// campbooks-cloud#332).
-pub fn operations(plan: &Plan, documents: &[serde_json::Value]) -> (Vec<String>, Vec<String>) {
+/// The problems of the Coverage rows of kind `operation` against the
+/// documents: a row whose `operationId` is in neither, and a mutating
+/// operation that no row names (coverage is required, with no baseline).
+pub fn operations(plan: &Plan, documents: &[serde_json::Value]) -> Vec<String> {
     let mut ids = BTreeSet::new();
     let mut mutating = BTreeSet::new();
     for document in documents {
@@ -751,8 +751,14 @@ pub fn operations(plan: &Plan, documents: &[serde_json::Value]) -> (Vec<String>,
             ));
         }
     }
-    let unmapped = mutating.difference(&named).cloned().collect();
-    (problems, unmapped)
+    for id in mutating.difference(&named) {
+        problems.push(format!(
+            "Coverage: operation `{id}` mutates and has no row: add one to \
+             tracking/tracking-plan.xlsx (a patch under tracking/patches/) with the events \
+             it tracks, or an exemption saying why it tracks none (docs/tracking.md)"
+        ));
+    }
+    problems
 }
 
 #[cfg(test)]
@@ -945,16 +951,34 @@ mod tests {
     }
 
     #[test]
-    fn a_stale_operation_fails_and_unmapped_ones_are_reported() {
+    fn a_stale_operation_and_an_unmapped_one_both_fail() {
         let plan = good();
         let document = serde_json::json!({"paths": {
             "/a": {"post": {"operationId": "things.break", "x-campbooks": {"mutates": true}}},
             "/b": {"get": {"operationId": "things.list", "x-campbooks": {"mutates": false}}},
         }});
-        let (problems, unmapped) = operations(&plan, &[document]);
-        assert_eq!(problems.len(), 1);
-        assert!(problems[0].contains("`things.make`"));
-        assert_eq!(unmapped, vec!["things.break".to_owned()]);
+        let problems = operations(&plan, &[document]);
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert!(problems[0].contains("`things.make`"), "{problems:?}");
+        assert!(problems[0].contains("in neither"), "{problems:?}");
+        assert!(
+            problems[1].contains("`things.break` mutates and has no row"),
+            "{problems:?}"
+        );
+        assert!(
+            !problems.iter().any(|p| p.contains("things.list")),
+            "a read needs no row: {problems:?}"
+        );
+    }
+
+    #[test]
+    fn every_mutating_operation_with_a_row_passes() {
+        let plan = good();
+        let document = serde_json::json!({"paths": {
+            "/a": {"post": {"operationId": "things.make", "x-campbooks": {"mutates": true}}},
+            "/b": {"get": {"operationId": "things.list", "x-campbooks": {"mutates": false}}},
+        }});
+        assert_eq!(operations(&plan, &[document]), Vec::<String>::new());
     }
 
     #[test]

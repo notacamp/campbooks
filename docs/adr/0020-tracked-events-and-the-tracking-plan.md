@@ -63,9 +63,8 @@ would make analytics needs part of the module contracts.
   `openapi.json` and `admin.json`) and every registered job, schedule and
   event handler must appear in *Coverage*, mapped to events or exempted with
   a reason. A `live` event must be tracked somewhere outside tests. Coverage
-  becomes required in CI with no baseline once every module is instrumented
-  (campbooks-cloud#332). Until then the check validates the entries that
-  exist.
+  is required in CI with no baseline (since campbooks-cloud#332, once every
+  module was instrumented).
 
 **Egress to RabbitMQ, with streams.** A relay in the worker role publishes
 the outbox, in order, to a topic exchange `campbooks.events`. The routing

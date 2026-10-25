@@ -30,19 +30,12 @@ pub enum TrackingCommand {
 pub fn run(root: &Path, check: bool, command: Option<TrackingCommand>) -> Result<String> {
     if check {
         let report = campbooks_tracking_plan::check(root)?;
-        let mut out = String::new();
-        for warning in &report.warnings {
-            out.push_str("warning: ");
-            out.push_str(warning);
-            out.push('\n');
-        }
         if report.problems.is_empty() {
-            out.push_str("tracking plan OK");
-            return Ok(out);
+            return Ok("tracking plan OK".to_owned());
         }
         let list: Vec<String> = report.problems.iter().map(|p| format!("  - {p}")).collect();
         bail!(
-            "{out}{} tracking plan problem(s) (see docs/tracking.md):\n{}",
+            "{} tracking plan problem(s) (see docs/tracking.md):\n{}",
             report.problems.len(),
             list.join("\n")
         );
