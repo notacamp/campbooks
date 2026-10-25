@@ -189,13 +189,16 @@ pub async fn invitation(
     })
 }
 
+/// One `workspaces.signup_requests` row, without its reason.
+type RequestRow = (Uuid, String, bool, DateTime<Utc>, Option<DateTime<Utc>>);
+
 /// The signup request of `user` as it is now. Whether it holds a reason,
 /// never the reason.
 pub async fn signup_request(
     conn: &mut PgConnection,
     user: UserId,
 ) -> Result<tracking::SignupRequestSnapshot> {
-    let row: Option<(Uuid, String, bool, DateTime<Utc>, Option<DateTime<Utc>>)> = sqlx::query_as(
+    let row: Option<RequestRow> = sqlx::query_as(
         "SELECT user_id, status, reason IS NOT NULL, requested_at, decided_at
                FROM workspaces.signup_requests WHERE user_id = $1",
     )
