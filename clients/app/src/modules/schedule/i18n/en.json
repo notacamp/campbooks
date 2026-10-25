@@ -113,7 +113,7 @@
     "done": "Done",
     "open": "Open task",
     "planned": "Planned",
-    "plannedOn": "Planned {{day}}",
+    "plannedOn": "Was for {{day}}",
     "metaPlanned": "Planned",
     "plannedFact": "Planned for {{day}}"
   },

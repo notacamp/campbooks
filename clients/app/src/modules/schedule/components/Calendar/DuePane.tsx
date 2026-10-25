@@ -19,7 +19,7 @@ import {
 import type { TaskSource, TaskView } from "~/modules/tasks";
 
 import type { TaskRow } from "../../due";
-import { dueTitle, dueWhen, type T } from "../../labels";
+import { dueTitle, dueWhen, dueWhenIsKind, type T } from "../../labels";
 import { dayLong, dayOf } from "../../model";
 import { useInAppLink } from "./links";
 
@@ -85,7 +85,10 @@ export function DuePane({ workspaceId, row, today, source, done, onClose }: DueP
             icon="clock"
             main={t(late ? "due.wasDue" : "due.dueOn", { day: dayLong(locale, due) })}
           >
-            {row.kind === "due" ? dueWhen(t, locale, row, today) : undefined}
+            {/* "Due today", "Due 17:00", "Overdue · 2 days"; a plain "Due" would repeat the line above. */}
+            {row.kind === "due" && !dueWhenIsKind(row, today)
+              ? dueWhen(t, locale, row, today)
+              : undefined}
           </SheetFact>
         )}
       </SheetFacts>

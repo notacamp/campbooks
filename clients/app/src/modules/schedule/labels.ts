@@ -126,7 +126,21 @@ export function dueWhen(t: T, locale: string, row: TaskRow, today: Ymd): string 
   return row.stands === today ? t("due.today") : t("due.label");
 }
 
-/** The second line of a row: "Task", or "Planned" for a Due row that is also planned. */
-export function dueMeta(t: T, row: TaskRow): string {
+/** Whether `dueWhen` says only the row's kind again ("Due", "Planned") and not a day or time. */
+export function dueWhenIsKind(row: TaskRow, today: Ymd): boolean {
+  return (
+    row.late === 0 && (row.kind === "planned" || (row.minute === undefined && row.stands !== today))
+  );
+}
+
+/**
+ * The rest of a row's second line: a Planned row says when it is due ("Due
+ * Thu"); a Due row says "Planned" when it is also planned for its day; else "Task".
+ */
+export function dueMeta(t: T, locale: string, row: TaskRow): string {
+  const due = row.task.due_on ?? undefined;
+  if (row.kind === "planned" && due !== undefined) {
+    return t("due.dueOn", { day: dayShort(locale, due) });
+  }
   return t(row.alsoPlanned ? "due.metaPlanned" : "due.meta");
 }

@@ -18,7 +18,16 @@ import type { TaskSource } from "~/modules/tasks";
 
 import type { CalendarView, EventView } from "../../api/types";
 import type { TaskRow } from "../../due";
-import { dueMeta, dueTitle, dueWhen, eventKey, metaLine, whenLabel, type T } from "../../labels";
+import {
+  dueMeta,
+  dueTitle,
+  dueWhen,
+  dueWhenIsKind,
+  eventKey,
+  metaLine,
+  whenLabel,
+  type T,
+} from "../../labels";
 import {
   agendaOn,
   blocksOn,
@@ -119,9 +128,10 @@ export function AgendaView(props: ViewProps) {
                   kind="due"
                   when={dueWhen(t, locale, row, today.day)}
                   overdue={late}
+                  whenInline={!dueWhenIsKind(row, today.day)}
                   title={dueTitle(t, row)}
                   kindLabel={t(row.kind === "due" ? "kind.due" : "kind.planned")}
-                  meta={dueMeta(t, row)}
+                  meta={dueMeta(t, locale, row)}
                   from={
                     source === undefined
                       ? undefined

@@ -113,7 +113,7 @@
     "done": "Hecha",
     "open": "Abrir tarea",
     "planned": "Planificada",
-    "plannedOn": "Planificada {{day}}",
+    "plannedOn": "Era para el {{day}}",
     "metaPlanned": "Planificada",
     "plannedFact": "Planificada para el {{day}}"
   },

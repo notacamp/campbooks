@@ -377,7 +377,7 @@ describe("tasks on the calendar", () => {
 
     // The lease: planned Wednesday, due Thursday, two rows.
     expect(await screen.findAllByRole("button", { name: /Do · Send the lease/u })).toHaveLength(2);
-    expect(screen.getByText("Planned Mon")).toBeInTheDocument();
+    expect(screen.getByText("Was for Mon")).toBeInTheDocument();
   });
 
   it("shows one row, saying it is planned, when it is planned for its due day", async () => {

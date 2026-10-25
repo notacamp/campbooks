@@ -1,6 +1,6 @@
 import { useTasks, type TaskView } from "~/modules/tasks";
 
-import { daysBetween, inZone, minutesOf, type Ymd } from "./model";
+import { daysBetween, nowIn, type Ymd } from "./model";
 
 /**
  * The tasks on the calendar. They are the member's own open tasks (the tasks
@@ -33,8 +33,7 @@ function dueMinute(task: TaskView, zone: string): number | undefined {
   if (task.due_at === null || task.due_at === undefined) {
     return undefined;
   }
-  const clock = inZone("en-GB", task.due_at, zone);
-  return clock === undefined ? undefined : minutesOf(`0000-00-00T${clock}`);
+  return nowIn(zone, new Date(task.due_at)).minute;
 }
 
 /**

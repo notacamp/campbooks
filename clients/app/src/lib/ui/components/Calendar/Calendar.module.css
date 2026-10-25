@@ -376,6 +376,8 @@ button.kindChip:hover {
 }
 
 .laneCells {
+  /* Pills fill the first row with room on their days, not one row each. */
+  grid-auto-flow: row dense;
   gap: var(--space-0-5);
   min-height: var(--size-control-md);
   padding: var(--space-1);
