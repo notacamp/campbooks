@@ -110,9 +110,15 @@
       "pr": "#672"
     },
     {
-      "change": "Invitations awaiting an answer on Home (campbooks-cloud#360): Coverage for schedule.release_response (connectors.calendar_change_completed), schedule.dispatch_invitation_backfills, schedule.announce_invitations and attention.project_invitation; no new event.",
+      "change": "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check, search.on_page_changed and the kernel's maintenance schedules and change-feed sequencer.",
       "date": "2026-10-25",
       "plan_version": 13,
+      "pr": "#666"
+    },
+    {
+      "change": "Invitations awaiting an answer on Home (campbooks-cloud#360): Coverage for schedule.release_response (connectors.calendar_change_completed), schedule.dispatch_invitation_backfills, schedule.announce_invitations and attention.project_invitation; no new event.",
+      "date": "2026-10-25",
+      "plan_version": 14,
       "pr": "#676"
     }
   ],
@@ -413,6 +419,12 @@
     },
     {
       "events": [],
+      "exemption": "projection of pages.page_changed: the page's entry in the index refreshed (removed when trashed or gone)",
+      "kind": "handler",
+      "name": "search.on_page_changed"
+    },
+    {
+      "events": [],
       "exemption": "projection of workspaces.workspace_deleted: it only stops indexing and schedules the purge",
       "kind": "handler",
       "name": "search.schedule_workspace_purge"
@@ -496,6 +508,14 @@
       "exemption": "maintenance, no action of anyone: MACs of pending changes re-tagged after a key rotation",
       "kind": "job",
       "name": "connectors.retag_bindings"
+    },
+    {
+      "events": [
+        "connectors.address_check_send_completed"
+      ],
+      "exemption": "",
+      "kind": "job",
+      "name": "connectors.send_address_check"
     },
     {
       "events": [
@@ -622,6 +642,12 @@
       "exemption": "derived state: a need worked out again from stored messages and answers (conversations.need_changed); no action of anyone",
       "kind": "job",
       "name": "conversations.wake_needs"
+    },
+    {
+      "events": [],
+      "exemption": "projection: numbers a workspace's change-feed entries for clients to follow; the changes are tracked by the modules that make them",
+      "kind": "job",
+      "name": "kernel.sequence_changes"
     },
     {
       "events": [],
@@ -893,6 +919,14 @@
       "exemption": "",
       "kind": "operation",
       "name": "bff.session"
+    },
+    {
+      "events": [
+        "connectors.address_check_requested"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "connectors.check_address"
     },
     {
       "events": [
@@ -1881,6 +1915,60 @@
     },
     {
       "events": [],
+      "exemption": "maintenance, no action of anyone: only enqueues the modules' re-tag jobs while a previous key is set, which have their own rows",
+      "kind": "schedule",
+      "name": "kernel.dispatch_rekeys"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: change-feed entries past their retention deleted",
+      "kind": "schedule",
+      "name": "kernel.prune_changes"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: domain events past their retention deleted, never one still being delivered",
+      "kind": "schedule",
+      "name": "kernel.prune_events"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: expired idempotency keys deleted",
+      "kind": "schedule",
+      "name": "kernel.prune_idempotency"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: finished jobs past their retention deleted",
+      "kind": "schedule",
+      "name": "kernel.prune_jobs"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: rate-limit counters whose window ended deleted",
+      "kind": "schedule",
+      "name": "kernel.prune_rate_limits"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: tracked events already published deleted from the outbox",
+      "kind": "schedule",
+      "name": "kernel.prune_tracked_events"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: blobs no record references, and abandoned uploads, deleted after their grace period",
+      "kind": "schedule",
+      "name": "kernel.sweep_blobs"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance: what reached the kernel's tables of a purged workspace after its purge deleted; the purge is tracked as workspaces.workspace_purged",
+      "kind": "schedule",
+      "name": "kernel.sweep_purged_workspaces"
+    },
+    {
+      "events": [],
       "exemption": "maintenance, no action of anyone: only enqueues the purge of each workspace's old trash, which tracks nothing",
       "kind": "schedule",
       "name": "pages.dispatch_purge_trash"
@@ -2398,6 +2486,61 @@
       "description": "The person signed out everywhere (identity.signed_out_everywhere).",
       "enum": "bff.web_sessions_end_cause",
       "value": "signed_out_everywhere"
+    },
+    {
+      "description": "The connection's address is no longer the one the check was for.",
+      "enum": "connectors.address_check_reason",
+      "value": "address_changed"
+    },
+    {
+      "description": "The address cannot be sent to as it is.",
+      "enum": "connectors.address_check_reason",
+      "value": "address_invalid"
+    },
+    {
+      "description": "The SMTP server would not send from or to the address.",
+      "enum": "connectors.address_check_reason",
+      "value": "address_refused"
+    },
+    {
+      "description": "The mailbox's password could not be used: the member must connect it again.",
+      "enum": "connectors.address_check_reason",
+      "value": "needs_reauth"
+    },
+    {
+      "description": "The mailbox's SMTP server or its messages stream is not stored.",
+      "enum": "connectors.address_check_reason",
+      "value": "not_connected"
+    },
+    {
+      "description": "A reason this plan does not know yet.",
+      "enum": "connectors.address_check_reason",
+      "value": "other"
+    },
+    {
+      "description": "IMAP is not turned on on this instance.",
+      "enum": "connectors.address_check_reason",
+      "value": "provider_not_configured"
+    },
+    {
+      "description": "The SMTP server refused the mailbox's password.",
+      "enum": "connectors.address_check_reason",
+      "value": "smtp_login_refused"
+    },
+    {
+      "description": "The SMTP server could not be used safely, or did not take the message in the attempts allowed.",
+      "enum": "connectors.address_check_reason",
+      "value": "smtp_unavailable"
+    },
+    {
+      "description": "It could not be sent; the check ended unverified and can be asked for again.",
+      "enum": "connectors.address_check_send_outcome",
+      "value": "failed"
+    },
+    {
+      "description": "The mailbox's SMTP server took the message (or may have): the runs look for its code.",
+      "enum": "connectors.address_check_send_outcome",
+      "value": "sent"
     },
     {
       "description": "Create an event.",
@@ -5689,6 +5832,307 @@
         "type": "object"
       },
       "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "requested",
+      "actor_types": [
+        "user",
+        "client",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 11,
+      "description": "Someone asked for an IMAP mailbox's address to be checked again: a new one-time code is sent to the address through the mailbox's own server. Never the address or the code.",
+      "fires_when": "connectors.check_address starts a new check of a mailbox whose address is not verified, in the transaction that starts it; asking while a check is under way, or being refused (not needed, needs reauth, IMAP off, the day's checks spent), tracks nothing.",
+      "module": "connectors",
+      "name": "connectors.address_check_requested",
+      "object": "address_check",
+      "openspec_change": "require-full-tracking-coverage",
+      "rust_type": "AddressCheckRequested",
+      "schema": {
+        "$id": "urn:campbooks:tracking:connectors.address_check_requested:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "Someone asked for an IMAP mailbox's address to be checked again: a new one-time code is sent to the address through the mailbox's own server. Never the address or the code.",
+        "properties": {
+          "connection": {
+            "additionalProperties": false,
+            "description": "The connection whose address is checked (address_verified false).",
+            "properties": {
+              "address_verified": {
+                "description": "Whether the provider verified the account's address (never the address).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "capabilities": {
+                "description": "What it lets Campbooks do.",
+                "items": {
+                  "enum": [
+                    "bank",
+                    "calendar",
+                    "files",
+                    "messages"
+                  ],
+                  "type": "string"
+                },
+                "type": "array",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was connected.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "granted_by": {
+                "description": "The member who granted it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "health": {
+                "description": "How it is doing.",
+                "enum": [
+                  "failing",
+                  "needs_reauth",
+                  "ok",
+                  "throttled"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "health_changed_at": {
+                "description": "Since when it has had this health.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "health_reason": {
+                "description": "Why, when it is not ok.",
+                "enum": [
+                  "access_refused",
+                  "credentials_unreadable",
+                  "grant_revoked",
+                  "imap_login_refused",
+                  "imap_settings_missing",
+                  "other",
+                  "provider_errors",
+                  "rate_limited",
+                  "unknown_data_centre"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The connection's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "mailboxes": {
+                "description": "Mailboxes it reads: its messages streams.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "The provider.",
+                "enum": [
+                  "google",
+                  "imap",
+                  "microsoft",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "address_verified",
+              "capabilities",
+              "created_at",
+              "granted_by",
+              "health",
+              "health_changed_at",
+              "id",
+              "mailboxes",
+              "provider"
+            ],
+            "title": "connectors.connection",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "connection"
+        ],
+        "title": "connectors.address_check_requested",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "completed",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 11,
+      "description": "The message of an IMAP mailbox's address check went out (its stream's runs look for it from now on), or could not be sent and the check ended unverified; reason is the kind of failure, never the server's reply.",
+      "fires_when": "connectors.send_address_check marks the check sent, or ends it failed, in the job's transaction; a check sent, ended or replaced meanwhile, a connection gone, or an address already verified tracks nothing, and a busy server tried again later is not an event.",
+      "module": "connectors",
+      "name": "connectors.address_check_send_completed",
+      "object": "address_check_send",
+      "openspec_change": "require-full-tracking-coverage",
+      "rust_type": "AddressCheckSendCompleted",
+      "schema": {
+        "$id": "urn:campbooks:tracking:connectors.address_check_send_completed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The message of an IMAP mailbox's address check went out (its stream's runs look for it from now on), or could not be sent and the check ended unverified; reason is the kind of failure, never the server's reply.",
+        "properties": {
+          "connection": {
+            "additionalProperties": false,
+            "description": "The connection whose address is checked.",
+            "properties": {
+              "address_verified": {
+                "description": "Whether the provider verified the account's address (never the address).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "capabilities": {
+                "description": "What it lets Campbooks do.",
+                "items": {
+                  "enum": [
+                    "bank",
+                    "calendar",
+                    "files",
+                    "messages"
+                  ],
+                  "type": "string"
+                },
+                "type": "array",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was connected.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "granted_by": {
+                "description": "The member who granted it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "health": {
+                "description": "How it is doing.",
+                "enum": [
+                  "failing",
+                  "needs_reauth",
+                  "ok",
+                  "throttled"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "health_changed_at": {
+                "description": "Since when it has had this health.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "health_reason": {
+                "description": "Why, when it is not ok.",
+                "enum": [
+                  "access_refused",
+                  "credentials_unreadable",
+                  "grant_revoked",
+                  "imap_login_refused",
+                  "imap_settings_missing",
+                  "other",
+                  "provider_errors",
+                  "rate_limited",
+                  "unknown_data_centre"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The connection's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "mailboxes": {
+                "description": "Mailboxes it reads: its messages streams.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "The provider.",
+                "enum": [
+                  "google",
+                  "imap",
+                  "microsoft",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "address_verified",
+              "capabilities",
+              "created_at",
+              "granted_by",
+              "health",
+              "health_changed_at",
+              "id",
+              "mailboxes",
+              "provider"
+            ],
+            "title": "connectors.connection",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "outcome": {
+            "description": "Whether the check's message went out.",
+            "enum": [
+              "failed",
+              "sent"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "reason": {
+            "description": "Why it could not be sent, when it was not.",
+            "enum": [
+              "address_changed",
+              "address_invalid",
+              "address_refused",
+              "needs_reauth",
+              "not_connected",
+              "other",
+              "provider_not_configured",
+              "smtp_login_refused",
+              "smtp_unavailable"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "connection",
+          "outcome"
+        ],
+        "title": "connectors.address_check_send_completed",
+        "type": "object"
+      },
+      "scope": "workspace",
       "status": "live",
       "version": 1
     },
@@ -22173,7 +22617,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-25",
-  "plan_version": 13,
+  "plan_version": 14,
   "properties": [
     {
       "classification": "operational",
@@ -22537,6 +22981,58 @@
       "property": "sessions_ended",
       "required": true,
       "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The connection whose address is checked (address_verified false).",
+      "event": "connectors.address_check_requested",
+      "example": "",
+      "list": false,
+      "of": "connectors.connection",
+      "pattern": "",
+      "property": "connection",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The connection whose address is checked.",
+      "event": "connectors.address_check_send_completed",
+      "example": "",
+      "list": false,
+      "of": "connectors.connection",
+      "pattern": "",
+      "property": "connection",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether the check's message went out.",
+      "event": "connectors.address_check_send_completed",
+      "example": "",
+      "list": false,
+      "of": "connectors.address_check_send_outcome",
+      "pattern": "",
+      "property": "outcome",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Why it could not be sent, when it was not.",
+      "event": "connectors.address_check_send_completed",
+      "example": "",
+      "list": false,
+      "of": "connectors.address_check_reason",
+      "pattern": "",
+      "property": "reason",
+      "required": false,
+      "type": "enum",
       "version": 1
     },
     {

@@ -567,18 +567,28 @@ export const ReaderScoutReadPhone: Story = {
 
 /* Settings → Calendar. */
 
+const problem = (status: number, code: string): MockRoute => ({
+  status,
+  body: { type: "about:blank", title: "Problem", status, code },
+});
+
 const CALENDAR_ACCESS = {
   ...CONNECTION,
   capabilities: ["messages", "calendar"],
+  offers: [],
 } as const;
 /** A Google mailbox signed in for mail only: Settings offers it calendar access. */
 const GOOGLE_MAIL_ONLY = { ...CONNECTION, capabilities: ["messages"] } as const;
+/** A Zoho mailbox, mail only: the server does not offer it calendar access (its adapter is off). */
 const MAIL_ONLY = {
   ...ZOHO_CONNECTION,
   address: "ana@lopesimoveis.example",
   health: "ok",
   capabilities: ["messages"],
+  offers: [],
 } as const;
+/** The same Zoho mailbox on a server whose Zoho Calendar adapter is on. */
+const ZOHO_OFFERED = { ...MAIL_ONLY, offers: ["calendar"] } as const;
 
 function settingsApi() {
   return {
@@ -618,13 +628,51 @@ function addAccessApi() {
   } satisfies Record<string, MockRoute>;
 }
 
-/** A Google mailbox without calendar access: Add calendar access, and not for the Zoho one. */
+/** A Google mailbox without calendar access: Add calendar access, and not for the Zoho one (not offered). */
 export const SettingsAddAccess: Story = {
   args: { path: `${BASE}/settings/calendar`, api: addAccessApi },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole("button", { name: "Add calendar access" })).toBeVisible();
     await expect(canvas.getAllByRole("button", { name: "Add calendar access" })).toHaveLength(1);
+  },
+};
+
+function zohoOfferedApi() {
+  return {
+    ...settingsApi(),
+    [`GET ${W}/connections`]: { body: { connections: [GOOGLE_MAIL_ONLY, ZOHO_OFFERED] } },
+  } satisfies Record<string, MockRoute>;
+}
+
+/** The server offers the Zoho mailbox calendar access too: one button for each. */
+export const SettingsAddAccessZoho: Story = {
+  args: { path: `${BASE}/settings/calendar`, api: zohoOfferedApi },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findAllByRole("button", { name: "Add calendar access" }),
+    ).toHaveLength(2);
+    await expect(canvas.getByText("ana@lopesimoveis.example")).toBeVisible();
+  },
+};
+
+function stepUpApi() {
+  return {
+    ...addAccessApi(),
+    "POST /bff/api/v1/identity/links": problem(403, "step_up_required"),
+  } satisfies Record<string, MockRoute>;
+}
+
+/** The sign-in is too old for a reconnect: the page offers Sign in again, not a dead end. */
+export const SettingsStepUp: Story = {
+  args: { path: `${BASE}/settings/calendar`, api: stepUpApi },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Add calendar access" }));
+    await expect(await canvas.findByText("Sign in again first")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Sign in again" })).toBeVisible();
+    await expect(canvas.queryByText("Couldn’t start that. Try again.")).toBeNull();
   },
 };
 
@@ -669,6 +717,17 @@ export const SettingsIdle: Story = {
 /** Settings with Add calendar access, to drive by hand. */
 export const SettingsAddAccessIdle: Story = {
   args: { path: `${BASE}/settings/calendar`, api: addAccessApi },
+};
+
+/** Settings with Add calendar access for Google and Zoho, whose sign-in is too old: to drive by hand. */
+export const SettingsStepUpIdle: Story = {
+  args: {
+    path: `${BASE}/settings/calendar`,
+    api: () => ({
+      ...stepUpApi(),
+      [`GET ${W}/connections`]: { body: { connections: [GOOGLE_MAIL_ONLY, ZOHO_OFFERED] } },
+    }),
+  },
 };
 
 /** The invitation Google refused a change to, to drive by hand. */

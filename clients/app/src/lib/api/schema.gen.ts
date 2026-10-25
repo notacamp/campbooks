@@ -3609,6 +3609,11 @@ export interface components {
             health_reason?: string | null;
             /** @description The connection. */
             id: components["schemas"]["ConnectionId"];
+            /**
+             * @description What it could still be given by consenting again: `calendar` for a
+             *     Google connection, and for a Zoho one while its adapter is on.
+             */
+            offers: components["schemas"]["Capability"][];
             /** @description The provider. */
             provider: components["schemas"]["Provider"];
             /** @description Its change streams. */
@@ -6918,6 +6923,11 @@ export interface components {
         };
         /** @description The round trip to start. */
         StartLink: {
+            /**
+             * @description Besides the mailbox, what to ask for (`calendar`); a reconnect also
+             *     asks for what the connection already has.
+             */
+            capabilities?: string[];
             /** @description The connection, for `reconnect`. */
             connection_id?: string | null;
             /**

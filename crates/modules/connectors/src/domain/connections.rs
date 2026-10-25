@@ -4,6 +4,8 @@ use campbooks_kernel::{Result, tenancy::UserId};
 use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
 
+use crate::deps::Deps;
+
 use super::model::{
     Capability, ConnectionId, ConnectionView, Health, InboxId, Phase, Provider, StreamId,
     StreamView,
@@ -72,6 +74,7 @@ pub async fn view(
     conn: &mut PgConnection,
     connection: Connection,
     caller: Option<UserId>,
+    deps: &Deps,
 ) -> Result<ConnectionView> {
     let rows = sqlx::query!(
         r#"SELECT s.id AS "id: StreamId", s.capability, s.inbox_id AS "inbox_id: InboxId",
@@ -126,6 +129,7 @@ pub async fn view(
         display_name: connection.display_name,
         granted_by: connection.granted_by,
         granted_by_you: caller == Some(connection.granted_by),
+        offers: deps.offers(connection.provider, &connection.capabilities),
         capabilities: connection.capabilities,
         health: connection.health,
         health_reason: connection.health_reason,

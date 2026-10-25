@@ -153,20 +153,71 @@ of being dropped silently.
 
 ## Coverage
 
-Every operation, job, schedule and event handler gets one Coverage row: the
-events it tracks, or why it tracks none (`maintenance, no action of
-anyone`). Reads need no row; one may be added to record that they track
-nothing.
+Every mutating operation (in `openapi/openapi.json` and
+`openapi/admin.json`), job, schedule and event handler the server composes,
+the kernel's own maintenance included, gets one Coverage row: the events it
+tracks, or why it tracks none (`maintenance, no action of anyone`). Reads
+need no row; one may be added to record that they track nothing.
 
-- The plan check fails on a row naming an `operationId` that is in neither
-  `openapi/openapi.json` nor `openapi/admin.json`, on an event that does not
-  exist, and on a row with both events and an exemption, or neither.
-- The server's coverage test (`crates/server/src/tracking_tests.rs`) builds
-  the real registry and catalogue and fails on a row naming an unknown job,
-  schedule or handler.
-- Both list what has no row yet as warnings. Once every module is
-  instrumented (campbooks-cloud#332) that becomes a failure
-  (`REQUIRE_FULL_COVERAGE`).
+**Coverage is required, with no baseline.** It is part of the definition of
+done: a PR that adds an operation, a job, a schedule or an event handler
+adds its Coverage row (and its events, live and tested) in the same PR, or
+CI fails. There is no allow-list to add yourself to.
+
+- The plan check (`cargo run -p campbooks-tracking-plan -- check`, which
+  needs no server build) fails on a mutating operation with no row, on a row
+  naming an `operationId` that is in neither document, on an event that
+  does not exist, and on a row with both events and an exemption, or
+  neither.
+- The server's coverage test (`crates/server/src/tracking_tests.rs`,
+  `coverage_names_what_the_server_composes`) builds the real registry and
+  catalogue. It fails on a row naming something the server does not
+  compose, and on any operation, job, schedule or handler with no row.
+- Policy ("Tracking plan changes come through a patch") fails a PR that
+  changes `tracking/tracking-plan.xlsx` or `tracking/tracking-plan.json`
+  without adding or changing a file under `tracking/patches/`.
+
+### Reading the failure and fixing it
+
+The coverage test's message lists each missing item as `<kind> \`<name>\``,
+for example:
+
+```text
+2 mutating operation(s), job(s), schedule(s) and handler(s) have no Coverage row. …
+  - operation `things.make`
+  - job `things.send_reminder`
+```
+
+The plan check prints the same for operations (`Coverage: operation
+\`things.make\` mutates and has no row: …`). The kind is the row's `kind`
+and the name its `name`: an `operationId`, or the `NAME` of the job,
+schedule or handler. For each one:
+
+1. Decide what it changes, and for whom. A change someone made, or a job
+   or handler made on their behalf (a sync, a send, a rule applied), is an
+   event, and so is a failure that matters to someone (with the kind of
+   failure as an enum). Maintenance (pruning, re-tagging, refreshing a
+   projection), a projection of an event tracked elsewhere, and work that
+   only enqueues other work that tracks get an exemption that says so
+   (`maintenance, no action of anyone: …`, `projection of <event>`,
+   `consequence of <event>, tracked there`).
+2. Add the row, with its events if any, to a patch
+   (`tracking/patches/<nnnn>-<slug>.yaml`, the next free number on `next`
+   and in open PRs), apply it, and track the events as in "Adding an
+   event":
+
+   ```yaml
+   coverage:
+     - { kind: operation, name: things.make, events: [things.thing_made] }
+     - { kind: job, name: things.send_reminder, exemption: "only enqueues the sends, which track" }
+   ```
+
+3. Run `cargo run -p campbooks-tracking-plan -- check` and commit the
+   patch, the workbook, the mirror and the generated code. The server's
+   test runs in CI.
+
+A row naming something that no longer exists (an operation renamed, a job
+removed) fails too: rename the row, or remove it with a patch's `remove:`.
 
 ## The envelope and the ambient context
 

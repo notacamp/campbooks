@@ -2,7 +2,7 @@
 //! connection with its streams. 404 unless the caller may see it.
 
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, State},
 };
 use campbooks_kernel::{
@@ -13,6 +13,7 @@ use campbooks_kernel::{
 };
 
 use crate::{
+    deps::Deps,
     domain::{
         connections,
         model::{ConnectionId, ConnectionPath, ConnectionView},
@@ -45,10 +46,11 @@ use crate::{
 )]
 pub async fn handler(
     State(state): State<AppState>,
+    Extension(deps): Extension<Deps>,
     workspace: Workspace<ConnectorsRead>,
     Path(path): Path<ConnectionPath>,
 ) -> Result<Json<ConnectionView>> {
-    execute(&state, &workspace.access, path.connection_id)
+    execute(&state, &deps, &workspace.access, path.connection_id)
         .await
         .map(Json)
 }
@@ -56,6 +58,7 @@ pub async fn handler(
 /// Connection `id`, if `access` may see it.
 pub async fn execute(
     state: &AppState,
+    deps: &Deps,
     access: &Access,
     id: ConnectionId,
 ) -> Result<ConnectionView> {
@@ -72,7 +75,7 @@ pub async fn execute(
     let connection = connections::load(&mut tx, id)
         .await?
         .ok_or(Error::NotFound)?;
-    let view = connections::view(&mut tx, connection, access.user).await?;
+    let view = connections::view(&mut tx, connection, access.user, deps).await?;
     tx.commit().await?;
     Ok(view)
 }

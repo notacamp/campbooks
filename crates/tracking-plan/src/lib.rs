@@ -44,10 +44,9 @@ pub const OPENAPI_DOCUMENTS: &[&str] = &["openapi/openapi.json", "openapi/admin.
 /// What a check found.
 #[derive(Debug, Default)]
 pub struct Report {
-    /// Broken rules: the check fails.
+    /// Broken rules, a mutating operation with no Coverage row among them:
+    /// the check fails.
     pub problems: Vec<String>,
-    /// Reported only, until campbooks-cloud#332 makes them problems.
-    pub warnings: Vec<String>,
 }
 
 /// The repository root this crate was built in (`crates/tracking-plan/../..`).
@@ -180,7 +179,7 @@ pub fn apply(root: &Path, patch_path: &Path) -> Result<String> {
     ))
 }
 
-/// `check`: every rule. Problems fail; warnings are reported.
+/// `check`: every rule. Any problem fails.
 pub fn check(root: &Path) -> Result<Report> {
     let mut report = Report::default();
     let plan = match workbook::read(&root.join(WORKBOOK))? {
@@ -227,16 +226,7 @@ pub fn check(root: &Path) -> Result<Report> {
             .with_context(|| format!("reading {document}"))?;
         documents.push(serde_json::from_str(&text).with_context(|| format!("parsing {document}"))?);
     }
-    let (problems, unmapped) = check::operations(&plan, &documents);
-    report.problems.extend(problems);
-    if !unmapped.is_empty() {
-        report.warnings.push(format!(
-            "{} mutating operation(s) have no Coverage row yet (required once \
-             campbooks-cloud#332 lands): {}",
-            unmapped.len(),
-            unmapped.join(", ")
-        ));
-    }
+    report.problems.extend(check::operations(&plan, &documents));
     Ok(report)
 }
 

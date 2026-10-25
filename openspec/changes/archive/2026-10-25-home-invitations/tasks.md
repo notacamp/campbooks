@@ -28,7 +28,7 @@
 ## 5. Finish
 - [x] 5.1 OpenAPI regenerated (`openapi/openapi.json`: `BandRule`, `EventView`, `OrganizerView`; `openapi/events.json`: `schedule.invitation_changed`)
 - [x] 5.2 Client types regenerated (`schema.gen.ts`)
-- [x] 5.3 Tracking plan: patch `0013-home-invitations.yaml` (Coverage rows), generated
+- [x] 5.3 Tracking plan: patch `0014-home-invitations.yaml` (Coverage rows), generated
 - [x] 5.4 Changelog entry `changelog/unreleased/added/home-invitations.md`
 - [x] 5.5 Gates green in CI
 - [x] 5.6 UI verified at 375px and desktop (recording)

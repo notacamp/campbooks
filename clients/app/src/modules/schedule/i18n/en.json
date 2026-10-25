@@ -180,7 +180,14 @@
       "colour": "Colour of {{name}}",
       "access": "Add calendar access",
       "accessHint": "Mail only. Allow calendar access to see this account’s calendars here.",
-      "refused": "Couldn’t start that. Try again."
+      "refused": "Couldn’t start that. Try again.",
+      "stepUp": {
+        "title": "Sign in again first",
+        "lead": "Adding calendar access needs a sign-in from the last ten minutes.",
+        "action": "Sign in again"
+      },
+      "unsupported": "This Campbooks can’t add calendar access to that account.",
+      "rateLimited": "Too many tries. Wait a few minutes, then try again."
     },
     "kinds": {
       "title": "What Scout adds from your mail",

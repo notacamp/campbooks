@@ -180,7 +180,14 @@
       "colour": "Cor de {{name}}",
       "access": "Dar acesso ao calendário",
       "accessHint": "Só correio. Dê acesso ao calendário para ver aqui os calendários desta conta.",
-      "refused": "Não foi possível começar. Tente de novo."
+      "refused": "Não foi possível começar. Tente de novo.",
+      "stepUp": {
+        "title": "Inicie sessão novamente primeiro",
+        "lead": "Dar acesso ao calendário exige um início de sessão dos últimos dez minutos.",
+        "action": "Iniciar sessão novamente"
+      },
+      "unsupported": "Este Campbooks não pode dar acesso ao calendário a essa conta.",
+      "rateLimited": "Demasiadas tentativas. Aguarde alguns minutos e tente de novo."
     },
     "kinds": {
       "title": "O que o Scout adiciona a partir do seu correio",
