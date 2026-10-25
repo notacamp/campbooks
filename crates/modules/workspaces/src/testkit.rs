@@ -129,6 +129,28 @@ impl AdminAudit for Trail {
     }
 }
 
+/// The module's admin routes over `state`, as the server mounts them: in
+/// the request's tracking context.
+pub fn admin_app(state: &AppState, trail: Arc<dyn AdminAudit>) -> Router {
+    admin_app_with(state, Arc::new(Profiles), trail)
+}
+
+/// [`admin_app`] with the given administrators.
+pub fn admin_app_with(
+    state: &AppState,
+    profiles: Arc<dyn AdminProfiles>,
+    trail: Arc<dyn AdminAudit>,
+) -> Router {
+    let (_, spec) = crate::module()
+        .admin_router
+        .expect("the module has admin routes")
+        .split_for_parts();
+    campbooks_kernel::tracking::http::around(
+        testing::admin_app(crate::module(), state.clone().with_admin(profiles, trail)),
+        campbooks_kernel::tracking::http::HttpTracking::from_spec(&spec),
+    )
+}
+
 impl Kit {
     /// The module with the default (`open`) signup policy.
     pub async fn new(db: PgPool) -> Self {
@@ -153,10 +175,7 @@ impl Kit {
         config.signup.codes = codes.map(SecretString::from);
         let app = testing::app(crate::module(), state.clone());
         let trail = Arc::new(Trail::default());
-        let admin_app = testing::admin_app(
-            crate::module(),
-            state.clone().with_admin(Arc::new(Profiles), trail.clone()),
-        );
+        let admin_app = admin_app(&state, trail.clone());
         Self {
             db,
             state,
@@ -166,6 +185,16 @@ impl Kit {
             unread_if_kept,
             idp,
         }
+    }
+
+    /// The same kit, writing tracked events to the outbox (ADR 0020), read
+    /// back with [`testing::tracked_events`].
+    #[must_use]
+    pub fn tracking(mut self) -> Self {
+        self.state = testing::tracking_outbox(self.state);
+        self.app = testing::app(crate::module(), self.state.clone());
+        self.admin_app = admin_app(&self.state, self.trail.clone());
+        self
     }
 
     /// A user `sub` with every scope and a verified `<sub>@example.com`.

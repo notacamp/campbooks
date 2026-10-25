@@ -36,8 +36,10 @@ use crate::{
     domain::{
         db::set_user,
         suspension::{self, Change},
+        tracked,
     },
     events::{AccountSuspended, AccountUnsuspended},
+    tracking,
 };
 
 /// How a dead delivery of the suspension's fan-out is counted and logged:
@@ -95,11 +97,11 @@ async fn announce(
 ) -> Result<(), JobError> {
     let state = ctx.state().clone();
     let tx = ctx.tx().await?;
-    let Some((user, workspaces)) = record(tx, &account.to_string(), change).await? else {
+    let Some((user, workspaces, fresh)) = record(tx, &account.to_string(), change).await? else {
         return Ok(());
     };
     for workspace in &workspaces {
-        publish(&state, *workspace, user, change).await?;
+        publish(&state, *workspace, user, change, fresh).await?;
     }
     tracing::info!(
         workspaces = workspaces.len(),
@@ -110,16 +112,18 @@ async fn announce(
 }
 
 /// Lock the user whose identity subject is `subject`, record `change` as
-/// theirs and list the workspaces to announce it in; `None` when there is
-/// nothing to announce: no such user (never signed in), or a newer change
-/// already announced. The lock is held until `tx` ends, so a workspace the
-/// user joins meanwhile is told on joining, and one they leave meanwhile
-/// is left first.
+/// theirs and list the workspaces to announce it in, with whether it changes
+/// whether they are suspended (a replay is announced again, but tracked
+/// only once); `None` when there is nothing to announce:
+/// no such user (never signed in), or a newer change already announced.
+/// The lock is held until `tx` ends, so a workspace the user joins
+/// meanwhile is told on joining, and one they leave meanwhile is left
+/// first.
 pub(crate) async fn record(
     tx: &mut sqlx::PgConnection,
     subject: &str,
     change: Change,
-) -> Result<Option<(UserId, Vec<WorkspaceId>)>, JobError> {
+) -> Result<Option<(UserId, Vec<WorkspaceId>, bool)>, JobError> {
     let Some((user, known)) = suspension::lock_subject(tx, subject).await? else {
         // Never signed in: a member of nothing.
         return Ok(None);
@@ -131,6 +135,11 @@ pub(crate) async fn record(
         );
         return Ok(None);
     }
+    // Tracked only when it changes whether they are suspended: a replay,
+    // or a second suspension with no lift between, changes nothing.
+    let fresh = known.map_or(change.suspended, |known| {
+        known.suspended != change.suspended
+    });
     suspension::record(tx, user, change).await?;
     // Across workspaces, as that user: row-level security applies.
     set_user(tx, user).await?;
@@ -144,18 +153,39 @@ pub(crate) async fn record(
     )
     .fetch_all(&mut *tx)
     .await?;
-    Ok(Some((user, workspaces)))
+    Ok(Some((user, workspaces, fresh)))
 }
 
-/// Publish `change` in `workspace`, in a transaction working there.
+/// Publish `change` in `workspace`, in a transaction working there, and
+/// track it there when it is `fresh` (it changes whether the user is
+/// suspended).
 pub(crate) async fn publish(
     state: &AppState,
     workspace: WorkspaceId,
     user: UserId,
     change: Change,
+    fresh: bool,
 ) -> Result<(), JobError> {
     let mut tx = state.db.begin_for(workspace).await?;
     suspension::announce(&state.events, &mut tx, &workspace.to_string(), user, change).await?;
+    // Listed under the user's lock, so still a member; one who is not any
+    // more has nothing to track.
+    if fresh && let Some(mut member) = tracked::member(&mut tx, workspace, user).await? {
+        // The user's row is changed in the job's transaction, which has not
+        // committed yet: this one still reads the state before.
+        member.suspended = change.suspended;
+        if change.suspended {
+            state
+                .tracker
+                .track(&mut tx, &tracking::MemberSuspended { workspace, member })
+                .await?;
+        } else {
+            state
+                .tracker
+                .track(&mut tx, &tracking::MemberUnsuspended { workspace, member })
+                .await?;
+        }
+    }
     tx.commit().await?;
     Ok(())
 }

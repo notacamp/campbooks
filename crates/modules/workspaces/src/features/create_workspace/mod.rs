@@ -20,14 +20,15 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        model::{Accent, Kind, WorkspaceView, workspace_name},
+        model::{Accent, Kind, SignupCodeId, WorkspaceView, workspace_name},
         security::{self, SecurityKind},
         signup::{self, Admission},
-        suspension,
+        suspension, tracked,
         users::ensure_user,
     },
     events::{MemberJoined, WorkspaceCreated},
     scopes::WorkspacesWrite,
+    tracking,
 };
 
 /// A new workspace.
@@ -173,6 +174,7 @@ pub async fn execute(
     if let Some(change) = known.filter(|change| change.suspended) {
         suspension::announce(&state.events, &mut tx, &id.to_string(), user, change).await?;
     }
+    track_creation(state, &mut tx, id, user, redeemed).await?;
     tx.commit().await?;
     tracing::info!(workspace = %id, user = %user, "workspace created");
 
@@ -184,6 +186,55 @@ pub async fn execute(
         created_at,
         role: Some(Role::Owner),
     })
+}
+
+/// Track the new workspace, its owner joining and the code it spent, in
+/// `tx` (the transaction creating it).
+async fn track_creation(
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    id: WorkspaceId,
+    user: UserId,
+    redeemed: Option<SignupCodeId>,
+) -> Result<()> {
+    let workspace_snapshot = tracked::workspace(tx, id).await?;
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::WorkspaceCreated {
+                workspace: id,
+                workspace_snapshot,
+            },
+        )
+        .await?;
+    let member = tracked::present_member(tx, id, user).await?;
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::MemberJoined {
+                workspace: id,
+                member,
+                via: tracking::JoinedVia::Created,
+                invitation: None,
+            },
+        )
+        .await?;
+    if let Some(code) = redeemed {
+        let signup_code = tracked::signup_code(tx, code, Utc::now()).await?;
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::SignupCodeRedeemed {
+                    workspace: id,
+                    signup_code,
+                },
+            )
+            .await?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

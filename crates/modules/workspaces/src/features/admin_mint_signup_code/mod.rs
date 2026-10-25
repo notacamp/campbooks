@@ -8,6 +8,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Problem, Result,
     admin::{Admin, AdminOperation, permission::SignupsReview},
+    db::begin_admin,
     extract,
 };
 use chrono::{DateTime, Utc};
@@ -19,7 +20,9 @@ use crate::{
     domain::{
         model::SignupCodeId,
         signup::{CodeRow, SignupCodeView, new_code},
+        tracked,
     },
+    tracking,
 };
 
 /// Longest label.
@@ -97,6 +100,8 @@ pub async fn handler(
     }
     let (code, digest) = new_code()?;
     let id = SignupCodeId::new();
+    // An administrator's transaction, as deciding a request is.
+    let mut tx = begin_admin(&state.db, &admin.grant).await?;
     let row = sqlx::query_as!(
         CodeRow,
         r#"INSERT INTO workspaces.signup_codes
@@ -111,8 +116,14 @@ pub async fn handler(
         input.expires_at,
         admin.grant.account(),
     )
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await?;
+    let signup_code = tracked::signup_code(&mut tx, id, now).await?;
+    state
+        .tracker
+        .track(&mut tx, &tracking::SignupCodeMinted { signup_code })
+        .await?;
+    tx.commit().await?;
     tracing::info!(code = %id, "signup code minted");
     Ok((
         StatusCode::CREATED,

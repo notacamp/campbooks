@@ -60,6 +60,12 @@
       "date": "2026-10-24",
       "plan_version": 4,
       "pr": "#655"
+    },
+    {
+      "change": "The workspaces module instrumented (campbooks-cloud#328): 16 events for workspaces created, updated, deleted and purged, members joined, role changed, left, suspended and unsuspended, invitations created, signup requests filed, approved and rejected, and signup codes minted, revoked and redeemed; records workspace, member, invitation, signup_request and signup_code; Coverage for every operation, handler and job of the module; the conversations and identity exemptions name workspaces.workspace_deleted.",
+      "date": "2026-10-25",
+      "plan_version": 5,
+      "pr": "#657"
     }
   ],
   "coverage": [
@@ -138,7 +144,7 @@
     },
     {
       "events": [],
-      "exemption": "projection of workspaces.workspace_deleting: it only schedules the purge",
+      "exemption": "projection of workspaces.workspace_deleted: it only schedules the purge",
       "kind": "handler",
       "name": "conversations.schedule_workspace_purge"
     },
@@ -164,7 +170,7 @@
     },
     {
       "events": [],
-      "exemption": "consequence of workspaces.workspace_deleting (tracked by workspaces): the deleted workspace's apps and their access go with it",
+      "exemption": "consequence of workspaces.workspace_deleted (tracked by workspaces): the deleted workspace's apps and their access go with it",
       "kind": "handler",
       "name": "identity.remove_workspace_clients"
     },
@@ -176,6 +182,22 @@
       "exemption": "",
       "kind": "handler",
       "name": "identity.revoke_departed_consents"
+    },
+    {
+      "events": [
+        "workspaces.member_suspended"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "workspaces.announce_member_suspended"
+    },
+    {
+      "events": [
+        "workspaces.member_unsuspended"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "workspaces.announce_member_unsuspended"
     },
     {
       "events": [
@@ -281,6 +303,14 @@
       "exemption": "derived state: a need worked out again from stored messages and answers (conversations.need_changed); no action of anyone",
       "kind": "job",
       "name": "conversations.wake_needs"
+    },
+    {
+      "events": [
+        "workspaces.workspace_purged"
+      ],
+      "exemption": "",
+      "kind": "job",
+      "name": "workspaces.purge_workspace"
     },
     {
       "events": [
@@ -928,6 +958,105 @@
       "exemption": "",
       "kind": "operation",
       "name": "identity.token"
+    },
+    {
+      "events": [
+        "workspaces.member_joined"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.accept_invitation"
+    },
+    {
+      "events": [
+        "workspaces.signup_request_approved"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.admin_approve_signup_request"
+    },
+    {
+      "events": [
+        "workspaces.signup_code_minted"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.admin_mint_signup_code"
+    },
+    {
+      "events": [
+        "workspaces.signup_request_rejected"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.admin_reject_signup_request"
+    },
+    {
+      "events": [
+        "workspaces.signup_code_revoked"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.admin_revoke_signup_code"
+    },
+    {
+      "events": [
+        "workspaces.member_role_changed"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.change_role"
+    },
+    {
+      "events": [
+        "workspaces.workspace_created",
+        "workspaces.member_joined",
+        "workspaces.signup_code_redeemed",
+        "workspaces.signup_request_filed"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.create"
+    },
+    {
+      "events": [
+        "workspaces.workspace_deleted"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.delete"
+    },
+    {
+      "events": [
+        "workspaces.invitation_created"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.invite_member"
+    },
+    {
+      "events": [
+        "workspaces.member_left"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.leave"
+    },
+    {
+      "events": [
+        "workspaces.member_left"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.remove_member"
+    },
+    {
+      "events": [
+        "workspaces.workspace_updated"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "workspaces.update"
     },
     {
       "events": [],
@@ -1738,6 +1867,136 @@
       "description": "The person removed it (Ways to sign in).",
       "enum": "identity.way_in_removal",
       "value": "member"
+    },
+    {
+      "description": "The business preset.",
+      "enum": "workspaces.accent",
+      "value": "business"
+    },
+    {
+      "description": "The forest preset.",
+      "enum": "workspaces.accent",
+      "value": "forest"
+    },
+    {
+      "description": "The personal preset.",
+      "enum": "workspaces.accent",
+      "value": "personal"
+    },
+    {
+      "description": "They left.",
+      "enum": "workspaces.departure",
+      "value": "left"
+    },
+    {
+      "description": "An owner or admin removed them.",
+      "enum": "workspaces.departure",
+      "value": "removed"
+    },
+    {
+      "description": "It was accepted.",
+      "enum": "workspaces.invitation_state",
+      "value": "accepted"
+    },
+    {
+      "description": "It can no longer be accepted.",
+      "enum": "workspaces.invitation_state",
+      "value": "expired"
+    },
+    {
+      "description": "It can be accepted.",
+      "enum": "workspaces.invitation_state",
+      "value": "pending"
+    },
+    {
+      "description": "They created the workspace (its first owner).",
+      "enum": "workspaces.joined_via",
+      "value": "created"
+    },
+    {
+      "description": "They accepted an invitation.",
+      "enum": "workspaces.joined_via",
+      "value": "invitation"
+    },
+    {
+      "description": "A business: a company, a freelancer, a team.",
+      "enum": "workspaces.kind",
+      "value": "business"
+    },
+    {
+      "description": "A household or one person's own affairs.",
+      "enum": "workspaces.kind",
+      "value": "personal"
+    },
+    {
+      "description": "Deleted with their connections (always when they leave).",
+      "enum": "workspaces.mail_choice",
+      "value": "delete"
+    },
+    {
+      "description": "Kept as read-only history for the workspace.",
+      "enum": "workspaces.mail_choice",
+      "value": "keep"
+    },
+    {
+      "description": "An admin: settings, invitations and members (not owners).",
+      "enum": "workspaces.role",
+      "value": "admin"
+    },
+    {
+      "description": "A member.",
+      "enum": "workspaces.role",
+      "value": "member"
+    },
+    {
+      "description": "An owner: everything, including deleting the workspace.",
+      "enum": "workspaces.role",
+      "value": "owner"
+    },
+    {
+      "description": "It can be redeemed.",
+      "enum": "workspaces.signup_code_state",
+      "value": "active"
+    },
+    {
+      "description": "Its expiry has passed.",
+      "enum": "workspaces.signup_code_state",
+      "value": "expired"
+    },
+    {
+      "description": "An administrator revoked it.",
+      "enum": "workspaces.signup_code_state",
+      "value": "revoked"
+    },
+    {
+      "description": "Every use is spent.",
+      "enum": "workspaces.signup_code_state",
+      "value": "used_up"
+    },
+    {
+      "description": "Approved: the person may create a workspace.",
+      "enum": "workspaces.signup_request_status",
+      "value": "approved"
+    },
+    {
+      "description": "Waiting for an administrator.",
+      "enum": "workspaces.signup_request_status",
+      "value": "pending"
+    },
+    {
+      "description": "Turned down.",
+      "enum": "workspaces.signup_request_status",
+      "value": "rejected"
+    },
+    {
+      "description": "Its colour preset.",
+      "enum": "workspaces.workspace_setting",
+      "value": "accent"
+    },
+    {
+      "description": "Its name (never the value).",
+      "enum": "workspaces.workspace_setting",
+      "value": "name"
     }
   ],
   "envelope": {
@@ -9332,11 +9591,1516 @@
       "scope": "instance",
       "status": "live",
       "version": 1
+    },
+    {
+      "action": "created",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 5,
+      "description": "Someone was invited to a workspace. The invitation is named by its id; the invited address never appears.",
+      "fires_when": "workspaces.invite_member stores the invitation, replacing any pending one to the same address.",
+      "module": "workspaces",
+      "name": "workspaces.invitation_created",
+      "object": "invitation",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "InvitationCreated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.invitation_created:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "Someone was invited to a workspace. The invitation is named by its id; the invited address never appears.",
+        "properties": {
+          "invitation": {
+            "additionalProperties": false,
+            "description": "The new invitation.",
+            "properties": {
+              "accepted_at": {
+                "description": "When it was accepted.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "accepted_by": {
+                "description": "Who accepted it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "created_at": {
+                "description": "When it was sent.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "expires_at": {
+                "description": "When it stops working.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The invitation's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "invited_by": {
+                "description": "Who invited: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "role": {
+                "description": "The role the invitee gets on accepting (admin or member).",
+                "enum": [
+                  "admin",
+                  "member",
+                  "owner"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "Where it stands.",
+                "enum": [
+                  "accepted",
+                  "expired",
+                  "pending"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "expires_at",
+              "id",
+              "invited_by",
+              "role",
+              "state"
+            ],
+            "title": "workspaces.invitation",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "replaced": {
+            "description": "The pending invitations to the same address it replaced (deleted), by id; usually none.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "id"
+          }
+        },
+        "required": [
+          "invitation",
+          "replaced"
+        ],
+        "title": "workspaces.invitation_created",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "joined",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 5,
+      "description": "A person became a member of a workspace: by creating it, or by accepting an invitation (which the event then carries, accepted).",
+      "fires_when": "workspaces.create adds its creator as owner, or workspaces.accept_invitation adds the invitee; in the transaction that inserts the membership.",
+      "module": "workspaces",
+      "name": "workspaces.member_joined",
+      "object": "member",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "MemberJoined",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.member_joined:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A person became a member of a workspace: by creating it, or by accepting an invitation (which the event then carries, accepted).",
+        "properties": {
+          "invitation": {
+            "additionalProperties": false,
+            "description": "The invitation they accepted, when they joined by one.",
+            "properties": {
+              "accepted_at": {
+                "description": "When it was accepted.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "accepted_by": {
+                "description": "Who accepted it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "created_at": {
+                "description": "When it was sent.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "expires_at": {
+                "description": "When it stops working.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The invitation's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "invited_by": {
+                "description": "Who invited: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "role": {
+                "description": "The role the invitee gets on accepting (admin or member).",
+                "enum": [
+                  "admin",
+                  "member",
+                  "owner"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "Where it stands.",
+                "enum": [
+                  "accepted",
+                  "expired",
+                  "pending"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "expires_at",
+              "id",
+              "invited_by",
+              "role",
+              "state"
+            ],
+            "title": "workspaces.invitation",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "member": {
+            "additionalProperties": false,
+            "description": "The new member.",
+            "properties": {
+              "joined_at": {
+                "description": "When they joined.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "role": {
+                "description": "Their role.",
+                "enum": [
+                  "admin",
+                  "member",
+                  "owner"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "suspended": {
+                "description": "Whether their account is suspended, as this module last announced it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "user_id": {
+                "description": "The member: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              }
+            },
+            "required": [
+              "joined_at",
+              "role",
+              "suspended",
+              "user_id"
+            ],
+            "title": "workspaces.member",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "via": {
+            "description": "How they joined.",
+            "enum": [
+              "created",
+              "invitation"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "member",
+          "via"
+        ],
+        "title": "workspaces.member_joined",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "left",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 5,
+      "description": "A person stopped being a member: they left, or a manager removed them. The snapshot is the membership as it stood when it ended.",
+      "fires_when": "workspaces.leave, or workspaces.remove_member (on oneself it is leaving), deletes the membership, in the transaction that publishes workspaces.member_left.",
+      "module": "workspaces",
+      "name": "workspaces.member_left",
+      "object": "member",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "MemberLeft",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.member_left:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A person stopped being a member: they left, or a manager removed them. The snapshot is the membership as it stood when it ended.",
+        "properties": {
+          "how": {
+            "description": "Whether they left or were removed.",
+            "enum": [
+              "left",
+              "removed"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "mail": {
+            "description": "What becomes of the mail of the mailboxes they connected.",
+            "enum": [
+              "delete",
+              "keep"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "member": {
+            "additionalProperties": false,
+            "description": "The membership as it stood when it ended.",
+            "properties": {
+              "joined_at": {
+                "description": "When they joined.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "role": {
+                "description": "Their role.",
+                "enum": [
+                  "admin",
+                  "member",
+                  "owner"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "suspended": {
+                "description": "Whether their account is suspended, as this module last announced it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "user_id": {
+                "description": "The member: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              }
+            },
+            "required": [
+              "joined_at",
+              "role",
+              "suspended",
+              "user_id"
+            ],
+            "title": "workspaces.member",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "how",
+          "mail",
+          "member"
+        ],
+        "title": "workspaces.member_left",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "role_changed",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 5,
+      "description": "A member's role changed. The snapshot is the member afterwards; before is the role they had.",
+      "fires_when": "workspaces.change_role gives a member another role; giving the role they have tracks nothing.",
+      "module": "workspaces",
+      "name": "workspaces.member_role_changed",
+      "object": "member",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "MemberRoleChanged",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.member_role_changed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member's role changed. The snapshot is the member afterwards; before is the role they had.",
+        "properties": {
+          "before": {
+            "description": "The role they had.",
+            "enum": [
+              "admin",
+              "member",
+              "owner"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "member": {
+            "additionalProperties": false,
+            "description": "The member with their new role.",
+            "properties": {
+              "joined_at": {
+                "description": "When they joined.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "role": {
+                "description": "Their role.",
+                "enum": [
+                  "admin",
+                  "member",
+                  "owner"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "suspended": {
+                "description": "Whether their account is suspended, as this module last announced it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "user_id": {
+                "description": "The member: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              }
+            },
+            "required": [
+              "joined_at",
+              "role",
+              "suspended",
+              "user_id"
+            ],
+            "title": "workspaces.member",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "member"
+        ],
+        "title": "workspaces.member_role_changed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "suspended",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 5,
+      "description": "A member's account was suspended: whatever acts in their name in the workspace stops until it is lifted. Tracked in each workspace they belong to.",
+      "fires_when": "workspaces.announce_member_suspended announces identity.account_suspended in the workspace, in the transaction that publishes workspaces.member_suspended there; a change that leaves them as they were (a replay, an older change, a second suspension with no lift between) tracks nothing.",
+      "module": "workspaces",
+      "name": "workspaces.member_suspended",
+      "object": "member",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "MemberSuspended",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.member_suspended:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member's account was suspended: whatever acts in their name in the workspace stops until it is lifted. Tracked in each workspace they belong to.",
+        "properties": {
+          "member": {
+            "additionalProperties": false,
+            "description": "The member, suspended.",
+            "properties": {
+              "joined_at": {
+                "description": "When they joined.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "role": {
+                "description": "Their role.",
+                "enum": [
+                  "admin",
+                  "member",
+                  "owner"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "suspended": {
+                "description": "Whether their account is suspended, as this module last announced it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "user_id": {
+                "description": "The member: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              }
+            },
+            "required": [
+              "joined_at",
+              "role",
+              "suspended",
+              "user_id"
+            ],
+            "title": "workspaces.member",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "member"
+        ],
+        "title": "workspaces.member_suspended",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "unsuspended",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 5,
+      "description": "A member's suspension was lifted. Tracked in each workspace they belong to.",
+      "fires_when": "workspaces.announce_member_unsuspended announces identity.account_unsuspended in the workspace, likewise; a lift that leaves them as they were (a replay, an older change) tracks nothing.",
+      "module": "workspaces",
+      "name": "workspaces.member_unsuspended",
+      "object": "member",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "MemberUnsuspended",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.member_unsuspended:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member's suspension was lifted. Tracked in each workspace they belong to.",
+        "properties": {
+          "member": {
+            "additionalProperties": false,
+            "description": "The member, no longer suspended.",
+            "properties": {
+              "joined_at": {
+                "description": "When they joined.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "role": {
+                "description": "Their role.",
+                "enum": [
+                  "admin",
+                  "member",
+                  "owner"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "suspended": {
+                "description": "Whether their account is suspended, as this module last announced it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "user_id": {
+                "description": "The member: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              }
+            },
+            "required": [
+              "joined_at",
+              "role",
+              "suspended",
+              "user_id"
+            ],
+            "title": "workspaces.member",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "member"
+        ],
+        "title": "workspaces.member_unsuspended",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "minted",
+      "actor_types": [
+        "admin"
+      ],
+      "added_in": 5,
+      "description": "An administrator minted a signup code. The code and its label never appear.",
+      "fires_when": "workspaces.admin_mint_signup_code stores it.",
+      "module": "workspaces",
+      "name": "workspaces.signup_code_minted",
+      "object": "signup_code",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "SignupCodeMinted",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.signup_code_minted:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An administrator minted a signup code. The code and its label never appear.",
+        "properties": {
+          "signup_code": {
+            "additionalProperties": false,
+            "description": "The new code, without the code itself or its label.",
+            "properties": {
+              "created_at": {
+                "description": "When it was minted.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "expires_at": {
+                "description": "After this it cannot be redeemed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The code's id (never the code).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "max_uses": {
+                "description": "How many times it can be redeemed.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "revoked_at": {
+                "description": "When it was revoked.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "What it can still do.",
+                "enum": [
+                  "active",
+                  "expired",
+                  "revoked",
+                  "used_up"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "uses": {
+                "description": "How many times it was.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "max_uses",
+              "state",
+              "uses"
+            ],
+            "title": "workspaces.signup_code",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "signup_code"
+        ],
+        "title": "workspaces.signup_code_minted",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "redeemed",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 5,
+      "description": "A use of a minted signup code was spent creating a workspace: the event belongs to the workspace it opened.",
+      "fires_when": "workspaces.create spends the code, in the transaction that creates the workspace. A code from the instance's configuration is not a minted one and tracks nothing.",
+      "module": "workspaces",
+      "name": "workspaces.signup_code_redeemed",
+      "object": "signup_code",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "SignupCodeRedeemed",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.signup_code_redeemed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A use of a minted signup code was spent creating a workspace: the event belongs to the workspace it opened.",
+        "properties": {
+          "signup_code": {
+            "additionalProperties": false,
+            "description": "The code after the use was spent.",
+            "properties": {
+              "created_at": {
+                "description": "When it was minted.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "expires_at": {
+                "description": "After this it cannot be redeemed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The code's id (never the code).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "max_uses": {
+                "description": "How many times it can be redeemed.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "revoked_at": {
+                "description": "When it was revoked.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "What it can still do.",
+                "enum": [
+                  "active",
+                  "expired",
+                  "revoked",
+                  "used_up"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "uses": {
+                "description": "How many times it was.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "max_uses",
+              "state",
+              "uses"
+            ],
+            "title": "workspaces.signup_code",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "signup_code"
+        ],
+        "title": "workspaces.signup_code_redeemed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "revoked",
+      "actor_types": [
+        "admin"
+      ],
+      "added_in": 5,
+      "description": "An administrator revoked a signup code: it can no longer be redeemed.",
+      "fires_when": "workspaces.admin_revoke_signup_code revokes a code that was not revoked; a retry tracks nothing.",
+      "module": "workspaces",
+      "name": "workspaces.signup_code_revoked",
+      "object": "signup_code",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "SignupCodeRevoked",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.signup_code_revoked:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An administrator revoked a signup code: it can no longer be redeemed.",
+        "properties": {
+          "signup_code": {
+            "additionalProperties": false,
+            "description": "The code, revoked.",
+            "properties": {
+              "created_at": {
+                "description": "When it was minted.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "expires_at": {
+                "description": "After this it cannot be redeemed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The code's id (never the code).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "max_uses": {
+                "description": "How many times it can be redeemed.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "revoked_at": {
+                "description": "When it was revoked.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "What it can still do.",
+                "enum": [
+                  "active",
+                  "expired",
+                  "revoked",
+                  "used_up"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "uses": {
+                "description": "How many times it was.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "max_uses",
+              "state",
+              "uses"
+            ],
+            "title": "workspaces.signup_code",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "signup_code"
+        ],
+        "title": "workspaces.signup_code_revoked",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "approved",
+      "actor_types": [
+        "admin"
+      ],
+      "added_in": 5,
+      "description": "An administrator approved a signup request: the person may create a workspace.",
+      "fires_when": "workspaces.admin_approve_signup_request approves a request that was not approved; a retry tracks nothing.",
+      "module": "workspaces",
+      "name": "workspaces.signup_request_approved",
+      "object": "signup_request",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "SignupRequestApproved",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.signup_request_approved:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An administrator approved a signup request: the person may create a workspace.",
+        "properties": {
+          "before": {
+            "description": "Where it stood before.",
+            "enum": [
+              "approved",
+              "pending",
+              "rejected"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "signup_request": {
+            "additionalProperties": false,
+            "description": "The request, approved.",
+            "properties": {
+              "decided_at": {
+                "description": "When an administrator decided.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "requested_at": {
+                "description": "When they first asked.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Where it stands.",
+                "enum": [
+                  "approved",
+                  "pending",
+                  "rejected"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "user_id": {
+                "description": "The requesting user (also the request's id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "with_reason": {
+                "description": "Whether the administrator gave a reason (never the reason).",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "requested_at",
+              "status",
+              "user_id",
+              "with_reason"
+            ],
+            "title": "workspaces.signup_request",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "signup_request"
+        ],
+        "title": "workspaces.signup_request_approved",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "filed",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 5,
+      "description": "A person with no workspace asked to create one on an instance whose signup needs approval.",
+      "fires_when": "workspaces.create under the approval policy files the person's first request; asking again tracks nothing.",
+      "module": "workspaces",
+      "name": "workspaces.signup_request_filed",
+      "object": "signup_request",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "SignupRequestFiled",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.signup_request_filed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A person with no workspace asked to create one on an instance whose signup needs approval.",
+        "properties": {
+          "signup_request": {
+            "additionalProperties": false,
+            "description": "The new request.",
+            "properties": {
+              "decided_at": {
+                "description": "When an administrator decided.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "requested_at": {
+                "description": "When they first asked.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Where it stands.",
+                "enum": [
+                  "approved",
+                  "pending",
+                  "rejected"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "user_id": {
+                "description": "The requesting user (also the request's id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "with_reason": {
+                "description": "Whether the administrator gave a reason (never the reason).",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "requested_at",
+              "status",
+              "user_id",
+              "with_reason"
+            ],
+            "title": "workspaces.signup_request",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "signup_request"
+        ],
+        "title": "workspaces.signup_request_filed",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "rejected",
+      "actor_types": [
+        "admin"
+      ],
+      "added_in": 5,
+      "description": "An administrator turned a signup request down. Whether they gave a reason is kept, never the reason.",
+      "fires_when": "workspaces.admin_reject_signup_request rejects a request that was not rejected; a retry tracks nothing.",
+      "module": "workspaces",
+      "name": "workspaces.signup_request_rejected",
+      "object": "signup_request",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "SignupRequestRejected",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.signup_request_rejected:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An administrator turned a signup request down. Whether they gave a reason is kept, never the reason.",
+        "properties": {
+          "before": {
+            "description": "Where it stood before.",
+            "enum": [
+              "approved",
+              "pending",
+              "rejected"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "signup_request": {
+            "additionalProperties": false,
+            "description": "The request, rejected.",
+            "properties": {
+              "decided_at": {
+                "description": "When an administrator decided.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "requested_at": {
+                "description": "When they first asked.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "status": {
+                "description": "Where it stands.",
+                "enum": [
+                  "approved",
+                  "pending",
+                  "rejected"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "user_id": {
+                "description": "The requesting user (also the request's id).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "with_reason": {
+                "description": "Whether the administrator gave a reason (never the reason).",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "requested_at",
+              "status",
+              "user_id",
+              "with_reason"
+            ],
+            "title": "workspaces.signup_request",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "signup_request"
+        ],
+        "title": "workspaces.signup_request_rejected",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "created",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 5,
+      "description": "A workspace was created; its creator is its first owner. The snapshot is the new workspace, never its name.",
+      "fires_when": "workspaces.create creates it, in the transaction that inserts it (with the owner's member_joined).",
+      "module": "workspaces",
+      "name": "workspaces.workspace_created",
+      "object": "workspace",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "WorkspaceCreated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.workspace_created:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A workspace was created; its creator is its first owner. The snapshot is the new workspace, never its name.",
+        "properties": {
+          "workspace_snapshot": {
+            "additionalProperties": false,
+            "description": "The new workspace.",
+            "properties": {
+              "accent": {
+                "description": "Its colour preset.",
+                "enum": [
+                  "business",
+                  "forest",
+                  "personal"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was created.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When it was deleted, if it was.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The workspace's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What it is for.",
+                "enum": [
+                  "business",
+                  "personal"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_count": {
+                "description": "How many members it has.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "purge_after": {
+                "description": "When a deleted workspace's records are purged.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "accent",
+              "created_at",
+              "id",
+              "kind",
+              "member_count"
+            ],
+            "title": "workspaces.workspace",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "workspace_snapshot"
+        ],
+        "title": "workspaces.workspace_created",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "deleted",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 5,
+      "description": "A workspace was deleted: hidden at once, every module purges its data, and its own records are purged after the grace period. The snapshot carries when it was deleted and when it is purged.",
+      "fires_when": "workspaces.delete deletes it, in the transaction that publishes workspaces.workspace_deleting and schedules the purge.",
+      "module": "workspaces",
+      "name": "workspaces.workspace_deleted",
+      "object": "workspace",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "WorkspaceDeleted",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.workspace_deleted:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A workspace was deleted: hidden at once, every module purges its data, and its own records are purged after the grace period. The snapshot carries when it was deleted and when it is purged.",
+        "properties": {
+          "workspace_snapshot": {
+            "additionalProperties": false,
+            "description": "The workspace, deleted.",
+            "properties": {
+              "accent": {
+                "description": "Its colour preset.",
+                "enum": [
+                  "business",
+                  "forest",
+                  "personal"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was created.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When it was deleted, if it was.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The workspace's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What it is for.",
+                "enum": [
+                  "business",
+                  "personal"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_count": {
+                "description": "How many members it has.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "purge_after": {
+                "description": "When a deleted workspace's records are purged.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "accent",
+              "created_at",
+              "id",
+              "kind",
+              "member_count"
+            ],
+            "title": "workspaces.workspace",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "workspace_snapshot"
+        ],
+        "title": "workspaces.workspace_deleted",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "purged",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 5,
+      "description": "A deleted workspace's records were hard-deleted at the end of its grace period. The snapshot is the workspace as it stood when purged.",
+      "fires_when": "The workspaces.purge_workspace job deletes the workspace's row, in that transaction; a workspace purged already, or no longer deleted, tracks nothing.",
+      "module": "workspaces",
+      "name": "workspaces.workspace_purged",
+      "object": "workspace",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "WorkspacePurged",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.workspace_purged:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A deleted workspace's records were hard-deleted at the end of its grace period. The snapshot is the workspace as it stood when purged.",
+        "properties": {
+          "workspace_snapshot": {
+            "additionalProperties": false,
+            "description": "The workspace as it stood when purged.",
+            "properties": {
+              "accent": {
+                "description": "Its colour preset.",
+                "enum": [
+                  "business",
+                  "forest",
+                  "personal"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was created.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When it was deleted, if it was.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The workspace's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What it is for.",
+                "enum": [
+                  "business",
+                  "personal"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_count": {
+                "description": "How many members it has.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "purge_after": {
+                "description": "When a deleted workspace's records are purged.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "accent",
+              "created_at",
+              "id",
+              "kind",
+              "member_count"
+            ],
+            "title": "workspaces.workspace",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "workspace_snapshot"
+        ],
+        "title": "workspaces.workspace_purged",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "updated",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 5,
+      "description": "A workspace's settings changed: which ones, never their values (the accent is an enum and is in the snapshot).",
+      "fires_when": "workspaces.update changes its name or its accent; the values it already has track nothing.",
+      "module": "workspaces",
+      "name": "workspaces.workspace_updated",
+      "object": "workspace",
+      "openspec_change": "track-workspaces-events",
+      "rust_type": "WorkspaceUpdated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:workspaces.workspace_updated:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A workspace's settings changed: which ones, never their values (the accent is an enum and is in the snapshot).",
+        "properties": {
+          "fields": {
+            "description": "The settings that changed.",
+            "items": {
+              "enum": [
+                "accent",
+                "name"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          },
+          "workspace_snapshot": {
+            "additionalProperties": false,
+            "description": "The workspace afterwards.",
+            "properties": {
+              "accent": {
+                "description": "Its colour preset.",
+                "enum": [
+                  "business",
+                  "forest",
+                  "personal"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was created.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "deleted_at": {
+                "description": "When it was deleted, if it was.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The workspace's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What it is for.",
+                "enum": [
+                  "business",
+                  "personal"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "member_count": {
+                "description": "How many members it has.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "purge_after": {
+                "description": "When a deleted workspace's records are purged.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "accent",
+              "created_at",
+              "id",
+              "kind",
+              "member_count"
+            ],
+            "title": "workspaces.workspace",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "fields",
+          "workspace_snapshot"
+        ],
+        "title": "workspaces.workspace_updated",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
     }
   ],
   "generated_by": "campbooks-tracking-plan",
-  "plan_date": "2026-10-24",
-  "plan_version": 4,
+  "plan_date": "2026-10-25",
+  "plan_version": 5,
   "properties": [
     {
       "classification": "pseudonymous",
@@ -11391,6 +13155,331 @@
       "required": true,
       "type": "id",
       "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The new invitation.",
+      "event": "workspaces.invitation_created",
+      "example": "",
+      "list": false,
+      "of": "workspaces.invitation",
+      "pattern": "",
+      "property": "invitation",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The pending invitations to the same address it replaced (deleted), by id; usually none.",
+      "event": "workspaces.invitation_created",
+      "example": "",
+      "list": true,
+      "of": "",
+      "pattern": "",
+      "property": "replaced",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The invitation they accepted, when they joined by one.",
+      "event": "workspaces.member_joined",
+      "example": "",
+      "list": false,
+      "of": "workspaces.invitation",
+      "pattern": "",
+      "property": "invitation",
+      "required": false,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The new member.",
+      "event": "workspaces.member_joined",
+      "example": "",
+      "list": false,
+      "of": "workspaces.member",
+      "pattern": "",
+      "property": "member",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How they joined.",
+      "event": "workspaces.member_joined",
+      "example": "",
+      "list": false,
+      "of": "workspaces.joined_via",
+      "pattern": "",
+      "property": "via",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether they left or were removed.",
+      "event": "workspaces.member_left",
+      "example": "",
+      "list": false,
+      "of": "workspaces.departure",
+      "pattern": "",
+      "property": "how",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "What becomes of the mail of the mailboxes they connected.",
+      "event": "workspaces.member_left",
+      "example": "",
+      "list": false,
+      "of": "workspaces.mail_choice",
+      "pattern": "",
+      "property": "mail",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The membership as it stood when it ended.",
+      "event": "workspaces.member_left",
+      "example": "",
+      "list": false,
+      "of": "workspaces.member",
+      "pattern": "",
+      "property": "member",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The role they had.",
+      "event": "workspaces.member_role_changed",
+      "example": "",
+      "list": false,
+      "of": "workspaces.role",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The member with their new role.",
+      "event": "workspaces.member_role_changed",
+      "example": "",
+      "list": false,
+      "of": "workspaces.member",
+      "pattern": "",
+      "property": "member",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The member, suspended.",
+      "event": "workspaces.member_suspended",
+      "example": "",
+      "list": false,
+      "of": "workspaces.member",
+      "pattern": "",
+      "property": "member",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The member, no longer suspended.",
+      "event": "workspaces.member_unsuspended",
+      "example": "",
+      "list": false,
+      "of": "workspaces.member",
+      "pattern": "",
+      "property": "member",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The new code, without the code itself or its label.",
+      "event": "workspaces.signup_code_minted",
+      "example": "",
+      "list": false,
+      "of": "workspaces.signup_code",
+      "pattern": "",
+      "property": "signup_code",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The code after the use was spent.",
+      "event": "workspaces.signup_code_redeemed",
+      "example": "",
+      "list": false,
+      "of": "workspaces.signup_code",
+      "pattern": "",
+      "property": "signup_code",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The code, revoked.",
+      "event": "workspaces.signup_code_revoked",
+      "example": "",
+      "list": false,
+      "of": "workspaces.signup_code",
+      "pattern": "",
+      "property": "signup_code",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Where it stood before.",
+      "event": "workspaces.signup_request_approved",
+      "example": "",
+      "list": false,
+      "of": "workspaces.signup_request_status",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The request, approved.",
+      "event": "workspaces.signup_request_approved",
+      "example": "",
+      "list": false,
+      "of": "workspaces.signup_request",
+      "pattern": "",
+      "property": "signup_request",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The new request.",
+      "event": "workspaces.signup_request_filed",
+      "example": "",
+      "list": false,
+      "of": "workspaces.signup_request",
+      "pattern": "",
+      "property": "signup_request",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Where it stood before.",
+      "event": "workspaces.signup_request_rejected",
+      "example": "",
+      "list": false,
+      "of": "workspaces.signup_request_status",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The request, rejected.",
+      "event": "workspaces.signup_request_rejected",
+      "example": "",
+      "list": false,
+      "of": "workspaces.signup_request",
+      "pattern": "",
+      "property": "signup_request",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The new workspace.",
+      "event": "workspaces.workspace_created",
+      "example": "",
+      "list": false,
+      "of": "workspaces.workspace",
+      "pattern": "",
+      "property": "workspace_snapshot",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The workspace, deleted.",
+      "event": "workspaces.workspace_deleted",
+      "example": "",
+      "list": false,
+      "of": "workspaces.workspace",
+      "pattern": "",
+      "property": "workspace_snapshot",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The workspace as it stood when purged.",
+      "event": "workspaces.workspace_purged",
+      "example": "",
+      "list": false,
+      "of": "workspaces.workspace",
+      "pattern": "",
+      "property": "workspace_snapshot",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The settings that changed.",
+      "event": "workspaces.workspace_updated",
+      "example": "",
+      "list": true,
+      "of": "workspaces.workspace_setting",
+      "pattern": "",
+      "property": "fields",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The workspace afterwards.",
+      "event": "workspaces.workspace_updated",
+      "example": "",
+      "list": false,
+      "of": "workspaces.workspace",
+      "pattern": "",
+      "property": "workspace_snapshot",
+      "required": true,
+      "type": "record",
+      "version": 1
     }
   ],
   "records": [
@@ -12405,6 +14494,347 @@
       "record": "identity.way_in",
       "required": true,
       "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was accepted.",
+      "enum": "",
+      "field": "accepted_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.invitation",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "Who accepted it: their user id.",
+      "enum": "",
+      "field": "accepted_by",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.invitation",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was sent.",
+      "enum": "",
+      "field": "created_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.invitation",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "When it stops working.",
+      "enum": "",
+      "field": "expires_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.invitation",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "id",
+      "description": "The invitation's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.invitation",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "Who invited: their user id.",
+      "enum": "",
+      "field": "invited_by",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.invitation",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "The role the invitee gets on accepting (admin or member).",
+      "enum": "workspaces.role",
+      "field": "role",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.invitation",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Where it stands.",
+      "enum": "workspaces.invitation_state",
+      "field": "state",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.invitation",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "When they joined.",
+      "enum": "",
+      "field": "joined_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.member",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "Their role.",
+      "enum": "workspaces.role",
+      "field": "role",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.member",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether their account is suspended, as this module last announced it.",
+      "enum": "",
+      "field": "suspended",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.member",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member: their user id.",
+      "enum": "",
+      "field": "user_id",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.member",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was minted.",
+      "enum": "",
+      "field": "created_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_code",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "After this it cannot be redeemed.",
+      "enum": "",
+      "field": "expires_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_code",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "id",
+      "description": "The code's id (never the code).",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_code",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "How many times it can be redeemed.",
+      "enum": "",
+      "field": "max_uses",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_code",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was revoked.",
+      "enum": "",
+      "field": "revoked_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_code",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "What it can still do.",
+      "enum": "workspaces.signup_code_state",
+      "field": "state",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_code",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "How many times it was.",
+      "enum": "",
+      "field": "uses",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_code",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "operational",
+      "description": "When an administrator decided.",
+      "enum": "",
+      "field": "decided_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_request",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "When they first asked.",
+      "enum": "",
+      "field": "requested_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_request",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "Where it stands.",
+      "enum": "workspaces.signup_request_status",
+      "field": "status",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_request",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The requesting user (also the request's id).",
+      "enum": "",
+      "field": "user_id",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_request",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether the administrator gave a reason (never the reason).",
+      "enum": "",
+      "field": "with_reason",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.signup_request",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "Its colour preset.",
+      "enum": "workspaces.accent",
+      "field": "accent",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.workspace",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was created.",
+      "enum": "",
+      "field": "created_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.workspace",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was deleted, if it was.",
+      "enum": "",
+      "field": "deleted_at",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.workspace",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "id",
+      "description": "The workspace's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.workspace",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "What it is for.",
+      "enum": "workspaces.kind",
+      "field": "kind",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.workspace",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "How many members it has.",
+      "enum": "",
+      "field": "member_count",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.workspace",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "operational",
+      "description": "When a deleted workspace's records are purged.",
+      "enum": "",
+      "field": "purge_after",
+      "list": false,
+      "pattern": "",
+      "record": "workspaces.workspace",
+      "required": false,
+      "type": "timestamp"
     }
   ]
 }

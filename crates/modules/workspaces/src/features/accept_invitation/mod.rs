@@ -26,12 +26,13 @@ use crate::{
         invitation,
         model::{InvitationId, WorkspaceView},
         security::{self, SecurityKind},
-        suspension,
+        suspension, tracked,
         users::ensure_user,
     },
     events::MemberJoined,
     features::get_workspace,
     scopes::WorkspacesWrite,
+    tracking,
 };
 
 /// The invitation to accept.
@@ -183,6 +184,7 @@ pub async fn execute(
     if let Some(change) = known {
         suspension::announce(&state.events, &mut tx, &workspace.to_string(), user, change).await?;
     }
+    track_joined(state, &mut tx, workspace, user, found.id).await?;
     let access = campbooks_kernel::tenancy::Access {
         workspace,
         user: Some(user),
@@ -192,6 +194,31 @@ pub async fn execute(
     tx.commit().await?;
     tracing::info!(workspace = %workspace, user = %user, "invitation accepted");
     Ok(view)
+}
+
+/// Track `user` joining `workspace` by `invitation`, in `tx`.
+async fn track_joined(
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    workspace: WorkspaceId,
+    user: UserId,
+    invitation: InvitationId,
+) -> Result<()> {
+    let member = tracked::present_member(tx, workspace, user).await?;
+    let invitation = tracked::invitation(tx, invitation).await?;
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::MemberJoined {
+                workspace,
+                member,
+                via: tracking::JoinedVia::Invitation,
+                invitation: Some(invitation),
+            },
+        )
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]
