@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
 } from "react";
 
-import { cx } from "@notacamp/ui";
+import { cx } from "../../internal/cx";
 
 import styles from "./TitleField.module.css";
 

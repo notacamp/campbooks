@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Icon, type IconName } from "@notacamp/ui";
+import { Icon, type IconName } from "../Icon/Icon";
 
 import styles from "./FormatBar.module.css";
 

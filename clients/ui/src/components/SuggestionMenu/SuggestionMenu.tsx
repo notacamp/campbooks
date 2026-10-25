@@ -1,6 +1,7 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 
-import { Icon, type IconName, Kbd } from "@notacamp/ui";
+import { Icon, type IconName } from "../Icon/Icon";
+import { Kbd } from "../Kbd/Kbd";
 
 import styles from "./SuggestionMenu.module.css";
 

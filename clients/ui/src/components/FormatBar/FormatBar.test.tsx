@@ -1,7 +1,7 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { renderUi } from "../../../../../test/render";
+import { renderUi } from "../../../test/render";
 
 import { FormatBar } from "./FormatBar";
 

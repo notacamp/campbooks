@@ -1,6 +1,6 @@
 import type { CSSProperties, DragEventHandler, ReactNode } from "react";
 
-import { IconButton } from "@notacamp/ui";
+import { IconButton } from "../IconButton/IconButton";
 
 import styles from "./BlockHandle.module.css";
 

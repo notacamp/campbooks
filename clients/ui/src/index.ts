@@ -93,6 +93,20 @@ export {
   type WeekGridProps,
   type WeekPill,
 } from "./components/Calendar/Calendar";
+// A document editor's pieces (Campbooks' Pages).
+export { BlockHandle, type BlockHandleProps } from "./components/BlockHandle/BlockHandle";
+export {
+  FormatBar,
+  type FormatBarItem,
+  type FormatBarProps,
+} from "./components/FormatBar/FormatBar";
+export {
+  SuggestionMenu,
+  type SuggestionGroup,
+  type SuggestionItem,
+  type SuggestionMenuProps,
+} from "./components/SuggestionMenu/SuggestionMenu";
+export { TitleField, type TitleFieldProps } from "./components/TitleField/TitleField";
 export { Switch, type SwitchProps } from "./components/Switch/Switch";
 export { Checkbox, type CheckboxProps } from "./components/Checkbox/Checkbox";
 export {
