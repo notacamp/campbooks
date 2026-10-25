@@ -341,13 +341,20 @@ async fn a_healthy_grant_reads_without_refreshing(db: PgPool) {
     assert_eq!(connection(&kit, ws, &ana).await["health"], "ok");
     // Once it has expired, the run refreshes it (and keeps the rotated
     // refresh token).
+    kit.clock.advance(TimeDelta::hours(2));
+    kit.next_run().await;
+    assert_eq!(kit.microsoft.token_calls(), 1);
+    assert_eq!(connection(&kit, ws, &ana).await["health"], "ok");
+    kit.clock.advance(TimeDelta::hours(2));
+    kit.next_run().await;
+    assert_eq!(kit.microsoft.token_calls(), 2, "the rotated token works");
+    assert_eq!(connection(&kit, ws, &ana).await["health"], "ok");
+    // Graph refusing the access token: dropped, refreshed by the next run.
     kit.microsoft.expire_access_tokens();
     kit.next_run().await;
-    assert_eq!(connection(&kit, ws, &ana).await["health"], "ok");
-    kit.microsoft.expire_access_tokens();
     kit.next_run().await;
+    assert_eq!(kit.microsoft.token_calls(), 3);
     assert_eq!(connection(&kit, ws, &ana).await["health"], "ok");
-    assert!(kit.microsoft.token_calls() >= 2, "the rotated token works");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
