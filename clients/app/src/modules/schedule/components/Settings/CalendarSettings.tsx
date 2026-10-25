@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  Banner,
   Button,
   CalendarColour,
   CalendarDot,
@@ -18,7 +19,7 @@ import {
   Text,
   TimePicker,
 } from "~/lib/ui";
-import { useConnections, type MailboxConsent } from "~/modules/connectors";
+import { useConnections, type ConsentRefusal, type MailboxConsent } from "~/modules/connectors";
 
 import { useCalendars, useScheduleSettings, useSettingsMutations } from "../../api/queries";
 import {
@@ -119,10 +120,10 @@ function CalendarsSection({
   onColour: (calendar: CalendarView, color: string) => void;
 }) {
   const { t } = useTranslation("schedule");
-  // Zoho Calendar is not offered yet (connectors keeps it behind a flag).
+  // What the server offers each connection (Google always; Zoho while its adapter is on).
   const withoutAccess = (connections ?? []).filter(
     (connection) =>
-      connection.provider === "google" && !connection.capabilities.includes("calendar"),
+      connection.offers.includes("calendar") && !connection.capabilities.includes("calendar"),
   );
   return (
     <SettingsSection
@@ -190,7 +191,11 @@ function CalendarsSection({
                   <Button
                     disabled={consent.starting}
                     onClick={() => {
-                      consent.start({ purpose: "reconnect", connection: connection.id });
+                      consent.start({
+                        purpose: "reconnect",
+                        connection: connection.id,
+                        capabilities: ["calendar"],
+                      });
                     }}
                   >
                     {t("settings.calendars.access")}
@@ -202,10 +207,38 @@ function CalendarsSection({
         </List>
       )}
       {consent.refusal === undefined ? null : (
-        <SettingsEmpty title={t("settings.calendars.refused")} />
+        <Refusal consent={consent} refusal={consent.refusal} />
       )}
     </SettingsSection>
   );
+}
+
+/** Why adding calendar access was refused, in words that say what to do. */
+function Refusal({ consent, refusal }: { consent: MailboxConsent; refusal: ConsentRefusal }) {
+  const { t } = useTranslation("schedule");
+  switch (refusal) {
+    case "step_up":
+      return (
+        <Banner
+          role="alert"
+          icon="key"
+          title={t("settings.calendars.stepUp.title")}
+          action={
+            <Button variant="secondary" onClick={consent.signInAgain}>
+              {t("settings.calendars.stepUp.action")}
+            </Button>
+          }
+        >
+          {t("settings.calendars.stepUp.lead")}
+        </Banner>
+      );
+    case "unsupported":
+      return <SettingsEmpty title={t("settings.calendars.unsupported")} />;
+    case "rate_limited":
+      return <SettingsEmpty title={t("settings.calendars.rateLimited")} />;
+    case "failed":
+      return <SettingsEmpty title={t("settings.calendars.refused")} />;
+  }
 }
 
 function KindsSection({

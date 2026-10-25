@@ -3,7 +3,8 @@
 //! one-time code sent to the address through the mailbox's own SMTP server,
 //! looked for in its Inbox by the stream's runs. For a mailbox whose last
 //! check did not find its code (or went with its job); one still under way
-//! is answered as it is.
+//! is answered as it is. A new check is tracked
+//! (`connectors.address_check_requested`); one under way tracks nothing.
 
 use axum::{
     Extension, Json,
@@ -24,9 +25,11 @@ use crate::{
     domain::{
         address_checks, connections,
         model::{AddressCheck, ConnectionId, ConnectionPath, ConnectionView, Health, Provider},
+        tracked,
     },
     events::CONNECTION_RECORD,
     scopes::ConnectorsWrite,
+    tracking,
 };
 
 /// Check a mailbox's address again.
@@ -109,6 +112,17 @@ pub async fn execute(
         }
         let mut tx = state.db.begin_for(access.workspace).await?;
         address_checks::start(&mut tx, access.workspace, id, locale, deps.clock.now()).await?;
+        let snapshot = tracked::connection(&mut tx, id).await?;
+        state
+            .tracker
+            .track(
+                &mut tx,
+                &tracking::AddressCheckRequested {
+                    workspace: access.workspace,
+                    connection: snapshot,
+                },
+            )
+            .await?;
         tx.commit().await?;
         tracing::info!(workspace = %access.workspace, connection = %id, "an address check was asked for again");
     }
@@ -116,7 +130,7 @@ pub async fn execute(
     let connection = connections::load(&mut tx, id)
         .await?
         .ok_or(Error::NotFound)?;
-    let view = connections::view(&mut tx, connection, access.user).await?;
+    let view = connections::view(&mut tx, connection, access.user, deps).await?;
     tx.commit().await?;
     Ok(view)
 }

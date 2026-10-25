@@ -217,6 +217,7 @@ pub async fn abandon(
 }
 
 /// The message of check `nonce` went out (or may have): look for it now.
+/// Whether it was still `sending` (and is now `waiting`).
 pub async fn sent(
     conn: &mut PgConnection,
     connection: ConnectionId,
@@ -237,15 +238,15 @@ pub async fn sent(
 }
 
 /// Check `nonce` ended without finding its code, for `reason` (a stable
-/// code).
+/// code): whether it was still under way (and so ended now).
 pub async fn failed(
     conn: &mut PgConnection,
     connection: ConnectionId,
     nonce: Uuid,
     reason: &'static str,
     now: DateTime<Utc>,
-) -> Result<()> {
-    sqlx::query(
+) -> Result<bool> {
+    let ended = sqlx::query(
         "UPDATE connectors.address_checks
             SET state = 'failed', reason = $3, updated_at = $4
           WHERE connection_id = $1 AND nonce = $2 AND state IN ('sending', 'waiting')",
@@ -256,7 +257,7 @@ pub async fn failed(
     .bind(now)
     .execute(conn)
     .await?;
-    Ok(())
+    Ok(ended.rows_affected() == 1)
 }
 
 /// The connection's address is verified (by check `nonce`, or already):

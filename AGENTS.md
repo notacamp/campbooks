@@ -149,11 +149,15 @@ the records it touched looked like. Defined in the tracking plan,
 `tracking/tracking-plan.xlsx`; how to work with it: `docs/tracking.md`.
 
 - **Every new mutating operation, job, schedule and event handler gets a
-  Coverage row**: the events it tracks, or an exemption with its reason.
-  *(CI: `cargo run -p campbooks-tracking-plan -- check` fails on a row
-  naming an unknown operation, on rows with both or neither; the server's
-  coverage test fails on an unknown job, schedule or handler and lists what
-  has no row, which campbooks-cloud#332 makes a failure.)*
+  Coverage row in the same PR**: the events it tracks, or an exemption with
+  its reason. Coverage is required, with no baseline. *(CI: `cargo run -p
+  campbooks-tracking-plan -- check` fails on a mutating operation with no
+  row, on a row naming an unknown operation, and on rows with both or
+  neither; the server's coverage test, `crates/server/src/tracking_tests.rs`,
+  fails on any operation, job, schedule or handler with no row, listing
+  each, and on a row naming one the server does not compose. Policy fails
+  a PR that changes `tracking/tracking-plan.xlsx` or
+  `tracking/tracking-plan.json` without a patch under `tracking/patches/`.)*
 - **Events are added through the plan**, in the workbook or with a YAML
   patch (`cargo run -p campbooks-tracking-plan -- apply <patch>`), then
   generated; never write a `TrackedEvent` or edit `tracking.gen.rs` or

@@ -1,8 +1,9 @@
 name: Policy
 
 # Gates on the PR's process and the repo's hygiene rather than its runtime
-# behaviour: PR title, changelog entries, UI recording, specs, secrets. Each step runs `if: always()`
-# so one failure never hides another.
+# behaviour: PR title, changelog entries, tracking-plan patches, UI
+# recording, specs, secrets. Each step runs `if: always()` so one failure
+# never hides another.
 
 on:
   pull_request:
@@ -117,6 +118,22 @@ jobs:
             exit 1
           fi
           echo "This PR cuts next-v${version}."
+
+      - name: Tracking plan changes come through a patch
+        # The tracking plan's history is its patches (tracking/patches/), so
+        # a PR that changes the workbook or its JSON mirror says what it
+        # changed as a patch, which reviewers read as text (docs/tracking.md).
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          plan=$(git diff --name-only "$PR_RANGE" -- tracking/tracking-plan.xlsx tracking/tracking-plan.json)
+          if [ -z "$plan" ]; then echo "The tracking plan is unchanged."; exit 0; fi
+          echo "Tracking plan files changed:"; echo "$plan" | sed 's/^/  /'
+          patches=$(git diff --name-only --diff-filter=AM "$PR_RANGE" -- tracking/patches/)
+          if [ -z "$patches" ]; then
+            echo "::error::This PR changes the tracking plan but adds or changes no patch under tracking/patches/. Write the rows you changed as a patch (the next free number) and apply it with cargo run -p campbooks-tracking-plan -- apply tracking/patches/<nnnn>-<slug>.yaml, which rewrites the workbook and the mirror for you. See docs/tracking.md (Adding an event)."
+            exit 1
+          fi
+          echo "Patches:"; echo "$patches" | sed 's/^/  /'
 
       - name: UI PRs include a screen recording
         # A PR that changes the client UI must show it working: a `## Recording`

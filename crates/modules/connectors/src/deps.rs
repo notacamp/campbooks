@@ -16,6 +16,7 @@ use figment::Figment;
 
 use crate::{
     config::{ConnectorsConfig, OAuthClientConfig},
+    domain::model::{Capability, Provider},
     google::{Endpoints, Google},
     imap::Imap,
     microsoft::{self, Microsoft},
@@ -81,6 +82,23 @@ impl Deps {
     /// can be sealed.
     pub fn imap_enabled(&self) -> bool {
         self.imap.config.enabled && self.cipher.is_some()
+    }
+
+    /// What a `provider` connection holding `held` could still be given by
+    /// consenting again: calendar access for Google, and for Zoho while its
+    /// adapter is on (`CAMPBOOKS_CONNECTORS__ZOHO_CALENDAR`, as the sync and
+    /// the consent check it). Microsoft and IMAP offer nothing yet.
+    pub fn offers(&self, provider: Provider, held: &[Capability]) -> Vec<Capability> {
+        let calendar = match provider {
+            Provider::Google => self.google.is_some(),
+            Provider::Zoho => self.zoho.is_some() && self.config.zoho_calendar,
+            Provider::Microsoft | Provider::Imap => false,
+        };
+        if calendar && !held.contains(&Capability::Calendar) {
+            vec![Capability::Calendar]
+        } else {
+            Vec::new()
+        }
     }
 
     /// Read `CAMPBOOKS_CONNECTORS__*`, `CAMPBOOKS_GOOGLE__*` and the

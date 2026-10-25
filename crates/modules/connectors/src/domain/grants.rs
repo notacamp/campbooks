@@ -173,7 +173,7 @@ pub async fn create_or_refresh_connection(
     let connection = connections::load(&mut tx, id)
         .await?
         .ok_or(Error::NotFound)?;
-    let view = connections::view(&mut tx, connection, Some(grant.user)).await?;
+    let view = connections::view(&mut tx, connection, Some(grant.user), deps).await?;
     tx.commit().await?;
     Ok(view)
 }
