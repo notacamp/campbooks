@@ -67,7 +67,13 @@ source (rules or model), the confidence and the threshold the answer was held
 to, and whether it acted. A stream suggestion SHALL offer "Move to <stream>"
 (1), which the user can undo. The note SHALL offer Reply, opening the same
 reply dialog as the reader's own Reply, whenever it says a reply is needed (a
-needs_reply suggestion or an open Reply need) and the user can reply.
+needs_reply suggestion or an open Reply need) and the user can reply. The
+decide pass's answers are about the conversation's newest inbound message:
+when the conversation has no open need and the user sent a message after
+that one, the note SHALL say they replied and when ("You replied on 23 Oct,
+so nothing here waits on you."), SHALL NOT suggest a reply, an ask, a date
+or urgency from those answers, and SHALL offer no Reply; a suspicious
+warning SHALL still be said.
 
 #### Scenario: Taking a suggestion
 - **WHEN** the user opens a newsletter that the rules suggest for Newsletters and presses 1
@@ -80,6 +86,14 @@ needs_reply suggestion or an open Reply need) and the user can reply.
 #### Scenario: No numbers up front
 - **WHEN** the user opens a conversation whose stream answer has a confidence of 0.87
 - **THEN** the note shows no percentage, and 0.87 appears only inside "How Campbooks decided"
+
+#### Scenario: After the user replied
+- **WHEN** the user opens a conversation with no open need whose newest inbound message the decide pass read as needing a reply, and they sent a reply on 23 Oct after it
+- **THEN** the note says "You replied on 23 Oct, so nothing here waits on you.", does not say it needs a reply, and offers no Reply
+
+#### Scenario: A warning stands after a reply
+- **WHEN** the user replied after a message the decide pass found suspicious
+- **THEN** the note says they replied and still says the message looks suspicious
 
 ### Requirement: Reading a conversation
 The reader SHALL show the conversation's subject, the note, and its messages

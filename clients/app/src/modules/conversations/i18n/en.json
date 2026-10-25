@@ -173,6 +173,7 @@
     "sortedDefault": "In {{stream}}: nothing moved it",
     "read": "Campbooks’ read, as suggestions: {{list}}.",
     "nothing": "Nothing here seems to ask anything of you.",
+    "replied": "You replied on {{date}}, so nothing here waits on you.",
     "needsReply": "it needs a reply",
     "asksAction": "it asks you to do something",
     "hasDeadline": "it mentions a date to meet",
