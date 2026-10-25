@@ -1,0 +1,207 @@
+# The tasks module's tracked events (campbooks-cloud#340, OpenSpec change
+# track-tasks-events): a task created (by a member, or by Scout from an ask
+# in an email), edited (which fields), its due date changed (the date
+# before), planned (the plan before), done, not needed, reopened (the state
+# before) and reassigned (handed off or taken back). Every mutating
+# operation, job and event handler of the module gets a Coverage row. Never
+# a title, a sender's address, an amount or a quote from the email. Applied
+# with `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0010-tasks.yaml`.
+changelog:
+  - date: "2026-10-25"
+    plan_version: 10
+    change: "The tasks module instrumented (campbooks-cloud#340): 8 events for a task created (by a member, or by Scout from an ask), edited (which fields), its due date changed (the date before), planned (the plan before), done, not needed, reopened (the state before) and reassigned (handed off or taken back, with the member who had it); records task, task_due and task_plan; Coverage for every operation, job and handler of the module."
+    pr: "#665"
+
+events:
+  - name: "tasks.task_created"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation, system]
+    description: "A task was made: written by a member, or made by Scout of an ask (something to do or pay) it read in an email to the inbox's owner. Never its title or amount."
+    fires_when: "tasks.create makes it, or tasks.add_read_asks makes a task of an ask it did not know, in the transaction that inserts it; an ask already known, or one that repeats an open task, makes none."
+    added_in: 10
+    openspec_change: "track-tasks-events"
+  - name: "tasks.task_edited"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "edited"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A task's title or verb changed: which fields, never their values (the verb is in the snapshot, and before_verb when it changed). A change of its due date is tasks.task_due_changed."
+    fires_when: "tasks.update changes the title or the verb, in the transaction of the change; the same values again track nothing."
+    added_in: 10
+    openspec_change: "track-tasks-events"
+  - name: "tasks.task_due_changed"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "due_changed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation, system]
+    description: "A task's due day or time changed (or was set, or cleared); before is the due date it had."
+    fires_when: "tasks.update changes the due day or time, or tasks.add_read_asks gives an open task with no due date the one a later ask names, in the transaction of the change; the same due date again tracks nothing."
+    added_in: 10
+    openspec_change: "track-tasks-events"
+  - name: "tasks.task_planned"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "planned"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "When the member will do a task changed: a day, Later until a time, or no plan; before is the plan it had."
+    fires_when: "tasks.plan stores another plan than the task had, in that transaction; the same plan again tracks nothing."
+    added_in: 10
+    openspec_change: "track-tasks-events"
+  - name: "tasks.task_done"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "done"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "An open task was done (paid, for a bill: Campbooks never pays, this marks it paid)."
+    fires_when: "tasks.done closes it, in that transaction."
+    added_in: 10
+    openspec_change: "track-tasks-events"
+  - name: "tasks.task_not_needed"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "not_needed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "An open task was marked not needed after all."
+    fires_when: "tasks.not_needed closes it, in that transaction."
+    added_in: 10
+    openspec_change: "track-tasks-events"
+  - name: "tasks.task_reopened"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "reopened"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "A closed task was opened again, with its plan; before is the state it had (done or not needed)."
+    fires_when: "tasks.reopen opens it, in that transaction."
+    added_in: 10
+    openspec_change: "track-tasks-events"
+  - name: "tasks.task_reassigned"
+    version: 1
+    module: "tasks"
+    object: "task"
+    action: "reassigned"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, assistant, automation]
+    description: "An open task went to another member: handed to a teammate (reassignment handed_off: the snapshot's assignee is the teammate, handed_by the member who handed it), or taken back by the member who had handed it off (taken_back). previous_assignee is who had it."
+    fires_when: "tasks.hand_off gives it to another member of the workspace, or tasks.take_back gives it back to the member who handed it, in that transaction."
+    added_in: 10
+    openspec_change: "track-tasks-events"
+
+properties:
+  - { event: "tasks.task_created", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The new task." }
+  - { event: "tasks.task_edited", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task afterwards." }
+  - { event: "tasks.task_edited", version: 1, property: "fields", type: "enum", list: true, of: "tasks.task_field", required: true, classification: "operational", description: "The fields that changed (at least one)." }
+  - { event: "tasks.task_edited", version: 1, property: "before_verb", type: "enum", of: "tasks.task_verb", required: false, classification: "operational", description: "Its verb before, when the verb changed." }
+  - { event: "tasks.task_due_changed", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task afterwards, with its new due date." }
+  - { event: "tasks.task_due_changed", version: 1, property: "before", type: "record", of: "tasks.task_due", required: true, classification: "operational", description: "Its due date before." }
+  - { event: "tasks.task_planned", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task afterwards, with its new plan." }
+  - { event: "tasks.task_planned", version: 1, property: "before", type: "record", of: "tasks.task_plan", required: true, classification: "operational", description: "Its plan before." }
+  - { event: "tasks.task_done", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task, done." }
+  - { event: "tasks.task_not_needed", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task, not needed." }
+  - { event: "tasks.task_reopened", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task, open again." }
+  - { event: "tasks.task_reopened", version: 1, property: "before", type: "enum", of: "tasks.task_state", required: true, classification: "operational", description: "The state it was reopened from (done or not_needed)." }
+
+  - { event: "tasks.task_reassigned", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task afterwards, with its new assignee." }
+  - { event: "tasks.task_reassigned", version: 1, property: "reassignment", type: "enum", of: "tasks.reassignment", required: true, classification: "operational", description: "Handed off to a teammate, or taken back." }
+  - { event: "tasks.task_reassigned", version: 1, property: "previous_assignee", type: "id", required: true, classification: "pseudonymous", description: "The member who had it: their user id." }
+  - { event: "tasks.task_reassigned", version: 1, property: "previous_handed_by", type: "id", required: false, classification: "pseudonymous", description: "The member who had handed it off before this change, if anyone (their user id): on a re-hand-off, who gave it to the member handing it on." }
+
+records:
+  - { record: "tasks.task", field: "id", type: "id", required: true, classification: "id", description: "The task's id." }
+  - { record: "tasks.task", field: "verb", type: "enum", enum: "tasks.task_verb", required: true, classification: "operational", description: "Something to do, or a bill to pay." }
+  - { record: "tasks.task", field: "origin", type: "enum", enum: "tasks.task_origin", required: true, classification: "operational", description: "How it came to be." }
+  - { record: "tasks.task", field: "state", type: "enum", enum: "tasks.task_state", required: true, classification: "operational", description: "Whether it still needs doing." }
+  - { record: "tasks.task", field: "due_on", type: "date", required: false, classification: "operational", description: "The day it is due." }
+  - { record: "tasks.task", field: "due_at", type: "timestamp", required: false, classification: "operational", description: "The time it is due, when it has one (due_on is its local day)." }
+  - { record: "tasks.task", field: "plan", type: "enum", enum: "tasks.plan_kind", required: true, classification: "operational", description: "The plan as stored (a Later whose time has passed still says later)." }
+  - { record: "tasks.task", field: "plan_on", type: "date", required: false, classification: "operational", description: "The planned day, for a date plan." }
+  - { record: "tasks.task", field: "later_until", type: "timestamp", required: false, classification: "operational", description: "When Later ends, for a later plan." }
+  - { record: "tasks.task", field: "assignee", type: "id", required: true, classification: "pseudonymous", description: "The member it is with: their user id." }
+  - { record: "tasks.task", field: "created_by", type: "id", required: true, classification: "pseudonymous", description: "The member who made it, or for whom Scout made it: their user id." }
+  - { record: "tasks.task", field: "handed_by", type: "id", required: false, classification: "pseudonymous", description: "The member who handed it to the assignee, while it is handed off: their user id." }
+  - { record: "tasks.task", field: "source", type: "record_ref", required: false, classification: "id", description: "The record it came from (a conversation), by reference; never the sender or the inbox." }
+  - { record: "tasks.task", field: "has_amount", type: "bool", required: true, classification: "operational", description: "Whether it carries an amount read from the email (never the amount or its currency)." }
+  - { record: "tasks.task", field: "revision", type: "int", required: true, classification: "operational", description: "Grows with every change of the task." }
+  - { record: "tasks.task", field: "closed_at", type: "timestamp", required: false, classification: "operational", description: "When it was closed, while it is." }
+  - { record: "tasks.task", field: "created_at", type: "timestamp", required: true, classification: "operational", description: "When it was made." }
+  - { record: "tasks.task", field: "updated_at", type: "timestamp", required: true, classification: "operational", description: "When it last changed." }
+  - { record: "tasks.task_due", field: "due_on", type: "date", required: false, classification: "operational", description: "The day it was due, if any." }
+  - { record: "tasks.task_due", field: "due_at", type: "timestamp", required: false, classification: "operational", description: "The time it was due, if it had one." }
+  - { record: "tasks.task_plan", field: "plan", type: "enum", enum: "tasks.plan_kind", required: true, classification: "operational", description: "The plan." }
+  - { record: "tasks.task_plan", field: "plan_on", type: "date", required: false, classification: "operational", description: "The planned day, for a date plan." }
+  - { record: "tasks.task_plan", field: "later_until", type: "timestamp", required: false, classification: "operational", description: "When Later ended, for a later plan." }
+
+enums:
+  - { enum: "tasks.task_verb", value: "do", description: "Something to do." }
+  - { enum: "tasks.task_verb", value: "pay", description: "Money is owed (Campbooks never pays)." }
+  - { enum: "tasks.task_origin", value: "own", description: "The member wrote it." }
+  - { enum: "tasks.task_origin", value: "ask", description: "Asked of the member in an email, read by Scout." }
+  - { enum: "tasks.task_origin", value: "deadline", description: "A deadline found in an email." }
+  - { enum: "tasks.task_state", value: "open", description: "It still needs doing." }
+  - { enum: "tasks.task_state", value: "done", description: "It was done (or paid)." }
+  - { enum: "tasks.task_state", value: "not_needed", description: "It is not needed after all." }
+  - { enum: "tasks.plan_kind", value: "none", description: "No plan." }
+  - { enum: "tasks.plan_kind", value: "date", description: "A day." }
+  - { enum: "tasks.plan_kind", value: "later", description: "Later: put off until a time." }
+  - { enum: "tasks.task_field", value: "title", description: "Its title." }
+  - { enum: "tasks.task_field", value: "verb", description: "Do or Pay." }
+  - { enum: "tasks.reassignment", value: "handed_off", description: "Handed to a teammate (tasks.hand_off)." }
+  - { enum: "tasks.reassignment", value: "taken_back", description: "Taken back by the member who handed it off (tasks.take_back)." }
+
+coverage:
+  - kind: "operation"
+    name: "tasks.create"
+    events: [tasks.task_created]
+  - kind: "operation"
+    name: "tasks.update"
+    events: [tasks.task_edited, tasks.task_due_changed]
+  - kind: "operation"
+    name: "tasks.plan"
+    events: [tasks.task_planned]
+  - kind: "operation"
+    name: "tasks.done"
+    events: [tasks.task_done]
+  - kind: "operation"
+    name: "tasks.not_needed"
+    events: [tasks.task_not_needed]
+  - kind: "operation"
+    name: "tasks.reopen"
+    events: [tasks.task_reopened]
+  - kind: "operation"
+    name: "tasks.hand_off"
+    events: [tasks.task_reassigned]
+  - kind: "operation"
+    name: "tasks.take_back"
+    events: [tasks.task_reassigned]
+  - kind: "handler"
+    name: "tasks.add_read_asks"
+    events: [tasks.task_created, tasks.task_due_changed]
+  - kind: "handler"
+    name: "tasks.schedule_workspace_purge"
+    exemption: "projection of workspaces.workspace_deleted: it only schedules the purge"
+  - kind: "job"
+    name: "tasks.purge_workspace"
+    exemption: "maintenance: a deleted workspace's tasks and history deleted; the deletion is tracked by workspaces"
