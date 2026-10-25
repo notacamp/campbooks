@@ -180,7 +180,8 @@
     "provider": {
       "google": "Google",
       "zoho": "Zoho",
-      "imap": "IMAP"
+      "imap": "IMAP",
+      "microsoft": "Microsoft"
     },
     "capability": {
       "messages": "Mail",
