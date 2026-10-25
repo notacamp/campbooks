@@ -47,10 +47,13 @@ const PREFER: &str = "odata.maxpagesize=50, IdType=\"ImmutableId\"";
 const EXPIRED_CODES: [&str; 3] = ["syncStateNotFound", "resyncRequired", "syncStateInvalid"];
 
 /// Whether `id` is one Graph could have given: 1 to [`MAX_ID`] letters,
-/// digits and `-_=+/.`.
+/// digits and `-_=+/.`, never starting with `.` nor holding `..` (no
+/// segment of it can climb a path, encoded or not).
 pub fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= MAX_ID
+        && !id.starts_with('.')
+        && !id.contains("..")
         && id.bytes().all(|b| {
             b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'=' | b'+' | b'/' | b'.')
         })
@@ -649,6 +652,8 @@ mod tests {
         assert!(!valid_id(""));
         assert!(!valid_id("a b"));
         assert!(!valid_id("../me"));
+        assert!(!valid_id(".."));
+        assert!(!valid_id("a/../b"));
         assert!(!valid_id(&"a".repeat(MAX_ID + 1)));
         assert!(valid_subscription_id(
             "7f105c7d-2dc5-4530-97cd-4e7ae6534c07"
