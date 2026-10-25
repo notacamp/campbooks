@@ -150,15 +150,18 @@ fn composed(laya: &MockServer, cap: u32) -> (Option<Gateway>, AiUsageMeter) {
     let url = || format!("{}/v1", laya.uri()).parse().unwrap();
     let decide = ProviderConfig::new(url(), "convaiinnovations/laya-multilingual")
         .with_protocol(Protocol::Laya);
-    ai_gateway(AiConfig {
-        roles: [
-            (Role::Decide, decide),
-            (Role::Complete, ProviderConfig::new(url(), "demo-instruct")),
-        ]
-        .into(),
-        daily_calls_per_workspace: Some(cap),
-        ..AiConfig::default()
-    }, Tracker::default())
+    ai_gateway(
+        AiConfig {
+            roles: [
+                (Role::Decide, decide),
+                (Role::Complete, ProviderConfig::new(url(), "demo-instruct")),
+            ]
+            .into(),
+            daily_calls_per_workspace: Some(cap),
+            ..AiConfig::default()
+        },
+        Tracker::default(),
+    )
     .unwrap()
 }
 
@@ -406,21 +409,27 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
 #[test]
 fn the_composed_gateway_is_metered_with_the_default_cap() {
     let provider = ProviderConfig::new("http://laya:8000/v1".parse().unwrap(), "laya");
-    let (gateway, meter) = ai_gateway(AiConfig {
-        roles: [(Role::Decide, provider.clone())].into(),
-        ..AiConfig::default()
-    }, Tracker::default())
+    let (gateway, meter) = ai_gateway(
+        AiConfig {
+            roles: [(Role::Decide, provider.clone())].into(),
+            ..AiConfig::default()
+        },
+        Tracker::default(),
+    )
     .unwrap();
     assert!(gateway.unwrap().is_metered());
     assert_eq!(
         meter.cap(),
         Some(campbooks_ai::usage::DEFAULT_DAILY_CALLS_PER_WORKSPACE)
     );
-    let (_, unlimited) = ai_gateway(AiConfig {
-        roles: [(Role::Decide, provider)].into(),
-        daily_calls_per_workspace: Some(0),
-        ..AiConfig::default()
-    }, Tracker::default())
+    let (_, unlimited) = ai_gateway(
+        AiConfig {
+            roles: [(Role::Decide, provider)].into(),
+            daily_calls_per_workspace: Some(0),
+            ..AiConfig::default()
+        },
+        Tracker::default(),
+    )
     .unwrap();
     assert_eq!(unlimited.cap(), None);
     let (none, _) = ai_gateway(AiConfig::default(), Tracker::default()).unwrap();

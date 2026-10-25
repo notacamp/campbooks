@@ -21,7 +21,7 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        ItemId, ItemRow, ItemView, ItemState, Reason, Trust, key, resources::ITEM_RECORD,
+        ItemId, ItemRow, ItemState, ItemView, Reason, Trust, key, resources::ITEM_RECORD,
         visible_containers,
     },
     events::ItemChanged,
@@ -218,7 +218,10 @@ async fn track(
 ) -> Result<()> {
     let workspace = access.workspace;
     match (before, until) {
-        (before, Some(until)) if before != Some(until) => {
+        // Postgres keeps microseconds: the same Later is the same to them.
+        (before, Some(until))
+            if before.map(|b| b.timestamp_micros()) != Some(until.timestamp_micros()) =>
+        {
             let event = tracking::ItemSnoozed {
                 workspace,
                 item: snapshot(view),

@@ -72,9 +72,57 @@
       "date": "2026-10-25",
       "plan_version": 6,
       "pr": "#659"
+    },
+    {
+      "change": "The assistant, attention, search and system modules instrumented (campbooks-cloud#330): 15 events for chats with Scout started, continued, answered and deleted, its proposals confirmed, declined and undone, a member's profile updated, an item snoozed and unsnoozed, a workspace's daily AI limit reached, and (the kernel's queue, from the system admin actions) a dead job retried or discarded, a kind's dead jobs retried and a schedule's stuck run discarded; records chat, answer, proposal, profile, item and job; Coverage for every operation, job, schedule and handler of the four modules (search and the telemetry reports exempt).",
+      "date": "2026-10-25",
+      "plan_version": 7,
+      "pr": ""
     }
   ],
   "coverage": [
+    {
+      "events": [],
+      "exemption": "consequence of workspaces.member_left, tracked there: the departed member's profile and chats go",
+      "kind": "handler",
+      "name": "assistant.forget_member"
+    },
+    {
+      "events": [],
+      "exemption": "projection of workspaces.workspace_deleted: it only schedules the purge",
+      "kind": "handler",
+      "name": "assistant.schedule_workspace_purge"
+    },
+    {
+      "events": [],
+      "exemption": "consequence of conversations.inbox_closed, tracked there: the removed inbox's items and their Laters go",
+      "kind": "handler",
+      "name": "attention.forget_inbox"
+    },
+    {
+      "events": [],
+      "exemption": "consequence of workspaces.member_left, tracked there: the departed member's Laters go",
+      "kind": "handler",
+      "name": "attention.forget_member"
+    },
+    {
+      "events": [],
+      "exemption": "projection of conversations.need_changed: one item per conversation's need (a new message from the sender ends its Laters)",
+      "kind": "handler",
+      "name": "attention.project_conversation_need"
+    },
+    {
+      "events": [],
+      "exemption": "projection of tasks.task_changed: one item per task",
+      "kind": "handler",
+      "name": "attention.project_task"
+    },
+    {
+      "events": [],
+      "exemption": "projection of workspaces.workspace_deleted: it only schedules the purge",
+      "kind": "handler",
+      "name": "attention.schedule_workspace_purge"
+    },
     {
       "events": [
         "bff.web_sessions_ended"
@@ -230,6 +278,36 @@
       "name": "identity.revoke_departed_consents"
     },
     {
+      "events": [],
+      "exemption": "projection of conversations.conversation_changed: the conversation's entries in the index refreshed",
+      "kind": "handler",
+      "name": "search.on_conversation_changed"
+    },
+    {
+      "events": [],
+      "exemption": "projection of conversations.inbox_removed (tracked as conversations.inbox_closed): the inbox's entries go",
+      "kind": "handler",
+      "name": "search.on_inbox_removed"
+    },
+    {
+      "events": [],
+      "exemption": "projection of conversations.message_received: the conversation's entries in the index refreshed",
+      "kind": "handler",
+      "name": "search.on_message_received"
+    },
+    {
+      "events": [],
+      "exemption": "projection of conversations.message_sent: the conversation's entries in the index refreshed",
+      "kind": "handler",
+      "name": "search.on_message_sent"
+    },
+    {
+      "events": [],
+      "exemption": "projection of workspaces.workspace_deleted: it only stops indexing and schedules the purge",
+      "kind": "handler",
+      "name": "search.schedule_workspace_purge"
+    },
+    {
       "events": [
         "workspaces.member_suspended"
       ],
@@ -244,6 +322,24 @@
       "exemption": "",
       "kind": "handler",
       "name": "workspaces.announce_member_unsuspended"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: chats 30 days past their last message deleted with their messages (retention, not anyone's request)",
+      "kind": "job",
+      "name": "assistant.expire_chats"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance: a deleted workspace's profiles and chats deleted; the deletion is tracked by workspaces",
+      "kind": "job",
+      "name": "assistant.purge_workspace"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance: a deleted workspace's items deleted; the deletion is tracked by workspaces",
+      "kind": "job",
+      "name": "attention.purge_workspace"
     },
     {
       "events": [],
@@ -378,12 +474,98 @@
       "name": "conversations.wake_needs"
     },
     {
+      "events": [],
+      "exemption": "projection: a workspace's index built from its sources a page at a time; no action of anyone",
+      "kind": "job",
+      "name": "search.backfill"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance: a deleted workspace's index deleted; the deletion is tracked by workspaces",
+      "kind": "job",
+      "name": "search.purge_workspace"
+    },
+    {
       "events": [
         "workspaces.workspace_purged"
       ],
       "exemption": "",
       "kind": "job",
       "name": "workspaces.purge_workspace"
+    },
+    {
+      "events": [
+        "assistant.chat_continued",
+        "assistant.answer_finished"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "assistant.ask_chat"
+    },
+    {
+      "events": [],
+      "exemption": "stores nothing: Scout proposes rules from a sentence, and a rule saved from them is tracked by conversations.create_rule",
+      "kind": "operation",
+      "name": "assistant.compile_instruction"
+    },
+    {
+      "events": [
+        "assistant.chat_deleted"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "assistant.delete_chat"
+    },
+    {
+      "events": [
+        "assistant.proposal_confirmed",
+        "assistant.proposal_declined",
+        "assistant.proposal_undone"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "assistant.settle_proposal"
+    },
+    {
+      "events": [
+        "assistant.chat_started"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "assistant.start_chat"
+    },
+    {
+      "events": [
+        "assistant.chat_continued",
+        "assistant.answer_finished"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "assistant.stream_chat"
+    },
+    {
+      "events": [
+        "assistant.profile_updated"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "assistant.update_profile"
+    },
+    {
+      "events": [
+        "attention.item_snoozed"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "attention.snooze"
+    },
+    {
+      "events": [
+        "attention.item_unsnoozed"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "attention.unsnooze"
     },
     {
       "events": [
@@ -1069,6 +1251,50 @@
     },
     {
       "events": [
+        "kernel.job_discarded"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "system.admin_discard_job"
+    },
+    {
+      "events": [
+        "kernel.schedule_run_discarded"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "system.admin_discard_schedule_run"
+    },
+    {
+      "events": [
+        "kernel.job_retried"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "system.admin_retry_job"
+    },
+    {
+      "events": [
+        "kernel.jobs_retried"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "system.admin_retry_jobs"
+    },
+    {
+      "events": [],
+      "exemption": "telemetry itself: the app's error and timing reports, forwarded scrubbed to the operator's collector and never stored; tracking them would record them twice",
+      "kind": "operation",
+      "name": "system.report_client_telemetry"
+    },
+    {
+      "events": [],
+      "exemption": "telemetry itself: a screen the app shows, relayed to the operator's usage analytics and never stored; tracking it would record it twice",
+      "kind": "operation",
+      "name": "system.report_screen_view"
+    },
+    {
+      "events": [
         "workspaces.member_joined"
       ],
       "exemption": "",
@@ -1168,6 +1394,12 @@
     },
     {
       "events": [],
+      "exemption": "maintenance, no action of anyone: only enqueues the jobs that do the work",
+      "kind": "schedule",
+      "name": "assistant.dispatch_expire_chats"
+    },
+    {
+      "events": [],
       "exemption": "maintenance: deletes web sessions already past their idle or absolute end and sign-ins never finished; no action of anyone",
       "kind": "schedule",
       "name": "bff.prune_sessions"
@@ -1207,6 +1439,421 @@
   ],
   "description": "The tracking plan (ADR 0020), generated from tracking/tracking-plan.xlsx by campbooks-tracking-plan. Do not edit: change the workbook and regenerate. Every event's `schema` is the JSON Schema of its body; `envelope` is the schema of what the kernel adds around it.",
   "enums": [
+    {
+      "description": "The model's answers are not trusted yet.",
+      "enum": "assistant.answer_failure",
+      "value": "answers_not_trusted"
+    },
+    {
+      "description": "The model's role is set up wrongly.",
+      "enum": "assistant.answer_failure",
+      "value": "config"
+    },
+    {
+      "description": "The model may not read mail here.",
+      "enum": "assistant.answer_failure",
+      "value": "external_content_refused"
+    },
+    {
+      "description": "The model's answer could not be read.",
+      "enum": "assistant.answer_failure",
+      "value": "invalid_response"
+    },
+    {
+      "description": "The call could not be counted.",
+      "enum": "assistant.answer_failure",
+      "value": "metering"
+    },
+    {
+      "description": "The workspace used its whole daily AI limit.",
+      "enum": "assistant.answer_failure",
+      "value": "over_cap"
+    },
+    {
+      "description": "The model's stream ended before an answer.",
+      "enum": "assistant.answer_failure",
+      "value": "provider"
+    },
+    {
+      "description": "No model serves the role.",
+      "enum": "assistant.answer_failure",
+      "value": "role_not_configured"
+    },
+    {
+      "description": "Scout used every round of tools without an answer.",
+      "enum": "assistant.answer_failure",
+      "value": "rounds"
+    },
+    {
+      "description": "The model answered with an error status.",
+      "enum": "assistant.answer_failure",
+      "value": "status"
+    },
+    {
+      "description": "The question ran out of time.",
+      "enum": "assistant.answer_failure",
+      "value": "timed_out"
+    },
+    {
+      "description": "A call to the model timed out.",
+      "enum": "assistant.answer_failure",
+      "value": "timeout"
+    },
+    {
+      "description": "The model could not be reached.",
+      "enum": "assistant.answer_failure",
+      "value": "transport"
+    },
+    {
+      "description": "The call named no workspace to count it against.",
+      "enum": "assistant.answer_failure",
+      "value": "unattributed"
+    },
+    {
+      "description": "Answered, but cut short: the model ran out of room.",
+      "enum": "assistant.answer_finish",
+      "value": "cut_short"
+    },
+    {
+      "description": "Answered.",
+      "enum": "assistant.answer_finish",
+      "value": "done"
+    },
+    {
+      "description": "Scout couldn't answer.",
+      "enum": "assistant.answer_finish",
+      "value": "failed"
+    },
+    {
+      "description": "Read what happened to a conversation.",
+      "enum": "assistant.chat_tool",
+      "value": "conversation_history"
+    },
+    {
+      "description": "Looked for conversations.",
+      "enum": "assistant.chat_tool",
+      "value": "find_conversations"
+    },
+    {
+      "description": "Looked for people who write to the member.",
+      "enum": "assistant.chat_tool",
+      "value": "find_people"
+    },
+    {
+      "description": "Read when the member is free.",
+      "enum": "assistant.chat_tool",
+      "value": "free_time"
+    },
+    {
+      "description": "Read the member's calendar.",
+      "enum": "assistant.chat_tool",
+      "value": "my_calendar"
+    },
+    {
+      "description": "Read the member's inboxes and their streams.",
+      "enum": "assistant.chat_tool",
+      "value": "my_inboxes"
+    },
+    {
+      "description": "Read the member's tasks.",
+      "enum": "assistant.chat_tool",
+      "value": "my_tasks"
+    },
+    {
+      "description": "Read a conversation.",
+      "enum": "assistant.chat_tool",
+      "value": "read_conversation"
+    },
+    {
+      "description": "Read one event of the member's calendar.",
+      "enum": "assistant.chat_tool",
+      "value": "read_event"
+    },
+    {
+      "description": "Read one task and what changed in it.",
+      "enum": "assistant.chat_tool",
+      "value": "read_task"
+    },
+    {
+      "description": "Read what needs the member.",
+      "enum": "assistant.chat_tool",
+      "value": "what_needs_me"
+    },
+    {
+      "description": "Start it and tell the member, with Undo.",
+      "enum": "assistant.proactivity",
+      "value": "act_then_tell"
+    },
+    {
+      "description": "Wait for a yes (the default).",
+      "enum": "assistant.proactivity",
+      "value": "ask_first"
+    },
+    {
+      "description": "Whether the member answered or put off the questions.",
+      "enum": "assistant.profile_setting",
+      "value": "asked"
+    },
+    {
+      "description": "How Scout's own proposals start.",
+      "enum": "assistant.profile_setting",
+      "value": "proactivity"
+    },
+    {
+      "description": "Add one of its inbox's labels.",
+      "enum": "assistant.proposal_action",
+      "value": "add_label"
+    },
+    {
+      "description": "Its Pay need: Already paid.",
+      "enum": "assistant.proposal_action",
+      "value": "already_paid"
+    },
+    {
+      "description": "Archive the conversation.",
+      "enum": "assistant.proposal_action",
+      "value": "archive"
+    },
+    {
+      "description": "A new calendar event.",
+      "enum": "assistant.proposal_action",
+      "value": "create_event"
+    },
+    {
+      "description": "Delete an event.",
+      "enum": "assistant.proposal_action",
+      "value": "delete_event"
+    },
+    {
+      "description": "Its need: Done.",
+      "enum": "assistant.proposal_action",
+      "value": "done"
+    },
+    {
+      "description": "A task: due on a day.",
+      "enum": "assistant.proposal_action",
+      "value": "due"
+    },
+    {
+      "description": "A task: handed to a teammate.",
+      "enum": "assistant.proposal_action",
+      "value": "hand_off"
+    },
+    {
+      "description": "Its need: Later.",
+      "enum": "assistant.proposal_action",
+      "value": "later"
+    },
+    {
+      "description": "Mark it read.",
+      "enum": "assistant.proposal_action",
+      "value": "mark_read"
+    },
+    {
+      "description": "Mark it unread.",
+      "enum": "assistant.proposal_action",
+      "value": "mark_unread"
+    },
+    {
+      "description": "Move it to another stream.",
+      "enum": "assistant.proposal_action",
+      "value": "move_to_stream"
+    },
+    {
+      "description": "Its need: Not needed.",
+      "enum": "assistant.proposal_action",
+      "value": "not_needed"
+    },
+    {
+      "description": "Not spam.",
+      "enum": "assistant.proposal_action",
+      "value": "not_spam"
+    },
+    {
+      "description": "A task: planned for a day.",
+      "enum": "assistant.proposal_action",
+      "value": "plan_day"
+    },
+    {
+      "description": "Add an event to a provider calendar.",
+      "enum": "assistant.proposal_action",
+      "value": "push_event"
+    },
+    {
+      "description": "Take a label off it.",
+      "enum": "assistant.proposal_action",
+      "value": "remove_label"
+    },
+    {
+      "description": "Report it as spam.",
+      "enum": "assistant.proposal_action",
+      "value": "report_spam"
+    },
+    {
+      "description": "Answer an invitation.",
+      "enum": "assistant.proposal_action",
+      "value": "respond_event"
+    },
+    {
+      "description": "Star it.",
+      "enum": "assistant.proposal_action",
+      "value": "star"
+    },
+    {
+      "description": "Its Pay need: Still to pay.",
+      "enum": "assistant.proposal_action",
+      "value": "still_to_pay"
+    },
+    {
+      "description": "A task: done.",
+      "enum": "assistant.proposal_action",
+      "value": "task_done"
+    },
+    {
+      "description": "A task: Later.",
+      "enum": "assistant.proposal_action",
+      "value": "task_later"
+    },
+    {
+      "description": "A task: not needed after all.",
+      "enum": "assistant.proposal_action",
+      "value": "task_not_needed"
+    },
+    {
+      "description": "Move it to the trash.",
+      "enum": "assistant.proposal_action",
+      "value": "trash"
+    },
+    {
+      "description": "Back to the inbox.",
+      "enum": "assistant.proposal_action",
+      "value": "unarchive"
+    },
+    {
+      "description": "Take an event off a provider calendar.",
+      "enum": "assistant.proposal_action",
+      "value": "unpush_event"
+    },
+    {
+      "description": "Unstar it.",
+      "enum": "assistant.proposal_action",
+      "value": "unstar"
+    },
+    {
+      "description": "Out of the trash.",
+      "enum": "assistant.proposal_action",
+      "value": "untrash"
+    },
+    {
+      "description": "Change an event.",
+      "enum": "assistant.proposal_action",
+      "value": "update_event"
+    },
+    {
+      "description": "Its question: Yes.",
+      "enum": "assistant.proposal_action",
+      "value": "yes_to_question"
+    },
+    {
+      "description": "One change to one record, made by the member's own request on Confirm.",
+      "enum": "assistant.proposal_kind",
+      "value": "change"
+    },
+    {
+      "description": "An intent for a reply draft, written in the Reply dialog.",
+      "enum": "assistant.proposal_kind",
+      "value": "reply"
+    },
+    {
+      "description": "A sentence for Teach Scout, which the member checks and saves.",
+      "enum": "assistant.proposal_kind",
+      "value": "rule"
+    },
+    {
+      "description": "Not now.",
+      "enum": "assistant.proposal_state",
+      "value": "declined"
+    },
+    {
+      "description": "Confirmed and done.",
+      "enum": "assistant.proposal_state",
+      "value": "done"
+    },
+    {
+      "description": "Confirmed, and the request was refused.",
+      "enum": "assistant.proposal_state",
+      "value": "failed"
+    },
+    {
+      "description": "Waiting for the member.",
+      "enum": "assistant.proposal_state",
+      "value": "pending"
+    },
+    {
+      "description": "Done, then undone.",
+      "enum": "assistant.proposal_state",
+      "value": "undone"
+    },
+    {
+      "description": "It no longer does.",
+      "enum": "attention.item_state",
+      "value": "cleared"
+    },
+    {
+      "description": "It still needs someone.",
+      "enum": "attention.item_state",
+      "value": "open"
+    },
+    {
+      "description": "A choice is needed.",
+      "enum": "attention.reason",
+      "value": "decide"
+    },
+    {
+      "description": "Something to do.",
+      "enum": "attention.reason",
+      "value": "do"
+    },
+    {
+      "description": "Someone the member waits on has not written by when they were expected to.",
+      "enum": "attention.reason",
+      "value": "nudge"
+    },
+    {
+      "description": "Money is owed.",
+      "enum": "attention.reason",
+      "value": "pay"
+    },
+    {
+      "description": "Someone is waiting for an answer.",
+      "enum": "attention.reason",
+      "value": "reply"
+    },
+    {
+      "description": "Look before acting: a warning, or a question.",
+      "enum": "attention.reason",
+      "value": "review"
+    },
+    {
+      "description": "The member waits on someone.",
+      "enum": "attention.reason",
+      "value": "waiting"
+    },
+    {
+      "description": "A rule the member taught keeps it in front of them until they have opened it once.",
+      "enum": "attention.reason",
+      "value": "worth_a_look"
+    },
+    {
+      "description": "It asks the member (a question).",
+      "enum": "attention.trust",
+      "value": "check"
+    },
+    {
+      "description": "The producing module asserts it.",
+      "enum": "attention.trust",
+      "value": "sure"
+    },
     {
       "description": "Its access token expired and it holds no refresh token.",
       "enum": "bff.web_session_end_cause",
@@ -2288,6 +2935,41 @@
       "value": "member"
     },
     {
+      "description": "Dead: out of attempts, or failed for good.",
+      "enum": "kernel.job_state",
+      "value": "failed"
+    },
+    {
+      "description": "Waiting to run.",
+      "enum": "kernel.job_state",
+      "value": "pending"
+    },
+    {
+      "description": "Claimed by a worker.",
+      "enum": "kernel.job_state",
+      "value": "running"
+    },
+    {
+      "description": "Longer free-form generation (drafts, summaries, Scout's answers).",
+      "enum": "system.ai_role",
+      "value": "complete"
+    },
+    {
+      "description": "Typed decisions about a state.",
+      "enum": "system.ai_role",
+      "value": "decide"
+    },
+    {
+      "description": "Text embeddings for search and similarity.",
+      "enum": "system.ai_role",
+      "value": "embed"
+    },
+    {
+      "description": "Understanding images and scanned documents.",
+      "enum": "system.ai_role",
+      "value": "vision"
+    },
+    {
       "description": "The business preset.",
       "enum": "workspaces.accent",
       "value": "business"
@@ -2569,6 +3251,1164 @@
     "type": "object"
   },
   "events": [
+    {
+      "action": "finished",
+      "actor_types": [
+        "user",
+        "client"
+      ],
+      "added_in": 7,
+      "description": "Scout's answer to a question was stored: answered, cut short, or failed. How it ended, the tools it used and how many proposals it made, never its words.",
+      "fires_when": "assistant.ask_chat or assistant.stream_chat stores the answer (or keeps it failed), in that transaction.",
+      "module": "assistant",
+      "name": "assistant.answer_finished",
+      "object": "answer",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "AnswerFinished",
+      "schema": {
+        "$id": "urn:campbooks:tracking:assistant.answer_finished:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "Scout's answer to a question was stored: answered, cut short, or failed. How it ended, the tools it used and how many proposals it made, never its words.",
+        "properties": {
+          "answer": {
+            "additionalProperties": false,
+            "description": "The answer, as stored.",
+            "properties": {
+              "chat_id": {
+                "description": "The chat it is in.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "failure": {
+                "description": "Why it failed, when it did and the kind is known.",
+                "enum": [
+                  "answers_not_trusted",
+                  "config",
+                  "external_content_refused",
+                  "invalid_response",
+                  "metering",
+                  "over_cap",
+                  "provider",
+                  "role_not_configured",
+                  "rounds",
+                  "status",
+                  "timed_out",
+                  "timeout",
+                  "transport",
+                  "unattributed"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "finish": {
+                "description": "How it ended.",
+                "enum": [
+                  "cut_short",
+                  "done",
+                  "failed"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The answer's id (its message).",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "proposals": {
+                "description": "How many proposals it holds.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "tools": {
+                "description": "The tools Scout used to answer, in order.",
+                "items": {
+                  "enum": [
+                    "conversation_history",
+                    "find_conversations",
+                    "find_people",
+                    "free_time",
+                    "my_calendar",
+                    "my_inboxes",
+                    "my_tasks",
+                    "read_conversation",
+                    "read_event",
+                    "read_task",
+                    "what_needs_me"
+                  ],
+                  "type": "string"
+                },
+                "type": "array",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "chat_id",
+              "finish",
+              "id",
+              "proposals",
+              "tools"
+            ],
+            "title": "assistant.answer",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "assistant.answer_finished",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "continued",
+      "actor_types": [
+        "user",
+        "client"
+      ],
+      "added_in": 7,
+      "description": "A member asked Scout a question in a chat. The question's text never appears; the snapshot carries the chat's question count.",
+      "fires_when": "assistant.ask_chat or assistant.stream_chat stores the question (and Scout's answer to come), in that transaction.",
+      "module": "assistant",
+      "name": "assistant.chat_continued",
+      "object": "chat",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ChatContinued",
+      "schema": {
+        "$id": "urn:campbooks:tracking:assistant.chat_continued:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member asked Scout a question in a chat. The question's text never appears; the snapshot carries the chat's question count.",
+        "properties": {
+          "chat": {
+            "additionalProperties": false,
+            "description": "The chat afterwards, with the new question counted.",
+            "properties": {
+              "about": {
+                "additionalProperties": false,
+                "description": "The record it is about (a conversation, a task, a rule, a calendar event), by reference; none for a chat about nothing in particular.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was started.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The chat's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "last_message_at": {
+                "description": "When its last message was written.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "questions": {
+                "description": "How many questions it holds.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "last_message_at",
+              "questions"
+            ],
+            "title": "assistant.chat",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "chat"
+        ],
+        "title": "assistant.chat_continued",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "deleted",
+      "actor_types": [
+        "user",
+        "client"
+      ],
+      "added_in": 7,
+      "description": "A member deleted a chat with Scout and its messages. The snapshot is the chat as it stood.",
+      "fires_when": "assistant.delete_chat deletes it, in that transaction.",
+      "module": "assistant",
+      "name": "assistant.chat_deleted",
+      "object": "chat",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ChatDeleted",
+      "schema": {
+        "$id": "urn:campbooks:tracking:assistant.chat_deleted:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member deleted a chat with Scout and its messages. The snapshot is the chat as it stood.",
+        "properties": {
+          "chat": {
+            "additionalProperties": false,
+            "description": "The chat as it stood when deleted.",
+            "properties": {
+              "about": {
+                "additionalProperties": false,
+                "description": "The record it is about (a conversation, a task, a rule, a calendar event), by reference; none for a chat about nothing in particular.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was started.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The chat's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "last_message_at": {
+                "description": "When its last message was written.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "questions": {
+                "description": "How many questions it holds.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "last_message_at",
+              "questions"
+            ],
+            "title": "assistant.chat",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "chat"
+        ],
+        "title": "assistant.chat_deleted",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "started",
+      "actor_types": [
+        "user",
+        "client"
+      ],
+      "added_in": 7,
+      "description": "A member started a chat with Scout, about a record or about nothing in particular. The snapshot names what it is about by reference, never its first question.",
+      "fires_when": "assistant.start_chat makes a new chat, in the transaction that inserts it; continuing the member's chat about the same record changes nothing and tracks nothing.",
+      "module": "assistant",
+      "name": "assistant.chat_started",
+      "object": "chat",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ChatStarted",
+      "schema": {
+        "$id": "urn:campbooks:tracking:assistant.chat_started:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member started a chat with Scout, about a record or about nothing in particular. The snapshot names what it is about by reference, never its first question.",
+        "properties": {
+          "chat": {
+            "additionalProperties": false,
+            "description": "The new chat.",
+            "properties": {
+              "about": {
+                "additionalProperties": false,
+                "description": "The record it is about (a conversation, a task, a rule, a calendar event), by reference; none for a chat about nothing in particular.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was started.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The chat's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "last_message_at": {
+                "description": "When its last message was written.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "questions": {
+                "description": "How many questions it holds.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "last_message_at",
+              "questions"
+            ],
+            "title": "assistant.chat",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "chat"
+        ],
+        "title": "assistant.chat_started",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "updated",
+      "actor_types": [
+        "user",
+        "client"
+      ],
+      "added_in": 7,
+      "description": "A member changed how Scout acts for them: which settings changed, and the profile afterwards.",
+      "fires_when": "assistant.update_profile changes proactivity or whether the questions were answered; the values it already has track nothing.",
+      "module": "assistant",
+      "name": "assistant.profile_updated",
+      "object": "profile",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ProfileUpdated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:assistant.profile_updated:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member changed how Scout acts for them: which settings changed, and the profile afterwards.",
+        "properties": {
+          "fields": {
+            "description": "The settings that changed.",
+            "items": {
+              "enum": [
+                "asked",
+                "proactivity"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          },
+          "profile": {
+            "additionalProperties": false,
+            "description": "The profile afterwards.",
+            "properties": {
+              "asked": {
+                "description": "Whether the member answered or put off the questions.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "asked_at": {
+                "description": "When they first did.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "proactivity": {
+                "description": "How rules Scout proposes from the member's corrections start.",
+                "enum": [
+                  "act_then_tell",
+                  "ask_first"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows by one on every save.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "user_id": {
+                "description": "The member: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              }
+            },
+            "required": [
+              "asked",
+              "proactivity",
+              "revision",
+              "user_id"
+            ],
+            "title": "assistant.profile",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "fields",
+          "profile"
+        ],
+        "title": "assistant.profile_updated",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "confirmed",
+      "actor_types": [
+        "user",
+        "client"
+      ],
+      "added_in": 7,
+      "description": "A member confirmed one of Scout's proposals: done, or failed when their own request was refused (the snapshot's state says which). The change itself is tracked by the module it changed.",
+      "fires_when": "assistant.settle_proposal settles a pending card done or failed; a card that cannot take that state is refused and tracks nothing.",
+      "module": "assistant",
+      "name": "assistant.proposal_confirmed",
+      "object": "proposal",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ProposalConfirmed",
+      "schema": {
+        "$id": "urn:campbooks:tracking:assistant.proposal_confirmed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member confirmed one of Scout's proposals: done, or failed when their own request was refused (the snapshot's state says which). The change itself is tracked by the module it changed.",
+        "properties": {
+          "proposal": {
+            "additionalProperties": false,
+            "description": "The proposal, settled done or failed.",
+            "properties": {
+              "action": {
+                "description": "The change it names (a change only).",
+                "enum": [
+                  "add_label",
+                  "already_paid",
+                  "archive",
+                  "create_event",
+                  "delete_event",
+                  "done",
+                  "due",
+                  "hand_off",
+                  "later",
+                  "mark_read",
+                  "mark_unread",
+                  "move_to_stream",
+                  "not_needed",
+                  "not_spam",
+                  "plan_day",
+                  "push_event",
+                  "remove_label",
+                  "report_spam",
+                  "respond_event",
+                  "star",
+                  "still_to_pay",
+                  "task_done",
+                  "task_later",
+                  "task_not_needed",
+                  "trash",
+                  "unarchive",
+                  "unpush_event",
+                  "unstar",
+                  "untrash",
+                  "update_event",
+                  "yes_to_question"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "chat_id": {
+                "description": "The chat it was made in.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "id": {
+                "description": "The proposal's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of thing Scout proposed.",
+                "enum": [
+                  "change",
+                  "reply",
+                  "rule"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "record": {
+                "additionalProperties": false,
+                "description": "The conversation, task or event it is about, by reference.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Where it stands.",
+                "enum": [
+                  "declined",
+                  "done",
+                  "failed",
+                  "pending",
+                  "undone"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "chat_id",
+              "id",
+              "kind",
+              "state"
+            ],
+            "title": "assistant.proposal",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "proposal"
+        ],
+        "title": "assistant.proposal_confirmed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "declined",
+      "actor_types": [
+        "user",
+        "client"
+      ],
+      "added_in": 7,
+      "description": "A member said Not now to one of Scout's proposals.",
+      "fires_when": "assistant.settle_proposal settles a pending card declined; a card that cannot take that state is refused and tracks nothing.",
+      "module": "assistant",
+      "name": "assistant.proposal_declined",
+      "object": "proposal",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ProposalDeclined",
+      "schema": {
+        "$id": "urn:campbooks:tracking:assistant.proposal_declined:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member said Not now to one of Scout's proposals.",
+        "properties": {
+          "proposal": {
+            "additionalProperties": false,
+            "description": "The proposal, declined.",
+            "properties": {
+              "action": {
+                "description": "The change it names (a change only).",
+                "enum": [
+                  "add_label",
+                  "already_paid",
+                  "archive",
+                  "create_event",
+                  "delete_event",
+                  "done",
+                  "due",
+                  "hand_off",
+                  "later",
+                  "mark_read",
+                  "mark_unread",
+                  "move_to_stream",
+                  "not_needed",
+                  "not_spam",
+                  "plan_day",
+                  "push_event",
+                  "remove_label",
+                  "report_spam",
+                  "respond_event",
+                  "star",
+                  "still_to_pay",
+                  "task_done",
+                  "task_later",
+                  "task_not_needed",
+                  "trash",
+                  "unarchive",
+                  "unpush_event",
+                  "unstar",
+                  "untrash",
+                  "update_event",
+                  "yes_to_question"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "chat_id": {
+                "description": "The chat it was made in.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "id": {
+                "description": "The proposal's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of thing Scout proposed.",
+                "enum": [
+                  "change",
+                  "reply",
+                  "rule"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "record": {
+                "additionalProperties": false,
+                "description": "The conversation, task or event it is about, by reference.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Where it stands.",
+                "enum": [
+                  "declined",
+                  "done",
+                  "failed",
+                  "pending",
+                  "undone"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "chat_id",
+              "id",
+              "kind",
+              "state"
+            ],
+            "title": "assistant.proposal",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "proposal"
+        ],
+        "title": "assistant.proposal_declined",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "undone",
+      "actor_types": [
+        "user",
+        "client"
+      ],
+      "added_in": 7,
+      "description": "A member undid a change of Scout's they had confirmed.",
+      "fires_when": "assistant.settle_proposal settles a done card undone; a card that cannot take that state is refused and tracks nothing.",
+      "module": "assistant",
+      "name": "assistant.proposal_undone",
+      "object": "proposal",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ProposalUndone",
+      "schema": {
+        "$id": "urn:campbooks:tracking:assistant.proposal_undone:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member undid a change of Scout's they had confirmed.",
+        "properties": {
+          "proposal": {
+            "additionalProperties": false,
+            "description": "The proposal, undone.",
+            "properties": {
+              "action": {
+                "description": "The change it names (a change only).",
+                "enum": [
+                  "add_label",
+                  "already_paid",
+                  "archive",
+                  "create_event",
+                  "delete_event",
+                  "done",
+                  "due",
+                  "hand_off",
+                  "later",
+                  "mark_read",
+                  "mark_unread",
+                  "move_to_stream",
+                  "not_needed",
+                  "not_spam",
+                  "plan_day",
+                  "push_event",
+                  "remove_label",
+                  "report_spam",
+                  "respond_event",
+                  "star",
+                  "still_to_pay",
+                  "task_done",
+                  "task_later",
+                  "task_not_needed",
+                  "trash",
+                  "unarchive",
+                  "unpush_event",
+                  "unstar",
+                  "untrash",
+                  "update_event",
+                  "yes_to_question"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "chat_id": {
+                "description": "The chat it was made in.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "id": {
+                "description": "The proposal's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "What kind of thing Scout proposed.",
+                "enum": [
+                  "change",
+                  "reply",
+                  "rule"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "record": {
+                "additionalProperties": false,
+                "description": "The conversation, task or event it is about, by reference.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Where it stands.",
+                "enum": [
+                  "declined",
+                  "done",
+                  "failed",
+                  "pending",
+                  "undone"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "chat_id",
+              "id",
+              "kind",
+              "state"
+            ],
+            "title": "assistant.proposal",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "proposal"
+        ],
+        "title": "assistant.proposal_undone",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "snoozed",
+      "actor_types": [
+        "user",
+        "client",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 7,
+      "description": "A member put an item off until later, for themselves. before is the Later it replaced, if any.",
+      "fires_when": "attention.snooze sets the caller's Later of the item to a new time; the same time again tracks nothing.",
+      "module": "attention",
+      "name": "attention.item_snoozed",
+      "object": "item",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ItemSnoozed",
+      "schema": {
+        "$id": "urn:campbooks:tracking:attention.item_snoozed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member put an item off until later, for themselves. before is the Later it replaced, if any.",
+        "properties": {
+          "before": {
+            "description": "Until when it was put off before, when it was.",
+            "format": "date-time",
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "item": {
+            "additionalProperties": false,
+            "description": "The item afterwards, with the caller's new Later.",
+            "properties": {
+              "due_on": {
+                "description": "When it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The item's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "reason": {
+                "description": "Why it needs someone.",
+                "enum": [
+                  "decide",
+                  "do",
+                  "nudge",
+                  "pay",
+                  "reply",
+                  "review",
+                  "waiting",
+                  "worth_a_look"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "record": {
+                "additionalProperties": false,
+                "description": "The record it is about (a conversation, a task), by reference.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "since": {
+                "description": "When its cause arrived.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "snoozed_until": {
+                "description": "Until when the acting member put it off, when they did.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "Whether it still needs someone.",
+                "enum": [
+                  "cleared",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "trust": {
+                "description": "How much the producing module stands behind it.",
+                "enum": [
+                  "check",
+                  "sure"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "urgent": {
+                "description": "Whether it is for today.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "id",
+              "reason",
+              "record",
+              "since",
+              "state",
+              "trust",
+              "urgent"
+            ],
+            "title": "attention.item",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "title": "attention.item_snoozed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "unsnoozed",
+      "actor_types": [
+        "user",
+        "client",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 7,
+      "description": "A member brought an item they had put off back now. before is until when it was put off.",
+      "fires_when": "attention.unsnooze ends the caller's Later of the item; an item not put off tracks nothing.",
+      "module": "attention",
+      "name": "attention.item_unsnoozed",
+      "object": "item",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ItemUnsnoozed",
+      "schema": {
+        "$id": "urn:campbooks:tracking:attention.item_unsnoozed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member brought an item they had put off back now. before is until when it was put off.",
+        "properties": {
+          "before": {
+            "description": "Until when it was put off.",
+            "format": "date-time",
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "item": {
+            "additionalProperties": false,
+            "description": "The item afterwards, no longer put off by the caller.",
+            "properties": {
+              "due_on": {
+                "description": "When it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The item's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "reason": {
+                "description": "Why it needs someone.",
+                "enum": [
+                  "decide",
+                  "do",
+                  "nudge",
+                  "pay",
+                  "reply",
+                  "review",
+                  "waiting",
+                  "worth_a_look"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "record": {
+                "additionalProperties": false,
+                "description": "The record it is about (a conversation, a task), by reference.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "since": {
+                "description": "When its cause arrived.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "snoozed_until": {
+                "description": "Until when the acting member put it off, when they did.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "Whether it still needs someone.",
+                "enum": [
+                  "cleared",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "trust": {
+                "description": "How much the producing module stands behind it.",
+                "enum": [
+                  "check",
+                  "sure"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "urgent": {
+                "description": "Whether it is for today.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "id",
+              "reason",
+              "record",
+              "since",
+              "state",
+              "trust",
+              "urgent"
+            ],
+            "title": "attention.item",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "item"
+        ],
+        "title": "attention.item_unsnoozed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
     {
       "action": "ended",
       "actor_types": [
@@ -11305,6 +13145,436 @@
       "version": 1
     },
     {
+      "action": "discarded",
+      "actor_types": [
+        "admin"
+      ],
+      "added_in": 7,
+      "description": "An administrator deleted a dead job. The snapshot is the job as it stood.",
+      "fires_when": "system.admin_discard_job deletes it, in the kernel's transaction; a job not dead, or gone, tracks nothing.",
+      "module": "kernel",
+      "name": "kernel.job_discarded",
+      "object": "job",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "JobDiscarded",
+      "schema": {
+        "$id": "urn:campbooks:tracking:kernel.job_discarded:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An administrator deleted a dead job. The snapshot is the job as it stood.",
+        "properties": {
+          "job": {
+            "additionalProperties": false,
+            "description": "The job as it stood when deleted.",
+            "properties": {
+              "attempts": {
+                "description": "Attempts made.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was enqueued.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The job's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "The job's kind (`<module>.<job>`).",
+                "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "max_attempts": {
+                "description": "Attempts it is allowed.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "queue": {
+                "description": "The queue it runs on.",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "Where it stands.",
+                "enum": [
+                  "failed",
+                  "pending",
+                  "running"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "workspace_id": {
+                "description": "The workspace it belongs to; none for instance-wide work.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              }
+            },
+            "required": [
+              "attempts",
+              "created_at",
+              "id",
+              "kind",
+              "max_attempts",
+              "queue",
+              "state"
+            ],
+            "title": "kernel.job",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "job"
+        ],
+        "title": "kernel.job_discarded",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "retried",
+      "actor_types": [
+        "admin"
+      ],
+      "added_in": 7,
+      "description": "An administrator put a dead job back on its queue. The job by id, kind and queue, never its payload or error.",
+      "fires_when": "system.admin_retry_job requeues it, in the kernel's transaction; a job not dead, or superseded by another of its key, tracks nothing.",
+      "module": "kernel",
+      "name": "kernel.job_retried",
+      "object": "job",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "JobRetried",
+      "schema": {
+        "$id": "urn:campbooks:tracking:kernel.job_retried:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An administrator put a dead job back on its queue. The job by id, kind and queue, never its payload or error.",
+        "properties": {
+          "job": {
+            "additionalProperties": false,
+            "description": "The job afterwards: pending, attempts reset.",
+            "properties": {
+              "attempts": {
+                "description": "Attempts made.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was enqueued.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The job's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "The job's kind (`<module>.<job>`).",
+                "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "max_attempts": {
+                "description": "Attempts it is allowed.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "queue": {
+                "description": "The queue it runs on.",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "Where it stands.",
+                "enum": [
+                  "failed",
+                  "pending",
+                  "running"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "workspace_id": {
+                "description": "The workspace it belongs to; none for instance-wide work.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              }
+            },
+            "required": [
+              "attempts",
+              "created_at",
+              "id",
+              "kind",
+              "max_attempts",
+              "queue",
+              "state"
+            ],
+            "title": "kernel.job",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "job"
+        ],
+        "title": "kernel.job_retried",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "retried",
+      "actor_types": [
+        "admin"
+      ],
+      "added_in": 7,
+      "description": "An administrator put the dead jobs of a kind back on their queue: one summary with how many, never their ids.",
+      "fires_when": "system.admin_retry_jobs requeues at least one, in the kernel's transaction; none requeued tracks nothing.",
+      "module": "kernel",
+      "name": "kernel.jobs_retried",
+      "object": "jobs",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "JobsRetried",
+      "schema": {
+        "$id": "urn:campbooks:tracking:kernel.jobs_retried:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An administrator put the dead jobs of a kind back on their queue: one summary with how many, never their ids.",
+        "properties": {
+          "kind": {
+            "description": "The kind whose dead jobs were retried (`<module>.<job>`).",
+            "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "more": {
+            "description": "Whether the batch limit was reached, so more dead jobs of the kind may remain.",
+            "type": "boolean",
+            "x-classification": "operational"
+          },
+          "queue": {
+            "description": "The queue the retry was limited to, if any.",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "requeued": {
+            "description": "How many jobs were put back on their queue.",
+            "type": "integer",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "kind",
+          "more",
+          "requeued"
+        ],
+        "title": "kernel.jobs_retried",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "discarded",
+      "actor_types": [
+        "admin"
+      ],
+      "added_in": 7,
+      "description": "An administrator deleted a schedule's pending or stuck run, so its next tick enqueues afresh. The snapshot is the run's row as it stood.",
+      "fires_when": "system.admin_discard_schedule_run deletes it, in the kernel's transaction; nothing to discard tracks nothing.",
+      "module": "kernel",
+      "name": "kernel.schedule_run_discarded",
+      "object": "schedule_run",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "ScheduleRunDiscarded",
+      "schema": {
+        "$id": "urn:campbooks:tracking:kernel.schedule_run_discarded:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An administrator deleted a schedule's pending or stuck run, so its next tick enqueues afresh. The snapshot is the run's row as it stood.",
+        "properties": {
+          "job": {
+            "additionalProperties": false,
+            "description": "The schedule's run (its job row; its kind is the schedule) as it stood when deleted.",
+            "properties": {
+              "attempts": {
+                "description": "Attempts made.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was enqueued.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The job's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "kind": {
+                "description": "The job's kind (`<module>.<job>`).",
+                "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "max_attempts": {
+                "description": "Attempts it is allowed.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "queue": {
+                "description": "The queue it runs on.",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "state": {
+                "description": "Where it stands.",
+                "enum": [
+                  "failed",
+                  "pending",
+                  "running"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "workspace_id": {
+                "description": "The workspace it belongs to; none for instance-wide work.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              }
+            },
+            "required": [
+              "attempts",
+              "created_at",
+              "id",
+              "kind",
+              "max_attempts",
+              "queue",
+              "state"
+            ],
+            "title": "kernel.job",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "job"
+        ],
+        "title": "kernel.schedule_run_discarded",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "reached",
+      "actor_types": [
+        "user",
+        "client",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 7,
+      "description": "A workspace reached its daily AI limit: its first AI call of the UTC day was refused. Until midnight UTC its new mail is sorted by rules only; the reserve is kept for what people ask.",
+      "fires_when": "The AI usage meter refuses the workspace's first call of the day, in the transaction that counts the refusal; later refusals that day track nothing.",
+      "module": "system",
+      "name": "system.ai_limit_reached",
+      "object": "ai_limit",
+      "openspec_change": "track-assistant-attention-search-system",
+      "rust_type": "AiLimitReached",
+      "schema": {
+        "$id": "urn:campbooks:tracking:system.ai_limit_reached:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A workspace reached its daily AI limit: its first AI call of the UTC day was refused. Until midnight UTC its new mail is sorted by rules only; the reserve is kept for what people ask.",
+        "properties": {
+          "ai_role": {
+            "description": "The AI role of the refused call.",
+            "enum": [
+              "complete",
+              "decide",
+              "embed",
+              "vision"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "cap": {
+            "description": "Calls the workspace may make per UTC day.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "day": {
+            "description": "The UTC day whose calls were used up.",
+            "format": "date",
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "interactive": {
+            "description": "Whether the refused call was one a person waited on (the whole cap was used); false when background work reached the cap less the reserve.",
+            "type": "boolean",
+            "x-classification": "operational"
+          },
+          "reserve": {
+            "description": "Calls of the cap kept for what people ask, which background work may not use.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "role": {
+            "description": "The AI role of the refused call.",
+            "enum": [
+              "complete",
+              "decide",
+              "embed",
+              "vision"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "ai_role",
+          "cap",
+          "day",
+          "interactive",
+          "reserve",
+          "role"
+        ],
+        "title": "system.ai_limit_reached",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "created",
       "actor_types": [
         "user"
@@ -12812,8 +15082,177 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-25",
-  "plan_version": 6,
+  "plan_version": 7,
   "properties": [
+    {
+      "classification": "operational",
+      "description": "The answer, as stored.",
+      "event": "assistant.answer_finished",
+      "example": "",
+      "list": false,
+      "of": "assistant.answer",
+      "pattern": "",
+      "property": "answer",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The chat afterwards, with the new question counted.",
+      "event": "assistant.chat_continued",
+      "example": "",
+      "list": false,
+      "of": "assistant.chat",
+      "pattern": "",
+      "property": "chat",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The chat as it stood when deleted.",
+      "event": "assistant.chat_deleted",
+      "example": "",
+      "list": false,
+      "of": "assistant.chat",
+      "pattern": "",
+      "property": "chat",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The new chat.",
+      "event": "assistant.chat_started",
+      "example": "",
+      "list": false,
+      "of": "assistant.chat",
+      "pattern": "",
+      "property": "chat",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The settings that changed.",
+      "event": "assistant.profile_updated",
+      "example": "",
+      "list": true,
+      "of": "assistant.profile_setting",
+      "pattern": "",
+      "property": "fields",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The profile afterwards.",
+      "event": "assistant.profile_updated",
+      "example": "",
+      "list": false,
+      "of": "assistant.profile",
+      "pattern": "",
+      "property": "profile",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The proposal, settled done or failed.",
+      "event": "assistant.proposal_confirmed",
+      "example": "",
+      "list": false,
+      "of": "assistant.proposal",
+      "pattern": "",
+      "property": "proposal",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The proposal, declined.",
+      "event": "assistant.proposal_declined",
+      "example": "",
+      "list": false,
+      "of": "assistant.proposal",
+      "pattern": "",
+      "property": "proposal",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The proposal, undone.",
+      "event": "assistant.proposal_undone",
+      "example": "",
+      "list": false,
+      "of": "assistant.proposal",
+      "pattern": "",
+      "property": "proposal",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Until when it was put off before, when it was.",
+      "event": "attention.item_snoozed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "before",
+      "required": false,
+      "type": "timestamp",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The item afterwards, with the caller's new Later.",
+      "event": "attention.item_snoozed",
+      "example": "",
+      "list": false,
+      "of": "attention.item",
+      "pattern": "",
+      "property": "item",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Until when it was put off.",
+      "event": "attention.item_unsnoozed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "timestamp",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The item afterwards, no longer put off by the caller.",
+      "event": "attention.item_unsnoozed",
+      "example": "",
+      "list": false,
+      "of": "attention.item",
+      "pattern": "",
+      "property": "item",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
     {
       "classification": "pseudonymous",
       "description": "The account it was signed in to, when known and a Campbooks account id (a retired cookie names only the session).",
@@ -15312,6 +17751,175 @@
     },
     {
       "classification": "operational",
+      "description": "The job as it stood when deleted.",
+      "event": "kernel.job_discarded",
+      "example": "",
+      "list": false,
+      "of": "kernel.job",
+      "pattern": "",
+      "property": "job",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The job afterwards: pending, attempts reset.",
+      "event": "kernel.job_retried",
+      "example": "",
+      "list": false,
+      "of": "kernel.job",
+      "pattern": "",
+      "property": "job",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The kind whose dead jobs were retried (`<module>.<job>`).",
+      "event": "kernel.jobs_retried",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+      "property": "kind",
+      "required": true,
+      "type": "code",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether the batch limit was reached, so more dead jobs of the kind may remain.",
+      "event": "kernel.jobs_retried",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "more",
+      "required": true,
+      "type": "bool",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The queue the retry was limited to, if any.",
+      "event": "kernel.jobs_retried",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "property": "queue",
+      "required": false,
+      "type": "code",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many jobs were put back on their queue.",
+      "event": "kernel.jobs_retried",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "requeued",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The schedule's run (its job row; its kind is the schedule) as it stood when deleted.",
+      "event": "kernel.schedule_run_discarded",
+      "example": "",
+      "list": false,
+      "of": "kernel.job",
+      "pattern": "",
+      "property": "job",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The AI role of the refused call.",
+      "event": "system.ai_limit_reached",
+      "example": "",
+      "list": false,
+      "of": "system.ai_role",
+      "pattern": "",
+      "property": "ai_role",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Calls the workspace may make per UTC day.",
+      "event": "system.ai_limit_reached",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "cap",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The UTC day whose calls were used up.",
+      "event": "system.ai_limit_reached",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "day",
+      "required": true,
+      "type": "date",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether the refused call was one a person waited on (the whole cap was used); false when background work reached the cap less the reserve.",
+      "event": "system.ai_limit_reached",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "interactive",
+      "required": true,
+      "type": "bool",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Calls of the cap kept for what people ask, which background work may not use.",
+      "event": "system.ai_limit_reached",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "reserve",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The AI role of the refused call.",
+      "event": "system.ai_limit_reached",
+      "example": "",
+      "list": false,
+      "of": "system.ai_role",
+      "pattern": "",
+      "property": "role",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "The new invitation.",
       "event": "workspaces.invitation_created",
       "example": "",
@@ -15637,6 +18245,347 @@
     }
   ],
   "records": [
+    {
+      "classification": "id",
+      "description": "The chat it is in.",
+      "enum": "",
+      "field": "chat_id",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.answer",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "Why it failed, when it did and the kind is known.",
+      "enum": "assistant.answer_failure",
+      "field": "failure",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.answer",
+      "required": false,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "How it ended.",
+      "enum": "assistant.answer_finish",
+      "field": "finish",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.answer",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "id",
+      "description": "The answer's id (its message).",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.answer",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "How many proposals it holds.",
+      "enum": "",
+      "field": "proposals",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.answer",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "operational",
+      "description": "The tools Scout used to answer, in order.",
+      "enum": "assistant.chat_tool",
+      "field": "tools",
+      "list": true,
+      "pattern": "",
+      "record": "assistant.answer",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "id",
+      "description": "The record it is about (a conversation, a task, a rule, a calendar event), by reference; none for a chat about nothing in particular.",
+      "enum": "",
+      "field": "about",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.chat",
+      "required": false,
+      "type": "record_ref"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was started.",
+      "enum": "",
+      "field": "created_at",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.chat",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "id",
+      "description": "The chat's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.chat",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "When its last message was written.",
+      "enum": "",
+      "field": "last_message_at",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.chat",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "How many questions it holds.",
+      "enum": "",
+      "field": "questions",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.chat",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether the member answered or put off the questions.",
+      "enum": "",
+      "field": "asked",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.profile",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "operational",
+      "description": "When they first did.",
+      "enum": "",
+      "field": "asked_at",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.profile",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "How rules Scout proposes from the member's corrections start.",
+      "enum": "assistant.proactivity",
+      "field": "proactivity",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.profile",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Grows by one on every save.",
+      "enum": "",
+      "field": "revision",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.profile",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member: their user id.",
+      "enum": "",
+      "field": "user_id",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.profile",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "The change it names (a change only).",
+      "enum": "assistant.proposal_action",
+      "field": "action",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.proposal",
+      "required": false,
+      "type": "enum"
+    },
+    {
+      "classification": "id",
+      "description": "The chat it was made in.",
+      "enum": "",
+      "field": "chat_id",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.proposal",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "id",
+      "description": "The proposal's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.proposal",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "What kind of thing Scout proposed.",
+      "enum": "assistant.proposal_kind",
+      "field": "kind",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.proposal",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "id",
+      "description": "The conversation, task or event it is about, by reference.",
+      "enum": "",
+      "field": "record",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.proposal",
+      "required": false,
+      "type": "record_ref"
+    },
+    {
+      "classification": "operational",
+      "description": "Where it stands.",
+      "enum": "assistant.proposal_state",
+      "field": "state",
+      "list": false,
+      "pattern": "",
+      "record": "assistant.proposal",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "When it is due.",
+      "enum": "",
+      "field": "due_on",
+      "list": false,
+      "pattern": "",
+      "record": "attention.item",
+      "required": false,
+      "type": "date"
+    },
+    {
+      "classification": "id",
+      "description": "The item's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "attention.item",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "Why it needs someone.",
+      "enum": "attention.reason",
+      "field": "reason",
+      "list": false,
+      "pattern": "",
+      "record": "attention.item",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "id",
+      "description": "The record it is about (a conversation, a task), by reference.",
+      "enum": "",
+      "field": "record",
+      "list": false,
+      "pattern": "",
+      "record": "attention.item",
+      "required": true,
+      "type": "record_ref"
+    },
+    {
+      "classification": "operational",
+      "description": "When its cause arrived.",
+      "enum": "",
+      "field": "since",
+      "list": false,
+      "pattern": "",
+      "record": "attention.item",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "Until when the acting member put it off, when they did.",
+      "enum": "",
+      "field": "snoozed_until",
+      "list": false,
+      "pattern": "",
+      "record": "attention.item",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it still needs someone.",
+      "enum": "attention.item_state",
+      "field": "state",
+      "list": false,
+      "pattern": "",
+      "record": "attention.item",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "How much the producing module stands behind it.",
+      "enum": "attention.trust",
+      "field": "trust",
+      "list": false,
+      "pattern": "",
+      "record": "attention.item",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it is for today.",
+      "enum": "",
+      "field": "urgent",
+      "list": false,
+      "pattern": "",
+      "record": "attention.item",
+      "required": true,
+      "type": "bool"
+    },
     {
       "classification": "operational",
       "description": "Whether the provider verified the account's address (never the address).",
@@ -16934,6 +19883,94 @@
       "record": "identity.way_in",
       "required": true,
       "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Attempts made.",
+      "enum": "",
+      "field": "attempts",
+      "list": false,
+      "pattern": "",
+      "record": "kernel.job",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was enqueued.",
+      "enum": "",
+      "field": "created_at",
+      "list": false,
+      "pattern": "",
+      "record": "kernel.job",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "id",
+      "description": "The job's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "kernel.job",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "The job's kind (`<module>.<job>`).",
+      "enum": "",
+      "field": "kind",
+      "list": false,
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+      "record": "kernel.job",
+      "required": true,
+      "type": "code"
+    },
+    {
+      "classification": "operational",
+      "description": "Attempts it is allowed.",
+      "enum": "",
+      "field": "max_attempts",
+      "list": false,
+      "pattern": "",
+      "record": "kernel.job",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "operational",
+      "description": "The queue it runs on.",
+      "enum": "",
+      "field": "queue",
+      "list": false,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "record": "kernel.job",
+      "required": true,
+      "type": "code"
+    },
+    {
+      "classification": "operational",
+      "description": "Where it stands.",
+      "enum": "kernel.job_state",
+      "field": "state",
+      "list": false,
+      "pattern": "",
+      "record": "kernel.job",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The workspace it belongs to; none for instance-wide work.",
+      "enum": "",
+      "field": "workspace_id",
+      "list": false,
+      "pattern": "",
+      "record": "kernel.job",
+      "required": false,
+      "type": "id"
     },
     {
       "classification": "operational",

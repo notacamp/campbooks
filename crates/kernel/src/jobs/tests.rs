@@ -2137,7 +2137,9 @@ mod administration {
         for id in [pending, running, done] {
             let before = job(&db, id).await;
             assert_eq!(
-                admin::retry(&db, &Tracker::default(), &grant(), id).await.unwrap(),
+                admin::retry(&db, &Tracker::default(), &grant(), id)
+                    .await
+                    .unwrap(),
                 Retry::Unchanged
             );
             let after = job(&db, id).await;
@@ -2147,12 +2149,16 @@ mod administration {
             );
         }
         assert_eq!(
-            admin::retry(&db, &Tracker::default(), &grant(), JobId::new()).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), JobId::new())
+                .await
+                .unwrap(),
             Retry::Missing
         );
 
         assert_eq!(
-            admin::retry(&db, &Tracker::default(), &grant(), dead).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), dead)
+                .await
+                .unwrap(),
             Retry::Requeued
         );
         let row = job(&db, dead).await;
@@ -2160,7 +2166,9 @@ mod administration {
         assert!(row.finished_at.is_none() && row.locked_by.is_none());
         // Twice is the same as once.
         assert_eq!(
-            admin::retry(&db, &Tracker::default(), &grant(), dead).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), dead)
+                .await
+                .unwrap(),
             Retry::Unchanged
         );
 
@@ -2183,16 +2191,22 @@ mod administration {
         let pending =
             created(enqueue_probe(&state, &Probe::note("p"), EnqueueOptions::default()).await);
         assert_eq!(
-            admin::discard(&db, &Tracker::default(), &grant(), pending).await.unwrap(),
+            admin::discard(&db, &Tracker::default(), &grant(), pending)
+                .await
+                .unwrap(),
             Discard::Unchanged
         );
         assert_eq!(job(&db, pending).await.state, "pending");
         assert_eq!(
-            admin::discard(&db, &Tracker::default(), &grant(), dead).await.unwrap(),
+            admin::discard(&db, &Tracker::default(), &grant(), dead)
+                .await
+                .unwrap(),
             Discard::Discarded
         );
         assert_eq!(
-            admin::discard(&db, &Tracker::default(), &grant(), dead).await.unwrap(),
+            admin::discard(&db, &Tracker::default(), &grant(), dead)
+                .await
+                .unwrap(),
             Discard::Missing
         );
         assert_eq!(count(&db, "SELECT count(*) FROM kernel.jobs").await, 1);
@@ -2233,9 +2247,15 @@ mod administration {
             0
         );
         assert_eq!(
-            admin::retry_kind(&db, &Tracker::default(), &grant(), "test.probe", Some("nope"))
-                .await
-                .unwrap(),
+            admin::retry_kind(
+                &db,
+                &Tracker::default(),
+                &grant(),
+                "test.probe",
+                Some("nope")
+            )
+            .await
+            .unwrap(),
             0
         );
     }
@@ -2254,11 +2274,15 @@ mod administration {
         created(enqueue_probe(&state, &Probe::note("held"), keyed("ana")).await);
 
         assert_eq!(
-            admin::retry(&db, &Tracker::default(), &grant(), ana).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), ana)
+                .await
+                .unwrap(),
             Retry::Superseded
         );
         assert_eq!(
-            admin::retry(&db, &Tracker::default(), &grant(), bob).await.unwrap(),
+            admin::retry(&db, &Tracker::default(), &grant(), bob)
+                .await
+                .unwrap(),
             Retry::Requeued,
             "ana's job does not hold bob's key"
         );
@@ -2711,12 +2735,16 @@ mod kernel_scope {
         assert_eq!(page.items.len(), 1);
         let dead = page.items[0].id;
         assert_eq!(
-            admin::retry(&state.db, &state.tracker, &grant, dead).await.unwrap(),
+            admin::retry(&state.db, &state.tracker, &grant, dead)
+                .await
+                .unwrap(),
             Retry::Requeued
         );
         Worker::new(state.clone()).run_until_idle().await;
         assert_eq!(
-            admin::discard(&state.db, &state.tracker, &grant, dead).await.unwrap(),
+            admin::discard(&state.db, &state.tracker, &grant, dead)
+                .await
+                .unwrap(),
             Discard::Discarded
         );
         assert_eq!(

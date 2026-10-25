@@ -3,7 +3,10 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::{Deps, testkit::world};
+use crate::{
+    Deps,
+    testkit::{tracked_world, world},
+};
 
 async fn job(db: &PgPool, kind: &str, state: &str) -> Uuid {
     sqlx::query_scalar(
@@ -239,4 +242,162 @@ async fn discarding_a_schedule_run_clears_only_what_blocks_its_ticks(db: PgPool)
         .call(Method::DELETE, &uri("mail.sync"), "fixer", None)
         .await;
     assert_eq!(other.status, StatusCode::NOT_FOUND);
+}
+
+// --- tracked events (ADR 0020, campbooks-cloud#330) -------------------------
+
+/// The `kernel.*` events named `name`, each version 1, instance-wide, from
+/// the administrator `sub`'s request to `operation`: ids, codes and counts,
+/// never a payload or an error.
+async fn by_admin(
+    db: &PgPool,
+    name: &str,
+    sub: &str,
+    operation: &str,
+) -> Vec<campbooks_kernel::testing::TrackedRow> {
+    let events = campbooks_kernel::testing::tracked_events(db, name).await;
+    for event in &events {
+        assert_eq!(event.version, 1, "{name}");
+        assert_eq!(event.workspace_id, None, "{name}");
+        assert_eq!(
+            event.envelope["actor"],
+            json!({"type": "admin", "id": sub}),
+            "{name}"
+        );
+        assert_eq!(event.envelope["operation"], operation, "{name}");
+        assert_eq!(event.envelope["workspace_id"], serde_json::Value::Null);
+        let body = event.body.to_string();
+        assert!(
+            !body.contains("secret") && !body.contains("boom") && !body.contains('@'),
+            "{name}: {body}"
+        );
+    }
+    events
+}
+
+/// A dead job of `kind` in `workspace`.
+async fn dead_in(db: &PgPool, kind: &str, workspace: &str) -> Uuid {
+    sqlx::query_scalar(
+        "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, state, max_attempts,
+                                  attempts, finished_at, last_error)
+         VALUES ('sync', $1, '{\"secret\": 1}', $2, 'failed', 3, 3, now(), 'boom at marta@example.com')
+         RETURNING id",
+    )
+    .bind(kind)
+    .bind(workspace)
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn retrying_and_discarding_a_job_are_tracked_once(db: PgPool) {
+    let workspace = Uuid::now_v7().to_string();
+    let dead = dead_in(&db, "mail.sync", &workspace).await;
+    let doomed = job(&db, "mail.sync", "failed").await;
+    let w = tracked_world(db.clone(), Deps::default()).await;
+
+    let retry = format!("/admin/v1/system/jobs/{dead}/retry");
+    for _ in 0..2 {
+        let response = w.call(Method::POST, &retry, "fixer", None).await;
+        assert_eq!(response.status, StatusCode::OK, "{}", response.json);
+    }
+    let retried = by_admin(&db, "kernel.job_retried", "fixer", "system.admin_retry_job").await;
+    assert_eq!(retried.len(), 1, "retrying again changes nothing");
+    let job = &retried[0].body["job"];
+    assert_eq!(job["id"], dead.to_string());
+    assert_eq!(job["kind"], "mail.sync");
+    assert_eq!(job["queue"], "sync");
+    assert_eq!(job["workspace_id"], workspace);
+    assert_eq!(job["state"], "pending");
+    assert_eq!(job["attempts"], 0);
+    assert_eq!(job["max_attempts"], 3);
+
+    let uri = format!("/admin/v1/system/jobs/{doomed}");
+    for _ in 0..2 {
+        let response = w.call(Method::DELETE, &uri, "fixer", None).await;
+        assert_eq!(response.status, StatusCode::OK, "{}", response.json);
+    }
+    // A job that is not dead is kept, and nothing is tracked.
+    let kept = w
+        .call(
+            Method::DELETE,
+            &format!("/admin/v1/system/jobs/{dead}"),
+            "fixer",
+            None,
+        )
+        .await;
+    assert_eq!(kept.json["outcome"], "unchanged");
+    let discarded = by_admin(
+        &db,
+        "kernel.job_discarded",
+        "fixer",
+        "system.admin_discard_job",
+    )
+    .await;
+    assert_eq!(discarded.len(), 1);
+    let job = &discarded[0].body["job"];
+    assert_eq!(job["id"], doomed.to_string());
+    assert_eq!(job["state"], "failed");
+    assert_eq!(job["attempts"], 3);
+    assert!(job.get("workspace_id").is_none());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn retrying_a_kind_is_one_summary(db: PgPool) {
+    for _ in 0..3 {
+        job(&db, "mail.sync", "failed").await;
+    }
+    let w = tracked_world(db.clone(), Deps::default()).await;
+    let uri = "/admin/v1/system/jobs/retry";
+    for _ in 0..2 {
+        let response = w
+            .call(
+                Method::POST,
+                uri,
+                "ada",
+                Some(json!({ "kind": "mail.sync", "queue": "sync" })),
+            )
+            .await;
+        assert_eq!(response.status, StatusCode::OK, "{}", response.json);
+    }
+    let none = w
+        .call(
+            Method::POST,
+            uri,
+            "ada",
+            Some(json!({ "kind": "nothing.here" })),
+        )
+        .await;
+    assert_eq!(none.json["requeued"], 0);
+    let events = by_admin(&db, "kernel.jobs_retried", "ada", "system.admin_retry_jobs").await;
+    assert_eq!(events.len(), 1, "none requeued tracks nothing");
+    assert_eq!(
+        events[0].body,
+        json!({ "kind": "mail.sync", "queue": "sync", "requeued": 3, "more": false })
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn discarding_a_schedule_run_is_tracked(db: PgPool) {
+    let w = tracked_world(db.clone(), Deps::default()).await;
+    let stuck = schedule_row(&db, "kernel.prune_jobs", "pending", "infinity", None, None).await;
+    let uri = "/admin/v1/system/schedules/kernel.prune_jobs/run";
+    for _ in 0..2 {
+        let response = w.call(Method::DELETE, uri, "fixer", None).await;
+        assert_eq!(response.status, StatusCode::OK, "{}", response.json);
+    }
+    let events = by_admin(
+        &db,
+        "kernel.schedule_run_discarded",
+        "fixer",
+        "system.admin_discard_schedule_run",
+    )
+    .await;
+    assert_eq!(events.len(), 1, "nothing to discard tracks nothing");
+    let job = &events[0].body["job"];
+    assert_eq!(job["id"], stuck.to_string());
+    assert_eq!(job["kind"], "kernel.prune_jobs");
+    assert_eq!(job["queue"], "maintenance");
+    assert_eq!(job["state"], "pending");
 }

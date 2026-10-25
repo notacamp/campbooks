@@ -190,7 +190,7 @@ impl AiUsageMeter {
                     cap: i64::from(cap),
                     reserve: i64::from(self.reserve().unwrap_or(0)),
                     interactive: call.interactive,
-                    role: ai_role(call.role),
+                    ai_role: ai_role(call.role),
                 };
                 self.tracker.track(&mut tx, &event).await?;
             }

@@ -193,14 +193,14 @@ pub async fn retry_kind(
     State(state): State<AppState>,
     JsonBody(body): JsonBody<RetryKind>,
 ) -> Result<Json<RetryKindResult>> {
-    let requeued =
-        admin::retry_kind(
+    let requeued = admin::retry_kind(
         &state.db,
         &state.tracker,
         &admin.grant,
         &body.kind,
         body.queue.as_deref(),
-    ).await?;
+    )
+    .await?;
     Ok(Json(RetryKindResult {
         requeued,
         more: i64::try_from(requeued).is_ok_and(|n| n >= admin::RETRY_BATCH),

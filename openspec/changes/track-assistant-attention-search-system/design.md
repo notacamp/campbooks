@@ -150,7 +150,7 @@ All are version 1, `live`, added in plan version 7 by this change.
 
 | Event | Fires when | Properties |
 | --- | --- | --- |
-| `ai_limit_reached` | the meter refuses a workspace's first AI call of a UTC day: background work at the cap less the reserve, or a person's call at the whole cap | `day`, `cap`, `reserve`, `interactive`, `role` (`decide`, `embed`, `complete`, `vision`) |
+| `ai_limit_reached` | the meter refuses a workspace's first AI call of a UTC day: background work at the cap less the reserve, or a person's call at the whole cap | `day`, `cap`, `reserve`, `interactive`, `ai_role` (`decide`, `embed`, `complete`, `vision`) |
 
 ### kernel (instance; `admin`)
 

@@ -2778,7 +2778,11 @@ fn by_member(
     assert_eq!(event.version, 1, "{name}");
     assert_eq!(event.workspace_id, Some(*workspace.as_uuid()), "{name}");
     let envelope = &event.envelope;
-    assert_eq!(envelope["actor"], json!({"type": "user", "id": sub}), "{name}");
+    assert_eq!(
+        envelope["actor"],
+        json!({"type": "user", "id": sub}),
+        "{name}"
+    );
     assert_eq!(envelope["operation"], operation, "{name}");
     assert_eq!(envelope["workspace_id"], workspace.to_string(), "{name}");
     assert_eq!(
@@ -2787,7 +2791,14 @@ fn by_member(
     );
     let body = event.body.to_string();
     for never in [
-        "Marta", "marta@", "Rent", "rent", "Pay because", "under Pay", "@", "inbox",
+        "Marta",
+        "marta@",
+        "Rent",
+        "rent",
+        "Pay because",
+        "under Pay",
+        "@",
+        "inbox",
     ] {
         assert!(!body.contains(never), "{name} holds `{never}`: {body}");
     }

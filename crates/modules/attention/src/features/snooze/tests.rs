@@ -1,7 +1,7 @@
 //! "Later", per member.
 
 use axum::http::StatusCode;
-use campbooks_kernel::tenancy::WorkspaceId;
+use campbooks_kernel::{tenancy::WorkspaceId, testing};
 use chrono::{TimeDelta, Utc};
 use serde_json::json;
 use sqlx::PgPool;
@@ -189,4 +189,81 @@ async fn a_removed_inbox_takes_its_items_and_their_later_with_it(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(left, 0);
+}
+
+/// A time `days` from now, in whole seconds (as the database keeps it).
+fn in_days(days: i64) -> chrono::DateTime<Utc> {
+    chrono::DateTime::from_timestamp(Utc::now().timestamp() + days * 86_400, 0).unwrap()
+}
+
+fn at(value: &serde_json::Value) -> chrono::DateTime<Utc> {
+    value.as_str().unwrap().parse().unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn later_is_tracked_with_what_it_replaced_and_a_no_op_is_not(db: PgPool) {
+    let kit = Kit::new(db).await.tracking();
+    let workspace = WorkspaceId::new();
+    let (sam, sam_id) = kit.member("sam", workspace);
+    kit.let_see(INBOX, sam_id);
+    kit.need(workspace, &need(1, FIRST)).await;
+    let item = kit.get(&sam, &list_uri(workspace)).await.json["items"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let base = format!("{}/{item}", list_uri(workspace));
+    let (monday, tuesday) = (in_days(4), in_days(5));
+
+    // Nothing to bring back: no event.
+    let back = kit.post(&sam, &format!("{base}/unsnooze"), None).await;
+    assert_eq!(back.status, StatusCode::OK);
+    for until in [monday, tuesday, tuesday] {
+        let snoozed = kit
+            .post(
+                &sam,
+                &format!("{base}/snooze"),
+                Some(json!({"until": until})),
+            )
+            .await;
+        assert_eq!(snoozed.status, StatusCode::OK, "{:?}", snoozed.json);
+    }
+    let back = kit.post(&sam, &format!("{base}/unsnooze"), None).await;
+    assert_eq!(back.status, StatusCode::OK);
+
+    let snoozed = testing::tracked_events(&kit.db, "attention.item_snoozed").await;
+    assert_eq!(snoozed.len(), 2, "the same Later again tracks nothing");
+    for event in &snoozed {
+        assert_eq!(event.version, 1);
+        assert_eq!(event.workspace_id, Some(*workspace.as_uuid()));
+        assert_eq!(
+            event.envelope["actor"],
+            json!({"type": "user", "id": "sam"})
+        );
+        assert_eq!(event.envelope["operation"], "attention.snooze");
+        let snapshot = &event.body["item"];
+        assert_eq!(snapshot["id"], item.as_str());
+        assert_eq!(
+            snapshot["record"],
+            json!({"type": "conversations.conversation", "id": need(1, FIRST).conversation})
+        );
+        assert_eq!(snapshot["reason"], "reply");
+        assert_eq!(snapshot["trust"], "sure");
+        assert_eq!(snapshot["state"], "open");
+        assert_eq!(snapshot["urgent"], false);
+    }
+    assert!(snoozed[0].body.get("before").is_none());
+    assert_eq!(at(&snoozed[0].body["item"]["snoozed_until"]), monday);
+    assert_eq!(at(&snoozed[1].body["before"]), monday);
+    assert_eq!(at(&snoozed[1].body["item"]["snoozed_until"]), tuesday);
+
+    let unsnoozed = testing::tracked_events(&kit.db, "attention.item_unsnoozed").await;
+    assert_eq!(unsnoozed.len(), 1, "nothing to end tracks nothing");
+    let event = &unsnoozed[0];
+    assert_eq!(
+        event.envelope["actor"],
+        json!({"type": "user", "id": "sam"})
+    );
+    assert_eq!(event.envelope["operation"], "attention.unsnooze");
+    assert_eq!(at(&event.body["before"]), tuesday);
+    assert!(event.body["item"].get("snoozed_until").is_none());
 }

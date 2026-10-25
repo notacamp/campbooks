@@ -245,7 +245,8 @@ async fn a_profile_change_is_tracked_by_the_settings_it_changed(db: PgPool) {
         assert_eq!(response.status, StatusCode::OK, "{}", response.json);
     }
 
-    let events = campbooks_kernel::testing::tracked_events(&kit.db, "assistant.profile_updated").await;
+    let events =
+        campbooks_kernel::testing::tracked_events(&kit.db, "assistant.profile_updated").await;
     assert_eq!(events.len(), 3, "{events:?}");
     for event in &events {
         assert_eq!(event.version, 1);

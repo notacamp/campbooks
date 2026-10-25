@@ -676,7 +676,8 @@ pub async fn stream(
     // The body streams after this handler returns, outside the request's
     // tracking context: the answer's events (and the AI meter's) are still
     // the member's, in their request.
-    let work = campbooks_kernel::tracking::scope(campbooks_kernel::tracking::current_or_outside(), work);
+    let work =
+        campbooks_kernel::tracking::scope(campbooks_kernel::tracking::current_or_outside(), work);
     let mut response = Sse::new(frames_until_done(work, rx))
         .keep_alive(KeepAlive::new().interval(KEEP_ALIVE))
         .into_response();
