@@ -672,15 +672,13 @@ async fn wait_target(
         return Err(Error::Conflict(crate::MESSAGES.reason("no_open_need")));
     }
     let not_a_party = || Error::Conflict(crate::MESSAGES.reason("not_a_party"));
-    let people = needs::people(&mut **tx, message)
-        .await?
-        .ok_or_else(not_a_party)?;
+    let people = needs::people(tx, message).await?.ok_or_else(not_a_party)?;
     let label = moves::awaited_label(&people, address).ok_or_else(not_a_party)?;
     let party = facts::awaitable(&people)
         .into_iter()
         .find(|p| p.address.trim().eq_ignore_ascii_case(address.trim()))
         .ok_or_else(not_a_party)?;
-    let stored = needs::answers(&mut **tx, message).await?;
+    let stored = needs::answers(tx, message).await?;
     let model = |id: &str| {
         stored
             .iter()
