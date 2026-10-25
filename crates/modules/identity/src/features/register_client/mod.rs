@@ -18,12 +18,13 @@ use crate::{
     domain::{
         accounts, client_names,
         clients::{is_registrable_redirect, third_party_may_hold},
-        step_up,
+        step_up, tracked,
         workspace_clients::{self, ClientType, NewClient, WorkspaceClient},
     },
     events::ClientRegistered,
     metadata::MAX_REDIRECT_URIS,
     scopes::IdentityClients,
+    tracking,
 };
 
 /// What to register.
@@ -75,6 +76,10 @@ pub struct RegisteredClient {
         (status = NOT_FOUND, description = "Not a member of the workspace.", body = Problem,
             content_type = "application/problem+json"),
     )
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one flow, read top to bottom; its tracked events sit next to the changes they record"
 )]
 pub async fn handler(
     State(state): State<AppState>,
@@ -164,6 +169,17 @@ pub async fn handler(
                 workspace: workspace.id.to_string(),
                 client: client.client_id.clone(),
                 kind: body.client_type.as_str().to_owned(),
+            },
+        )
+        .await?;
+    let snapshot = tracked::client(&mut tx, &client.client_id).await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::ClientRegistered {
+                workspace: workspace.id,
+                client: snapshot,
             },
         )
         .await?;

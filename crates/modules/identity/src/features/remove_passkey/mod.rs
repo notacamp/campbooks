@@ -14,9 +14,10 @@ use super::PasskeyPath;
 use crate::{
     MESSAGES,
     deps::Deps,
-    domain::{accounts, passkeys, sessions, step_up, ways_in},
+    domain::{accounts, passkeys, sessions, step_up, tracked, ways_in},
     events::WayInRemoved,
     scopes::IdentityWrite,
+    tracking,
 };
 
 /// Remove a passkey.
@@ -69,6 +70,7 @@ pub async fn handler(
     }
     // Whoever signed in with it is signed out, before it goes.
     let ended = sessions::end_signed_in_with_passkey(&mut tx, path.id, now).await?;
+    let removed = tracked::existing_passkey(&mut tx, path.id).await?;
     if !passkeys::delete(&mut tx, path.id, account).await? {
         return Err(Error::NotFound);
     }
@@ -88,6 +90,16 @@ pub async fn handler(
                 account,
                 method: "passkey".to_owned(),
                 provider: None,
+            },
+        )
+        .await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::PasskeyRemoved {
+                passkey: removed,
+                sessions_ended: i64::try_from(ended).unwrap_or(i64::MAX),
             },
         )
         .await?;

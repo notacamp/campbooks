@@ -360,11 +360,70 @@ async fn an_origin_names_the_person_never_the_system() {
     let none = scope(job, async { origin() }).await;
     assert_eq!(none, Some(json!({"correlation": "c"})));
     let for_someone = TrackingContext::new(Actor::system("test.sweep"))
-        .on_behalf_of(Actor::client("app-1"))
+        .on_behalf_of(Actor::client(SYNC_APP))
         .correlated("c");
     let remembered = scope(for_someone, async { origin() }).await;
     assert_eq!(
         remembered,
-        Some(json!({"actor": {"type": "client", "id": "app-1"}, "correlation": "c"}))
+        Some(json!({"actor": {"type": "client", "id": SYNC_APP}, "correlation": "c"}))
+    );
+}
+
+/// A workspace's app, as Campbooks mints its client id.
+const SYNC_APP: &str = "cb_AAAAAAAAAAAAAAAAAAAAAA";
+
+/// A client known by its metadata document: its id is a URL.
+const DOCUMENT_CLIENT: &str = "https://agent.example.com/oauth/client.json";
+
+#[test]
+fn only_client_ids_campbooks_minted_are_recorded() {
+    for minted in [
+        "campbooks-web",
+        "campbooks-native",
+        SYNC_APP,
+        "dcr_abcdefghijklmnopqrst-_",
+    ] {
+        assert_eq!(minted_client_id(minted), Some(minted));
+        assert_eq!(Actor::client(minted).id.as_deref(), Some(minted));
+    }
+    for other in [
+        DOCUMENT_CLIENT,
+        "cb_short",
+        "dcr_abcdefghijklmnopqrst@x",
+        "another-idp-client",
+        "",
+    ] {
+        assert_eq!(minted_client_id(other), None, "{other}");
+        assert_eq!(Actor::client(other).id, None, "{other}");
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_url_client_id_never_reaches_the_outbox(db: PgPool) {
+    let state = outbox(testing::app_role_pool(&db).await);
+    let context = TrackingContext::new(Actor::client(DOCUMENT_CLIENT))
+        .on_behalf_of(Actor::client(DOCUMENT_CLIENT));
+    let mut tx = state.db.begin().await.unwrap();
+    scope(
+        context,
+        state.tracker.track(&mut tx, &InstanceTicked { n: 1 }),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let rows = testing::tracked_events(&db, InstanceTicked::NAME).await;
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].envelope["actor"], json!({"type": "client"}));
+    assert_eq!(rows[0].envelope["on_behalf_of"], json!({"type": "client"}));
+    let everything: Vec<String> =
+        sqlx::query_scalar("SELECT envelope::text || body::text FROM kernel.tracked_events")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    assert!(
+        everything
+            .iter()
+            .all(|row| !row.contains("agent.example.com")),
+        "{everything:?}"
     );
 }

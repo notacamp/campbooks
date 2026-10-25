@@ -16,11 +16,12 @@ use crate::{
     domain::{
         accounts,
         passkeys::{self, Binding, Purpose},
-        step_up,
+        step_up, tracked,
     },
     events::WayInAdded,
     protocol::passkey,
     scopes::IdentityWrite,
+    tracking,
     webauthn::RegistrationCredential,
 };
 
@@ -121,6 +122,11 @@ pub async fn handler(
                 way_in: Some(id),
             },
         )
+        .await?;
+    let passkey = tracked::existing_passkey(&mut tx, id).await?;
+    state
+        .tracker
+        .track(&mut tx, &tracking::PasskeyRegistered { passkey })
         .await?;
     tx.commit().await?;
     let added = passkeys::list(&state.db, account)

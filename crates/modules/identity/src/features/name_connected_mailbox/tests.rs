@@ -17,6 +17,7 @@ use crate::{
     domain::mailbox_links::{self, Recorded},
     events::ConnectionAdded,
     testkit::Kit,
+    tracking_tests::{no_address, tracked},
     upstream::Provider,
 };
 
@@ -200,6 +201,19 @@ async fn a_record_never_named_is_swept_with_the_way_in_it_left(db: PgPool) {
     );
     assert_eq!(left.len(), 1);
     assert_eq!(removals(&kit).await, 1);
+    // Tracked by the prune, with why it went (ADR 0020).
+    let tracked = tracked(&kit, "identity.way_in_removed").await;
+    assert_eq!(tracked.len(), 1);
+    let event = &tracked[0];
+    assert_eq!(event.workspace_id, None);
+    assert_eq!(
+        event.envelope["actor"],
+        json!({"type": "system", "id": "identity.prune"})
+    );
+    assert_eq!(event.body["cause"], "mailbox_never_connected");
+    assert_eq!(event.body["provider"], "google");
+    assert_eq!(event.body["account_id"], account_of(&access));
+    no_address(event);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

@@ -16,8 +16,9 @@ use campbooks_kernel::{
 use super::register_client::RegisteredClient;
 use crate::{
     deps::Deps,
-    domain::{accounts, step_up, workspace_clients},
+    domain::{accounts, step_up, tracked, workspace_clients},
     scopes::IdentityClients,
+    tracking,
 };
 
 /// The app a path names.
@@ -78,6 +79,17 @@ pub async fn handler(
         now,
     )
     .await?;
+    let snapshot = tracked::client(&mut tx, &client.client_id).await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::ClientSecretRotated {
+                workspace: workspace.id,
+                client: snapshot,
+            },
+        )
+        .await?;
     tx.commit().await?;
     Ok(Json(RegisteredClient {
         client,

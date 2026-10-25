@@ -23,6 +23,7 @@ use uuid::Uuid;
 use crate::{
     domain::consents,
     events::{ConsentRevoked, MemberLeft},
+    tracking,
 };
 
 /// Revokes a departed member's consents in that workspace.
@@ -65,6 +66,14 @@ impl EventConsumer for RevokeDepartedConsents {
         )
         .await
         .map_err(|e| JobError::retry(e.to_string()))?;
+        if !revoked.is_empty() {
+            ctx.track(&tracking::ConsentsRevoked {
+                workspace: WorkspaceId::from_uuid(workspace),
+                member_id: event.payload.user,
+                consents: i64::try_from(revoked.len()).unwrap_or(i64::MAX),
+            })
+            .await?;
+        }
         for consent in revoked {
             publish(ctx, consent, "member_left").await?;
         }
@@ -110,6 +119,18 @@ async fn remove_their_clients(
                 &crate::events::ClientRemoved {
                     workspace: workspace.to_string(),
                     client: client.clone(),
+                },
+            )
+            .await?;
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::ClientRemoved {
+                    workspace: WorkspaceId::from_uuid(workspace),
+                    client_id: client.clone(),
+                    cause: tracking::ClientRemoval::MemberLeft,
+                    consents_revoked: i64::try_from(ended.len()).unwrap_or(i64::MAX),
                 },
             )
             .await?;
@@ -207,5 +228,23 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(removed, 1);
+        // Tracked in Home by the handler, with why it went (ADR 0020); it
+        // held no consents, and the member had given none.
+        let tracked = crate::tracking_tests::tracked(&kit, "identity.client_removed").await;
+        assert_eq!(tracked.len(), 1);
+        assert_eq!(tracked[0].workspace_id, Some(HOME));
+        assert_eq!(
+            tracked[0].envelope["actor"],
+            serde_json::json!({"type": "system", "id": "identity.revoke_departed_consents"})
+        );
+        assert_eq!(
+            tracked[0].body,
+            serde_json::json!({"client_id": "cb_theirs", "cause": "member_left", "consents_revoked": 0})
+        );
+        assert!(
+            crate::tracking_tests::tracked(&kit, "identity.consents_revoked")
+                .await
+                .is_empty()
+        );
     }
 }

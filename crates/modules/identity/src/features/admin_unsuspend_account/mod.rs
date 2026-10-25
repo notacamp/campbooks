@@ -15,8 +15,12 @@ use campbooks_kernel::{
 use chrono::Utc;
 
 use crate::{
-    domain::suspension::{self, Outcome},
+    domain::{
+        suspension::{self, Outcome},
+        tracked,
+    },
     features::admin_get_account::{self, AccountPath, AdminAccount},
+    tracking,
 };
 
 /// Unsuspend an account.
@@ -54,6 +58,14 @@ pub async fn handler(
     .await?;
     if outcome == Outcome::Missing {
         return Err(Error::NotFound);
+    }
+    // A retry changes nothing, and tracks nothing.
+    if outcome == Outcome::Changed {
+        let account = tracked::account(&mut tx, path.account_id).await?;
+        state
+            .tracker
+            .track(&mut tx, &tracking::AccountUnsuspended { account })
+            .await?;
     }
     let account = admin_get_account::load(&mut tx, path.account_id, now)
         .await?

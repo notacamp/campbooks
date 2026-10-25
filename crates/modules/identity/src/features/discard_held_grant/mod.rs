@@ -9,7 +9,13 @@ use axum::{
 };
 use campbooks_kernel::{AppState, Error, Operation, Problem, Result, Risk, auth::Unbound};
 
-use crate::{deps::Deps, domain::held_grants, scopes::IdentityWrite, upstream::Provider};
+use crate::{
+    deps::Deps,
+    domain::{held_grants, tracked},
+    scopes::IdentityWrite,
+    tracking,
+    upstream::Provider,
+};
 
 /// Discard a held mailbox grant.
 #[utoipa::path(
@@ -49,6 +55,18 @@ pub async fn handler(
         .await?
         .ok_or(Error::NotFound)?;
     held_grants::delete(&mut tx, path.id, account).await?;
+    state
+        .tracker
+        .track(
+            &mut tx,
+            &tracking::HeldGrantDiscarded {
+                held_grant_id: path.id,
+                account_id: account,
+                provider: tracked::provider(&taken.grant.provider)
+                    .ok_or_else(|| Error::internal("a held grant names an unknown provider"))?,
+            },
+        )
+        .await?;
     tx.commit().await?;
     let upstream = Provider::parse(&taken.grant.provider).and_then(|p| issuer.upstream(p));
     if let (Some(upstream), Some(refresh)) = (upstream, taken.tokens.refresh_token.as_deref())

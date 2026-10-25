@@ -16,7 +16,10 @@ use campbooks_kernel::{Job, JobContext, JobError, redact, tenancy::WorkspaceId};
 use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{domain::mailbox_links, features::forget_connected_way_in::announce};
+use crate::{
+    domain::mailbox_links,
+    features::forget_connected_way_in::{announce, track_removed},
+};
 
 /// How often [`Prune`] runs.
 pub const PRUNE_EVERY: Duration = Duration::from_mins(15);
@@ -196,6 +199,13 @@ pub async fn sweep_unnamed_mailboxes(
             mailbox_links::settle_unnamed(&mut tx, account, &checked, cutoff, now).await?;
         for way_in in &removed {
             announce(&state, &mut tx, way_in, "mailbox_never_connected", now).await?;
+            track_removed(
+                &state,
+                &mut tx,
+                way_in,
+                crate::tracking::WayInRemoval::MailboxNeverConnected,
+            )
+            .await?;
         }
         tx.commit().await?;
         gone += removed.len();
