@@ -211,6 +211,7 @@ export {
   ItemDetail,
   SwipeAction,
   type ItemDetailProps,
+  type ItemEyebrow,
   type ItemProps,
 } from "./components/Item/Item";
 export {

@@ -67,6 +67,10 @@
   color: var(--text-secondary);
 }
 
+.groupTitle[data-tone="danger"] {
+  color: var(--danger);
+}
+
 .groupAction {
   padding: 0 var(--row-pad-x);
 }

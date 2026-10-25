@@ -32,7 +32,7 @@ Two refinements of the brief's table, both judgment calls:
 - A nudge's `due_on` is when Scout expected an answer, so it is always in
   the past once the wait turns into a nudge. Rules 2, 3 and 7 skip nudges;
   rule 5 carries the expected day so Home can say "Rui's answer was due
-  Fri 23".
+  Fri".
 - An item dated more than a week ahead is Whenever with `due_on`, not
   `no_date`: Home must not say "No date" over a bill due on the 30th.
 
@@ -118,10 +118,12 @@ tool description and the assistant handbook line say "most pressing first".
 
 - `model.ts`: `groupByBand` replaces `groupByReason` (server order kept
   inside a band); `bandOf` falls back to `whenever` for an item without one.
-- `lib/ui` `Item` gains an `eyebrow` slot (one line before the name, `xs`
-  semibold caps, `--tracking-caps`, tertiary), and an `ItemEyebrow` part
-  (signal dot, kind, `·`, reason in secondary or danger). `QueueGroup` takes
-  no signal (no dot) and a `danger` tone for Now.
+- `lib/ui` `Item` gains an `eyebrow` (`ItemEyebrow`: signal, kind, reason,
+  danger): one line before the name, `xs` semibold capitals,
+  `--tracking-caps`, tertiary, the dot, the kind, `·`, then the reason in
+  secondary or danger. A long reason wraps rather than being cut, so the
+  copy-fit check reads it whole. `QueueGroup` takes no signal (no dot) and a
+  `danger` tone for Now.
 - Reason sentences come from `band_reason` in the member's language; names
   are the first name Home already derives (`firstNameOf`), with a neutral
   sentence when there is none.

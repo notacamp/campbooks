@@ -11,14 +11,53 @@
     "lookSubline_one": "Rien ne vous est demandé. {{count}} e-mail ci-dessous mérite un coup d’œil.",
     "lookSubline_other": "Rien ne vous est demandé. {{count}} e-mails ci-dessous méritent un coup d’œil."
   },
-  "groups": {
+  "kinds": {
     "review": "À vérifier",
     "reply": "À répondre",
     "decide": "À décider",
     "do": "À faire",
     "pay": "À payer",
     "worth_a_look": "À voir",
-    "nudge": "À relancer"
+    "nudge": "À relancer",
+    "doTask": "Tâche à faire",
+    "payTask": "Tâche à payer"
+  },
+  "bands": {
+    "now": "Maintenant",
+    "today": "Aujourd’hui",
+    "week": "Cette semaine",
+    "whenever": "Quand vous pourrez"
+  },
+  "bandNotes": {
+    "now": "Les alertes d’arnaque et tout ce qui est en retard.",
+    "today": "Pour aujourd’hui ou demain, prévu pour aujourd’hui, les relances qui arrivent à échéance et les personnes qui attendent depuis 3 jours ou plus.",
+    "week": "Daté dans les 7 prochains jours, et les personnes qui attendent votre réponse.",
+    "whenever": "Sans date, venant de services, ou gardé ici par vos règles."
+  },
+  "reason": {
+    "warning": "Arnaque possible · vérifiez d’abord",
+    "overdue_one": "En retard · {{count}} jour",
+    "overdue_other": "En retard · {{count}} jours",
+    "dueToday": "Pour aujourd’hui",
+    "dueTomorrow": "Pour demain",
+    "plannedToday": "Vous l’avez prévu pour aujourd’hui",
+    "nudgeDue": "La réponse de {{name}} était attendue {{date}}",
+    "nudgeDueNoName": "Une réponse était attendue {{date}}",
+    "nudgeDueToday": "La réponse de {{name}} était attendue aujourd’hui",
+    "nudgeDueTodayNoName": "Une réponse était attendue aujourd’hui",
+    "waited_one": "{{name}} attend depuis {{count}} jour",
+    "waited_other": "{{name}} attend depuis {{count}} jours",
+    "waitedNoName_one": "En attente depuis {{count}} jour",
+    "waitedNoName_other": "En attente depuis {{count}} jours",
+    "dueOn": "Pour le {{date}}",
+    "waitingAnswer": "{{name}} attend votre réponse",
+    "waitingAnswerNoName": "En attente de votre réponse",
+    "keptByRule": "Gardé ici par votre règle",
+    "noDate": "Sans date"
+  },
+  "why": {
+    "title": "Pourquoi c’est ici",
+    "sentence": "Dans « {{band}} » parce que {{reason}}."
   },
   "context": "Fait aujourd’hui",
   "doneTodayTitle": "Fait aujourd’hui",
@@ -89,7 +128,9 @@
   "pay": {
     "allPaid_one": "J’ai déjà payé {{count}}",
     "allPaid_other": "J’ai déjà payé les {{count}}",
-    "note": "Campbooks n’a pas accès à votre banque : il demande donc si chaque facture est payée."
+    "note": "Campbooks n’a pas accès à votre banque : il demande donc si chaque facture est payée.",
+    "asked_one": "Campbooks vous interroge sur {{count}} facture.",
+    "asked_other": "Campbooks vous interroge sur {{count}} factures."
   },
   "nudge": {
     "note": "Des personnes qui n’ont pas encore répondu. Scout rédige la relance, vous l’envoyez.",
@@ -106,5 +147,8 @@
     "label": "En attente de {{name}}",
     "fold": "En attente d’autres personnes · {{count}}",
     "ask": "Demander à Scout"
-  }
+  },
+  "tasksElsewhere_one": "Encore {{count}} dans Tâches",
+  "tasksElsewhere_other": "Encore {{count}} dans Tâches",
+  "openTasks": "Ouvrir Tâches"
 }

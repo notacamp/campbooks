@@ -1,13 +1,32 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
+import type { Signal } from "../../tokens/tokens";
 import { Avatar, type AvatarProps } from "../Avatar/Avatar";
+import { Dot } from "../Dot/Dot";
 import { Icon, type IconName } from "../Icon/Icon";
 import { Tag } from "../Tag/Tag";
 import { Visor } from "../Visor/Visor";
 
 import styles from "./Item.module.css";
 
+/**
+ * The line before a row's name: what kind of thing it is and why it is
+ * where it is ("Reply · Pedro has waited 4 days").
+ */
+export interface ItemEyebrow {
+  /** The kind's signal colour, drawn as a dot before it. */
+  signal: Signal;
+  /** The kind: "Reply", "Pay task". */
+  kind: string;
+  /** Why it is here, in a sentence: "Overdue · 2 days". */
+  reason: string;
+  /** A warning or something overdue: the reason in the danger colour. */
+  danger?: boolean | undefined;
+}
+
 export interface ItemProps {
+  /** Before the name: the kind and why it is here, in small capitals. */
+  eyebrow?: ItemEyebrow | undefined;
   /** Who it is from: "Sofia Pessoa · Brightloop". */
   who: string;
   /** What it needs, in one line. */
@@ -58,6 +77,7 @@ export interface ItemProps {
  * the quote, the assistant's context and the actions.
  */
 export function Item({
+  eyebrow,
   who,
   what,
   excerpt,
@@ -83,6 +103,17 @@ export function Item({
   const content = (
     <>
       <Avatar {...avatar} />
+      {eyebrow === undefined ? null : (
+        <>
+          <span className={styles["eyebrow"]}>
+            <Dot signal={eyebrow.signal} />
+            {eyebrow.kind} <span aria-hidden="true">·</span>{" "}
+            <span className={styles["eyebrowReason"]} data-danger={eyebrow.danger || undefined}>
+              {eyebrow.reason}
+            </span>
+          </span>{" "}
+        </>
+      )}
       <span className={styles["who"]}>{who}</span>{" "}
       <span className={styles["when"]}>
         {age === undefined ? null : (
@@ -111,6 +142,7 @@ export function Item({
     id,
     className: styles["item"],
     "data-selected": selected || undefined,
+    "data-eyebrow": eyebrow === undefined ? undefined : "",
   };
   const row =
     href === undefined ? (
@@ -197,6 +229,12 @@ export interface ItemDetailProps {
   summary?: string | undefined;
   /** The summary's heading: "Scout's summary". */
   summaryLabel?: string | undefined;
+  /**
+   * Why the item is where it is on the list, after the summary: a sentence
+   * under a small heading with the visor ("Why it's here"), then quieter
+   * lines (what its group holds, a note about its kind).
+   */
+  why?: { label: string; text: string; notes?: string[] | undefined } | undefined;
   /** The email itself, after the summary (in place of the quote). */
   mail?: ReactNode | undefined;
   /** The assistant's context, next to the visor. */
@@ -214,6 +252,7 @@ export function ItemDetail({
   reasons = [],
   summary,
   summaryLabel,
+  why,
   mail,
   context,
   actions,
@@ -237,6 +276,20 @@ export function ItemDetail({
             </span>
           )}
           <p className={styles["summaryText"]}>{summary}</p>
+        </section>
+      )}
+      {why === undefined ? null : (
+        <section className={styles["summary"]} aria-label={why.label}>
+          <span className={styles["summaryHead"]} aria-hidden="true">
+            <Visor size="xs" />
+            {why.label}
+          </span>
+          <p className={styles["whyText"]}>{why.text}</p>
+          {(why.notes ?? []).map((note) => (
+            <p key={note} className={styles["whyNote"]}>
+              {note}
+            </p>
+          ))}
         </section>
       )}
       {mail}

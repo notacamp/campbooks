@@ -74,6 +74,18 @@ describe("Queue (home)", () => {
     expect(screen.getByText("Campbooks can’t see your bank.")).toBeInTheDocument();
   });
 
+  it("heads a band with its name and count, Now in the danger tone, with no dot", () => {
+    const { container } = renderUi(
+      <QueueGroup tone="danger" name="Now" count={2}>
+        <p>items</p>
+      </QueueGroup>,
+    );
+    const heading = screen.getByRole("heading", { level: 2, name: "Now 2" });
+
+    expect(heading).toHaveAttribute("data-tone", "danger");
+    expect(container.querySelector("[data-signal]")).toBeNull();
+  });
+
   it("drops the visor in the compact hero", () => {
     const { container } = renderUi(<PageHero compact title="5 things need you" />);
 

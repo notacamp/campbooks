@@ -6,7 +6,7 @@ attention items (`attention.list`) in groups by priority band, in the order
 Now, Today, This week, Whenever, leaving out empty groups, each item in the
 list's order. Each group SHALL be headed by its name and its count, Now in
 the danger tone. The hero SHALL say how many things need the user, with the
-Visor `alert` when a warning is on the list. The selected item SHALL be shown
+Visor `alert` when a Review item is on the list. The selected item SHALL be shown
 by the selected background and a full focus ring, never by a coloured stripe
 on one edge. Each item SHALL show, before its name, an eyebrow line with its
 kind and why it is in its band (see *The reason first*), then who it is from,
@@ -26,7 +26,7 @@ The keys (↑/↓ and the rest) SHALL follow the order on screen.
 
 #### Scenario: Due soonest first
 - **WHEN** This week holds a question due Wednesday and an older one with no date
-- **THEN** the one due Wednesday is first, and its eyebrow says "Due Wed 14"
+- **THEN** the one due Wednesday is first, and its eyebrow says "Due Wed"
 
 #### Scenario: How long it has waited
 - **WHEN** Marta's question arrived at 10:00 today, Pedro's on Monday and the bill on 2 October, and it is Friday 15:00
@@ -170,7 +170,7 @@ A `nudge` item SHALL say who has not written yet, by the awaited person's
 name ("Ana Costa hasn't written yet") when someone else on the email was
 awaited, or "No word from Rui Matos yet" when the sender was, with the
 sender's sentence quoted on one line, its eyebrow saying when an answer was
-due ("Ana's answer was due Mon 12") and, at the row's end, since when it has
+due ("Ana's answer was due Mon") and, at the row's end, since when it has
 waited ("Asked 14 Oct"). The opened item SHALL say that Scout drafts the
 nudge and the member sends it, and, after a nudge, how many were sent
 ("Nudged once"). Its actions SHALL be Nudge (1, the nudge dialog), Heard
@@ -191,8 +191,8 @@ may only read SHALL offer only Later.
 Home SHALL include the user's open task items the list returns (those for
 today), rendered from `tasks.list` with `ids`, in their bands beside
 conversation items and in the list's order. A task row SHALL show its
-eyebrow ("Do task" or "Pay task" and its reason), its title, where it came
-from and its due chip. Its actions SHALL be Done (Paid for `pay`) `e`, Later
+eyebrow ("Do task" or "Pay task" and its reason, its date among them), where
+it came from and its title. Its actions SHALL be Done (Paid for `pay`) `e`, Later
 `s` and Not needed `x`, calling `tasks.done`, `tasks.plan` with `later` and
 `tasks.not_needed`, each with Undo.
 
@@ -235,7 +235,7 @@ colour, or the danger colour for a warning and an overdue item. The reasons
 SHALL read, in the user's language: "Possible scam · check first", "Overdue ·
 N days" (one day singular), "Due today", "Due tomorrow", "You planned it for
 today", "<Name>'s answer was due <day>", "<Name> has waited N days", "Due
-<day>" (short weekday and day within a week, else day and month), "<Name> is
+<day>" (the short weekday within a week, else the day and month), "<Name> is
 waiting for your answer", "Kept here by your rule" and "No date". <Name> SHALL
 be the person's first name as Home shows it elsewhere; without a name the
 reason SHALL read without one ("Waited N days", "Waiting for your answer",

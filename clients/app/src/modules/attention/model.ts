@@ -1,28 +1,23 @@
-// Pure helpers of Home's "What needs you": grouping, Snooze's times, the
-// actions a row offers and the
-// sentences of Done today. No React, no fetching.
+// Pure helpers of Home's "What needs you": the bands, the reasons in words,
+// Snooze's times, the actions a row offers and the sentences of Done today.
+// No React, no fetching.
 import type { Schema } from "~/lib/api";
 
 import type { ItemView, Reason } from "./api/queries";
 
-/**
- * The groups, in the order Home shows them. A wait (`waiting`) is never in
- * the queue: Home lists it under "Waiting on others" until it turns into a
- * nudge (campbooks-cloud#293).
- */
-const REASONS: readonly Reason[] = [
-  "review",
-  "reply",
-  "decide",
-  "do",
-  "pay",
-  "nudge",
-  "worth_a_look",
-];
+export type Band = Schema<"Band">;
+export type BandReason = Schema<"BandReason">;
 
 /**
- * The signal colour of a group: its reason's, except "Worth a look", which
- * has a hue of its own (`look`), and a wait, which shares the nudge's.
+ * The bands, in the order Home shows them (campbooks-cloud#358). A wait
+ * (`waiting`) is never in the queue: Home lists it under "Waiting on
+ * others" until it turns into a nudge (campbooks-cloud#293).
+ */
+export const BANDS: readonly Band[] = ["now", "today", "week", "whenever"];
+
+/**
+ * The signal colour of a reason: its own, except "Worth a look", which has
+ * a hue of its own (`look`), and a wait, which shares the nudge's.
  */
 export function signalOf(reason: Reason): Exclude<Reason, "worth_a_look" | "waiting"> | "look" {
   if (reason === "waiting") {
@@ -31,12 +26,111 @@ export function signalOf(reason: Reason): Exclude<Reason, "worth_a_look" | "wait
   return reason === "worth_a_look" ? "look" : reason;
 }
 
-/** Items by reason, in display order, keeping the server's order inside each group. */
-export function groupByReason(items: readonly ItemView[]): { reason: Reason; items: ItemView[] }[] {
-  return REASONS.flatMap((reason) => {
-    const inGroup = items.filter((item) => item.reason === reason);
-    return inGroup.length === 0 ? [] : [{ reason, items: inGroup }];
+/** An item's band: the server's, or Whenever for an item without one. */
+export function bandOf(item: ItemView): Band {
+  return item.band ?? "whenever";
+}
+
+/**
+ * Items by band, in display order, keeping the server's order inside each
+ * band. A wait is never listed.
+ */
+export function groupByBand(items: readonly ItemView[]): { band: Band; items: ItemView[] }[] {
+  return BANDS.flatMap((band) => {
+    const inBand = items.filter((item) => item.reason !== "waiting" && bandOf(item) === band);
+    return inBand.length === 0 ? [] : [{ band, items: inBand }];
   });
+}
+
+/** A warning or something overdue: its reason is drawn in the danger colour. */
+export function isPressing(reason: BandReason | null | undefined): boolean {
+  return reason?.rule === "warning" || reason?.rule === "overdue";
+}
+
+/** A calendar date ("2026-10-19") as a local date at midnight. */
+function localDate(isoDate: string): Date {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+}
+
+/** Whole days from `today` to `isoDate` (negative in the past). */
+function daysTo(isoDate: string, today: Date): number {
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((localDate(isoDate).getTime() - start.getTime()) / 86_400_000);
+}
+
+/**
+ * A day as a reason names it, as due dates do elsewhere: the short weekday
+ * within a week either way ("Wed"), else the day and month ("30 Oct").
+ */
+export function reasonDay(isoDate: string, today: Date, locale: string): string {
+  const within = Math.abs(daysTo(isoDate, today)) < 7;
+  return new Intl.DateTimeFormat(
+    locale,
+    within ? { weekday: "short" } : { day: "numeric", month: "short" },
+  ).format(localDate(isoDate));
+}
+
+/**
+ * Why an item is in its band, as Home says it: the message key (under
+ * `reason.`) and its values. `name` is the person's first name when there
+ * is one; without it the sentence names nobody.
+ */
+export function reasonSentence(
+  reason: BandReason | null | undefined,
+  { name, today, locale }: { name?: string | undefined; today: Date; locale: string },
+): { key: string; values: Record<string, string | number> } {
+  const named = name !== undefined && name !== "";
+  const who = named ? { name } : {};
+  switch (reason?.rule) {
+    case "warning": {
+      return { key: "reason.warning", values: {} };
+    }
+    case "overdue": {
+      return { key: "reason.overdue", values: { count: reason.days ?? 1 } };
+    }
+    case "due_today": {
+      return { key: "reason.dueToday", values: {} };
+    }
+    case "due_tomorrow": {
+      return { key: "reason.dueTomorrow", values: {} };
+    }
+    case "planned_today": {
+      return { key: "reason.plannedToday", values: {} };
+    }
+    case "nudge_due": {
+      const on = reason.on ?? null;
+      if (on === null || daysTo(on, today) >= 0) {
+        return { key: named ? "reason.nudgeDueToday" : "reason.nudgeDueTodayNoName", values: who };
+      }
+      return {
+        key: named ? "reason.nudgeDue" : "reason.nudgeDueNoName",
+        values: { ...who, date: reasonDay(on, today, locale) },
+      };
+    }
+    case "waited": {
+      return {
+        key: named ? "reason.waited" : "reason.waitedNoName",
+        values: { ...who, count: reason.days ?? 3 },
+      };
+    }
+    case "due_on": {
+      const on = reason.on ?? null;
+      return on === null
+        ? { key: "reason.noDate", values: {} }
+        : { key: "reason.dueOn", values: { date: reasonDay(on, today, locale) } };
+    }
+    case "waiting_answer": {
+      return { key: named ? "reason.waitingAnswer" : "reason.waitingAnswerNoName", values: who };
+    }
+    case "kept_by_rule": {
+      return { key: "reason.keptByRule", values: {} };
+    }
+    case "no_date":
+    case undefined: {
+      return { key: "reason.noDate", values: {} };
+    }
+  }
 }
 
 export type SnoozeKey = "today" | "tomorrow" | "monday" | "nextWeek";

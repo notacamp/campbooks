@@ -84,6 +84,7 @@ function api(
     [`POST ${W}/conversations/${PHISH.id}/need/reopen`]: { body: PHISH },
     [`POST ${W}/conversations/${MARTA.id}/need/resolve`]: { body: { ...MARTA, need: null } },
     [`POST ${W}/conversations/${JONAS.id}/need/resolve`]: { body: { ...JONAS, need: null } },
+    [`POST ${W}/conversations/${PEDRO.id}/need/resolve`]: { body: { ...PEDRO, need: null } },
     [`POST ${W}/attention/${ITEMS[3]?.id ?? ""}/snooze`]: { body: ITEMS[3] },
     [`POST ${W}/conversations/${MARTA.id}/reply/suggestions`]: {
       body: {
@@ -117,20 +118,68 @@ function isSelected(text: string): boolean {
 }
 
 describe("What needs you", () => {
-  it("groups what needs you, Review first, in plain words", async () => {
+  it("groups what needs you by band, Now first, in plain words", async () => {
     api();
     renderHome();
     expect(
       await screen.findByRole("heading", { level: 1, name: "6 things need you" }),
     ).toBeVisible();
     const groups = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(groups.slice(0, 4)).toEqual(["Review 1", "Reply 2", "Do 1", "Pay 2"]);
+    expect(groups.slice(0, 4)).toEqual(["Now 2", "Today 1", "This week 2", "Whenever 1"]);
     expect(screen.getByText("Marta Ferreira is waiting for your reply")).toBeVisible();
     expect(screen.getByText("Due tomorrow")).toBeVisible();
     // The warning names the sender by address; no percentage anywhere.
     expect(screen.getByText("it-support@at3lier-sol.example")).toBeVisible();
     expect(document.body).not.toHaveTextContent("%");
     expect(screen.getByText("Replied · Tile samples")).toBeVisible();
+  });
+
+  it("says first what each row is and why it is there, and only its age at the end", async () => {
+    api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    const row = (text: string) => screen.getByText(text).closest("button");
+    expect(row("This may be phishing. Don’t use its links.")?.textContent).toMatch(
+      /Review · Possible scam · check first it-support@at3lier-sol.example/u,
+    );
+    expect(row("Pay Luz Energia")?.textContent).toMatch(/Pay · Overdue · 1 day Luz Energia/u);
+    expect(screen.getByText("Overdue · 1 day")).toHaveAttribute("data-danger", "true");
+    expect(row("Pedro Alves asked you to do something")?.textContent).toMatch(
+      /Do · Due Fri Pedro Alves/u,
+    );
+    expect(row("Jonas Weber asked you a question")?.textContent).toMatch(
+      /Reply · Jonas is waiting for your answer Jonas Weber/u,
+    );
+    // The due date is in the eyebrow, not at the row's end.
+    expect(row("Marta Ferreira is waiting for your reply")?.textContent).not.toMatch(
+      /Due tomorrow$/u,
+    );
+  });
+
+  it("says why an opened item is here", async () => {
+    api();
+    renderHome();
+    fireEvent.click(await screen.findByText("Marta Ferreira is waiting for your reply"));
+    const why = await screen.findByRole("region", { name: "Why it’s here" });
+    expect(why).toHaveTextContent("In Today because due tomorrow.");
+    expect(why).toHaveTextContent(
+      "Due today or tomorrow, planned for today, nudges that are due, and people who have waited 3 days or more.",
+    );
+  });
+
+  it("ends the list with how many more tasks are in Tasks", async () => {
+    mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [], tasks_elsewhere: 0 } }
+          : { body: { items: ITEMS, counts: COUNTS, tasks_elsewhere: 4 } },
+      [`GET ${W}/conversations`]: { body: { conversations: NEEDS, next_cursor: null } },
+    });
+    renderHome();
+    expect(await screen.findByText("4 more in Tasks")).toBeVisible();
+    const open = screen.getByRole("link", { name: /^Open Tasks/u });
+    expect(open).toHaveAttribute("href", `/w/${DUARTE.id}/tasks`);
+    expect(open).toHaveAttribute("aria-keyshortcuts");
   });
 
   it("offers Continue with Scout after the need's own actions, on .", async () => {
@@ -217,7 +266,8 @@ describe("What needs you", () => {
     api();
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
-    // Stepping onto it opens it, as a click does.
+    // Stepping onto it (past Luz's bill) opens it, as a click does.
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "j" });
     expect(await screen.findByText(/Hope the move went well/u)).toBeVisible();
     expect(screen.getByRole("button", { name: "Show the whole email" })).toBeVisible();
@@ -227,6 +277,7 @@ describe("What needs you", () => {
     api();
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "j" });
     const summary = await screen.findByRole("region", { name: "Scout’s summary" });
     expect(summary).toHaveTextContent(
@@ -257,23 +308,25 @@ describe("What needs you", () => {
       screen.getByText(text).closest("button")?.getAttribute("aria-expanded") === "true";
     // Nothing is open on arrival.
     expect(isOpen("This may be phishing. Don’t use its links.")).toBe(false);
+    // Down Now: from the warning to Luz's bill, a day late.
     fireEvent.keyDown(document, { key: "ArrowDown" });
-    expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
-    expect(isOpen("Marta Ferreira is waiting for your reply")).toBe(true);
+    expect(isSelected("Pay Luz Energia")).toBe(true);
+    expect(isOpen("Pay Luz Energia")).toBe(true);
     fireEvent.keyDown(document, { key: "ArrowUp" });
     expect(isSelected("This may be phishing. Don’t use its links.")).toBe(true);
     expect(isOpen("This may be phishing. Don’t use its links.")).toBe(true);
-    expect(isOpen("Marta Ferreira is waiting for your reply")).toBe(false);
+    expect(isOpen("Pay Luz Energia")).toBe(false);
     expect(await screen.findByText("How Campbooks decided")).toBeVisible();
-    // Enter closes the open item, Esc too; J and K step and open the same way.
+    // Enter closes the open item, Esc too; J and K step and open the same
+    // way, from one band into the next.
     fireEvent.keyDown(document, { key: "Enter" });
     expect(isOpen("This may be phishing. Don’t use its links.")).toBe(false);
     fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "j" });
-    expect(isSelected("Jonas Weber asked you a question")).toBe(true);
-    expect(isOpen("Jonas Weber asked you a question")).toBe(true);
+    expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
+    expect(isOpen("Marta Ferreira is waiting for your reply")).toBe(true);
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(isOpen("Jonas Weber asked you a question")).toBe(false);
+    expect(isOpen("Marta Ferreira is waiting for your reply")).toBe(false);
   });
 
   it("opens the next item when the open one is done", async () => {
@@ -281,12 +334,14 @@ describe("What needs you", () => {
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
     fireEvent.keyDown(document, { key: "j" });
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "e" });
     expect((await screen.findAllByText("Done · Marta Ferreira")).length).toBeGreaterThan(0);
-    expect(isSelected("Jonas Weber asked you a question")).toBe(true);
+    // The first of This week takes its place.
+    expect(isSelected("Pedro Alves asked you to do something")).toBe(true);
     expect(
       screen
-        .getByText("Jonas Weber asked you a question")
+        .getByText("Pedro Alves asked you to do something")
         .closest("button")
         ?.getAttribute("aria-expanded"),
     ).toBe("true");
@@ -323,6 +378,7 @@ describe("What needs you", () => {
     ).toEqual(["Report and delete1", "It’s safe2", "DoneE", "Snooze…S"]);
     expect(screen.getAllByRole("group", { name: /^Actions for/u })).toHaveLength(1);
     fireEvent.keyDown(document, { key: "j" });
+    fireEvent.keyDown(document, { key: "j" });
     const marta = screen.getByRole("group", { name: "Actions for Marta Ferreira" });
     expect(
       within(marta)
@@ -339,6 +395,7 @@ describe("What needs you", () => {
     const calls = api();
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "ArrowRight" });
     const reply = screen.getByRole("button", { name: /^Reply/u });
@@ -357,9 +414,9 @@ describe("What needs you", () => {
         `POST ${W}/conversations/${MARTA.id}/need/resolve`,
       );
     });
-    // The row folds into its confirmation, and Jonas takes the selection.
+    // The row folds into its confirmation, and Pedro takes the selection.
     expect(screen.getByText("Not needed · Marta Ferreira")).toBeVisible();
-    expect(isSelected("Jonas Weber asked you a question")).toBe(true);
+    expect(isSelected("Pedro Alves asked you to do something")).toBe(true);
   });
 
   it("leaves Enter on the toast's Undo to that button", async () => {
@@ -375,7 +432,7 @@ describe("What needs you", () => {
         `POST ${W}/conversations/${PHISH.id}/need/reopen`,
       );
     });
-    // Marta, now selected, was not touched.
+    // Luz, now selected, was not touched, nor Marta.
     expect(calls.calls.map((c) => c.route)).not.toContain(
       `POST ${W}/conversations/${MARTA.id}/need/resolve`,
     );
@@ -484,12 +541,13 @@ describe("What needs you", () => {
     });
     renderHome();
     expect(await screen.findByText("Acme Hosting sent an invoice. Is it paid?")).toBeVisible();
-    expect(
-      screen.getByText("Campbooks can’t see your bank, so it asks whether each invoice is paid."),
-    ).toBeVisible();
     // One bill asked about: no "All … already paid".
     expect(screen.queryByRole("button", { name: /already paid/u })).toBeNull();
     fireEvent.click(screen.getByText("Acme Hosting"));
+    // Opened, it says why it asks.
+    expect(
+      screen.getByText("Campbooks can’t see your bank, so it asks whether each invoice is paid."),
+    ).toBeVisible();
     const actions = screen.getByRole("group", { name: "Actions for Acme Hosting" });
     expect(
       within(actions)
@@ -548,9 +606,9 @@ describe("What needs you", () => {
       .map((b) => b.textContent);
     expect(labels[0]).toMatch(/^Remind me /u);
     expect(labels.slice(1)).toEqual(["Mark paid2", "Snooze…S", "Not neededX"]);
-    // Luz, overdue, says by how much.
+    // Luz, overdue, says by how much, in its eyebrow.
     expect(screen.getByText("Pay Luz Energia")).toBeVisible();
-    expect(screen.getByText("1 day overdue")).toBeVisible();
+    expect(screen.getByText("Overdue · 1 day")).toBeVisible();
   });
 
   it("marks every bill asked about paid at once, with one Undo", async () => {
@@ -590,6 +648,7 @@ describe("What needs you", () => {
     const { router } = renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
     fireEvent.keyDown(document, { key: "j" });
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "r" });
     expect(await screen.findByRole("dialog", { name: "Reply to Marta" })).toBeVisible();
     expect(await screen.findByRole("button", { name: /Say Thursday works/u })).toBeVisible();
@@ -610,6 +669,7 @@ describe("What needs you", () => {
     const calls = api();
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "1" });
     const first = await screen.findByRole("button", { name: /Say Thursday works/u });
@@ -696,8 +756,9 @@ describe("What needs you", () => {
     const calls = api(ITEMS, live);
     const { queryClient } = renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
-    // The first item is selected from the start; J moves to Marta.
+    // The first item is selected from the start; J J moves past Luz to Marta.
     expect(isSelected("This may be phishing. Don’t use its links.")).toBe(true);
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "j" });
     expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
     // Marta is replied to elsewhere: the live update drops her.
@@ -707,11 +768,11 @@ describe("What needs you", () => {
       expect(screen.queryByText("Marta Ferreira is waiting for your reply")).toBeNull();
     });
     // Her neighbour takes the selection, not the top of the list.
-    expect(isSelected("Jonas Weber asked you a question")).toBe(true);
+    expect(isSelected("Pedro Alves asked you to do something")).toBe(true);
     fireEvent.keyDown(document, { key: "e" });
     await waitFor(() => {
       expect(calls.calls.map((c) => c.route)).toContain(
-        `POST ${W}/conversations/${JONAS.id}/need/resolve`,
+        `POST ${W}/conversations/${PEDRO.id}/need/resolve`,
       );
     });
     expect(calls.calls.map((c) => c.route)).not.toContain(
@@ -724,6 +785,7 @@ describe("What needs you", () => {
     api(ITEMS, live);
     const { queryClient } = renderHome();
     await screen.findByText("Marta Ferreira is waiting for your reply");
+    fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "j" });
     // The server answers and the list no longer has Marta before the row has folded.
     live.items = ITEMS.filter((item) => item.record.id !== MARTA.id);
@@ -742,23 +804,23 @@ describe("What needs you", () => {
           : { body: { items: ITEMS, counts: COUNTS } },
       [`GET ${W}/conversations`]: { body: { conversations: NEEDS, next_cursor: null } },
       [`POST ${W}/conversations/${PHISH.id}/need/resolve`]: problem(503, "unavailable"),
-      [`POST ${W}/conversations/${MARTA.id}/need/resolve`]: { body: { ...MARTA, need: null } },
-      [`POST ${W}/conversations/${MARTA.id}/need/reopen`]: { body: MARTA },
+      [`POST ${W}/conversations/${LUZ.id}/need/resolve`]: { body: { ...LUZ, need: null } },
+      [`POST ${W}/conversations/${LUZ.id}/need/reopen`]: { body: LUZ },
     });
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
-    // X on the warning, then E on the row that took its place, before the
-    // first request comes back.
+    // X on the warning, then X (Not needed) on Luz's bill, which took its
+    // place, before the first request comes back.
     fireEvent.keyDown(document, { key: "x" });
-    fireEvent.keyDown(document, { key: "e" });
+    fireEvent.keyDown(document, { key: "x" });
     expect(await screen.findByRole("alert")).toHaveTextContent(/nothing changed/u);
     expect(await screen.findByText("This may be phishing. Don’t use its links.")).toBeVisible();
-    // Z takes back Marta's Done; the failed verdict is not in the history,
-    // so a second Z reopens nothing.
+    // Z takes back Luz's Not needed; the failed verdict is not in the
+    // history, so a second Z reopens nothing.
     fireEvent.keyDown(document, { key: "z" });
     await waitFor(() => {
       expect(calls.calls.map((c) => c.route)).toContain(
-        `POST ${W}/conversations/${MARTA.id}/need/reopen`,
+        `POST ${W}/conversations/${LUZ.id}/need/reopen`,
       );
     });
     fireEvent.keyDown(document, { key: "z" });
@@ -784,12 +846,13 @@ describe("What needs you", () => {
     expect(screen.getByText("This may be phishing. Don’t use its links.")).toBeVisible();
   });
 
-  it("shows mail a rule keeps in front of you last, as Worth a look, with Seen and Snooze", async () => {
+  it("shows mail a rule keeps in front of you in Whenever, as Worth a look, with Seen and Snooze", async () => {
     const calls = api([...ITEMS, DIGEST_ITEM]);
     renderHome();
     await screen.findByText("You asked to see mail from Design Notes");
     const groups = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(groups.slice(0, 5)).toEqual(["Review 1", "Reply 2", "Do 1", "Pay 2", "Worth a look 1"]);
+    expect(groups.slice(0, 4)).toEqual(["Now 2", "Today 1", "This week 2", "Whenever 2"]);
+    expect(screen.getByText("Kept here by your rule")).toBeVisible();
     // It asks nothing of you: the heading counts the others only.
     expect(screen.getByRole("heading", { level: 1, name: "6 things need you" })).toBeVisible();
     // Nothing is asked of you: no Reply, and no "Not needed" about your own rule.
@@ -820,7 +883,7 @@ describe("What needs you", () => {
       screen.getByText("Nothing asks anything of you. 1 email below is worth a look."),
     ).toBeVisible();
     expect(await screen.findByText("You asked to see mail from Design Notes")).toBeVisible();
-    expect(screen.getByRole("heading", { level: 2, name: "Worth a look 1" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "Whenever 1" })).toBeVisible();
   });
 
   describe("Scout noticed", () => {
@@ -850,9 +913,9 @@ describe("What needs you", () => {
       const note = await screen.findByRole("region", { name: "Scout noticed" });
       const heading = (name: string) =>
         screen.getAllByRole("heading", { level: 2 }).find((h) => h.textContent === name);
-      const review = heading("Review 1");
-      const reply = heading("Reply 2");
-      const pay = heading("Pay 2");
+      const review = heading("Now 2");
+      const reply = heading("Today 1");
+      const pay = heading("This week 2");
       const follows = (a: Node | undefined, b: Node) =>
         a !== undefined && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
       expect(follows(review, note)).toBe(true);
