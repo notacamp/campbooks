@@ -1,9 +1,13 @@
 use campbooks_kernel::{
     admin::{AdminAction, Permission},
+    config::{TrackingConfig, TrackingSink},
     testing,
+    tracking::Tracker,
 };
 use chrono::Utc;
+use serde_json::{Value, json};
 use sqlx::PgPool;
+use uuid::Uuid;
 
 use crate::cli::{self, Revoked};
 
@@ -24,6 +28,7 @@ async fn grants_add_up_and_are_recorded(db: PgPool) {
     let now = Utc::now();
     let first = cli::grant(
         &mut conn,
+        &Tracker::default(),
         "acc-1",
         &[Permission::SystemRead, Permission::SystemRead],
         Some("on call"),
@@ -33,9 +38,16 @@ async fn grants_add_up_and_are_recorded(db: PgPool) {
     .unwrap();
     assert_eq!(first.permissions, ["system.read"]);
     assert_eq!(first.note.as_deref(), Some("on call"));
-    let second = cli::grant(&mut conn, "acc-1", &[Permission::Super], None, now)
-        .await
-        .unwrap();
+    let second = cli::grant(
+        &mut conn,
+        &Tracker::default(),
+        "acc-1",
+        &[Permission::Super],
+        None,
+        now,
+    )
+    .await
+    .unwrap();
     assert_eq!(second.permissions, ["super", "system.read"]);
     assert_eq!(second.note.as_deref(), Some("on call"), "kept");
     assert_eq!(cli::list(&mut conn).await.unwrap(), [second]);
@@ -70,11 +82,14 @@ async fn revoking_removes_permissions_then_the_profile(db: PgPool) {
     let mut conn = db.acquire().await.unwrap();
     let now = Utc::now();
     assert_eq!(
-        cli::revoke(&mut conn, "acc-1", &[], now).await.unwrap(),
+        cli::revoke(&mut conn, &Tracker::default(), "acc-1", &[], now)
+            .await
+            .unwrap(),
         Revoked::NotAnAdmin
     );
     cli::grant(
         &mut conn,
+        &Tracker::default(),
         "acc-1",
         &[Permission::JobsRead, Permission::JobsRetry],
         None,
@@ -82,25 +97,45 @@ async fn revoking_removes_permissions_then_the_profile(db: PgPool) {
     )
     .await
     .unwrap();
-    let Revoked::Remaining(left) = cli::revoke(&mut conn, "acc-1", &[Permission::JobsRetry], now)
-        .await
-        .unwrap()
-    else {
+    let Revoked::Remaining(left) = cli::revoke(
+        &mut conn,
+        &Tracker::default(),
+        "acc-1",
+        &[Permission::JobsRetry],
+        now,
+    )
+    .await
+    .unwrap() else {
         panic!("jobs.read remains");
     };
     assert_eq!(left.permissions, ["jobs.read"]);
     assert_eq!(
-        cli::revoke(&mut conn, "acc-1", &[Permission::JobsRead], now)
-            .await
-            .unwrap(),
+        cli::revoke(
+            &mut conn,
+            &Tracker::default(),
+            "acc-1",
+            &[Permission::JobsRead],
+            now
+        )
+        .await
+        .unwrap(),
         Revoked::Removed,
         "nothing left: no profile"
     );
-    cli::grant(&mut conn, "acc-1", &[Permission::Super], None, now)
-        .await
-        .unwrap();
+    cli::grant(
+        &mut conn,
+        &Tracker::default(),
+        "acc-1",
+        &[Permission::Super],
+        None,
+        now,
+    )
+    .await
+    .unwrap();
     assert_eq!(
-        cli::revoke(&mut conn, "acc-1", &[], now).await.unwrap(),
+        cli::revoke(&mut conn, &Tracker::default(), "acc-1", &[], now)
+            .await
+            .unwrap(),
         Revoked::Removed
     );
     assert!(cli::list(&mut conn).await.unwrap().is_empty());
@@ -115,9 +150,16 @@ async fn revoking_removes_permissions_then_the_profile(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_runtime_role_reads_profiles_and_appends_actions(db: PgPool) {
     let mut conn = db.acquire().await.unwrap();
-    cli::grant(&mut conn, "acc-1", &[Permission::Super], None, Utc::now())
-        .await
-        .unwrap();
+    cli::grant(
+        &mut conn,
+        &Tracker::default(),
+        "acc-1",
+        &[Permission::Super],
+        None,
+        Utc::now(),
+    )
+    .await
+    .unwrap();
     let app = testing::app_role_pool(&db).await;
     let permissions = super::profiles()
         .permissions_of(&app, "acc-1")
@@ -160,6 +202,7 @@ async fn the_runtime_role_cannot_write_a_profile_or_rewrite_the_trail(db: PgPool
     let mut conn = db.acquire().await.unwrap();
     cli::grant(
         &mut conn,
+        &Tracker::default(),
         "acc-1",
         &[Permission::SystemRead],
         None,
@@ -196,6 +239,7 @@ async fn the_runtime_role_cannot_write_a_profile_or_rewrite_the_trail(db: PgPool
         assert!(
             cli::grant(
                 &mut conn,
+                &Tracker::default(),
                 "intruder",
                 &[Permission::Super],
                 None,
@@ -213,4 +257,227 @@ async fn the_runtime_role_cannot_write_a_profile_or_rewrite_the_trail(db: PgPool
         cli::list(&mut conn).await.unwrap()[0].permissions,
         ["system.read"]
     );
+}
+
+/// The tracker the `admin` command builds, writing the outbox, with the
+/// actor the server's `main` names for it (`system`, the command's name).
+fn outbox() -> Tracker {
+    campbooks_kernel::tracking::set_command("admin");
+    Tracker::new(&TrackingConfig {
+        sink: TrackingSink::Outbox,
+        ..TrackingConfig::default()
+    })
+    .with_role("cli")
+}
+
+/// What the kernel wrote around an event of the `admin` command.
+fn assert_command_envelope(row: &testing::TrackedRow) {
+    assert_eq!(row.version, 1);
+    assert_eq!(row.workspace_id, None, "instance-wide");
+    assert_eq!(row.envelope["workspace_id"], Value::Null);
+    assert_eq!(
+        row.envelope["actor"],
+        json!({"type": "system", "id": "admin"})
+    );
+    assert_eq!(row.envelope["on_behalf_of"], Value::Null);
+    assert_eq!(row.envelope["operation"], Value::Null, "no operationId");
+    assert_eq!(row.envelope["role"], "cli");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_grant_that_changes_permissions_is_tracked(db: PgPool) {
+    let tracker = outbox();
+    let mut conn = db.acquire().await.unwrap();
+    let account = Uuid::now_v7().to_string();
+    let now = Utc::now();
+    let first = cli::grant(
+        &mut conn,
+        &tracker,
+        &account,
+        &[Permission::SystemRead],
+        Some("on call for Ada"),
+        now,
+    )
+    .await
+    .unwrap();
+    // The same permission again, with another note: nothing to track.
+    cli::grant(
+        &mut conn,
+        &tracker,
+        &account,
+        &[Permission::SystemRead],
+        Some("still on call"),
+        now,
+    )
+    .await
+    .unwrap();
+    let second = cli::grant(
+        &mut conn,
+        &tracker,
+        &account,
+        &[Permission::Super, Permission::SystemRead],
+        None,
+        now,
+    )
+    .await
+    .unwrap();
+
+    let events = testing::tracked_events(&db, "admin.profile_granted").await;
+    assert_eq!(events.len(), 2, "a grant that adds nothing tracks nothing");
+    for event in &events {
+        assert_command_envelope(event);
+    }
+    assert_eq!(
+        events[0].body,
+        json!({
+            "profile": {
+                "account_id": account,
+                "permissions": ["system_read"],
+                "with_note": true,
+                "granted_at": first.granted_at,
+                "updated_at": first.updated_at,
+            },
+            "before": [],
+            "granted": ["system_read"],
+            "new_profile": true,
+        })
+    );
+    assert_eq!(
+        events[1].body,
+        json!({
+            "profile": {
+                "account_id": account,
+                "permissions": ["super", "system_read"],
+                "with_note": true,
+                "granted_at": second.granted_at,
+                "updated_at": second.updated_at,
+            },
+            "before": ["system_read"],
+            "granted": ["super"],
+            "new_profile": false,
+        })
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|e| e.body.to_string().contains("on call")),
+        "never the note"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_revoke_that_takes_permissions_away_is_tracked(db: PgPool) {
+    let tracker = outbox();
+    let mut conn = db.acquire().await.unwrap();
+    let account = Uuid::now_v7().to_string();
+    let now = Utc::now();
+    assert_eq!(
+        cli::revoke(&mut conn, &tracker, &account, &[], now)
+            .await
+            .unwrap(),
+        Revoked::NotAnAdmin
+    );
+    let granted = cli::grant(
+        &mut conn,
+        &tracker,
+        &account,
+        &[Permission::JobsRead, Permission::JobsRetry],
+        Some("queue duty"),
+        now,
+    )
+    .await
+    .unwrap();
+    // A permission the profile does not hold: nothing changes.
+    let Revoked::Remaining(unchanged) =
+        cli::revoke(&mut conn, &tracker, &account, &[Permission::UsersRead], now)
+            .await
+            .unwrap()
+    else {
+        panic!("the profile stays");
+    };
+    assert_eq!(unchanged.permissions, granted.permissions);
+    let Revoked::Remaining(left) =
+        cli::revoke(&mut conn, &tracker, &account, &[Permission::JobsRetry], now)
+            .await
+            .unwrap()
+    else {
+        panic!("jobs.read remains");
+    };
+    assert_eq!(
+        cli::revoke(&mut conn, &tracker, &account, &[], now)
+            .await
+            .unwrap(),
+        Revoked::Removed
+    );
+    assert_eq!(
+        cli::revoke(&mut conn, &tracker, &account, &[], now)
+            .await
+            .unwrap(),
+        Revoked::NotAnAdmin
+    );
+
+    let events = testing::tracked_events(&db, "admin.profile_revoked").await;
+    assert_eq!(events.len(), 2, "a revoke of nothing tracks nothing");
+    for event in &events {
+        assert_command_envelope(event);
+    }
+    assert_eq!(
+        events[0].body,
+        json!({
+            "profile": {
+                "account_id": account,
+                "permissions": ["jobs_read"],
+                "with_note": true,
+                "granted_at": left.granted_at,
+                "updated_at": left.updated_at,
+            },
+            "before": ["jobs_read", "jobs_retry"],
+            "revoked": ["jobs_retry"],
+        })
+    );
+    assert_eq!(
+        events[1].body,
+        json!({
+            "profile": {
+                "account_id": account,
+                "permissions": [],
+                "with_note": true,
+                "granted_at": granted.granted_at,
+                "updated_at": now,
+                "removed_at": now,
+            },
+            "before": ["jobs_read"],
+            "revoked": ["jobs_read"],
+        })
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_account_of_another_identity_provider_is_not_named(db: PgPool) {
+    let tracker = outbox();
+    let mut conn = db.acquire().await.unwrap();
+    let now = Utc::now();
+    // Another identity provider's subject can be an address.
+    let account = "ada@example.com";
+    cli::grant(
+        &mut conn,
+        &tracker,
+        account,
+        &[Permission::UsersRead],
+        None,
+        now,
+    )
+    .await
+    .unwrap();
+    cli::revoke(&mut conn, &tracker, account, &[], now)
+        .await
+        .unwrap();
+    let mut events = testing::tracked_events(&db, "admin.profile_granted").await;
+    events.extend(testing::tracked_events(&db, "admin.profile_revoked").await);
+    assert_eq!(events.len(), 2);
+    for event in &events {
+        assert_eq!(event.body["profile"].get("account_id"), None);
+        assert!(!event.body.to_string().contains("example.com"));
+        assert!(!event.envelope.to_string().contains("example.com"));
+    }
 }

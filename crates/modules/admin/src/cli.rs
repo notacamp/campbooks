@@ -4,11 +4,18 @@
 //! `admin.actions` with `via = 'cli'` and the database login as the actor.
 //!
 //! Nothing else writes `admin.profiles`; no HTTP endpoint calls these.
+//!
+//! A grant or revoke that changes a profile's permissions is tracked
+//! (`admin.profile_granted`, `admin.profile_revoked`, ADR 0020) in the
+//! transaction of the change; outside any request or job, the actor is
+//! `system` with the command's name.
 
-use campbooks_kernel::{Result, admin::Permission};
+use campbooks_kernel::{Result, admin::Permission, tracking::Tracker};
 use chrono::{DateTime, Utc};
-use sqlx::{Connection as _, PgConnection};
+use sqlx::{Connection as _, PgConnection, Postgres, Transaction};
 use uuid::Uuid;
+
+use crate::tracking;
 
 /// One administrator's profile.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,9 +41,12 @@ fn names(permissions: &[Permission]) -> Vec<String> {
 }
 
 /// Give `account` the `permissions` (added to any it already holds), and
-/// `note` when given. Returns the profile as it now stands.
+/// `note` when given. Returns the profile as it now stands. Tracks
+/// `admin.profile_granted` with `tracker` when the profile is new or gained
+/// a permission.
 pub async fn grant(
     conn: &mut PgConnection,
+    tracker: &Tracker,
     account: &str,
     permissions: &[Permission],
     note: Option<&str>,
@@ -44,6 +54,7 @@ pub async fn grant(
 ) -> Result<Profile> {
     let added = names(permissions);
     let mut tx = conn.begin().await?;
+    let before = stored(&mut tx, account).await?;
     let profile = sqlx::query_as!(
         Profile,
         r#"INSERT INTO admin.profiles AS p (account_id, permissions, note, granted_at, updated_at)
@@ -68,6 +79,25 @@ pub async fn grant(
         now,
     )
     .await?;
+    let held = before
+        .as_ref()
+        .map(|b| b.permissions.as_slice())
+        .unwrap_or_default();
+    let granted: Vec<String> = profile
+        .permissions
+        .iter()
+        .filter(|name| !held.contains(name))
+        .cloned()
+        .collect();
+    if before.is_none() || !granted.is_empty() {
+        let event = tracking::ProfileGranted {
+            profile: snapshot(&profile),
+            before: tracked(held),
+            granted: tracked(&granted),
+            new_profile: before.is_none(),
+        };
+        tracker.track(&mut tx, &event).await?;
+    }
     tx.commit().await?;
     Ok(profile)
 }
@@ -84,15 +114,21 @@ pub enum Revoked {
 }
 
 /// Take `permissions` away from `account`, or its whole profile when
-/// `permissions` is empty or nothing would be left.
+/// `permissions` is empty or nothing would be left. Tracks
+/// `admin.profile_revoked` with `tracker` when the profile lost a
+/// permission or is gone.
 pub async fn revoke(
     conn: &mut PgConnection,
+    tracker: &Tracker,
     account: &str,
     permissions: &[Permission],
     now: DateTime<Utc>,
 ) -> Result<Revoked> {
     let removed = names(permissions);
     let mut tx = conn.begin().await?;
+    let Some(before) = stored(&mut tx, account).await? else {
+        return Ok(Revoked::NotAnAdmin);
+    };
     let left: Option<Vec<String>> = sqlx::query_scalar!(
         r#"SELECT ARRAY(SELECT unnest(permissions) EXCEPT SELECT unnest($2::text[]) ORDER BY 1)
                   AS "left!"
@@ -131,8 +167,96 @@ pub async fn revoke(
         now,
     )
     .await?;
+    let (profile, lost): (tracking::ProfileSnapshot, Vec<String>) = match &outcome {
+        Revoked::Remaining(profile) => (
+            snapshot(profile),
+            before
+                .permissions
+                .iter()
+                .filter(|name| !profile.permissions.contains(name))
+                .cloned()
+                .collect(),
+        ),
+        // The row is gone: the profile as it is now, with nothing left.
+        Revoked::NotAnAdmin | Revoked::Removed => (
+            tracking::ProfileSnapshot {
+                account_id: account.parse::<Uuid>().ok(),
+                permissions: Vec::new(),
+                with_note: before.with_note,
+                granted_at: before.granted_at,
+                updated_at: now,
+                removed_at: Some(now),
+            },
+            before.permissions.clone(),
+        ),
+    };
+    if !lost.is_empty() {
+        let event = tracking::ProfileRevoked {
+            profile,
+            before: tracked(&before.permissions),
+            revoked: tracked(&lost),
+        };
+        tracker.track(&mut tx, &event).await?;
+    }
     tx.commit().await?;
     Ok(outcome)
+}
+
+/// A profile as it stood before a change, read and locked in its
+/// transaction.
+struct Stored {
+    permissions: Vec<String>,
+    with_note: bool,
+    granted_at: DateTime<Utc>,
+}
+
+async fn stored(tx: &mut Transaction<'_, Postgres>, account: &str) -> Result<Option<Stored>> {
+    let row: Option<(Vec<String>, bool, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT permissions, note IS NOT NULL, granted_at
+           FROM admin.profiles WHERE account_id = $1 FOR UPDATE",
+    )
+    .bind(account)
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(row.map(|(permissions, with_note, granted_at)| Stored {
+        permissions,
+        with_note,
+        granted_at,
+    }))
+}
+
+/// The tracked snapshot of `profile`: no note, and the account only by its
+/// Campbooks account id (another identity provider's subject may be an
+/// address).
+fn snapshot(profile: &Profile) -> tracking::ProfileSnapshot {
+    tracking::ProfileSnapshot {
+        account_id: profile.account_id.parse::<Uuid>().ok(),
+        permissions: tracked(&profile.permissions),
+        with_note: profile.note.is_some(),
+        granted_at: profile.granted_at,
+        updated_at: profile.updated_at,
+        removed_at: None,
+    }
+}
+
+/// The plan's values of permission wire names; a name the kernel no longer
+/// knows is left out.
+fn tracked(names: &[String]) -> Vec<tracking::Permission> {
+    names
+        .iter()
+        .map(String::as_str)
+        .filter_map(Permission::parse)
+        .map(|permission| match permission {
+            Permission::Super => tracking::Permission::Super,
+            Permission::SystemRead => tracking::Permission::SystemRead,
+            Permission::SignupsReview => tracking::Permission::SignupsReview,
+            Permission::UsersRead => tracking::Permission::UsersRead,
+            Permission::UsersSuspend => tracking::Permission::UsersSuspend,
+            Permission::WorkspacesRead => tracking::Permission::WorkspacesRead,
+            Permission::JobsRead => tracking::Permission::JobsRead,
+            Permission::JobsRetry => tracking::Permission::JobsRetry,
+        })
+        .collect()
 }
 
 /// Every administrator, oldest grant first.

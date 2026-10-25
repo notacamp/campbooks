@@ -330,6 +330,7 @@ impl World {
         let mut conn = db.acquire().await.unwrap();
         campbooks_admin::cli::grant(
             &mut conn,
+            &campbooks_kernel::tracking::Tracker::default(),
             &format!("ivy-{run}"),
             &[campbooks_kernel::admin::Permission::Super],
             None,
