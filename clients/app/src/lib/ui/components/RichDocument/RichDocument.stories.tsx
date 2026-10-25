@@ -101,11 +101,11 @@ export const Mentions: Story = {
   ),
 };
 
-/** A wide code block scrolls inside its box. */
+/** A wide code block wraps inside its box (nothing scrolls sideways). */
 export const WideCode: Story = {
   render: (args) => (
     <RichDocument {...args}>
-      <pre tabIndex={0}>
+      <pre>
         <code>
           {
             "const a = 'a very long line that goes well past the edge of a phone screen and keeps going and going';"

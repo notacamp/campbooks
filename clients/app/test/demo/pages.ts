@@ -82,10 +82,10 @@ export const JONAS = {
 } as const;
 
 /** A task the viewer cannot open: no read answers for it. */
-export const SECRET_TASK_ID = "0192f1a0-0000-7000-8000-00000000dead";
+const SECRET_TASK_ID = "0192f1a0-0000-7000-8000-00000000dead";
 
 /** The document, as the server stores it. */
-export function documentOf(doc: Y.Doc): { update: string; state_vector: string } {
+function documentOf(doc: Y.Doc): { update: string; state_vector: string } {
   return {
     update: toBase64(Y.encodeStateAsUpdate(doc)),
     state_vector: toBase64(Y.encodeStateVector(doc)),
@@ -178,11 +178,6 @@ export function richDoc(threadId: string, taskId: string): Y.Doc {
       block("paragraph", {}, "Notes from the kickoff go below."),
     ]);
   return doc;
-}
-
-/** The page as `pages.get` returns it. */
-export function viewOf(summary: Summary, lines: string[]): View {
-  return viewOfDoc(summary, plainDoc(...lines));
 }
 
 /** The page as `pages.get` returns it, with `doc` as its body. */

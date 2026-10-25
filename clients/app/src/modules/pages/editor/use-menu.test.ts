@@ -53,6 +53,9 @@ describe("a suggestion menu", () => {
     expect(result.current.active).toBe(1);
     act(() => {
       expect(result.current.bridge.key(key("ArrowUp"))).toBe(true);
+    });
+    expect(result.current.active).toBe(0);
+    act(() => {
       expect(result.current.bridge.key(key("ArrowUp"))).toBe(true);
     });
     expect(result.current.active).toBe(2);

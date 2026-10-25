@@ -67,7 +67,8 @@
 .document :where(pre) {
   margin: 0;
   padding: var(--space-3) var(--space-4);
-  overflow-x: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
   font-family: var(--font-mono);

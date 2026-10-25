@@ -9,7 +9,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { W } from "../../../../test/demo/conversations";
 import {
@@ -207,7 +207,7 @@ describe("the pages tree", () => {
       return found;
     };
     expect(screen.getByText(BUDGET.title).closest("div[draggable='true']")).toBeNull();
-    const dataTransfer = { effectAllowed: "", setData: () => {} };
+    const dataTransfer = { effectAllowed: "", setData: vi.fn() };
     const source = row(IDEAS.title);
     const target = row(HANDBOOK.title);
     fireEvent.dragStart(source, { dataTransfer });
