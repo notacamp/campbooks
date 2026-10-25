@@ -2906,7 +2906,7 @@ export interface components {
          * @description The rule that put an item in its band.
          * @enum {string}
          */
-        BandRule: "warning" | "overdue" | "due_today" | "due_tomorrow" | "planned_today" | "nudge_due" | "waited" | "due_on" | "waiting_answer" | "kept_by_rule" | "no_date";
+        BandRule: "warning" | "overdue" | "due_today" | "due_tomorrow" | "event_today" | "event_tomorrow" | "planned_today" | "nudge_due" | "waited" | "due_on" | "event_on" | "waiting_answer" | "kept_by_rule" | "no_date";
         /**
          * @description How regularly a sender writes.
          * @enum {string}
@@ -4066,6 +4066,7 @@ export interface components {
             occurrence?: string | null;
             /** @description Whether it is on a provider calendar and exists there. */
             on_provider: boolean;
+            organizer?: components["schemas"]["OrganizerView"] | null;
             /** @description Who made it. */
             origin: components["schemas"]["EventOrigin"];
             /** @description Whether your last change still waits to reach the provider. */
@@ -5049,6 +5050,24 @@ export interface components {
          * @enum {string}
          */
         NoticePatternSource: "template" | "phrase";
+        /** @description Who organises an event. */
+        OrganizerView: {
+            /**
+             * @description Their address, when the provider gave one.
+             * @example joao@example.com
+             */
+            address?: string | null;
+            /**
+             * @description Their name, when the provider gave one.
+             * @example João Pereira
+             */
+            name?: string | null;
+            /**
+             * @description Whether a person rather than a machine (a no-reply or service
+             *     address) organises it, from the address alone; `null` when unknown.
+             */
+            person?: boolean | null;
+        };
         /**
          * @description How a member resolves a need.
          * @enum {string}

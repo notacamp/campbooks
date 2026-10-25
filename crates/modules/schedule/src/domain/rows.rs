@@ -39,6 +39,8 @@ impl CalendarRow {
 }
 
 /// An event, as stored.
+// The table's columns: independent facts, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, FromRow)]
 pub struct EventRow {
     pub id: EventId,

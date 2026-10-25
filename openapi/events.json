@@ -1632,6 +1632,68 @@
       }
     },
     {
+      "name": "schedule.invitation_changed",
+      "module": "schedule",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "An invitation awaiting the member's answer opened, changed or closed\n(`contracts/schedule.invitation_changed.v1.schema.json`,\ncampbooks-cloud#360): an event of a provider calendar that syncs, which\nthe member was asked to and did not organise, not yet answered, cancelled\nor started. Ids, a day, a time and flags only: never the title, the place\nor who asked.",
+        "required": [
+          "workspace",
+          "event",
+          "calendar",
+          "owner",
+          "revision"
+        ],
+        "properties": {
+          "calendar": {
+            "$ref": "#/components/schemas/CalendarId",
+            "description": "Its calendar."
+          },
+          "closed_because": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InvitationClosed",
+                "description": "Why it no longer awaits an answer, when it does not."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The event."
+          },
+          "invitation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InvitationFacts",
+                "description": "The invitation while it awaits the member's answer; absent once it\ndoes not."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member whose calendar it is, who is asked."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every announcement of this event's invitation: a consumer\napplies only newer ones."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "schedule.outbound_requested",
       "module": "schedule",
       "version": 1,
@@ -2322,6 +2384,44 @@
         "type": "string",
         "format": "uuid",
         "description": "InboxId (UUIDv7)"
+      },
+      "InvitationClosed": {
+        "type": "string",
+        "description": "Why an invitation no longer awaits the member's answer\n(`schedule.invitation_changed`).",
+        "enum": [
+          "answered",
+          "cancelled",
+          "removed",
+          "hidden",
+          "started"
+        ]
+      },
+      "InvitationFacts": {
+        "type": "object",
+        "description": "An invitation that awaits the member's answer.",
+        "required": [
+          "on",
+          "lapses_at"
+        ],
+        "properties": {
+          "from_person": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether a person rather than a machine sent it, from the organiser's\naddress alone; absent when unknown."
+          },
+          "lapses_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it stops awaiting an answer: when the event starts, or for an\nall-day event when its first day ends, in the member's time zone."
+          },
+          "on": {
+            "type": "string",
+            "format": "date",
+            "description": "The day the event starts, in the member's time zone."
+          }
+        }
       },
       "ItemId": {
         "type": "string",

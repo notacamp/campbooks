@@ -247,5 +247,18 @@
     "inHours": "Dans {{hours}} h",
     "inHoursMinutes": "Dans {{hours}} h {{minutes}} min",
     "addNamed": "Ajouter à mon agenda : {{title}}"
+  },
+  "invite": {
+    "title": "Invitation : {{title}}",
+    "where": "{{when}} · {{place}}",
+    "free": "Vous êtes libre à ce moment-là",
+    "busy": "Vous avez {{title}} à ce moment-là",
+    "answered": {
+      "accepted": "Acceptée : {{title}}",
+      "declined": "Refusée : {{title}}",
+      "tentative": "Peut-être : {{title}}"
+    },
+    "failed": "Impossible de répondre à {{title}}. Réessayez.",
+    "undoFailed": "Impossible d’annuler votre réponse à {{title}}."
   }
 }

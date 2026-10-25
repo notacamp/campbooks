@@ -247,5 +247,18 @@
     "inHours": "Daqui a {{hours}} h",
     "inHoursMinutes": "Daqui a {{hours}} h {{minutes}} min",
     "addNamed": "Adicionar ao meu calendário: {{title}}"
+  },
+  "invite": {
+    "title": "Convite: {{title}}",
+    "where": "{{when}} · {{place}}",
+    "free": "Está livre a essa hora",
+    "busy": "Tem {{title}} a essa hora",
+    "answered": {
+      "accepted": "Aceite: {{title}}",
+      "declined": "Recusado: {{title}}",
+      "tentative": "Talvez: {{title}}"
+    },
+    "failed": "Não foi possível responder a {{title}}. Tente novamente.",
+    "undoFailed": "Não foi possível anular a resposta a {{title}}."
   }
 }

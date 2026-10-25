@@ -61,7 +61,16 @@ import {
   type NudgeResume,
   type ReplyResume,
 } from "~/modules/conversations";
-import { useHomeDay, type DayEvent, type DayLine } from "~/modules/schedule";
+import {
+  useHomeDay,
+  useInvitationAnswers,
+  useInvitations,
+  type Answer,
+  type DayEvent,
+  type DayLine,
+  type InvitationRef,
+  type InvitationRow,
+} from "~/modules/schedule";
 import {
   heldText,
   holdable,
@@ -97,6 +106,8 @@ type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 const CONVERSATION = "conversations.conversation";
 const TASK = "tasks.task";
+/** An invitation awaiting the member's answer is an item about its event (campbooks-cloud#360). */
+const INVITATION = "schedule.event";
 
 /** Continue with Scout: its action id and its key (`.`, the assistant's). */
 const SCOUT = "scout";
@@ -154,8 +165,26 @@ interface TaskEntry {
   at?: number | undefined;
 }
 
-/** What Home lists: a conversation's need, or a task. */
-type Entry = Row | TaskEntry;
+/**
+ * An invitation awaiting the member's answer (campbooks-cloud#360): a Decide
+ * row whose answers (Accept, Decline, Maybe) the schedule module gives.
+ */
+interface InviteEntry {
+  item: ItemView;
+  invite: InvitationRow;
+  /** Who asked. */
+  name: string;
+  /** Acted on: the one-line confirmation it shows while it folds away. */
+  confirmation?: string | undefined;
+  /** Where the item stood in the list when it was acted on. */
+  at?: number | undefined;
+}
+
+/** What Home lists: a conversation's need, a task, or an invitation. */
+type Entry = Row | TaskEntry | InviteEntry;
+
+/** What Snooze puts off from Home's dialog: a need or an invitation. */
+type Snoozable = Row | InviteEntry;
 
 /**
  * An event of the member's calendar among the rows (campbooks-cloud#359):
@@ -174,6 +203,8 @@ type Listed = Entry | EventEntry;
 const EVENT_PREFIX = "event:";
 
 const isTask = (entry: Listed): entry is TaskEntry => "task" in entry;
+const isInvite = (entry: Listed): entry is InviteEntry => "invite" in entry;
+const isRow = (entry: Listed): entry is Row => "need" in entry;
 const isEvent = (entry: Listed): entry is EventEntry => "event" in entry;
 const idOf = (entry: Listed): string => (isEvent(entry) ? entry.id : entry.item.id);
 
@@ -321,6 +352,13 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     .map((item) => item.record.id);
   const tasks = useTasksByIds(workspaceId, taskIds);
   const taskById = new Map((tasks.data ?? []).map((task) => [task.id, task] as const));
+  // Invitations awaiting an answer (campbooks-cloud#360): their events, in
+  // words, from the schedule module; never also a calendar row below.
+  const inviteRefs: InvitationRef[] = openItems
+    .filter((item) => item.record.type === INVITATION)
+    .map((item) => ({ id: item.record.id, on: item.due_on }));
+  const invitations = useInvitations(workspaceId, inviteRefs, { now });
+  const invited = new Set(inviteRefs.map((ref) => ref.id));
 
   // A row still folding away keeps its place even once the list no longer
   // has its item (the server answered and the list refetched first).
@@ -343,6 +381,10 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       }
       const origin = task.source?.type === CONVERSATION ? byId.get(task.source.id) : undefined;
       return [{ item, task, conversation: origin }];
+    }
+    if (item.record.type === INVITATION) {
+      const invite = invitations.rows.get(item.record.id);
+      return invite === undefined ? [] : [{ item, invite, name: invite.who }];
     }
     const conversation = byId.get(item.record.id);
     const need = conversation?.need;
@@ -370,7 +412,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   // The action ←/→ are on, on the selected row.
   const [highlight, setHighlight] = useState<string | undefined>();
   // Snooze's dialog, or Remind's (the same times, a bill's due date first).
-  const [snoozing, setSnoozing] = useState<{ row: Row; remind: boolean } | undefined>();
+  const [snoozing, setSnoozing] = useState<{ row: Snoozable; remind: boolean } | undefined>();
   // A task's Later dialog (S on a task).
   const [laterFor, setLaterFor] = useState<TaskEntry | undefined>();
   // A Do task's Hold time dialog (H on a task).
@@ -401,6 +443,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       selection.id?.startsWith(EVENT_PREFIX) === true
         ? selection.id.slice(EVENT_PREFIX.length)
         : undefined,
+    hide: invited,
   });
   const asEntry = (event: DayEvent): EventEntry => ({ id: `${EVENT_PREFIX}${event.id}`, event });
   const nextEntry = day.nextUp === undefined ? undefined : asEntry(day.nextUp);
@@ -510,7 +553,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   // it needs nothing.
   const rowOf = (conversation: ConversationSummary) =>
     [...rows, ...gone.values()].find(
-      (row): row is Row => !isTask(row) && row.conversation.id === conversation.id,
+      (row): row is Row => isRow(row) && row.conversation.id === conversation.id,
     );
   // A task's entry, hidden or shown, when its change is undone or fails.
   const entryOfTask = (task: TaskView) =>
@@ -592,6 +635,36 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     },
   });
 
+  // Invitations (campbooks-cloud#360): the schedule module answers them and
+  // keeps the Undo, for its undo window.
+  const entryOfInvite = (eventId: string) =>
+    [...rows, ...gone.values()].find(
+      (entry): entry is InviteEntry => isInvite(entry) && entry.item.record.id === eventId,
+    );
+  const invitationAnswers = useInvitationAnswers(workspaceId, {
+    onUndo: (eventId) => {
+      const entry = entryOfInvite(eventId);
+      if (entry !== undefined) {
+        show(entry);
+      }
+      refresh();
+    },
+    onFailed: (eventId) => {
+      const entry = entryOfInvite(eventId);
+      if (entry !== undefined) {
+        show(entry);
+      }
+    },
+  });
+  const answerInvite = (entry: InviteEntry, answer: Answer) => {
+    const chosen = entry.invite.answers.find((each) => each.id === answer);
+    if (chosen === undefined) {
+      return;
+    }
+    hide(entry, chosen.done);
+    invitationAnswers.answer(entry.invite.event, answer);
+  };
+
   const when = (until: Date) =>
     new Intl.DateTimeFormat(i18n.language, {
       weekday: "short",
@@ -613,6 +686,9 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       doneTask(entry);
       return;
     }
+    if (isInvite(entry)) {
+      return;
+    }
     const row = entry;
     hide(row, t(DONE_CONFIRMATION[kindOf(row.need)] ?? "confirm.done", { name: row.name }));
     needActions.done(row.conversation);
@@ -620,6 +696,9 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   const notNeeded = (entry: Entry) => {
     if (isTask(entry)) {
       notNeededTask(entry);
+      return;
+    }
+    if (isInvite(entry)) {
       return;
     }
     const row = entry;
@@ -655,7 +734,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   // Each request settles on its own promise (`mutate`'s callbacks only fire
   // for the latest call). `entry` is the snooze's undo entry, taken back when
   // it fails.
-  const snoozeOrRollBack = (row: Row, until?: Date, entry?: number) => {
+  const snoozeOrRollBack = (row: Snoozable, until?: Date, entry?: number) => {
     void snooze.mutateAsync({ item: row.item.id, until }).catch(() => {
       if (until === undefined) {
         hide(row);
@@ -674,7 +753,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       });
     });
   };
-  const snoozeUntil = (row: Row, until: Date) => {
+  const snoozeUntil = (row: Snoozable, until: Date) => {
     hide(row, t("confirm.snoozed", { name: row.name, when: when(until) }));
     const entry = undo.push({
       label: t("snooze.toast", { name: row.name, when: when(until) }),
@@ -783,6 +862,24 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     choices: OwnChoice[];
     picked: boolean;
   } => {
+    if (isInvite(entry)) {
+      // An invitation: its answers on 1 to 3 (none on a calendar that cannot
+      // be written), then Snooze, and Open in Calendar on Enter.
+      return {
+        own: entry.invite.answers.map((answer, index) => ({
+          id: answer.id,
+          label: answer.label,
+          key: CHOICE_KEYS[index] ?? "item.choice1",
+        })),
+        after: [],
+        universal: [
+          { id: "snooze", label: t("snooze.button"), key: UNIVERSAL_KEYS.snooze },
+          { id: "calendar", label: t("calendar.openInCalendar"), key: "list.open" },
+        ],
+        choices: [],
+        picked: false,
+      };
+    }
     if (isTask(entry)) {
       // A task has no questions: Done (Paid), Later, Hold time (a Do task), Not needed.
       return {
@@ -927,6 +1024,24 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       }
     }
   };
+  const runInvite = (entry: InviteEntry, id: string) => {
+    switch (id) {
+      case "snooze": {
+        startSnooze(entry);
+        return;
+      }
+      case "calendar": {
+        entry.invite.openInCalendar();
+        return;
+      }
+      default: {
+        const answer = entry.invite.answers.find((each) => each.id === id);
+        if (answer !== undefined) {
+          answerInvite(entry, answer.id);
+        }
+      }
+    }
+  };
   const startSnooze = (entry: Entry, remind = false) => {
     keepFocus();
     setHighlight(undefined);
@@ -1020,6 +1135,10 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   const run = (entry: Listed, id: string) => {
     if (isEvent(entry)) {
       runEvent(entry, id);
+      return;
+    }
+    if (isInvite(entry)) {
+      runInvite(entry, id);
       return;
     }
     if (isTask(entry)) {
@@ -1162,9 +1281,13 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
         run(selected, highlight);
         return;
       }
-      // An event opens in Calendar, on its day.
+      // An event, or an invitation, opens in Calendar, on its day.
       if (isEvent(selected)) {
         selected.event.openInCalendar();
+        return;
+      }
+      if (isInvite(selected)) {
+        selected.invite.openInCalendar();
         return;
       }
       setExpandedId((id) => (id === selected.item.id ? undefined : selected.item.id));
@@ -1235,7 +1358,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     { enabled: offered("not_needed") || offered("no") || offered("safe") },
   );
   // Shift+E: every bill the Pay group asks about is already paid.
-  const askedBills = order.filter((row): row is Row => !isTask(row) && kindOf(row.need) === "bill");
+  const askedBills = order.filter((row): row is Row => isRow(row) && kindOf(row.need) === "bill");
   useShortcut(
     "item.all_paid",
     () => {
@@ -1246,7 +1369,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   useShortcut(
     "item.reply",
     () => {
-      if (selectedEntry !== undefined && !isTask(selectedEntry)) {
+      if (selectedEntry !== undefined && isRow(selectedEntry)) {
         reply(selectedEntry);
       }
     },
@@ -1255,7 +1378,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   useShortcut(
     SCOUT_KEY,
     () => {
-      if (selectedEntry !== undefined && !isTask(selectedEntry)) {
+      if (selectedEntry !== undefined && isRow(selectedEntry)) {
         continueWithScout(selectedEntry);
       }
     },
@@ -1323,7 +1446,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   const loading =
     open.isPending ||
     (ids.length > 0 && conversations.isPending) ||
-    (taskIds.length > 0 && tasks.isPending);
+    (taskIds.length > 0 && tasks.isPending) ||
+    invitations.loading;
   // "Worth a look" asks nothing of the member: it has its own group and
   // count, and stays out of "N things need you" (campbooks-cloud#282).
   const count = order.filter((row) => row.item.reason !== "worth_a_look").length;
@@ -1346,7 +1470,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   const review = order.some((row) => row.item.reason === "review");
   const times = snoozeOptions(today);
   // Remind's times: a bill's reminder before its due date first, then Snooze's.
-  const billDue = (row: Row) => ["bill", "toPay"].includes(kindOf(row.need));
+  const billDue = (row: Snoozable): row is Row =>
+    isRow(row) && ["bill", "toPay"].includes(kindOf(row.need));
   const beforeDue =
     snoozing?.remind === true && billDue(snoozing.row) && reminder(snoozing.row).kind === "before"
       ? [{ key: "due" as const, until: reminder(snoozing.row).until }]
@@ -1533,6 +1658,50 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     );
   };
 
+  // An invitation as a row (campbooks-cloud#360): Decide and the day of the
+  // event, who asked, "Invitation: <title>", when and where, and whether the
+  // member is free then; selected, its answers.
+  const renderInvite = (entry: InviteEntry) => {
+    const { invite } = entry;
+    const isSelected = entry.item.id === selectedId;
+    const actions = isSelected ? actionsOf(entry) : undefined;
+    return (
+      <Item
+        key={entry.item.id}
+        id={itemId(entry.item.id)}
+        eyebrow={eyebrowOf(entry)}
+        who={entry.name}
+        what={invite.what}
+        excerpt={invite.excerpt}
+        avatar={{ name: entry.name, kind: invite.person ? "person" : "service" }}
+        tags={[invite.tag]}
+        age={ageLabel(entry.item.since, now ?? new Date(), i18n.language)}
+        selected={isSelected}
+        confirmation={entry.confirmation}
+        onConfirmEnd={() => {
+          folded(entry);
+        }}
+        onToggle={() => {
+          select(entry.item.id);
+        }}
+        actions={
+          actions === undefined ? undefined : (
+            <ItemActions
+              label={t("actions.label", { name: invite.title })}
+              own={actions.own}
+              universal={actions.universal}
+              highlighted={highlight}
+              onHighlight={setHighlight}
+              onAction={(id) => {
+                runInvite(entry, id);
+              }}
+            />
+          )
+        }
+      />
+    );
+  };
+
   // An event as a row (campbooks-cloud#359): its kind's square, the kind and
   // when, its title and where, its time at the end; selected, its actions.
   const renderEvent = (entry: EventEntry) => {
@@ -1662,6 +1831,9 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
           const items = group.rows.map((row) => {
             if (isTask(row)) {
               return renderTask(row);
+            }
+            if (isInvite(row)) {
+              return renderInvite(row);
             }
             const expanded = expandedId === row.item.id;
             const isSelected = row.item.id === selectedId;

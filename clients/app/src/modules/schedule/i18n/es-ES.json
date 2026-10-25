@@ -247,5 +247,18 @@
     "inHours": "En {{hours}} h",
     "inHoursMinutes": "En {{hours}} h {{minutes}} min",
     "addNamed": "Añadir a mi calendario: {{title}}"
+  },
+  "invite": {
+    "title": "Invitación: {{title}}",
+    "where": "{{when}} · {{place}}",
+    "free": "Estás libre a esa hora",
+    "busy": "Tienes {{title}} a esa hora",
+    "answered": {
+      "accepted": "Aceptada: {{title}}",
+      "declined": "Rechazada: {{title}}",
+      "tentative": "Quizá: {{title}}"
+    },
+    "failed": "No se ha podido responder a {{title}}. Inténtalo de nuevo.",
+    "undoFailed": "No se ha podido deshacer tu respuesta a {{title}}."
   }
 }
