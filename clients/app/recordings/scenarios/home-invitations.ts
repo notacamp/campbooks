@@ -115,8 +115,8 @@ function isPhone(page: Page): boolean {
   return (page.viewportSize()?.width ?? 1440) < 768;
 }
 
-const OFFSITE = "Invitation: Offsite planning";
-const WEBINAR = "Invitation: Cash flow basics webinar";
+const OFFSITE = "Invitation: Offsite planning · Office, 3rd floor";
+const WEBINAR = "Invitation: Cash flow basics webinar · webinars.ledgerly.example";
 
 /** Select the row holding `text` with the keys, from wherever the selection is. */
 async function walkTo(page: Page, text: string, key: "ArrowDown"): Promise<void> {
@@ -169,7 +169,7 @@ export default async function homeInvitations({ page }: ScenarioContext): Promis
     await caption(page, "↓ walks the list onto an invitation", 1800);
     await walkTo(page, OFFSITE, "ArrowDown");
     await caption(page, "This week: Decide · Event Thu, who asked, when and where", 2800);
-    await caption(page, "You’re free then: nothing else on your calendar", 2400);
+    await caption(page, "Free then: nothing else on your calendar", 2400);
     await caption(page, "Accept 1, Decline 2, Maybe 3", 2000);
     await page.keyboard.press("1");
     await page.getByText("Accepted: Offsite planning").first().waitFor();

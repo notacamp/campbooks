@@ -11,8 +11,8 @@ organiser waits for an answer.
 
 This change makes every invitation that awaits the member's answer a Decide
 row on Home, in its band by the day of the event ("Decide · Event Thu 29"),
-with Accept (1), Decline (2) and Maybe (3) on the row, "You're free then" or
-"You have <title> then", and Undo in the toast. It counts in the Home badge
+with Accept (1), Decline (2) and Maybe (3) on the row, "Free then" or "Busy
+then" with what the member has then, and Undo in the toast. It counts in the Home badge
 and "N things need you", and Scout's `what_needs_me` lists it with what it
 is and who asked.
 
@@ -57,7 +57,7 @@ module may (AGENTS.md); the dispatcher's maintenance scope has its
   within it a new answer replaces it and "not answered" takes it back, so
   Undo never reaches the organiser.
 - **Home.** The Decide row: the eyebrow, the organiser's name, "Invitation:
-  <title>", "<day>, 14:00–15:00 · <place>", the free/busy tag, Accept (1),
+  <title> · <place>", its time at the row's end, the free/busy tags, Accept (1),
   Decline (2), Maybe (3), Snooze (S) and Open in Calendar (Enter); on a
   calendar that cannot be written, no answers. An invitation shows as the
   Decide row only, never also as a calendar row.

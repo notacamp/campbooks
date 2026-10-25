@@ -114,25 +114,28 @@ describe("Invitations on Home", () => {
   it("lists each invitation as a Decide row, counted, by the day of its event", async () => {
     api();
     renderHome();
-    await screen.findByText("Invitation: Offsite planning");
+    await screen.findByText("Invitation: Offsite planning · Office, 3rd floor");
     expect(screen.getByRole("heading", { level: 1, name: "8 things need you" })).toBeVisible();
 
-    const offsite = rowOf("Invitation: Offsite planning");
+    const offsite = rowOf("Invitation: Offsite planning · Office, 3rd floor");
     expect(offsite.textContent).toMatch(/Decide.*Event Thu.*Beatriz Lemos/u);
-    expect(offsite.textContent).toMatch(/14:00 – 15:00 · Office, 3rd floor/u);
-    expect(within(offsite).getByText("You’re free then")).toBeVisible();
+    expect(offsite.textContent).toContain("14:00 – 15:00");
+    expect(within(offsite).getByText("Free then")).toBeVisible();
     const week = screen.getByRole("heading", { level: 2, name: /^This week/u }).closest("section");
-    expect(within(week ?? document.body).getByText("Invitation: Offsite planning")).toBeVisible();
+    expect(
+      within(week ?? document.body).getByText("Invitation: Offsite planning · Office, 3rd floor"),
+    ).toBeVisible();
 
     // From a service, tomorrow, while the furniture comes.
-    const webinar = rowOf("Invitation: Cash flow basics webinar");
+    const webinar = rowOf("Invitation: Cash flow basics webinar · webinars.ledgerly.example");
     expect(webinar.textContent).toMatch(/Event tomorrow.*Ledgerly Webinars/u);
-    expect(
-      within(webinar).getByText("You have Furniture delivery, 2 of 3 parcels then"),
-    ).toBeVisible();
+    expect(within(webinar).getByText("Busy then")).toBeVisible();
+    expect(within(webinar).getByText("Furniture delivery, 2 of 3 parcels")).toBeVisible();
     const today = screen.getByRole("heading", { level: 2, name: /^Today/u }).closest("section");
     expect(
-      within(today ?? document.body).getByText("Invitation: Cash flow basics webinar"),
+      within(today ?? document.body).getByText(
+        "Invitation: Cash flow basics webinar · webinars.ledgerly.example",
+      ),
     ).toBeVisible();
   });
 
@@ -149,7 +152,7 @@ describe("Invitations on Home", () => {
   it("answers on 1, 2 and 3; 1 accepts, with Undo in the toast", async () => {
     const mocked = api();
     renderHome();
-    fireEvent.click(await screen.findByText("Invitation: Offsite planning"));
+    fireEvent.click(await screen.findByText("Invitation: Offsite planning · Office, 3rd floor"));
     const actions = screen.getByRole("group", { name: "Actions for Offsite planning" });
     expect(within(actions).getByRole("button", { name: /^Accept/u })).toHaveAttribute(
       "aria-keyshortcuts",
@@ -175,7 +178,7 @@ describe("Invitations on Home", () => {
     // The row's own confirmation, next to the toast saying the same.
     expect((await screen.findAllByText("Accepted: Offsite planning")).length).toBeGreaterThan(0);
     await waitFor(() => {
-      expect(screen.queryByText("Invitation: Offsite planning")).toBeNull();
+      expect(screen.queryByText("Invitation: Offsite planning · Office, 3rd floor")).toBeNull();
     });
 
     // Z takes the latest back.
@@ -187,13 +190,15 @@ describe("Invitations on Home", () => {
           .map((call) => call.body),
       ).toEqual([{ response: "accepted" }, { response: "needs_action" }]);
     });
-    expect(await screen.findByText("Invitation: Offsite planning")).toBeVisible();
+    expect(
+      await screen.findByText("Invitation: Offsite planning · Office, 3rd floor"),
+    ).toBeVisible();
   });
 
   it("opens the invitation in Calendar on its day with Enter", async () => {
     api();
     const { router } = renderHome();
-    fireEvent.click(await screen.findByText("Invitation: Offsite planning"));
+    fireEvent.click(await screen.findByText("Invitation: Offsite planning · Office, 3rd floor"));
     fireEvent.keyDown(document, { key: "Enter" });
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/schedule`);
@@ -204,7 +209,7 @@ describe("Invitations on Home", () => {
   it("offers no answer on a calendar that cannot be written", async () => {
     api({ calendars: HOME_CALENDARS.map((calendar) => ({ ...calendar, writable: false })) });
     renderHome();
-    fireEvent.click(await screen.findByText("Invitation: Offsite planning"));
+    fireEvent.click(await screen.findByText("Invitation: Offsite planning · Office, 3rd floor"));
     const actions = screen.getByRole("group", { name: "Actions for Offsite planning" });
     expect(within(actions).queryByRole("button", { name: /^Accept/u })).toBeNull();
     expect(within(actions).getByRole("button", { name: /^Snooze/u })).toBeVisible();

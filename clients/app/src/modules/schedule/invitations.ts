@@ -8,8 +8,8 @@ import { useUndoToast } from "~/lib/ui";
 import { useCalendars, useEvents, useScheduleSettings } from "./api/queries";
 import type { CalendarView, EventView, Response } from "./api/types";
 import { useClock } from "./clock";
-import { COMING_DAYS } from "./day";
-import { eventKey, whenLong, type T } from "./labels";
+import { COMING_DAYS, joinUrl } from "./day";
+import { eventKey, whenLabel, type T } from "./labels";
 import { addDays, dayOf, nowIn, type Ymd } from "./model";
 
 /**
@@ -39,12 +39,12 @@ export interface InvitationRow {
   who: string;
   /** Whether a person rather than a machine asked (the avatar's kind). */
   person: boolean;
-  /** "Invitation: Offsite planning". */
+  /** "Invitation: Offsite planning · Office, 3rd floor" (a web place by its host). */
   what: string;
-  /** "Thursday 15 October, 14:00 – 15:00 · Office, 3rd floor". */
-  excerpt: string;
-  /** "You’re free then", or "You have <title> then". */
-  tag: string;
+  /** At the row's end: "14:00 – 15:00", "All day". */
+  when: string;
+  /** "Free then", or "Busy then" and what the member has then. */
+  tags: string[];
   /** Its calendar can be written: the member may answer it from Home. */
   writable: boolean;
   /**
@@ -173,17 +173,19 @@ export function useInvitations(
     const calendar = calendarList.find((each) => each.id === event.calendar_id);
     const writable = calendar?.writable === true;
     const busy = busyThen(event, list);
-    const place = event.place?.trim() ?? "";
-    const when = whenLong(t, locale, event);
+    const place = joinUrl(event)?.host ?? event.place?.trim() ?? "";
     const day = dayOf(event.starts);
     rows.set(ref.id, {
       id: eventKey(event),
       title: event.title,
       who: askedBy(event, calendarList),
       person: event.organizer?.person !== false,
-      what: t("invite.title", { title: event.title }),
-      excerpt: place === "" ? when : t("invite.where", { when, place }),
-      tag: busy === undefined ? t("invite.free") : t("invite.busy", { title: busy.title }),
+      what:
+        place === ""
+          ? t("invite.title", { title: event.title })
+          : t("invite.titleAt", { title: event.title, place }),
+      when: whenLabel(t, locale, event),
+      tags: busy === undefined ? [t("invite.free")] : [t("invite.busy"), busy.title],
       writable,
       answers: writable
         ? ANSWERS.map((id) => ({

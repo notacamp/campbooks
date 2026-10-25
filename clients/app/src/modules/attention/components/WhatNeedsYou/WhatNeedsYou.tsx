@@ -1672,9 +1672,9 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
         eyebrow={eyebrowOf(entry)}
         who={entry.name}
         what={invite.what}
-        excerpt={invite.excerpt}
+        due={invite.when}
         avatar={{ name: entry.name, kind: invite.person ? "person" : "service" }}
-        tags={[invite.tag]}
+        tags={invite.tags}
         age={ageLabel(entry.item.since, now ?? new Date(), i18n.language)}
         selected={isSelected}
         confirmation={entry.confirmation}

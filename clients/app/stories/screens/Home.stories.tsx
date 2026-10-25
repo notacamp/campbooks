@@ -633,11 +633,11 @@ export const Invitations: Story = {
     await expect(
       await canvas.findByRole("heading", { level: 1, name: "12 things need you" }),
     ).toBeVisible();
-    await expect(await canvas.findByText("Invitation: Offsite planning")).toBeVisible();
-    await expect(canvas.getByText("You’re free then")).toBeVisible();
     await expect(
-      canvas.getByText("You have Furniture delivery, 2 of 3 parcels then"),
+      await canvas.findByText("Invitation: Offsite planning · Office, 3rd floor"),
     ).toBeVisible();
+    await expect(canvas.getByText("Free then")).toBeVisible();
+    await expect(canvas.getByText("Busy then")).toBeVisible();
     await expect(canvas.getByText("Event tomorrow")).toBeVisible();
   },
 };
@@ -648,7 +648,9 @@ export const InvitationSelected: Story = {
   args: { path: PATH, api: invited() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByText("Invitation: Offsite planning"));
+    await userEvent.click(
+      await canvas.findByText("Invitation: Offsite planning · Office, 3rd floor"),
+    );
     const actions = await canvas.findByRole("group", { name: "Actions for Offsite planning" });
     await expect(within(actions).getByRole("button", { name: /Accept/u })).toBeVisible();
     await expect(within(actions).getByRole("button", { name: /Maybe/u })).toBeVisible();
@@ -661,7 +663,9 @@ export const InvitationAccepted: Story = {
   args: { path: PATH, api: invited() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByText("Invitation: Offsite planning"));
+    await userEvent.click(
+      await canvas.findByText("Invitation: Offsite planning · Office, 3rd floor"),
+    );
     await userEvent.keyboard("1");
     const body = within(canvasElement.ownerDocument.body);
     await expect(await body.findByText("Accepted: Offsite planning")).toBeVisible();
@@ -675,7 +679,7 @@ export const InvitationsPhone: Story = {
   ...at("phone", 375, 812),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await canvas.findByText("Invitation: Offsite planning");
+    await canvas.findByText("Invitation: Offsite planning · Office, 3rd floor");
     await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
       globalThis.innerWidth,
     );

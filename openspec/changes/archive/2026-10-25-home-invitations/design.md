@@ -129,10 +129,12 @@ the calendar instead of the organiser.
   events of the invitation items (one `schedule.list_events` window from
   today to the last invitation's day, at least the 8 days `useHomeDay`
   reads, so both share one query), each as a row in words: the organiser
-  (name, else address, else the calendar's name), "Invitation: <title>",
-  "<long day>, 14:00–15:00 · <place>" in the member's zone and language,
+  (name, else address, else the calendar's name), "Invitation: <title> ·
+  <place>" (a web place by its host), its time ("14:00 – 15:00") in the
+  member's zone and language, at the row's end (the day is in the eyebrow;
+  every line of it wraps or is short, so the copy fits in every language),
   whether its calendar can be written, Open in Calendar, and the free/busy
-  fact. And `useInvitationAnswers`, the answers with their toast ("Accepted:
+  fact ("Free then", or "Busy then" and the other event's title). And `useInvitationAnswers`, the answers with their toast ("Accepted:
   <title>", Undo for the window's 10 seconds).
 - **Free or busy** is worked out on the client from the same events: another
   event that overlaps it, busy, timed, not declined (held time counts: the

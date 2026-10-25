@@ -250,9 +250,9 @@
   },
   "invite": {
     "title": "Invitation : {{title}}",
-    "where": "{{when}} · {{place}}",
-    "free": "Vous êtes libre à ce moment-là",
-    "busy": "Vous avez {{title}} à ce moment-là",
+    "titleAt": "Invitation : {{title}} · {{place}}",
+    "free": "Libre à ce moment-là",
+    "busy": "Occupé à ce moment-là",
     "answered": {
       "accepted": "Acceptée : {{title}}",
       "declined": "Refusée : {{title}}",
