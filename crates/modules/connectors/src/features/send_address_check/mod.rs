@@ -12,6 +12,10 @@
 //! server that cannot be used safely ends the check `failed`; a busy one is
 //! tried again, up to six attempts. A connection lost after the message
 //! went out counts as sent: the search decides. The code is never logged, and no error carries it.
+//!
+//! The message sent, or the check ended because it could not be, is tracked
+//! (`connectors.address_check_send_completed`, with the kind of failure);
+//! a check settled meanwhile and a busy server tried again track nothing.
 
 use std::time::Duration;
 
@@ -31,10 +35,11 @@ use crate::{
         credentials::{self, TokenError},
         imap_servers,
         model::{ConnectionId, StreamId},
-        schedule,
+        schedule, tracked,
     },
     features::send_message::via_imap::{give_back, mailbox, sending_budgets, take_all},
     imap::smtp::{Failed, Submission},
+    tracking,
 };
 
 /// The job's name.
@@ -228,6 +233,14 @@ impl SendAddressCheck {
                 if address_checks::sent(tx, connection, check.nonce, now).await? {
                     // Its runs look for it from now on.
                     schedule::run_now(tx, workspace, stream, now).await?;
+                    let snapshot = tracked::connection(tx, connection).await?;
+                    ctx.track(&tracking::AddressCheckSendCompleted {
+                        workspace,
+                        connection: snapshot,
+                        outcome: tracking::AddressCheckSendOutcome::Sent,
+                        reason: None,
+                    })
+                    .await?;
                 }
                 Ok(())
             }
@@ -263,7 +276,8 @@ impl SendAddressCheck {
         }
     }
 
-    /// End check `nonce` of `connection`, unverified, for `reason`.
+    /// End check `nonce` of `connection`, unverified, for `reason`; tracked
+    /// when it was still under way.
     async fn end(
         &self,
         ctx: &mut JobContext,
@@ -272,9 +286,39 @@ impl SendAddressCheck {
         reason: &'static str,
     ) -> Result<(), JobError> {
         let now = self.deps.clock.now();
+        let workspace: WorkspaceId = ctx
+            .workspace()
+            .and_then(|w| w.parse().ok())
+            .ok_or_else(|| JobError::fatal("an address check enqueued outside a workspace"))?;
         let tx = ctx.tx().await?;
-        address_checks::failed(tx, connection, nonce, reason, now).await?;
+        if !address_checks::failed(tx, connection, nonce, reason, now).await? {
+            return Ok(());
+        }
+        let snapshot = tracked::connection(tx, connection).await?;
+        ctx.track(&tracking::AddressCheckSendCompleted {
+            workspace,
+            connection: snapshot,
+            outcome: tracking::AddressCheckSendOutcome::Failed,
+            reason: Some(check_reason(reason)),
+        })
+        .await?;
         Ok(())
+    }
+}
+
+/// The plan's kind of a check's failure (`other` for a code it does not
+/// name yet).
+fn check_reason(reason: &str) -> tracking::AddressCheckReason {
+    match reason {
+        "provider_not_configured" => tracking::AddressCheckReason::ProviderNotConfigured,
+        "address_changed" => tracking::AddressCheckReason::AddressChanged,
+        "needs_reauth" => tracking::AddressCheckReason::NeedsReauth,
+        "not_connected" => tracking::AddressCheckReason::NotConnected,
+        "address_invalid" => tracking::AddressCheckReason::AddressInvalid,
+        "address_refused" => tracking::AddressCheckReason::AddressRefused,
+        "smtp_login_refused" => tracking::AddressCheckReason::SmtpLoginRefused,
+        "smtp_unavailable" => tracking::AddressCheckReason::SmtpUnavailable,
+        _ => tracking::AddressCheckReason::Other,
     }
 }
 
