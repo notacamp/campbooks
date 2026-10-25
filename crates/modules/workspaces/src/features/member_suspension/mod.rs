@@ -115,9 +115,10 @@ async fn announce(
 /// theirs and list the workspaces to announce it in, with whether the change
 /// is new for them (not the one recorded already: a replay is announced
 /// again, but tracked only once); `None` when there is nothing to announce:
-/// no such user (never signed in), or a newer change already announced. The lock is held until `tx` ends, so a workspace the
-/// user joins meanwhile is told on joining, and one they leave meanwhile
-/// is left first.
+/// no such user (never signed in), or a newer change already announced.
+/// The lock is held until `tx` ends, so a workspace the user joins
+/// meanwhile is told on joining, and one they leave meanwhile is left
+/// first.
 pub(crate) async fn record(
     tx: &mut sqlx::PgConnection,
     subject: &str,
