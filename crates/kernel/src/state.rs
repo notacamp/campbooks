@@ -16,6 +16,7 @@ use crate::{
     crypto::Signer,
     events::EventBus,
     i18n::{LocalePreferencePort, NoLocalePreference},
+    idempotency::RequestHasher,
     jobs::Registry,
     operations::Operations,
     outbound::{
@@ -138,6 +139,12 @@ pub struct AppState {
     /// installs one derived from the instance secret; until then nothing
     /// is signed or verifies, so nothing is sent or changed.
     pub binding: Binding,
+    /// Keys the hashes the idempotency layer keeps of keyed requests
+    /// ([`idempotency`](crate::idempotency), campbooks-cloud#335), so the
+    /// database alone cannot test a guess of a secret a body carries. The
+    /// server installs one derived from the instance secret, shared by all
+    /// its processes; until then each process keys its own.
+    pub request_hasher: RequestHasher,
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
@@ -198,6 +205,7 @@ impl AppState {
             rate_limits: RateLimits::default(),
             signer: Signer::default(),
             binding: Binding::disabled(),
+            request_hasher: RequestHasher::default(),
             resources: authz::Catalogue::default(),
             mailer: Arc::new(crate::mail::NoMailer),
         }
@@ -380,6 +388,13 @@ impl AppState {
     #[must_use]
     pub fn with_signer(mut self, signer: Signer) -> Self {
         self.signer = signer;
+        self
+    }
+
+    /// The same state, keying idempotency request hashes with `hasher`.
+    #[must_use]
+    pub fn with_request_hasher(mut self, hasher: RequestHasher) -> Self {
+        self.request_hasher = hasher;
         self
     }
 
