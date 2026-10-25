@@ -163,11 +163,14 @@ describe("What needs you: Scout isn't sure", () => {
     });
     expect((await screen.findAllByText("Waiting on Águas do Ribatejo")).length).toBeGreaterThan(0);
     // The nudge to them is a dialog away, and optional.
-    expect(await screen.findByRole("dialog", { name: "Nudge Águas" })).toBeVisible();
-    fireEvent.keyDown(document, { key: "Escape" });
+    const dialog = await screen.findByRole("dialog", { name: "Nudge Águas" });
+    expect(dialog).toBeVisible();
+    // Closing it sends nothing; the conversation keeps waiting.
+    fireEvent.keyDown(dialog, { key: "Escape" });
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Nudge Águas" })).toBeNull();
     });
+    // Z takes the answer back.
     fireEvent.keyDown(document, { key: "z" });
     await waitFor(() => {
       expect(calls.calls.map((c) => c.route)).toContain(

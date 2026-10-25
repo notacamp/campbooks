@@ -670,7 +670,11 @@ export const ScoutIsntSureNudge: Story = {
     );
     await userEvent.keyboard("1");
     const body = within(canvasElement.ownerDocument.body);
-    await expect(await body.findByRole("dialog", { name: "Nudge Águas" })).toBeVisible();
+    const dialog = await body.findByRole("dialog", { name: "Nudge Águas" });
+    // It rises in over a moment.
+    await waitFor(async () => {
+      await expect(dialog).toBeVisible();
+    });
   },
 };
 
