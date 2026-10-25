@@ -353,22 +353,21 @@ fn upstream_client(
             None => Endpoints::microsoft(mail_tenant),
             Some(base) => Endpoints::under(provider, base, mail_tenant),
         };
-        match endpoints {
-            Ok(endpoints) => Some(Upstream::new(
+        if let Ok(endpoints) = endpoints {
+            Some(Upstream::new(
                 provider,
                 client_id.clone(),
                 secret.clone(),
                 redirect_uri.clone(),
                 endpoints,
-            )?),
-            Err(_) => {
-                tracing::warn!(
-                    "CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT is not common, organizations, \
-                     consumers or a tenant id: Microsoft mail round trips use sign-in's tenant \
-                     (CAMPBOOKS_MICROSOFT__TENANT)"
-                );
-                None
-            }
+            )?)
+        } else {
+            tracing::warn!(
+                "CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT is not common, organizations, \
+                 consumers or a tenant id: Microsoft mail round trips use sign-in's tenant \
+                 (CAMPBOOKS_MICROSOFT__TENANT)"
+            );
+            None
         }
     } else {
         None
