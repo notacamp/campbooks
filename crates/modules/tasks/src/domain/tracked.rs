@@ -131,6 +131,27 @@ fn replanned(before: &TaskRow, after: &TaskRow) -> bool {
         != (&after.plan, after.plan_on, after.later_until)
 }
 
+/// `tasks.task_reassigned` of a hand-off or a take-back of the task that was
+/// `before`.
+fn reassigned(
+    workspace: WorkspaceId,
+    task: tracking::TaskSnapshot,
+    change: TaskChange,
+    before: &TaskRow,
+) -> tracking::TaskReassigned {
+    tracking::TaskReassigned {
+        workspace,
+        task,
+        reassignment: if change == TaskChange::HandedOff {
+            tracking::Reassignment::HandedOff
+        } else {
+            tracking::Reassignment::TakenBack
+        },
+        previous_assignee: *before.assignee.as_uuid(),
+        previous_handed_by: before.handed_by.map(|by| *by.as_uuid()),
+    }
+}
+
 /// Track, in `tx`, the change `change` of the task that was `before` (none
 /// for a new one) and is `after` now. What did not change tracks nothing: a
 /// plan set again to the one the task had, an update whose values it had.
@@ -227,17 +248,7 @@ pub async fn track(
             tracker.track(tx, &reopened).await?;
         }
         TaskChange::HandedOff | TaskChange::TakenBack => {
-            let reassigned = tracking::TaskReassigned {
-                workspace,
-                task,
-                reassignment: if change == TaskChange::HandedOff {
-                    tracking::Reassignment::HandedOff
-                } else {
-                    tracking::Reassignment::TakenBack
-                },
-                previous_assignee: *before.assignee.as_uuid(),
-                previous_handed_by: before.handed_by.map(|by| *by.as_uuid()),
-            };
+            let reassigned = reassigned(workspace, task, change, before);
             tracker.track(tx, &reassigned).await?;
         }
         // Handled above.
