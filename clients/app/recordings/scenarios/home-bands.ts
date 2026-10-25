@@ -25,7 +25,7 @@ const NOW = new Date("2026-10-13T15:00:00Z");
  * string: the recordings are type-checked without the DOM types. Done on
  * Tiago's reply takes it off the list until Undo puts it back.
  */
-const FAKE_BFF = String.raw`(() => {
+const FAKE_BFF = `(() => {
   const original = window.fetch.bind(window);
   const demo = Promise.all([
     import("/test/demo/attention.ts"),
@@ -93,12 +93,9 @@ function isPhone(page: Page): boolean {
   return (page.viewportSize()?.width ?? 1440) < 768;
 }
 
-/** Bring the band titled `name` into view, smoothly enough to watch. */
+/** Bring the band titled `name` into view and linger on it. */
 async function showBand(page: Page, name: RegExp, ms: number): Promise<void> {
-  const heading = page.getByRole("heading", { level: 2, name });
-  await heading.evaluate((element: { scrollIntoView: (options: object) => void }) => {
-    element.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+  await page.getByRole("heading", { level: 2, name }).scrollIntoViewIfNeeded();
   await pause(ms);
 }
 
