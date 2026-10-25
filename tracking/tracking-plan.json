@@ -89,7 +89,7 @@
       "change": "The tasks module instrumented (campbooks-cloud#340): 8 events for a task created (by a member, or by Scout from an ask), edited (which fields), its due date changed (the date before), planned (the plan before), done, not needed, reopened (the state before) and reassigned (handed off or taken back, with the member who had it); records task, task_due and task_plan; Coverage for every operation, job and handler of the module.",
       "date": "2026-10-25",
       "plan_version": 10,
-      "pr": ""
+      "pr": "#665"
     }
   ],
   "coverage": [
