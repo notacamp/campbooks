@@ -153,6 +153,7 @@ describe("SafeHtml", () => {
     expect(estimateHeight(`<p>${"word ".repeat(400)}</p>`)).toBeGreaterThan(400);
     expect(estimateHeight(`<p>${"word ".repeat(40_000)}</p>`)).toBe(1400);
     expect(estimateHeight('<img height="300"><p>x</p>')).toBeGreaterThan(300);
+    expect(estimateHeight("<".repeat(100_000))).toBe(1400);
   });
 
   it("shrinks a layout wider than its frame, down to a floor", () => {

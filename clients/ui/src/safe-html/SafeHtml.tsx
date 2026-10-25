@@ -143,7 +143,8 @@ const MAX_HEIGHT = 1400;
  * image heights.
  */
 export function estimateHeight(html: string): number {
-  const text = html.replaceAll(/<[^>]*>/gu, " ").replaceAll(/\s+/gu, " ");
+  // `[^<>]`, not `[^>]`: a run of unclosed "<" is then scanned once, not once per "<".
+  const text = html.replaceAll(/<[^<>]*>/gu, " ").replaceAll(/\s+/gu, " ");
   const blocks = (html.match(/<(?:p|br|li|tr|h[1-6]|div)\b/giu) ?? []).length;
   const images = [...html.matchAll(/<img\b[^>]*\bheight="(\d+)"/giu)].reduce(
     (sum, match) => sum + Math.min(Number(match[1]), 400),
