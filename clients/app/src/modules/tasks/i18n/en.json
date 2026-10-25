@@ -93,7 +93,9 @@
     "done": "Done",
     "paid": "Paid",
     "notNeeded": "Not needed",
-    "payNote": "Campbooks never pays for you. This only marks it paid."
+    "payNote": "Campbooks never pays for you. This only marks it paid.",
+    "holdTime": "Hold time",
+    "release": "Release"
   },
   "toast": {
     "done": "Done · {{title}}",
@@ -107,7 +109,9 @@
     "handedOff": "Handed to {{name}} · {{title}}",
     "takenBack": "Taken back · {{title}}",
     "failed": "Couldn’t change {{title}}. It is as it was.",
-    "changed": "{{title}} changed in the meantime. Take another look."
+    "changed": "{{title}} changed in the meantime. Take another look.",
+    "held": "Held {{when}} · {{title}}",
+    "released": "Released · {{title}}"
   },
   "make": {
     "button": "Make it a task",
@@ -121,5 +125,21 @@
     "title": "Put it off until…",
     "description": "It leaves Home until then, and comes back on its own.",
     "choices": "When"
+  },
+  "hold": {
+    "length": "Length",
+    "minutes": "{{minutes}} min",
+    "calendar": "Calendar",
+    "campbooks": "Campbooks",
+    "slots": "Free time",
+    "looking": "Looking for free time…",
+    "failed": "Your free time could not be read. Try again in a moment.",
+    "noneBeforeDue": "No free time before it is due. Try another length.",
+    "noneThisWeek": "No free time in the next 7 days. Try another length.",
+    "held": "Held {{when}}"
+  },
+  "holdDialog": {
+    "title": "Hold time",
+    "description": "A busy block on your calendar, in your free time."
   }
 }

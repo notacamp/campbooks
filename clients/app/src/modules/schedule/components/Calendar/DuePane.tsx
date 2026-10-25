@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -16,7 +17,14 @@ import {
   SourceLink,
 } from "~/lib/ui";
 
-import type { TaskSource, TaskView } from "~/modules/tasks";
+import {
+  holdable,
+  HoldTime,
+  type HoldPick,
+  type HoldSources,
+  type TaskSource,
+  type TaskView,
+} from "~/modules/tasks";
 
 import type { TaskRow } from "../../due";
 import { dueTitle, dueWhen, dueWhenIsKind, type T } from "../../labels";
@@ -32,14 +40,17 @@ export interface DuePaneProps {
   source: TaskSource | undefined;
   /** The tasks module's Done (Paid), with its own Undo. */
   done: (task: TaskView) => void;
+  /** The tasks module's Hold time, with its own Undo, and where it reads free time. */
+  hold?: { sources: HoldSources; run: (task: TaskView, pick: HoldPick) => void } | undefined;
   onClose: () => void;
 }
 
 /**
  * A task on this day, due or planned. It lives in the member's tasks, so the
- * sheet has no Remove: Done or Paid (E), Open task (↵).
+ * sheet has no Remove: Done or Paid (E), Hold time for a Do task (H), Open
+ * task (↵).
  */
-export function DuePane({ workspaceId, row, today, source, done, onClose }: DuePaneProps) {
+export function DuePane({ workspaceId, row, today, source, done, hold, onClose }: DuePaneProps) {
   const { t: typed, i18n } = useTranslation("schedule");
   const t: T = typed;
   const locale = i18n.language;
@@ -53,9 +64,18 @@ export function DuePane({ workspaceId, row, today, source, done, onClose }: DueP
   const finish = () => {
     done(task);
   };
+  const [holding, setHolding] = useState(false);
+  const canHold = hold !== undefined && holdable(task);
   useShortcut("overlay.close", onClose);
   useShortcut("item.done", finish);
   useShortcut("list.open", open);
+  useShortcut(
+    "item.hold",
+    () => {
+      setHolding((shown) => !shown);
+    },
+    { enabled: canHold },
+  );
 
   const planned =
     task.plan === "date" && task.plan_on !== null && task.plan_on !== undefined
@@ -107,10 +127,34 @@ export function DuePane({ workspaceId, row, today, source, done, onClose }: DueP
           {...link(source.href)}
         />
       )}
+      {hold !== undefined && canHold && holding ? (
+        <HoldTime
+          workspaceId={workspaceId}
+          task={task}
+          sources={hold.sources}
+          onPick={(pick) => {
+            setHolding(false);
+            hold.run(task, pick);
+          }}
+        />
+      ) : null}
       <SheetActions>
         <Button size="lg" variant="primary" icon="check" shortcut="item.done" onClick={finish}>
           {paying ? t("due.paid") : t("due.done")}
         </Button>
+        {canHold ? (
+          <Button
+            size="lg"
+            variant="ghost"
+            shortcut="item.hold"
+            aria-pressed={holding}
+            onClick={() => {
+              setHolding((shown) => !shown);
+            }}
+          >
+            {t("due.hold")}
+          </Button>
+        ) : null}
         <Button size="lg" variant="ghost" shortcut="list.open" onClick={open}>
           {t("due.open")}
         </Button>

@@ -12,6 +12,18 @@ const base = {
 };
 
 describe("Item", () => {
+  it("shows its pills in their signal's colour, before the tags", () => {
+    renderUi(
+      <Item
+        {...base}
+        tags={["2 messages"]}
+        pills={[{ text: "Held Wed 10:00–10:30", signal: "do" }]}
+      />,
+    );
+
+    expect(screen.getByText("Held Wed 10:00–10:30")).toHaveAttribute("data-signal", "do");
+  });
+
   it("expands its detail and says so", () => {
     const onToggle = vi.fn();
     renderUi(

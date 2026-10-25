@@ -59,7 +59,17 @@ import {
   type NudgeResume,
   type ReplyResume,
 } from "~/modules/conversations";
-import { dueText, planText, useTaskActions, useTasksByIds, type TaskView } from "~/modules/tasks";
+import {
+  dueText,
+  heldText,
+  holdable,
+  HoldTime,
+  planText,
+  useTaskActions,
+  useTasksByIds,
+  type HoldSources,
+  type TaskView,
+} from "~/modules/tasks";
 
 import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../../api/queries";
 import {
@@ -91,6 +101,10 @@ const SCOUT_KEY = "scout.ask";
 /** The item's own actions take 1, 2 and 3, in order. */
 const CHOICE_KEYS = ["item.choice1", "item.choice2", "item.choice3"] as const;
 
+/** A Do task's Hold time, and its key. */
+const HOLD = "hold";
+const HOLD_KEY = "item.hold";
+
 const UNIVERSAL_KEYS: Record<UniversalActionId, string> = {
   done: "item.done",
   snooze: "item.snooze",
@@ -101,6 +115,8 @@ export interface WhatNeedsYouProps {
   workspaceId: string;
   /** Under the hero: an offer from another module (Scout's questions). */
   offer?: ReactNode | undefined;
+  /** The member's free time and calendars, for a Do task's Hold time (the schedule module's). */
+  holdSources?: HoldSources | undefined;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
 }
@@ -233,7 +249,7 @@ const kindOf = (need: NeedView): RowKind => {
  * conversations module's records; `attention` only says which, why and by
  * when.
  */
-export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
+export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeedsYouProps) {
   const { t: typedAttention, i18n } = useTranslation("attention");
   const t = typedAttention as unknown as Translate;
   const { t: typedConversations } = useTranslation("conversations");
@@ -333,6 +349,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const [snoozing, setSnoozing] = useState<{ row: Row; remind: boolean } | undefined>();
   // A task's Later dialog (S on a task).
   const [laterFor, setLaterFor] = useState<TaskEntry | undefined>();
+  // A Do task's Hold time dialog (H on a task).
+  const [holdFor, setHoldFor] = useState<TaskEntry | undefined>();
   // Forward's dialog: whom to send it to.
   const [forwarding, setForwarding] = useState<Row | undefined>();
   // Open attachment: the opened item whose first file takes the focus.
@@ -716,7 +734,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     picked: boolean;
   } => {
     if (isTask(entry)) {
-      // A task has no questions: Done (Paid), Later, Not needed.
+      // A task has no questions: Done (Paid), Later, Hold time (a Do task), Not needed.
       return {
         own: [],
         after: [],
@@ -727,6 +745,9 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
             key: UNIVERSAL_KEYS.done,
           },
           { id: "snooze", label: tt("detail.later"), key: UNIVERSAL_KEYS.snooze },
+          ...(holdSources !== undefined && holdable(entry.task)
+            ? [{ id: HOLD, label: tt("detail.holdTime"), key: HOLD_KEY }]
+            : []),
           { id: "not_needed", label: tt("detail.notNeeded"), key: UNIVERSAL_KEYS.not_needed },
         ],
         choices: [],
@@ -826,6 +847,11 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     }
     setSnoozing({ row: entry, remind });
   };
+  const startHold = (entry: TaskEntry) => {
+    keepFocus();
+    setHighlight(undefined);
+    setHoldFor(entry);
+  };
   // Open attachment: the item opens on the email, its first file focused
   // (Enter previews or saves it, as in the reader). Before a dialog of the
   // same pair, it only opens: the focus stays in the dialog.
@@ -911,6 +937,10 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         }
         case "snooze": {
           startSnooze(entry);
+          return;
+        }
+        case HOLD: {
+          startHold(entry);
           return;
         }
         case "not_needed": {
@@ -1083,6 +1113,16 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     },
     { enabled: offered("snooze") },
   );
+  // H: a Do task's Hold time.
+  useShortcut(
+    HOLD_KEY,
+    () => {
+      if (selected !== undefined && isTask(selected)) {
+        startHold(selected);
+      }
+    },
+    { enabled: selectedActions?.universal.some((action) => action.id === HOLD) === true },
+  );
   // X: not needed, a warning's "It's safe" or a question's No.
   useShortcut(
     "conversations.resolve_need",
@@ -1245,6 +1285,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     const actions = isSelected ? actionsOf(entry) : undefined;
     const due = dueText(task, tt, i18n.language, today);
     const plan = planText(task, tt, i18n.language, today);
+    const held = heldText(task, tt, i18n.language);
     const from = conversation === undefined ? undefined : displayName(conversation.latest_from);
     const dueLine = [due?.text, plan].filter((part) => part !== undefined).join(" · ");
     return (
@@ -1256,6 +1297,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         avatar={{ name: from ?? task.title, kind: task.verb === "pay" ? "service" : "person" }}
         due={dueLine === "" ? undefined : dueLine}
         soon={due?.late === true}
+        pills={held === undefined ? undefined : [{ text: held, signal: "do" }]}
         selected={isSelected}
         confirmation={entry.confirmation}
         onConfirmEnd={() => {
@@ -1505,6 +1547,28 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
             }
           }}
         />
+      </Dialog>
+      <Dialog
+        open={holdFor !== undefined}
+        onClose={() => {
+          setHoldFor(undefined);
+        }}
+        title={tt("holdDialog.title")}
+        description={tt("holdDialog.description")}
+      >
+        {holdFor === undefined || holdSources === undefined ? null : (
+          <HoldTime
+            workspaceId={workspaceId}
+            task={holdFor.task}
+            sources={holdSources}
+            now={now}
+            onPick={(pick) => {
+              const entry = holdFor;
+              setHoldFor(undefined);
+              taskActions.hold(entry.task, pick);
+            }}
+          />
+        )}
       </Dialog>
       {forwarding === undefined ? null : (
         <ForwardDialog

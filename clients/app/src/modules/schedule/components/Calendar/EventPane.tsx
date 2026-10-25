@@ -108,10 +108,15 @@ export function EventPane({
   useShortcut("schedule.update_event", onEdit, { enabled: !held });
   useShortcut("schedule.delete_event", remove);
   useShortcut("schedule.open_source", openEmail, { enabled: source.data !== undefined });
+  // A held block opens the task it holds time for.
+  const heldTask =
+    held && event.source?.type === "tasks.task"
+      ? `/w/${workspaceId}/tasks/${event.source.id}`
+      : `/w/${workspaceId}/tasks`;
   useShortcut(
     "list.open",
     () => {
-      void navigate({ to: `/w/${workspaceId}/tasks` });
+      void navigate({ to: heldTask });
     },
     { enabled: held },
   );
@@ -241,7 +246,7 @@ export function EventPane({
               variant="secondary"
               shortcut="list.open"
               onClick={() => {
-                void navigate({ to: `/w/${workspaceId}/tasks` });
+                void navigate({ to: heldTask });
               }}
             >
               {t("due.open")}

@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 
 import { api, operationKey, unwrap, type Schema } from "~/lib/api";
 import { useUndoToast } from "~/lib/ui";
+import type { FreeSlots, FreeWindow, HoldCalendar } from "~/modules/tasks";
 
 import { sameMoment, type Period } from "../model";
 
@@ -36,6 +37,13 @@ const keys = {
     operationKey("schedule.list_calendars", { workspace_id: workspaceId }),
   settings: (workspaceId: string) =>
     operationKey("schedule.get_settings", { workspace_id: workspaceId }),
+  free: (workspaceId: string, window: FreeWindow) =>
+    operationKey("schedule.free_slots", {
+      workspace_id: workspaceId,
+      from: window.from,
+      to: window.to,
+      minutes: window.minutes,
+    }),
   read: (workspaceId: string, conversationId: string, messageId: string) =>
     operationKey("conversations.get_message_read", {
       workspace_id: workspaceId,
@@ -84,6 +92,55 @@ export function useCalendars(workspaceId: string) {
         }),
       ).calendars,
   });
+}
+
+/**
+ * `schedule.free_slots`: the member's free time in a window, as Hold time
+ * reads it (the tasks module's plug).
+ */
+export function useFreeSlots(workspaceId: string, window: FreeWindow): FreeSlots {
+  const free = useQuery({
+    queryKey: keys.free(workspaceId, window),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/schedule/free-slots", {
+          params: {
+            path: { workspace_id: workspaceId },
+            query: { from: window.from, to: window.to, minutes: window.minutes },
+          },
+          signal,
+        }),
+      ),
+  });
+  return { slots: free.data?.slots, failed: free.isError };
+}
+
+/**
+ * The calendars a hold can go on: the member's writable ones, the primary
+ * provider calendar first, then their Campbooks calendar, then the others
+ * (the tasks module's plug).
+ */
+export function useWritableCalendars(workspaceId: string): readonly HoldCalendar[] | undefined {
+  const calendars = useCalendars(workspaceId).data;
+  if (calendars === undefined) {
+    return undefined;
+  }
+  const rank = (calendar: CalendarView) => {
+    if (calendar.source === "provider" && calendar.primary) {
+      return 0;
+    }
+    return calendar.source === "campbooks" ? 1 : 2;
+  };
+  return calendars
+    .filter(
+      (calendar) => calendar.writable && (calendar.source === "campbooks" || calendar.syncing),
+    )
+    .toSorted((a, b) => rank(a) - rank(b))
+    .map((calendar) => ({
+      id: calendar.id,
+      name: calendar.name,
+      campbooks: calendar.source === "campbooks",
+    }));
 }
 
 /** `schedule.get_settings`. */

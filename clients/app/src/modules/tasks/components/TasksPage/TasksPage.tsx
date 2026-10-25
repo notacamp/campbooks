@@ -20,9 +20,10 @@ import {
 import { useMembers } from "~/modules/workspaces";
 
 import { useHandedOff, useTasks, type TaskView } from "../../api/queries";
+import { holdable as canHold, type HoldSources } from "../../hold";
 import { dueThisWeek, GROUPS, groupTasks, listOrder, type Group } from "../../model";
 import { CONVERSATION, type TaskSource, type UseTaskSources } from "../../source";
-import { dueText, planText } from "../../task-text";
+import { dueText, heldText, planText } from "../../task-text";
 import { memberName } from "../HandOff";
 import { NewTaskForm } from "../NewTaskForm";
 import { TaskDetail } from "../TaskDetail";
@@ -48,6 +49,8 @@ export interface TasksPageProps {
   creating?: boolean | undefined;
   /** Where tasks made from conversations came from. */
   useSources: UseTaskSources;
+  /** The member's free time and calendars, for Hold time (none: no Hold time). */
+  holdSources?: HoldSources | undefined;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
 }
@@ -71,14 +74,15 @@ function byDue(a: TaskView, b: TaskView): number {
  * Tasks: the member's open tasks in Overdue, Today, Coming up and No date
  * yet, and a folded Later; a task's detail, or the new-task form, beside the
  * list from `lg`, replacing it below. Keys: `n t` opens the form, J/K move,
- * Enter opens, E marks done (paid), S offers Later, X marks not needed, Esc
- * closes the detail or the form, Z undoes.
+ * Enter opens, E marks done (paid), S offers Later, H offers Hold time, X
+ * marks not needed, Esc closes the detail or the form, Z undoes.
  */
 export function TasksPage({
   workspaceId,
   taskId,
   creating = false,
   useSources,
+  holdSources,
   now,
 }: TasksPageProps) {
   const { t: typed, i18n } = useTranslation("tasks");
@@ -95,6 +99,7 @@ export function TasksPage({
   const newButton = useRef<HTMLButtonElement>(null);
   const [laterOpen, setLaterOpen] = useState(false);
   const [offerLater, setOfferLater] = useState(false);
+  const [offerHold, setOfferHold] = useState(false);
   const [cursor, setCursor] = useState<string | undefined>();
 
   const own = mine.data ?? [];
@@ -127,10 +132,12 @@ export function TasksPage({
   const openTask = (task: TaskView) => {
     setCursor(task.id);
     setOfferLater(false);
+    setOfferHold(false);
     goTo(`${base}/${task.id}`);
   };
   const closeDetail = () => {
     setOfferLater(false);
+    setOfferHold(false);
     goTo(base);
   };
   // The form lives in the URL (`?new=1`): the header's button, the empty
@@ -255,6 +262,20 @@ export function TasksPage({
     },
     { enabled: holdable(subject) },
   );
+  const offersHold = holdSources !== undefined && holdable(subject) && canHold(subject);
+  useShortcut(
+    "item.hold",
+    () => {
+      if (subject !== undefined) {
+        if (taskId !== subject.id) {
+          openTask(subject);
+        }
+        setOfferLater(false);
+        setOfferHold(true);
+      }
+    },
+    { enabled: offersHold },
+  );
   useShortcut("overlay.close", closeDetail, { enabled: taskId !== undefined });
   useShortcut("overlay.close", closeForm, { enabled: creating });
 
@@ -265,6 +286,10 @@ export function TasksPage({
       : { text: due.text, tone: due.late ? "danger" : "neutral" };
   };
   const planChip = (task: TaskView): TaskRowChip | undefined => {
+    const held = heldText(task, t, i18n.language);
+    if (held !== undefined) {
+      return { text: held, signal: "do" };
+    }
     const plan = planText(task, t, i18n.language, clock);
     return plan === undefined ? undefined : { text: plan };
   };
@@ -429,6 +454,9 @@ export function TasksPage({
             actions={actions}
             laterOpen={offerLater}
             onLaterOpen={setOfferLater}
+            holdSources={holdSources}
+            holdOpen={offerHold}
+            onHoldOpen={setOfferHold}
             onBack={closeDetail}
             now={now}
           />

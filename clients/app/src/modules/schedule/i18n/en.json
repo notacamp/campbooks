@@ -115,7 +115,8 @@
     "planned": "Planned",
     "plannedOn": "Was for {{day}}",
     "metaPlanned": "Planned",
-    "plannedFact": "Planned for {{day}}"
+    "plannedFact": "Planned for {{day}}",
+    "hold": "Hold time"
   },
   "form": {
     "newTitle": "New event",

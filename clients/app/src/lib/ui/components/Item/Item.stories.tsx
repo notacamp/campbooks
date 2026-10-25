@@ -108,6 +108,18 @@ export const DueSoon: Story = {
   },
 };
 
+/** A task with time held on the calendar: the held time in Do's colour. */
+export const Held: Story = {
+  args: {
+    who: "You wrote this",
+    avatar: { name: "Send the signed lease" },
+    due: "Due Fri 30",
+    what: "Send the signed lease",
+    tags: [],
+    pills: [{ text: "Held Wed 10:00–10:30", signal: "do" }],
+  },
+};
+
 /** Phone: a link to the conversation, with the swipe actions revealed. */
 export const Swiped: Story = {
   args: {

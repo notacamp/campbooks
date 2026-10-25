@@ -115,7 +115,8 @@
     "planned": "Planifiée",
     "plannedOn": "Prévue pour {{day}}",
     "metaPlanned": "Planifiée",
-    "plannedFact": "Planifiée pour {{day}}"
+    "plannedFact": "Planifiée pour {{day}}",
+    "hold": "Réserver du temps"
   },
   "form": {
     "newTitle": "Nouvel événement",

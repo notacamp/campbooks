@@ -26,7 +26,12 @@ import {
   SuspendedAccounts,
   useMailboxConsent,
 } from "~/modules/identity";
-import { buildScheduleRoutes, SCHEDULE_SHORTCUTS } from "~/modules/schedule";
+import {
+  buildScheduleRoutes,
+  SCHEDULE_SHORTCUTS,
+  useFreeSlots,
+  useWritableCalendars,
+} from "~/modules/schedule";
 import { buildSearchRoutes, SEARCH_SHORTCUTS } from "~/modules/search";
 import {
   buildSystemAdminRoutes,
@@ -34,7 +39,7 @@ import {
   JOBS_ADMIN_SECTION,
   SYSTEM_ADMIN_SECTION,
 } from "~/modules/system";
-import { buildTasksRoutes, TASKS_SHORTCUTS } from "~/modules/tasks";
+import { buildTasksRoutes, TASKS_SHORTCUTS, type HoldSources } from "~/modules/tasks";
 import {
   buildWorkspacesAdminRoutes,
   buildWorkspacesRoutes,
@@ -43,6 +48,12 @@ import {
   WORKSPACES_ADMIN_SECTION,
   WORKSPACES_SHORTCUTS,
 } from "~/modules/workspaces";
+
+/**
+ * Hold time (tasks) reads the member's free time and writable calendars:
+ * the schedule module's, plugged in here so tasks never imports it.
+ */
+export const HOLD_SOURCES: HoldSources = { useFreeSlots, useWritableCalendars };
 
 export interface ModuleRouteParents<
   TPublic extends AnyRoute,
@@ -88,8 +99,12 @@ export function buildModuleRoutes<
       // `identity` is the front door for connecting a mailbox (as on the server).
       ...buildConnectorsRoutes(workspace, { useConsent: useMailboxConsent }),
       ...assistant.workspace,
-      // Tasks made from emails say where they came from: the conversations module knows.
-      ...buildTasksRoutes(workspace, { useSources: useConversationSources }),
+      // Tasks made from emails say where they came from: the conversations module knows;
+      // Hold time reads the schedule module's free time and calendars.
+      ...buildTasksRoutes(workspace, {
+        useSources: useConversationSources,
+        holdSources: HOLD_SOURCES,
+      }),
       ...buildScheduleRoutes(workspace, {
         useConsent: useMailboxConsent,
         useSources: useConversationSources,
