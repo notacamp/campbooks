@@ -5,7 +5,7 @@
 use campbooks_kernel::{
     Error, RecordRef,
     db::BeginFor as _,
-    schedule::{HoldRequest, Holds as _},
+    schedule::HoldRequest,
     tenancy::{UserId, WorkspaceId},
 };
 use chrono::{DateTime, TimeDelta, Utc};

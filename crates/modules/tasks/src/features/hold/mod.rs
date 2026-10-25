@@ -39,6 +39,15 @@ pub const MINUTES: std::ops::RangeInclusive<i64> = 15..=240;
 /// moment ago), in seconds.
 const STARTED_GRACE_SECONDS: i64 = 120;
 
+/// The kind of calendar a block is on, as its tracked event says it.
+const fn calendar_kind(at_provider: bool) -> tracking::HoldCalendar {
+    if at_provider {
+        tracking::HoldCalendar::Provider
+    } else {
+        tracking::HoldCalendar::Campbooks
+    }
+}
+
 /// The time to hold.
 #[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -186,11 +195,7 @@ pub async fn hold(
             minutes,
             moved,
             by: tracking::HoldActor::Member,
-            calendar: Some(if held.at_provider {
-                tracking::HoldCalendar::Provider
-            } else {
-                tracking::HoldCalendar::Campbooks
-            }),
+            calendar: Some(calendar_kind(held.at_provider)),
         },
     )
     .await?;
