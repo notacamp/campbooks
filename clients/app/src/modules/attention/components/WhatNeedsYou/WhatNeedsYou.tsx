@@ -1456,7 +1456,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     let kind = `kinds.${item.reason}`;
     if (isTask(entry)) {
       kind = entry.task.verb === "pay" ? "kinds.payTask" : "kinds.doTask";
-    } else if (kindOf(entry.need) === "unsure") {
+    } else if (isRow(entry) && kindOf(entry.need) === "unsure") {
       kind = "kinds.unsure";
     }
     return {
