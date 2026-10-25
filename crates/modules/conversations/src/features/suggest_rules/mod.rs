@@ -3,19 +3,23 @@
 //! it, each with a preview, and the one to offer first.
 //!
 //! Likenesses are deterministic and said in plain words: the sender, the
-//! list, or the sender (or its domain) with the subject's template. A person
-//! the inbox writes to gets no default, and is never offered a rule that
-//! hides their mail; suspicious mail never starts a suggestion; a member who
-//! turned a suggestion down does not see it again for 30 days, and never
+//! list, the sender with words the `complete` model proposed for its
+//! subjects during Scout noticed's pass (kept, never asked for here), or the
+//! sender (or its domain) with the subject's template. A machine sender's
+//! default is all its mail when that mail is all of one kind for what the
+//! inbox does with it, else only mail like this one (campbooks-cloud#356).
+//! A person the inbox writes to gets no default, and is never offered a rule
+//! that hides their mail; suspicious mail never starts a suggestion; a member
+//! who turned a suggestion down does not see it again for 30 days, and never
 //! after the second time.
 
 #[cfg(test)]
 mod tests;
 
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_ai::decide::{
     signals::email::{Envelope, Party, is_machine_sender, registrable_domain},
-    taught::is_free_mail,
+    taught::{contains_words, is_free_mail},
 };
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, RecordRef, Result, Risk,
@@ -29,13 +33,17 @@ use sqlx::PgConnection;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::{
+    config::NoticeSettings,
     domain::{
         paths::ConversationPath,
         resources,
         rules::{self, Candidate, RuleAction, RuleCondition, SurfaceWhen},
     },
     events::CONVERSATION_RECORD,
-    features::rules::{PREVIEW_DEADLINE, RulePreview, compute_preview, may_teach},
+    features::{
+        rule_notices,
+        rules::{PREVIEW_DEADLINE, RulePreview, compute_preview, may_teach},
+    },
     model::{ConversationId, InboxId, LabelId, Stream},
     scopes::{ConversationsRead, ConversationsWrite},
     tracking,
@@ -90,6 +98,9 @@ pub enum Likeness {
     Sender,
     /// Everything from the mailing list.
     List,
+    /// The sender's mail whose subject holds words the model proposed for
+    /// that sender's subjects (Scout noticed's grouping), as this one does.
+    SenderPhrase,
     /// The sender's mail with this subject's template.
     SenderTemplate,
     /// The domain's mail with this subject's template.
@@ -181,6 +192,7 @@ impl RuleSuggestions {
 )]
 pub async fn suggest(
     State(state): State<AppState>,
+    Extension(settings): Extension<NoticeSettings>,
     workspace: Workspace<ConversationsRead>,
     extract::Path(path): extract::Path<ConversationPath>,
     extract::Query(query): extract::Query<SuggestQuery>,
@@ -188,7 +200,12 @@ pub async fn suggest(
     let access = &workspace.access;
     let mut tx = crate::features::rules::begin_read(&state, access.workspace).await?;
     let inbox = teachable_inbox(&state, &mut tx, access, path.conversation_id).await?;
-    let out = suggestions(&mut tx, access, inbox, path.conversation_id, query).await?;
+    let asked = Asked {
+        inbox,
+        id: path.conversation_id,
+        query,
+    };
+    let out = suggestions(&mut tx, access, asked, &settings).await?;
     tx.commit().await?;
     Ok(Json(out))
 }
@@ -221,13 +238,21 @@ async fn teachable_inbox(
     Ok(inbox)
 }
 
-async fn suggestions(
-    conn: &mut PgConnection,
-    access: &Access,
+/// What a member asked suggestions for.
+#[derive(Debug, Clone, Copy)]
+struct Asked {
     inbox: InboxId,
     id: ConversationId,
     query: SuggestQuery,
+}
+
+async fn suggestions(
+    conn: &mut PgConnection,
+    access: &Access,
+    asked: Asked,
+    settings: &NoticeSettings,
 ) -> Result<RuleSuggestions> {
+    let Asked { inbox, id, query } = asked;
     // One deadline for every likeness's preview together.
     let deadline = std::time::Instant::now() + PREVIEW_DEADLINE;
     let shared = rules::is_shared(conn, inbox).await?;
@@ -256,8 +281,14 @@ async fn suggestions(
             .await;
     }
 
+    // Words the model proposed for the sender's subjects, kept from Scout
+    // noticed's pass: the first this subject holds.
+    let phrases = rule_notices::phrases_of(conn, inbox, &candidate.sender_address).await?;
+    let phrase = phrases
+        .iter()
+        .find(|phrase| contains_words(&candidate.subject, phrase));
     let mut out = Vec::new();
-    for (likeness, conditions) in likenesses(&candidate) {
+    for (likeness, conditions) in likenesses(&candidate, phrase.map(String::as_str)) {
         if rules::validate(&conditions, &actions).is_err() {
             continue;
         }
@@ -277,10 +308,17 @@ async fn suggestions(
     }
     let machine = is_machine_sender(&envelope(&candidate));
     let has_list = out.iter().any(|s| s.likeness == Likeness::List);
+    let position = |likeness: Likeness| out.iter().position(|s| s.likeness == likeness);
     let default = if correspondent {
         None
     } else if machine {
-        out.iter().position(|s| s.likeness == Likeness::Sender)
+        // All of the sender's mail when it is all one kind; else only mail
+        // like this one, or the member chooses.
+        if rule_notices::uniform(conn, inbox, &candidate.sender_address, settings).await? {
+            position(Likeness::Sender)
+        } else {
+            position(Likeness::SenderPhrase).or_else(|| position(Likeness::SenderTemplate))
+        }
     } else if has_list {
         out.iter().position(|s| s.likeness == Likeness::List)
     } else {
@@ -480,8 +518,9 @@ async fn actions_for(
     })
 }
 
-/// The likenesses of `candidate`, broad to narrow.
-fn likenesses(candidate: &Candidate) -> Vec<(Likeness, Vec<RuleCondition>)> {
+/// The likenesses of `candidate`, broad to narrow, with `phrase`, words
+/// the model proposed for its sender's subjects that its subject holds.
+fn likenesses(candidate: &Candidate, phrase: Option<&str>) -> Vec<(Likeness, Vec<RuleCondition>)> {
     let sender = candidate.sender_address.clone();
     let mut out = vec![(
         Likeness::Sender,
@@ -496,6 +535,15 @@ fn likenesses(candidate: &Candidate) -> Vec<(Likeness, Vec<RuleCondition>)> {
         out.push((
             Likeness::List,
             vec![RuleCondition::ListId(list.trim().to_owned())],
+        ));
+    }
+    if let Some(phrase) = phrase {
+        out.push((
+            Likeness::SenderPhrase,
+            vec![
+                RuleCondition::SenderAddress(sender.clone()),
+                RuleCondition::SubjectContains(phrase.to_owned()),
+            ],
         ));
     }
     if let Some(template) = &candidate.subject_template {

@@ -21414,6 +21414,7 @@
         "enum": [
           "sender",
           "list",
+          "sender_phrase",
           "sender_template",
           "domain_template",
           "domain",
@@ -22305,6 +22306,37 @@
         "enum": [
           "keep_off_home",
           "archive_on_arrival"
+        ]
+      },
+      "NoticePattern": {
+        "type": "object",
+        "description": "The part of a sender's mail a suggestion is about (campbooks-cloud#356).",
+        "required": [
+          "source",
+          "example",
+          "search"
+        ],
+        "properties": {
+          "example": {
+            "type": "string",
+            "description": "One recent subject of that mail, as plain text."
+          },
+          "search": {
+            "type": "string",
+            "description": "What narrows a search for the sender's mail to it, in the search\ngrammar (`subject:\"…\"`); empty when no words of it can."
+          },
+          "source": {
+            "$ref": "#/components/schemas/NoticePatternSource",
+            "description": "What picks it out."
+          }
+        }
+      },
+      "NoticePatternSource": {
+        "type": "string",
+        "description": "What picks out the part of a sender's mail a suggestion is about.",
+        "enum": [
+          "template",
+          "phrase"
         ]
       },
       "Outcome": {
@@ -24569,7 +24601,7 @@
           },
           "evidence": {
             "$ref": "#/components/schemas/NoticeEvidence",
-            "description": "Why, in numbers."
+            "description": "Why, in numbers: the counts of the part of the sender's mail it is\nabout."
           },
           "id": {
             "$ref": "#/components/schemas/RuleNoticeId",
@@ -24582,6 +24614,17 @@
           "kind": {
             "$ref": "#/components/schemas/NoticeKind",
             "description": "What Scout noticed."
+          },
+          "pattern": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoticePattern",
+                "description": "The part of the sender's mail it is about; none for all of it."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sender": {
             "type": "string",

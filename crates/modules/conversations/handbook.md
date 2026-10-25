@@ -62,7 +62,7 @@ Rules run first, before Scout's own reading, and always the same. The same messa
 
 ### Scout noticed
 
-For mail an inbox gets a lot of, Scout may offer a rule, such as "archive it as it arrives" or "keep it off Home". This is worked out from counts and facts, never from the text. It never covers a person, a sender the inbox writes to, or a sender that looked suspicious or asked for something. The member can say Not now (hidden for 14 days) or Never. Nothing is saved without the member's yes.
+For mail an inbox gets a lot of, Scout may offer a rule, such as "archive it as it arrives" or "keep it off Home". This is worked out from counts and facts, never from the text. When a sender's mail is of several kinds (a shop's promotions and its shipping notices), the offer is for one kind only: the sender with a subject pattern, or with words the model proposed from the subjects alone. Each offer quotes one real subject as an example. It never covers a person, a sender the inbox writes to, a sender that looked suspicious, or a kind of mail that asked for something. The member can say Not now (hidden for 14 days) or Never, for each offer. Nothing is saved without the member's yes.
 
 ### Person notes
 

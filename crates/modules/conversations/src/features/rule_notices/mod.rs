@@ -1,18 +1,21 @@
-//! "Scout noticed" (campbooks-cloud#169): mail an inbox gets a lot of, and
-//! the smart rule Scout offers for it, one at a time at the bottom of Home.
+//! "Scout noticed" (campbooks-cloud#169, #356): mail an inbox gets a lot of,
+//! and the smart rule Scout offers for it, one at a time at the bottom of
+//! Home.
 //!
 //! - `conversations.notice_rules` (a job, one per inbox, at most every
-//!   [`NoticeSettings::every_hours`]) counts each sender's recent mail
-//!   ([`analysis`]: how often and how regularly it comes, the stream the
+//!   [`NoticeSettings::every_hours`]) counts each frequent sender's recent
+//!   mail ([`analysis`]: how often and how regularly it comes, the stream the
 //!   decide pass sorted it to, whether it asked anything or a payment is
 //!   owed, and what the inbox did with it: opened, archived or deleted
-//!   unread, replied), and keeps a suggestion per sender and kind
-//!   (`conversations.rule_notices`), refreshed on every pass and dropped
-//!   once the sender no longer qualifies.
+//!   unread, replied), split into kinds where the sender's mail is mixed (by
+//!   subject template, or by words the `complete` model proposed for its
+//!   subjects, [`grouping`]), and keeps a suggestion per sender, kind of
+//!   suggestion and pattern (`conversations.rule_notices`), refreshed on
+//!   every pass and dropped once it no longer qualifies.
 //! - `GET …/rule-notices` lists the suggestions of the inboxes the caller may
 //!   teach in, without those the caller answered "Not now" (for a while) or
-//!   "Don't suggest this" (for good, per sender and kind), and starts a pass
-//!   for an inbox not looked at lately.
+//!   "Don't suggest this" (for good, per sender, kind and pattern), and
+//!   starts a pass for an inbox not looked at lately.
 //! - `GET …/rule-notices/{id}` reads one of them, as the list shows it (Scout's
 //!   chat about a suggestion reads it so, as the member), and starts no pass.
 //! - `POST …/rule-notices/{id}/answer` records that answer, per member;
@@ -22,15 +25,24 @@
 //!   the suggestion is then accepted, and Undo of the new rule offers it
 //!   again.
 //!
-//! No model is asked and no email text is read; the member's preference
-//! becomes a deterministic rule, never prompt text.
+//! No body is read. Subjects are grouped by template equality, and only for
+//! a mixed sender the model sees its subjects, nothing else, while the
+//! `complete` role may receive mail here; the member's preference becomes a
+//! deterministic rule, never prompt text.
 
 mod analysis;
+mod grouping;
 #[cfg(test)]
 mod tests;
 
+use std::collections::HashMap;
+
 use axum::{Extension, Json, extract::State, http::StatusCode};
-use campbooks_ai::decide::signals::email::{Envelope, Party, is_machine_sender};
+use campbooks_ai::{
+    Gateway, Role,
+    decide::signals::email::{Envelope, Party, is_machine_sender, subject_template, subject_words},
+    usage::Scope,
+};
 use campbooks_kernel::{
     AppState, Error, JobContext, JobError, JobHandler, Operation, Problem, Result, Risk,
     db::BeginFor as _,
@@ -49,17 +61,21 @@ use crate::{
     config::NoticeSettings,
     domain::{
         access::visible_inboxes,
-        rules::{self, RuleAction, RuleCondition},
+        rules::{self, RuleAction, RuleCondition, Stored},
         tracked,
     },
-    features::rules::{PREVIEW_DEADLINE, compute_preview, may_teach, member_only},
+    features::{
+        read_message::{error_kind, may_read_mail},
+        rules::{PREVIEW_DEADLINE, compute_preview, may_teach, member_only},
+    },
     ingest::Headers,
     model::{InboxId, NoticeAnswer, NoticeKind, RuleId, RuleNoticeId, Stream},
     scopes::{ConversationsRead, ConversationsWrite},
     tracking,
 };
 
-use analysis::SenderStats;
+use analysis::{Mail, Pattern, Sender};
+use grouping::ToGroup;
 
 /// Senders looked at per pass, the most frequent first.
 const SENDERS_PER_PASS: i64 = 40;
@@ -76,12 +92,15 @@ pub struct NoticeRulesPayload {
 /// Looks at an inbox's mail and keeps what Scout noticed.
 pub struct NoticeRules {
     settings: NoticeSettings,
+    gateway: Option<Gateway>,
 }
 
 impl NoticeRules {
-    /// The pass, under `settings`.
-    pub const fn new(settings: NoticeSettings) -> Self {
-        Self { settings }
+    /// The pass, under `settings`; the model's grouping of mixed senders'
+    /// subjects through `gateway`'s `complete` role, `None` (the role is not
+    /// configured, or may not receive mail here) never asking it.
+    pub const fn new(settings: NoticeSettings, gateway: Option<Gateway>) -> Self {
+        Self { settings, gateway }
     }
 }
 
@@ -91,11 +110,103 @@ impl JobHandler for NoticeRules {
     const QUEUE: &'static str = "rules";
 
     async fn run(&self, ctx: &mut JobContext, payload: NoticeRulesPayload) -> Result<(), JobError> {
+        // The model first, with no transaction held while it answers; what
+        // it found is kept, then the pass reads it.
+        if let Some(gateway) = &self.gateway {
+            group(ctx, gateway, payload.inbox, &self.settings).await?;
+        }
         let tx = ctx.tx().await?;
         let kept = scan(tx, payload.inbox, &self.settings).await?;
         tracing::info!(suggestions = kept, "rule notices refreshed");
         Ok(())
     }
+}
+
+/// Ask the model to group the subjects of the inbox's mixed senders whose
+/// grouping is missing or stale, at most `model_senders_per_pass`, and keep
+/// what it answers. Any failure of the model leaves things as they were:
+/// the pass goes on with the templates alone.
+async fn group(
+    ctx: &JobContext,
+    gateway: &Gateway,
+    inbox: InboxId,
+    settings: &NoticeSettings,
+) -> Result<(), JobError> {
+    // Nothing to ask while the role may not receive mail here: no subject
+    // is even read.
+    if settings.model_senders_per_pass == 0 || !may_read_mail(gateway) {
+        return Ok(());
+    }
+    let Some(workspace) = ctx.workspace().and_then(|w| w.parse::<WorkspaceId>().ok()) else {
+        return Ok(());
+    };
+    let state = ctx.state();
+    let mut tx = state.db.begin_for(workspace).await?;
+    let asks = to_group(&mut tx, inbox, settings).await?;
+    tx.commit().await?;
+    if asks.is_empty() {
+        return Ok(());
+    }
+    let usage = Scope::workspace(state.db.clone(), workspace, grouping::FEATURE);
+    let found = usage
+        .run(async {
+            let mut found = Vec::new();
+            for ask in &asks {
+                match gateway
+                    .chat(Role::Complete, grouping::request_for(&ask.subjects))
+                    .await
+                {
+                    // An answer that is not the JSON asked for is kept as
+                    // "no kinds", so the sender is not asked about again soon.
+                    Ok(response) => found.push((
+                        ask.sender.clone(),
+                        grouping::phrases(&response).unwrap_or_default(),
+                    )),
+                    Err(error) => {
+                        tracing::info!(
+                            feature = grouping::FEATURE,
+                            error = error_kind(&error),
+                            "the grouping call failed"
+                        );
+                        // Over the daily limit, or refused: the others would
+                        // be too.
+                        if matches!(
+                            error,
+                            campbooks_ai::Error::OverDailyCap { .. }
+                                | campbooks_ai::Error::ExternalContentRefused { .. }
+                                | campbooks_ai::Error::RoleNotConfigured(_)
+                        ) {
+                            break;
+                        }
+                    }
+                }
+            }
+            found
+        })
+        .await;
+    if found.is_empty() {
+        return Ok(());
+    }
+    let mut tx = state.db.begin_for(workspace).await?;
+    if let Some(at) = inbox_workspace(&mut tx, inbox).await? {
+        grouping::keep(&mut tx, (at, inbox), &found).await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// The workspace of `inbox`, unless it is kept read-only or gone.
+async fn inbox_workspace(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+) -> Result<Option<sqlx::types::Uuid>> {
+    Ok(sqlx::query_scalar!(
+        r#"SELECT workspace_id FROM conversations.inboxes
+            WHERE id = $1 AND detached_at IS NULL"#,
+        inbox as InboxId,
+    )
+    .fetch_optional(&mut *conn)
+    .await?)
 }
 
 /// Enqueue a pass over `inbox` in `workspace`, unless one is pending.
@@ -114,30 +225,211 @@ async fn enqueue(
     .await
 }
 
-/// A sender's mail in the window, as one query counts it.
+/// A frequent sender's conversation in the window, as one query reads it.
+#[derive(sqlx::FromRow)]
 #[allow(
     clippy::struct_excessive_bools,
     reason = "one row of independent yes/no facts, read straight from SQL"
 )]
-struct StatsRow {
+struct MailRow {
     sender_address: String,
-    sender_name: Option<String>,
-    received: i64,
-    opened: i64,
-    archived_unread: i64,
-    last_week: i64,
-    days: i64,
+    name: Option<String>,
+    subject: String,
+    subject_template: Option<String>,
+    sent_at: DateTime<Utc>,
+    opened: bool,
+    archived_unread: bool,
     replied: bool,
     suspicious: bool,
     owed: bool,
     asked: bool,
     stream: String,
     headers: serde_json::Value,
-    dates: Vec<DateTime<Utc>>,
+}
+
+/// The conversations of `inbox`'s senders over the window whose newest
+/// inbound message is theirs: of the most frequent senders with at least
+/// `min` (or of `only`), most frequent first, each sender's newest first.
+const SENDER_MAIL: &str = "
+    WITH latest AS (
+        SELECT c.id, c.stream, c.archived_at IS NOT NULL AS archived, c.trashed,
+               c.unread_count > 0 AS unread, m.sender_address, m.sender ->> 'name' AS name,
+               m.subject, m.subject_template, m.sent_at, m.headers,
+               EXISTS (SELECT 1 FROM conversations.messages o
+                        WHERE o.conversation_id = c.id AND o.direction = 'outbound') AS replied,
+               EXISTS (SELECT 1 FROM conversations.decisions d
+                        WHERE d.conversation_id = c.id AND d.question = 'suspicious'
+                          AND d.value = 'true'::jsonb) AS suspicious,
+               EXISTS (SELECT 1 FROM conversations.decisions d
+                        WHERE d.conversation_id = c.id AND d.question = 'money'
+                          AND d.value = '\"owed\"'::jsonb) AS owed,
+               EXISTS (SELECT 1 FROM conversations.needs n
+                        WHERE n.conversation_id = c.id AND n.reason IN ('reply', 'do')
+                          AND (n.state = 'open' OR n.verdict IN ('done', 'confirmed'))) AS asked
+          FROM conversations.conversations c
+          CROSS JOIN LATERAL (
+              SELECT sender_address, sender, subject, subject_template, sent_at, headers
+                FROM conversations.messages
+               WHERE conversation_id = c.id AND direction = 'inbound'
+               ORDER BY sent_at DESC, id DESC LIMIT 1
+          ) m
+         WHERE c.inbox_id = $1 AND c.last_message_at > now() - make_interval(days => $2)
+           AND ($5::text IS NULL OR m.sender_address = $5)
+    ),
+    frequent AS (
+        SELECT sender_address, count(*) AS n
+          FROM latest
+         GROUP BY sender_address
+        HAVING count(*) >= $3
+         ORDER BY count(*) DESC, sender_address
+         LIMIT $4
+    )
+    SELECT l.sender_address, l.name, l.subject, l.subject_template, l.sent_at,
+           NOT l.unread AS opened, l.unread AND (l.archived OR l.trashed) AS archived_unread,
+           l.replied, l.suspicious, l.owed, l.asked, l.stream, l.headers
+      FROM latest l
+      JOIN frequent f ON f.sender_address = l.sender_address
+     ORDER BY f.n DESC, l.sender_address, l.sent_at DESC";
+
+/// A sender and its mail, with the name it gives.
+struct Loaded {
+    sender: Sender,
+    name: Option<String>,
+}
+
+/// The frequent senders of `inbox` and their mail over the window (or only
+/// `only`'s, however little), the most frequent first.
+async fn senders(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    settings: &NoticeSettings,
+    only: Option<&str>,
+) -> Result<Vec<Loaded>> {
+    let window = i32::try_from(settings.window_days).unwrap_or(i32::MAX);
+    let min = if only.is_some() {
+        1
+    } else {
+        i64::from(settings.min_messages)
+    };
+    let rows: Vec<MailRow> = sqlx::query_as(SENDER_MAIL)
+        .bind(inbox)
+        .bind(window)
+        .bind(min)
+        .bind(SENDERS_PER_PASS)
+        .bind(only)
+        .fetch_all(&mut *conn)
+        .await?;
+    let mut out: Vec<Loaded> = Vec::new();
+    for row in rows {
+        // `''` means "no template"; NULL means not worked out yet.
+        let template = match row.subject_template {
+            None => subject_template(&row.subject),
+            Some(t) if t.is_empty() => None,
+            Some(t) => Some(t),
+        };
+        let mail = Mail {
+            subject: row.subject,
+            template,
+            sent_at: row.sent_at,
+            opened: row.opened,
+            archived_unread: row.archived_unread,
+            replied: row.replied,
+            suspicious: row.suspicious,
+            owed: row.owed,
+            asked: row.asked,
+            stream: row.stream.parse().unwrap_or(Stream::Primary),
+        };
+        if let Some(last) = out
+            .last_mut()
+            .filter(|l| l.sender.address == row.sender_address)
+        {
+            last.name = last.name.take().max(row.name);
+            last.sender.mail.push(mail);
+            continue;
+        }
+        // The newest conversation's headers say whether a machine sent it.
+        let headers: Headers = serde_json::from_value(row.headers).unwrap_or_default();
+        out.push(Loaded {
+            sender: Sender {
+                machine: is_machine_sender(&envelope(&row.sender_address, &headers)),
+                correspondent: rules::corresponds(conn, inbox, &row.sender_address).await?,
+                address: row.sender_address,
+                mail: vec![mail],
+            },
+            name: row.name,
+        });
+    }
+    Ok(out)
+}
+
+/// What rules of the inbox already say about `sender`'s mail: all of it, or
+/// the patterns they name.
+fn taught(rules: &[Stored], sender: &str) -> (bool, Vec<Pattern>) {
+    let mut whole = false;
+    let mut patterns = Vec::new();
+    for rule in rules {
+        let names = rule.conditions.iter().any(
+            |c| matches!(c, RuleCondition::SenderAddress(a) if a.eq_ignore_ascii_case(sender)),
+        );
+        if !names {
+            continue;
+        }
+        let subject = rule.conditions.iter().find_map(|c| match c {
+            RuleCondition::SubjectTemplate(t) => Some(Pattern::Template(t.trim().to_lowercase())),
+            RuleCondition::SubjectContains(w) => Some(Pattern::Phrase(subject_words(w).join(" "))),
+            _ => None,
+        });
+        match subject {
+            Some(pattern) => patterns.push(pattern),
+            None => whole = true,
+        }
+    }
+    (whole, patterns)
+}
+
+/// The senders of `inbox` the model should group now: mixed, with much of
+/// their mail fitting no template, not wholly taught, and with no fresh
+/// grouping; the most frequent first, at most `model_senders_per_pass`.
+async fn to_group(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    settings: &NoticeSettings,
+) -> Result<Vec<ToGroup>> {
+    if inbox_workspace(conn, inbox).await?.is_none() {
+        return Ok(Vec::new());
+    }
+    let loaded = senders(conn, inbox, settings, None).await?;
+    let rules = rules::of_inboxes(conn, &[inbox]).await?;
+    let fresh: Vec<String> = grouping::cached(conn, inbox, settings)
+        .await?
+        .into_iter()
+        .filter_map(|(sender, _, fresh)| fresh.then_some(sender))
+        .collect();
+    let max = usize::try_from(settings.model_senders_per_pass).unwrap_or(usize::MAX);
+    let now = Utc::now();
+    let mut out = Vec::new();
+    for Loaded { sender, .. } in loaded {
+        if out.len() >= max {
+            break;
+        }
+        if fresh.contains(&sender.address) || taught(&rules, &sender.address).0 {
+            continue;
+        }
+        if !analysis::read(&sender, &[], settings, now).to_group {
+            continue;
+        }
+        let subjects =
+            grouping::distinct_subjects(sender.mail.iter().map(|m| m.subject.as_str()), settings);
+        out.push(ToGroup {
+            sender: sender.address,
+            subjects,
+        });
+    }
+    Ok(out)
 }
 
 /// Look at `inbox`'s recent mail and keep what Scout noticed: a suggestion
-/// per sender and kind, refreshed, and none left for a sender that no
+/// per sender, kind and pattern, refreshed, and none left for one that no
 /// longer qualifies. Returns how many it kept.
 pub async fn scan(
     conn: &mut PgConnection,
@@ -145,77 +437,56 @@ pub async fn scan(
     settings: &NoticeSettings,
 ) -> Result<usize> {
     // An inbox kept read-only, or gone, gets nothing.
-    let Some(workspace) = sqlx::query_scalar!(
-        r#"SELECT workspace_id FROM conversations.inboxes
-            WHERE id = $1 AND detached_at IS NULL"#,
-        inbox as InboxId,
-    )
-    .fetch_optional(&mut *conn)
-    .await?
-    else {
+    let Some(workspace) = inbox_workspace(conn, inbox).await? else {
         return Ok(0);
     };
-    let rows = senders(conn, inbox, settings).await?;
-    // Senders a rule of the inbox already speaks for.
-    let taught: Vec<String> = rules::of_inboxes(conn, &[inbox])
+    let loaded = senders(conn, inbox, settings, None).await?;
+    let rules = rules::of_inboxes(conn, &[inbox]).await?;
+    let groupings: HashMap<String, Vec<String>> = grouping::cached(conn, inbox, settings)
         .await?
-        .iter()
-        .flat_map(|rule| rule.conditions.iter())
-        .filter_map(|c| match c {
-            RuleCondition::SenderAddress(address) => Some(address.clone()),
-            _ => None,
-        })
+        .into_iter()
+        .map(|(sender, phrases, _)| (sender, phrases))
         .collect();
     let max = usize::try_from(settings.max_per_inbox).unwrap_or(usize::MAX);
+    let now = Utc::now();
     let mut kept = 0;
-    for row in rows {
-        if kept >= max {
-            break;
-        }
-        if taught.contains(&row.sender_address) {
+    'senders: for Loaded { sender, name } in loaded {
+        let (whole, patterns) = taught(&rules, &sender.address);
+        if whole {
             continue;
         }
-        let headers: Headers = serde_json::from_value(row.headers).unwrap_or_default();
-        let stats = SenderStats {
-            received: count(row.received),
-            opened: count(row.opened),
-            archived_unread: count(row.archived_unread),
-            last_week: count(row.last_week),
-            days: count(row.days),
-            replied: row.replied,
-            suspicious: row.suspicious,
-            owed: row.owed,
-            asked: row.asked,
-            stream: row.stream.parse().unwrap_or(Stream::Primary),
-            machine: is_machine_sender(&envelope(&row.sender_address, &headers)),
-            correspondent: rules::corresponds(conn, inbox, &row.sender_address).await?,
-            dates: row.dates,
-            sender: row.sender_address,
-        };
-        let Some(noticed) = analysis::notice(&stats, settings) else {
-            continue;
-        };
-        // Only what a rule would still change is worth a word.
-        let deadline = std::time::Instant::now() + PREVIEW_DEADLINE;
-        let preview = compute_preview(
-            conn,
-            inbox,
-            (&noticed.conditions, &noticed.actions),
-            deadline,
-        )
-        .await?;
-        if preview.would_change == 0 {
-            continue;
+        let phrases = groupings
+            .get(&sender.address)
+            .map_or(&[][..], Vec::as_slice);
+        for noticed in analysis::read(&sender, phrases, settings, now).notices {
+            if kept >= max {
+                break 'senders;
+            }
+            if patterns.contains(&noticed.pattern) {
+                continue;
+            }
+            // Only what a rule would still change is worth a word.
+            let deadline = std::time::Instant::now() + PREVIEW_DEADLINE;
+            let preview = compute_preview(
+                conn,
+                inbox,
+                (&noticed.conditions, &noticed.actions),
+                deadline,
+            )
+            .await?;
+            if preview.would_change == 0 {
+                continue;
+            }
+            store(
+                conn,
+                (workspace, inbox),
+                &noticed,
+                &sender.address,
+                name.as_deref(),
+            )
+            .await?;
+            kept += 1;
         }
-        store(
-            conn,
-            (workspace, inbox),
-            &noticed,
-            &stats.sender,
-            row.sender_name.as_deref(),
-        )
-        .await?;
-        kept += 1;
     }
     // What no longer holds goes; accepted ones stay (they name a rule).
     sqlx::query!(
@@ -227,6 +498,44 @@ pub async fn scan(
     .await?;
     record_scan(conn, (workspace, inbox), settings).await?;
     Ok(kept)
+}
+
+/// Whether `sender`'s mail in `inbox` is all of one kind for what the inbox
+/// does with it, as the pass would read it now (the model's kept words for
+/// it counted): teach once's default is
+/// then the whole sender, else only mail like the one acted on. A sender
+/// with little or no mail in the window is.
+pub async fn uniform(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    sender: &str,
+    settings: &NoticeSettings,
+) -> Result<bool> {
+    let address = sender.trim().to_lowercase();
+    let Some(Loaded { mut sender, .. }) = senders(conn, inbox, settings, Some(&address))
+        .await?
+        .into_iter()
+        .next()
+    else {
+        return Ok(true);
+    };
+    // Teach once asks this only of a machine sender the inbox does not
+    // write to.
+    sender.machine = true;
+    sender.correspondent = false;
+    // The model's words for it, kept from a pass, count as kinds too.
+    let phrases = grouping::of_sender(conn, inbox, &address).await?;
+    Ok(analysis::uniform(&sender, &phrases, settings, Utc::now()))
+}
+
+/// The words the model proposed for `sender`'s mail in `inbox`, kept from a
+/// pass; never a new call.
+pub async fn phrases_of(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    sender: &str,
+) -> Result<Vec<String>> {
+    Ok(grouping::of_sender(conn, inbox, &sender.trim().to_lowercase()).await?)
 }
 
 /// How soon an inbox with no mail yet is looked at again: soon after its
@@ -270,69 +579,6 @@ async fn record_scan(
     Ok(())
 }
 
-/// Each sender's mail in `inbox` over the window, the most frequent first.
-async fn senders(
-    conn: &mut PgConnection,
-    inbox: InboxId,
-    settings: &NoticeSettings,
-) -> Result<Vec<StatsRow>> {
-    let window = i32::try_from(settings.window_days).unwrap_or(i32::MAX);
-    Ok(sqlx::query_as!(
-        StatsRow,
-        r#"
-        WITH latest AS (
-            SELECT c.id, c.stream, c.archived_at IS NOT NULL AS archived, c.trashed,
-                   c.unread_count > 0 AS unread, m.sender_address, m.sender ->> 'name' AS name,
-                   m.sent_at, m.headers,
-                   EXISTS (SELECT 1 FROM conversations.messages o
-                            WHERE o.conversation_id = c.id AND o.direction = 'outbound') AS replied,
-                   EXISTS (SELECT 1 FROM conversations.decisions d
-                            WHERE d.conversation_id = c.id AND d.question = 'suspicious'
-                              AND d.value = 'true'::jsonb) AS suspicious,
-                   EXISTS (SELECT 1 FROM conversations.decisions d
-                            WHERE d.conversation_id = c.id AND d.question = 'money'
-                              AND d.value = '"owed"'::jsonb) AS owed,
-                   EXISTS (SELECT 1 FROM conversations.needs n
-                            WHERE n.conversation_id = c.id AND n.reason IN ('reply', 'do')
-                              AND (n.state = 'open' OR n.verdict IN ('done', 'confirmed'))) AS asked
-              FROM conversations.conversations c
-              CROSS JOIN LATERAL (
-                  SELECT sender_address, sender, sent_at, headers
-                    FROM conversations.messages
-                   WHERE conversation_id = c.id AND direction = 'inbound'
-                   ORDER BY sent_at DESC, id DESC LIMIT 1
-              ) m
-             WHERE c.inbox_id = $1 AND c.last_message_at > now() - make_interval(days => $2)
-        )
-        SELECT sender_address AS "sender_address!",
-               max(name) AS sender_name,
-               count(*) AS "received!",
-               count(*) FILTER (WHERE NOT unread) AS "opened!",
-               count(*) FILTER (WHERE unread AND (archived OR trashed)) AS "archived_unread!",
-               count(*) FILTER (WHERE sent_at > now() - interval '7 days') AS "last_week!",
-               count(DISTINCT date_trunc('day', sent_at)) AS "days!",
-               bool_or(replied) AS "replied!",
-               bool_or(suspicious) AS "suspicious!",
-               bool_or(owed) AS "owed!",
-               bool_or(asked) AS "asked!",
-               mode() WITHIN GROUP (ORDER BY stream) AS "stream!",
-               (array_agg(headers ORDER BY sent_at DESC))[1] AS "headers!",
-               array_agg(sent_at ORDER BY sent_at) AS "dates!"
-          FROM latest
-         GROUP BY sender_address
-        HAVING count(*) >= $3
-         ORDER BY count(*) DESC, sender_address
-         LIMIT $4
-        "#,
-        inbox as InboxId,
-        window,
-        i64::from(settings.min_messages),
-        SENDERS_PER_PASS,
-    )
-    .fetch_all(conn)
-    .await?)
-}
-
 /// Keep `noticed` for `sender` in `inbox`: new, or refreshed while still
 /// open (an accepted one stays as it is).
 async fn store(
@@ -343,35 +589,31 @@ async fn store(
     name: Option<&str>,
 ) -> Result<()> {
     let (workspace, inbox) = at;
-    sqlx::query!(
-        r#"
-        INSERT INTO conversations.rule_notices
-            (id, workspace_id, inbox_id, kind, sender_address, sender_name, conditions,
-             actions, evidence)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (inbox_id, kind, sender_address) DO UPDATE
-           SET sender_name = EXCLUDED.sender_name, conditions = EXCLUDED.conditions,
-               actions = EXCLUDED.actions, evidence = EXCLUDED.evidence,
-               refreshed_at = now()
-         WHERE conversations.rule_notices.state = 'open'
-        "#,
-        RuleNoticeId::new() as RuleNoticeId,
-        workspace,
-        inbox as InboxId,
-        noticed.kind.as_str(),
-        sender,
-        name.map(|n| n.chars().take(200).collect::<String>()),
-        serde_json::json!(noticed.conditions),
-        serde_json::json!(noticed.actions),
-        serde_json::json!(noticed.evidence),
+    sqlx::query(
+        "INSERT INTO conversations.rule_notices
+             (id, workspace_id, inbox_id, kind, sender_address, sender_name, conditions,
+              actions, evidence, pattern, example_subject)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (inbox_id, kind, sender_address, pattern) DO UPDATE
+            SET sender_name = EXCLUDED.sender_name, conditions = EXCLUDED.conditions,
+                actions = EXCLUDED.actions, evidence = EXCLUDED.evidence,
+                example_subject = EXCLUDED.example_subject, refreshed_at = now()
+          WHERE conversations.rule_notices.state = 'open'",
     )
+    .bind(RuleNoticeId::new())
+    .bind(workspace)
+    .bind(inbox)
+    .bind(noticed.kind.as_str())
+    .bind(sender)
+    .bind(name.map(|n| n.chars().take(200).collect::<String>()))
+    .bind(serde_json::json!(noticed.conditions))
+    .bind(serde_json::json!(noticed.actions))
+    .bind(serde_json::json!(noticed.evidence))
+    .bind(noticed.pattern.key())
+    .bind(noticed.example.as_deref())
     .execute(conn)
     .await?;
     Ok(())
-}
-
-fn count(n: i64) -> u32 {
-    u32::try_from(n).unwrap_or_default()
 }
 
 /// The envelope the machine-sender facts read: the address and the bulk
@@ -417,10 +659,81 @@ pub struct RuleNotice {
     pub conditions: Vec<RuleCondition>,
     /// Its actions.
     pub actions: Vec<RuleAction>,
-    /// Why, in numbers.
+    /// Why, in numbers: the counts of the part of the sender's mail it is
+    /// about.
     pub evidence: NoticeEvidence,
+    /// The part of the sender's mail it is about; none for all of it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<NoticePattern>,
     /// Other members use the inbox: the rule would act for them too.
     pub shared: bool,
+}
+
+/// The part of a sender's mail a suggestion is about (campbooks-cloud#356).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NoticePattern {
+    /// What picks it out.
+    pub source: NoticePatternSource,
+    /// One recent subject of that mail, as plain text.
+    pub example: String,
+    /// What narrows a search for the sender's mail to it, in the search
+    /// grammar (`subject:"…"`); empty when no words of it can.
+    pub search: String,
+}
+
+/// What picks out the part of a sender's mail a suggestion is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NoticePatternSource {
+    /// The subject's template (the rule's `subject_template`).
+    Template,
+    /// Words the model proposed for the sender's subjects and the pass
+    /// checked against its mail (the rule's `subject_contains`).
+    Phrase,
+}
+
+/// The search for mail whose subject has `template`: its longest run of
+/// words between the parts that change (`#`, `*`), quoted.
+fn template_search(template: &str) -> String {
+    let best = template
+        .split(['#', '*'])
+        .map(|run| {
+            run.replace('"', " ")
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .filter(|run| run.chars().any(char::is_alphanumeric))
+        .fold(String::new(), |best, run| {
+            let words = |s: &str| s.split(' ').count();
+            if best.is_empty() || words(&run) > words(&best) {
+                run
+            } else {
+                best
+            }
+        });
+    if best.is_empty() {
+        String::new()
+    } else {
+        format!("subject:\"{best}\"")
+    }
+}
+
+/// `pattern` (as stored) and its example as the API shows them.
+fn pattern_of(pattern: &str, example: Option<String>) -> Option<NoticePattern> {
+    let (source, search) = match Pattern::of_key(pattern) {
+        Pattern::Sender => return None,
+        Pattern::Template(template) => (NoticePatternSource::Template, template_search(&template)),
+        Pattern::Phrase(words) => (
+            NoticePatternSource::Phrase,
+            format!("subject:\"{}\"", words.replace('"', " ")),
+        ),
+    };
+    Some(NoticePattern {
+        source,
+        example: example.unwrap_or_default(),
+        search,
+    })
 }
 
 /// What Scout noticed, the most frequent sender first.
@@ -440,7 +753,22 @@ struct NoticeRow {
     conditions: serde_json::Value,
     actions: serde_json::Value,
     evidence: serde_json::Value,
+    pattern: String,
+    example_subject: Option<String>,
 }
+
+/// The open suggestions of the inboxes `$1` that member `$2` did not hide.
+const LIST: &str = "
+    SELECT n.id, n.inbox_id, n.kind, n.sender_address, n.sender_name, n.conditions, n.actions,
+           n.evidence, n.pattern, n.example_subject
+      FROM conversations.rule_notices n
+     WHERE n.inbox_id = ANY($1) AND n.state = 'open'
+       AND NOT EXISTS (
+           SELECT 1 FROM conversations.rule_notice_answers a
+            WHERE a.inbox_id = n.inbox_id AND a.user_id = $2 AND a.kind = n.kind
+              AND a.sender_address = n.sender_address AND a.pattern = n.pattern
+              AND (a.answer = 'never' OR a.until > now()))
+     ORDER BY (n.evidence ->> 'received')::int DESC, n.id";
 
 /// List what Scout noticed in the inboxes you may teach in: smart rules it
 /// offers for mail you get a lot of.
@@ -500,25 +828,11 @@ pub async fn list(
     for inbox in to_scan {
         enqueue(&mut tx, &ws, inbox).await?;
     }
-    let rows = sqlx::query_as!(
-        NoticeRow,
-        r#"
-        SELECT n.id AS "id: RuleNoticeId", n.inbox_id AS "inbox_id: InboxId", n.kind,
-               n.sender_address, n.sender_name, n.conditions, n.actions, n.evidence
-          FROM conversations.rule_notices n
-         WHERE n.inbox_id = ANY($1) AND n.state = 'open'
-           AND NOT EXISTS (
-               SELECT 1 FROM conversations.rule_notice_answers a
-                WHERE a.inbox_id = n.inbox_id AND a.user_id = $2 AND a.kind = n.kind
-                  AND a.sender_address = n.sender_address
-                  AND (a.answer = 'never' OR a.until > now()))
-         ORDER BY (n.evidence ->> 'received')::int DESC, n.id
-        "#,
-        &teachable as &[InboxId],
-        access.user.map(|u| *u.as_uuid()),
-    )
-    .fetch_all(&mut *tx)
-    .await?;
+    let rows: Vec<NoticeRow> = sqlx::query_as(LIST)
+        .bind(&teachable)
+        .bind(access.user.map(|u| *u.as_uuid()))
+        .fetch_all(&mut *tx)
+        .await?;
     let shared = rules::shared_of(&mut tx, &teachable).await?;
     tx.commit().await?;
     let notices = rows
@@ -543,6 +857,7 @@ fn notice_of(row: NoticeRow, shared: bool) -> Result<RuleNotice> {
         conditions: serde_json::from_value(row.conditions).map_err(json)?,
         actions: serde_json::from_value(row.actions).map_err(json)?,
         evidence: serde_json::from_value(row.evidence).map_err(json)?,
+        pattern: pattern_of(&row.pattern, row.example_subject),
         shared,
     })
 }
@@ -580,7 +895,7 @@ pub async fn get(
 ) -> Result<Json<RuleNotice>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let (inbox, _, _) = target(&mut tx, path.notice_id).await?;
+    let Target { inbox, .. } = target(&mut tx, path.notice_id).await?;
     // As the list: only an inbox the caller may teach in. One they only read
     // answers as one they cannot see (404), since the list never shows them
     // its suggestions; an app gets 403: suggestions are a member's own.
@@ -594,13 +909,13 @@ pub async fn get(
     let user = access.user.ok_or(Error::NotFound)?;
     let row: NoticeRow = sqlx::query_as(
         "SELECT n.id, n.inbox_id, n.kind, n.sender_address, n.sender_name, n.conditions, \
-                n.actions, n.evidence \
+                n.actions, n.evidence, n.pattern, n.example_subject \
            FROM conversations.rule_notices n \
           WHERE n.id = $1 AND n.state = 'open' \
             AND NOT EXISTS ( \
                 SELECT 1 FROM conversations.rule_notice_answers a \
                  WHERE a.inbox_id = n.inbox_id AND a.user_id = $2 AND a.kind = n.kind \
-                   AND a.sender_address = n.sender_address \
+                   AND a.sender_address = n.sender_address AND a.pattern = n.pattern \
                    AND (a.answer = 'never' OR a.until > now()))",
     )
     .bind(path.notice_id)
@@ -630,18 +945,26 @@ pub struct AnswerRuleNotice {
     pub answer: NoticeAnswer,
 }
 
-/// A suggestion's inbox, kind and sender; 404 when it is gone or in another
-/// workspace (row-level security).
-async fn target(conn: &mut PgConnection, id: RuleNoticeId) -> Result<(InboxId, String, String)> {
-    let row = sqlx::query!(
-        r#"SELECT inbox_id AS "inbox: InboxId", kind, sender_address
-             FROM conversations.rule_notices WHERE id = $1"#,
-        id as RuleNoticeId,
+/// What an answer to a suggestion is about.
+#[derive(sqlx::FromRow)]
+struct Target {
+    inbox: InboxId,
+    kind: String,
+    sender: String,
+    pattern: String,
+}
+
+/// A suggestion's inbox, kind, sender and pattern; 404 when it is gone or
+/// in another workspace (row-level security).
+async fn target(conn: &mut PgConnection, id: RuleNoticeId) -> Result<Target> {
+    sqlx::query_as(
+        "SELECT inbox_id AS inbox, kind, sender_address AS sender, pattern
+           FROM conversations.rule_notices WHERE id = $1",
     )
+    .bind(id)
     .fetch_optional(conn)
     .await?
-    .ok_or(Error::NotFound)?;
-    Ok((row.inbox, row.kind, row.sender_address))
+    .ok_or(Error::NotFound)
 }
 
 /// Answer a suggestion: "Not now" hides it for a while, "Don't suggest
@@ -679,7 +1002,12 @@ pub async fn answer(
 ) -> Result<StatusCode> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let (inbox, kind, sender) = target(&mut tx, path.notice_id).await?;
+    let Target {
+        inbox,
+        kind,
+        sender,
+        pattern,
+    } = target(&mut tx, path.notice_id).await?;
     // 404 unless the caller sees its inbox, 403 when they only read it; an
     // app gets 403 too: answers are a member's own.
     may_teach(&state, &mut tx, access, inbox).await?;
@@ -689,20 +1017,21 @@ pub async fn answer(
         NoticeAnswer::NotNow => Some(i32::try_from(settings.not_now_days).unwrap_or(i32::MAX)),
         NoticeAnswer::Never => None,
     };
-    sqlx::query!(
-        r#"INSERT INTO conversations.rule_notice_answers
-               (workspace_id, inbox_id, user_id, kind, sender_address, answer, until)
-           VALUES ($1, $2, $3, $4, $5, $6, now() + make_interval(days => $7))
-           ON CONFLICT (inbox_id, user_id, kind, sender_address) DO UPDATE
-              SET answer = EXCLUDED.answer, until = EXCLUDED.until, answered_at = now()"#,
-        access.workspace.as_uuid(),
-        inbox as InboxId,
-        user.as_uuid(),
-        kind,
-        sender,
-        body.answer.as_str(),
-        days,
+    sqlx::query(
+        "INSERT INTO conversations.rule_notice_answers
+             (workspace_id, inbox_id, user_id, kind, sender_address, pattern, answer, until)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now() + make_interval(days => $8))
+         ON CONFLICT (inbox_id, user_id, kind, sender_address, pattern) DO UPDATE
+            SET answer = EXCLUDED.answer, until = EXCLUDED.until, answered_at = now()",
     )
+    .bind(access.workspace.as_uuid())
+    .bind(inbox)
+    .bind(user.as_uuid())
+    .bind(&kind)
+    .bind(&sender)
+    .bind(&pattern)
+    .bind(body.answer.as_str())
+    .bind(days)
     .execute(&mut *tx)
     .await?;
     state
@@ -752,20 +1081,27 @@ pub async fn clear_answer(
 ) -> Result<StatusCode> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let (inbox, kind, sender) = target(&mut tx, path.notice_id).await?;
+    let Target {
+        inbox,
+        kind,
+        sender,
+        pattern,
+    } = target(&mut tx, path.notice_id).await?;
     // 404 unless the caller sees its inbox, 403 when they only read it; an
     // app gets 403 too: answers are a member's own.
     may_teach(&state, &mut tx, access, inbox).await?;
     member_only(&workspace.principal)?;
     let user = access.user.ok_or(Error::NotFound)?;
-    let cleared = sqlx::query!(
-        r#"DELETE FROM conversations.rule_notice_answers
-            WHERE inbox_id = $1 AND user_id = $2 AND kind = $3 AND sender_address = $4"#,
-        inbox as InboxId,
-        user.as_uuid(),
-        kind,
-        sender,
+    let cleared = sqlx::query(
+        "DELETE FROM conversations.rule_notice_answers
+          WHERE inbox_id = $1 AND user_id = $2 AND kind = $3 AND sender_address = $4
+            AND pattern = $5",
     )
+    .bind(inbox)
+    .bind(user.as_uuid())
+    .bind(&kind)
+    .bind(&sender)
+    .bind(&pattern)
     .execute(&mut *tx)
     .await?
     .rows_affected();
@@ -876,5 +1212,9 @@ pub async fn forget_inbox(conn: &mut PgConnection, inbox: InboxId) -> Result<()>
     )
     .execute(&mut *conn)
     .await?;
+    sqlx::query("DELETE FROM conversations.rule_notice_groupings WHERE inbox_id = $1")
+        .bind(inbox)
+        .execute(&mut *conn)
+        .await?;
     Ok(())
 }
