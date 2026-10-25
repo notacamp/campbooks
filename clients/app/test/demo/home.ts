@@ -163,7 +163,7 @@ const found = (
   });
 
 /** In 20 minutes, with a web address to join at. */
-export const HOME_CALL = event(1, {
+const HOME_CALL = event(1, {
   kind: "meeting",
   title: "Kitchen plan call with Marta Ferreira",
   starts: "2026-10-13T11:20:00-04:00",
@@ -172,7 +172,7 @@ export const HOME_CALL = event(1, {
   response: "accepted",
 });
 
-export const HOME_LUNCH = event(2, {
+const HOME_LUNCH = event(2, {
   kind: "reservation",
   title: "Lunch with Rui",
   starts: "2026-10-13T12:30:00-04:00",
@@ -181,7 +181,7 @@ export const HOME_LUNCH = event(2, {
 });
 
 /** Time Sam held for the lease task. */
-export const HOME_HOLD = found(3, {
+const HOME_HOLD = found(3, {
   kind: "hold",
   title: "Send the signed lease to Marta",
   starts: "2026-10-13T15:00:00-04:00",
@@ -192,7 +192,7 @@ export const HOME_HOLD = found(3, {
 });
 
 /** Read from Marta's email: only Sam sees it. */
-export const HOME_HANDOVER = found(4, {
+const HOME_HANDOVER = found(4, {
   kind: "appointment",
   title: "Key handover · Rua das Flores 12",
   starts: "2026-10-13T18:00:00-04:00",
@@ -237,7 +237,7 @@ const HOME_RENEWAL = event(8, {
 });
 
 /** A train only Sam sees, read from the ticket's email. */
-export const HOME_TRAIN = found(9, {
+const HOME_TRAIN = found(9, {
   kind: "travel",
   title: "Train to Boston, car 4 seat 52",
   starts: "2026-10-18T08:15:00-04:00",

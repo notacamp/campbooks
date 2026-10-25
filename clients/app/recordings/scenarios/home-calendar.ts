@@ -128,7 +128,7 @@ export default async function homeCalendar({ page }: ScenarioContext): Promise<v
     .goto("/")
     .then(() => page.evaluate(`import("/test/demo/workspaces.ts").then((demo) => demo.DUARTE.id)`));
   await page.goto(`/w/${String(workspace)}`);
-  const call = page.getByText(CALL).first();
+  const call = page.getByText(CALL, { exact: true }).first();
   await call.waitFor();
   await page.getByRole("heading", { level: 2, name: "Coming up" }).waitFor();
   await caption(page, "Demo workspace, fictional mail and calendar", 1600);
@@ -138,7 +138,7 @@ export default async function homeCalendar({ page }: ScenarioContext): Promise<v
   await caption(page, "Join opens the call; Enter opens it in Calendar", 2600);
   await caption(page, "The hero says what is next, from your calendar", 2400);
 
-  const lunch = page.getByText("Lunch with Rui").first();
+  const lunch = page.getByText("Lunch with Rui", { exact: true }).first();
   if (phone) {
     await page.getByRole("heading", { level: 2, name: /^Today/u }).scrollIntoViewIfNeeded();
     await lunch.scrollIntoViewIfNeeded();
@@ -150,8 +150,9 @@ export default async function homeCalendar({ page }: ScenarioContext): Promise<v
       .click();
   } else {
     await caption(page, "↓ walks the list: Now, then Today", 1600);
-    // Next up, the warning and the bill (Now), then Today's four items: lunch.
-    for (let step = 0; step < 7; step += 1) {
+    // Through Now and Today's items, onto lunch.
+    const lunchRow = page.locator("button[data-selected]", { hasText: "Lunch with Rui" });
+    for (let step = 0; step < 12 && (await lunchRow.count()) === 0; step += 1) {
       await page.keyboard.press("ArrowDown");
       await pause(500);
     }
