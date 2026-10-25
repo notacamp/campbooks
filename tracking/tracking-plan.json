@@ -2115,6 +2115,11 @@
       "value": "imap"
     },
     {
+      "description": "Microsoft: Outlook.com, Hotmail and Microsoft 365 mail.",
+      "enum": "connectors.provider",
+      "value": "microsoft"
+    },
+    {
       "description": "Zoho: Zoho Mail and Zoho Calendar.",
       "enum": "connectors.provider",
       "value": "zoho"
@@ -4761,6 +4766,7 @@
                 "enum": [
                   "google",
                   "imap",
+                  "microsoft",
                   "zoho"
                 ],
                 "type": "string",
@@ -4907,6 +4913,7 @@
                 "enum": [
                   "google",
                   "imap",
+                  "microsoft",
                   "zoho"
                 ],
                 "type": "string",
@@ -5069,6 +5076,7 @@
                 "enum": [
                   "google",
                   "imap",
+                  "microsoft",
                   "zoho"
                 ],
                 "type": "string",
@@ -5222,6 +5230,7 @@
                 "enum": [
                   "google",
                   "imap",
+                  "microsoft",
                   "zoho"
                 ],
                 "type": "string",
@@ -5371,6 +5380,7 @@
                 "enum": [
                   "google",
                   "imap",
+                  "microsoft",
                   "zoho"
                 ],
                 "type": "string",
@@ -5449,6 +5459,7 @@
             "enum": [
               "google",
               "imap",
+              "microsoft",
               "zoho"
             ],
             "type": "string",
@@ -5552,6 +5563,7 @@
                 "enum": [
                   "google",
                   "imap",
+                  "microsoft",
                   "zoho"
                 ],
                 "type": "string",
@@ -5661,6 +5673,7 @@
                 "enum": [
                   "google",
                   "imap",
+                  "microsoft",
                   "zoho"
                 ],
                 "type": "string",
@@ -5762,6 +5775,7 @@
             "enum": [
               "google",
               "imap",
+              "microsoft",
               "zoho"
             ],
             "type": "string",

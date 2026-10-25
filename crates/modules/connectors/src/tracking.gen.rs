@@ -532,6 +532,9 @@ pub enum Provider {
     /// Any mailbox over IMAP and SMTP, with its password.
     #[serde(rename = "imap")]
     Imap,
+    /// Microsoft: Outlook.com, Hotmail and Microsoft 365 mail.
+    #[serde(rename = "microsoft")]
+    Microsoft,
     /// Zoho: Zoho Mail and Zoho Calendar.
     #[serde(rename = "zoho")]
     Zoho,

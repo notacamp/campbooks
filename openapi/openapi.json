@@ -23298,7 +23298,8 @@
         "enum": [
           "google",
           "zoho",
-          "imap"
+          "imap",
+          "microsoft"
         ]
       },
       "PushTo": {
@@ -25751,7 +25752,7 @@
             "items": {
               "$ref": "#/components/schemas/Capability"
             },
-            "description": "The capabilities to ask for (`messages`, and `calendar` for Google,\nand for Zoho while its flag is on)."
+            "description": "The capabilities to ask for (`messages`, and `calendar` for Google,\nand for Zoho while its flag is on; `messages` only for Microsoft)."
           },
           "connection": {
             "oneOf": [

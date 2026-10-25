@@ -168,7 +168,7 @@ async fn known_labels(
     Ok(match target.provider {
         Provider::Google => Some(user_labels(conn, target.stream).await?),
         Provider::Zoho => zoho_labels(conn, target.connection, target.stream).await?,
-        Provider::Imap => None,
+        Provider::Imap | Provider::Microsoft => None,
     })
 }
 
@@ -254,11 +254,14 @@ fn outcome(
         Provider::Google => outbound::writable(label),
         Provider::Zoho => zoho::state::writable(label),
         Provider::Imap => imap::write::writable(label),
+        // Nothing is written to Microsoft yet (campbooks-cloud#317).
+        Provider::Microsoft => false,
     };
     let mapped = match provider {
         Provider::Google => outbound::map(change, known.unwrap_or(&HashSet::new())),
         Provider::Zoho => outbound::map_zoho(change, known),
         Provider::Imap => outbound::map_imap(change),
+        Provider::Microsoft => Mapped::Skip("unsupported"),
     };
     match mapped {
         Mapped::Labels { add, remove } if !add.iter().chain(&remove).all(|l| writable(l)) => {

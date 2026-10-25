@@ -13,7 +13,9 @@
 //!   one token endpoint and key set signing for every tenant's issuer,
 //!   `https://login.microsoftonline.com/{tid}/v2.0`. The issuer a token must
 //!   have is computed from its own `tid`, then checked with the signature.
-//!   Its address counts as verified only with `xms_edov`.
+//!   Its address counts as verified only with `xms_edov`. A mail connection's
+//!   round trip may go to another tenant than sign-in's (the mail tenant,
+//!   `common` by default): a second client, [`Upstream::for_mailbox`].
 //! - **Zoho**: the callback names the data centre's accounts server, which
 //!   must be one of Zoho's (a fixed list) before anything is sent; the code
 //!   is exchanged there, and its ID token must be issued by it.
@@ -336,6 +338,9 @@ pub struct Upstream {
     redirect_uri: String,
     authorize: Url,
     rule: Rule,
+    /// The client for mail round trips (connect, reconnect), when they go to
+    /// another tenant than sign-in's (Microsoft).
+    mail: Option<Box<Upstream>>,
 }
 
 impl std::fmt::Debug for Upstream {
@@ -410,7 +415,51 @@ impl Upstream {
             secret,
             authorize: endpoints.authorize,
             rule,
+            mail: None,
         })
+    }
+
+    /// This client, with `mail` for the round trips that connect or
+    /// reconnect a mailbox (a mail tenant other than sign-in's).
+    #[must_use]
+    pub fn with_mail(mut self, mail: Self) -> Self {
+        self.mail = Some(Box::new(mail));
+        self
+    }
+
+    /// The client a round trip goes through: the mail client when it brings
+    /// a mailbox (`mailbox`) and there is one, else this one.
+    pub fn for_mailbox(&self, mailbox: bool) -> &Self {
+        match &self.mail {
+            Some(mail) if mailbox => mail,
+            _ => self,
+        }
+    }
+
+    /// Whether signing in through this client would accept `identity`
+    /// (validated by this client or its mail client): for Microsoft, its
+    /// tenant (from its issuer) is one sign-in's tenant takes.
+    pub fn admits(&self, identity: &ProviderIdentity) -> bool {
+        let Rule::Tenant {
+            prefix,
+            suffix,
+            only,
+            except,
+            ..
+        } = &self.rule
+        else {
+            return true;
+        };
+        let Some(tid) = identity
+            .issuer
+            .strip_prefix(prefix.as_str())
+            .and_then(|rest| rest.strip_suffix(suffix.as_str()))
+            .filter(|tid| is_tenant_id(tid))
+        else {
+            return false;
+        };
+        !(only.as_ref().is_some_and(|only| only != tid)
+            || except.as_ref().is_some_and(|except| except == tid))
     }
 
     /// The provider.
@@ -837,6 +886,63 @@ mod tests {
         assert!(work.authorize.as_str().contains("/organizations/"));
         assert!(Endpoints::microsoft("not a tenant").is_err());
         assert!(Endpoints::microsoft("72f988bf-86f1-41af-91ab-2d7cd011db47").is_ok());
+    }
+
+    #[test]
+    fn a_mail_round_trip_goes_to_the_mail_tenant() {
+        let organizations = Endpoints::microsoft("organizations").unwrap();
+        let common = Endpoints::microsoft("common").unwrap();
+        let microsoft = client(Provider::Microsoft, organizations)
+            .with_mail(client(Provider::Microsoft, common));
+        let path = |upstream: &Upstream| {
+            let (url, q) = query(&upstream.authorize_url(&request(true, true)));
+            assert_eq!(
+                q["redirect_uri"],
+                "https://app.example.com/auth/callback/microsoft"
+            );
+            url.path().to_owned()
+        };
+        assert_eq!(
+            path(microsoft.for_mailbox(false)),
+            "/organizations/oauth2/v2.0/authorize"
+        );
+        assert_eq!(
+            path(microsoft.for_mailbox(true)),
+            "/common/oauth2/v2.0/authorize"
+        );
+        // Without a mail client, the same one.
+        let google = client(Provider::Google, Endpoints::google());
+        assert!(std::ptr::eq(google.for_mailbox(true), &google));
+    }
+
+    #[test]
+    fn sign_in_admits_only_the_tenants_it_takes() {
+        let identity = |tid: &str| ProviderIdentity {
+            provider: "microsoft".to_owned(),
+            issuer: format!("{MICROSOFT_ISSUER_PREFIX}{tid}{MICROSOFT_ISSUER_SUFFIX}"),
+            subject: "s".to_owned(),
+            email: None,
+            email_verified: false,
+            name: None,
+        };
+        let work = "72f988bf-86f1-41af-91ab-2d7cd011db47";
+        let organizations = client(
+            Provider::Microsoft,
+            Endpoints::microsoft("organizations").unwrap(),
+        );
+        assert!(organizations.admits(&identity(work)));
+        assert!(!organizations.admits(&identity(MICROSOFT_CONSUMERS_TENANT)));
+        let common = client(Provider::Microsoft, Endpoints::microsoft("common").unwrap());
+        assert!(common.admits(&identity(MICROSOFT_CONSUMERS_TENANT)));
+        let one = client(Provider::Microsoft, Endpoints::microsoft(work).unwrap());
+        assert!(one.admits(&identity(work)));
+        assert!(!one.admits(&identity(MICROSOFT_CONSUMERS_TENANT)));
+        let mut forged = identity(work);
+        forged.issuer = "https://evil.example.com/72f988bf-86f1-41af-91ab-2d7cd011db47/v2.0".into();
+        assert!(!common.admits(&forged));
+        // Other providers have no tenants.
+        let google = client(Provider::Google, Endpoints::google());
+        assert!(google.admits(&identity(work)));
     }
 
     #[test]

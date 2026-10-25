@@ -139,6 +139,8 @@ impl JobHandler for SyncStream {
             Provider::Zoho => self.deps.zoho.is_some(),
             Provider::Imap if self.deps.imap.config.enabled && self.deps.cipher.is_some() => true,
             Provider::Imap => return self.idle_imap(ctx, workspace, &target, now).await,
+            // No reading until campbooks-cloud#316: the grant is kept alive.
+            Provider::Microsoft => return self.idle_microsoft(ctx, workspace, &target, now).await,
         };
         let (true, Some(inbox)) = (configured, target.inbox) else {
             // The provider is no longer configured (or the stream has no
@@ -212,7 +214,7 @@ impl JobHandler for SyncStream {
                 self.run_zoho(ctx, workspace, &target, &token, &backlog, now)
                     .await
             }
-            Provider::Imap => Ok(None),
+            Provider::Imap | Provider::Microsoft => Ok(None),
         }
         .inspect_err(|_| metrics::sync_finished(target.provider, SyncOutcome::Failed))?;
         // Without a page the run waits or has recorded its trouble, and
@@ -308,8 +310,9 @@ impl SyncStream {
                      VALUES ($1, $2, $3, $4, now())
                      ON CONFLICT (stream_id, label_id) DO UPDATE SET name = EXCLUDED.name",
                 ),
-                // IMAP has no label cache (its stream folders are in the cursor).
-                Provider::Imap => continue,
+                // IMAP has no label cache (its stream folders are in the cursor),
+                // and nothing is written to Microsoft yet.
+                Provider::Imap | Provider::Microsoft => continue,
             };
             insert
                 .bind(workspace)
@@ -651,6 +654,63 @@ impl SyncStream {
         }
         let idle = now + TimeDelta::seconds(i64::from(self.deps.config.poll.max_seconds));
         schedule::set_due(ctx.tx().await?, workspace, target.stream, idle).await?;
+        Ok(())
+    }
+
+    /// A Microsoft stream until reading lands (campbooks-cloud#316): a valid
+    /// access token is had (the stored one, or a refresh under the
+    /// connection's lock), so a grant Microsoft no longer honours shows as
+    /// `needs_reauth` and throttling as `throttled`, then it waits at the
+    /// slowest interval. Nothing is read or written. On an instance that no
+    /// longer offers Microsoft mail, nothing is asked of Microsoft and the
+    /// leased schedule row brings the stream back later.
+    async fn idle_microsoft(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        now: DateTime<Utc>,
+    ) -> Result<(), JobError> {
+        if self.deps.microsoft.is_none() {
+            tracing::debug!(stream = %target.stream, "Microsoft mail is not offered here");
+            return Ok(());
+        }
+        match credentials::access_token(ctx.pool(), &self.deps, workspace, target.connection).await
+        {
+            Ok(_) => {}
+            Err(TokenError::NeedsReauth(reason)) => {
+                metrics::sync_finished(target.provider, SyncOutcome::Refused);
+                return self.needs_reauth(ctx, workspace, target, reason, now).await;
+            }
+            Err(TokenError::Provider(err)) => {
+                return self.trouble(ctx, workspace, target, &err, now).await;
+            }
+            Err(TokenError::Database(err)) => return Err(err.into()),
+        }
+        let state = ctx.state().clone();
+        let tx = ctx.tx().await?;
+        health::lock(tx, target.connection).await?;
+        sqlx::query(
+            "UPDATE connectors.streams SET consecutive_failures = 0, throttled_until = NULL
+              WHERE id = $1",
+        )
+        .bind(target.stream)
+        .execute(&mut **tx)
+        .await?;
+        if matches!(target.health, Health::Throttled | Health::Failing) {
+            health::set(
+                tx,
+                &state.tracker,
+                workspace,
+                target.connection,
+                Health::Ok,
+                None,
+                now,
+            )
+            .await?;
+        }
+        let idle = now + TimeDelta::seconds(i64::from(self.deps.config.poll.max_seconds));
+        schedule::set_due(tx, workspace, target.stream, idle).await?;
         Ok(())
     }
 
@@ -1812,7 +1872,7 @@ async fn label_rows(
               WHERE stream_id = $1 AND kind = 'user'"
         }
         Provider::Zoho => "SELECT label_id, name FROM connectors.zoho_labels WHERE stream_id = $1",
-        Provider::Imap => return Ok(Vec::new()),
+        Provider::Imap | Provider::Microsoft => return Ok(Vec::new()),
     };
     let mut tx = ctx.pool().begin_for(workspace).await?;
     let rows: Vec<(String, String)> = sqlx::query_as(query)
@@ -2120,5 +2180,7 @@ mod calendar_tests;
 mod imap_tests;
 #[cfg(test)]
 mod imap_write_tests;
+#[cfg(test)]
+mod microsoft_tests;
 #[cfg(test)]
 mod tests;

@@ -2,8 +2,9 @@
 //! IMAP and SMTP servers of an email address: from the bundled provider
 //! database, the domain's own autoconfig document, its SRV records or its
 //! MX host (`imap::discover`). An address at a provider Campbooks connects
-//! natively is answered with that provider instead. A read: nothing is
-//! stored, and no server is signed in to.
+//! natively is answered with that provider instead (Microsoft only while
+//! this instance offers Microsoft mail; `not_supported_yet` otherwise). A
+//! read: nothing is stored, and no server is signed in to.
 
 use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
@@ -190,7 +191,23 @@ pub async fn execute(
         Rate::per_hour(DISCOVERIES_PER_HOUR),
     )
     .await?;
-    Ok(discover::discover(&deps.imap, &address).await.into())
+    Ok(offered(deps, discover::discover(&deps.imap, &address).await).into())
+}
+
+/// `found` as this instance connects it: an Outlook or Microsoft 365
+/// address goes to Microsoft's sign-in while Microsoft mail is offered
+/// (`CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED`), and is not supported yet
+/// otherwise.
+fn offered(deps: &Deps, found: Discovery) -> Discovery {
+    match found {
+        Discovery::NotSupportedYet(Native::Microsoft) if deps.microsoft.is_some() => {
+            Discovery::UseProvider(Native::Microsoft)
+        }
+        Discovery::UseProvider(Native::Microsoft) if deps.microsoft.is_none() => {
+            Discovery::NotSupportedYet(Native::Microsoft)
+        }
+        other => other,
+    }
 }
 
 /// Whether a member who may create a connection may find or connect an

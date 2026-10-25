@@ -214,7 +214,7 @@ async fn list_calendars(
                     _ => None,
                 }
             }
-            Provider::Imap => None,
+            Provider::Imap | Provider::Microsoft => None,
         };
         match answer {
             Some(Ok(calendars)) => listed = calendars,
@@ -227,7 +227,7 @@ async fn list_calendars(
         provider: match grant.provider {
             Provider::Google => Some("google"),
             Provider::Zoho => Some("zoho"),
-            Provider::Imap => None,
+            Provider::Imap | Provider::Microsoft => None,
         },
         calendars: listed.clone(),
     };

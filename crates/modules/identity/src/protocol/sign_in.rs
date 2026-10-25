@@ -429,6 +429,9 @@ pub async fn callback(
             clear_flow,
         ));
     };
+    // A round trip that brings a mailbox went to the mail tenant (Microsoft):
+    // its code is redeemed, and its ID token validated, there.
+    let upstream = upstream.for_mailbox(flow.purpose.wants_mailbox());
     let signed_in = match identify(upstream, code, &query, &flow).await {
         Ok(found) => found,
         Err(code) => return Ok(with_cookie(fail(&ctx, &flow, code).await?, clear_flow)),
@@ -755,9 +758,32 @@ impl MailGrant {
                 .map(ToOwned::to_owned)
                 .collect(),
         };
-        let granted = !wanted.is_empty() && wanted.iter().all(|s| scopes.contains(s));
+        let granted = !wanted.is_empty()
+            && wanted
+                .iter()
+                .all(|w| scopes.iter().any(|s| same_scope(provider, s, w)));
         Self { granted, scopes }
     }
+}
+
+/// How Microsoft may prefix a Graph scope in a token answer.
+const GRAPH_RESOURCE: &str = "https://graph.microsoft.com/";
+
+/// Whether `granted` is the `wanted` scope. Microsoft may answer a Graph
+/// scope with or without its resource prefix, in any case; the others answer
+/// what was asked.
+fn same_scope(provider: Provider, granted: &str, wanted: &str) -> bool {
+    if provider != Provider::Microsoft {
+        return granted == wanted;
+    }
+    let name = |scope: &str| -> String {
+        let lower = scope.to_ascii_lowercase();
+        lower
+            .strip_prefix(GRAPH_RESOURCE)
+            .unwrap_or(&lower)
+            .to_owned()
+    };
+    name(granted) == name(wanted)
 }
 
 /// Keep `identity` (and its mailbox grant, when there is one with offline
@@ -1155,6 +1181,42 @@ mod tests {
         let partial =
             MailGrant::from_answer(Provider::Zoho, Some("ZohoMail.accounts.READ"), &wanted());
         assert!(!partial.granted);
+    }
+
+    #[test]
+    fn microsoft_scopes_are_granted_with_or_without_the_graph_prefix() {
+        let wanted: Vec<String> = ["Mail.ReadWrite", "Mail.Send", "User.Read"]
+            .map(str::to_owned)
+            .to_vec();
+        let prefixed = MailGrant::from_answer(
+            Provider::Microsoft,
+            Some(
+                "https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send \
+                 https://graph.microsoft.com/User.Read openid profile email offline_access",
+            ),
+            &wanted,
+        );
+        assert!(prefixed.granted);
+        let short = MailGrant::from_answer(
+            Provider::Microsoft,
+            Some("mail.readwrite Mail.Send User.Read"),
+            &wanted,
+        );
+        assert!(short.granted);
+        let without_send = MailGrant::from_answer(
+            Provider::Microsoft,
+            Some("https://graph.microsoft.com/Mail.ReadWrite User.Read"),
+            &wanted,
+        );
+        assert!(!without_send.granted);
+        // Only Microsoft's answers are read so.
+        let google = MailGrant::from_answer(
+            Provider::Google,
+            Some("https://graph.microsoft.com/Mail.ReadWrite Mail.Send User.Read"),
+            &wanted,
+        );
+        assert!(!google.granted);
+        assert!(!MailGrant::from_answer(Provider::Microsoft, None, &wanted).granted);
     }
 
     #[test]

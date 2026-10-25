@@ -1,6 +1,7 @@
-//! The module's settings: `CAMPBOOKS_CONNECTORS__*` (the sync engine and
-//! the IMAP adapter), `CAMPBOOKS_GOOGLE__*` and `CAMPBOOKS_ZOHO__*` (the
-//! OAuth clients, shared with sign-in).
+//! The module's settings: `CAMPBOOKS_CONNECTORS__*` (the sync engine, the
+//! IMAP adapter and Microsoft mail), `CAMPBOOKS_GOOGLE__*`,
+//! `CAMPBOOKS_MICROSOFT__*` and `CAMPBOOKS_ZOHO__*` (the OAuth clients,
+//! shared with sign-in).
 
 use std::path::PathBuf;
 
@@ -24,6 +25,9 @@ pub struct ConnectorsConfig {
     pub imap: ImapConfig,
     /// Calendar sync (`CAMPBOOKS_CONNECTORS__CALENDAR__*`).
     pub calendar: CalendarConfig,
+    /// Microsoft mail (`CAMPBOOKS_CONNECTORS__MICROSOFT__*`), off by
+    /// default.
+    pub microsoft: MicrosoftMailConfig,
     /// Whether Zoho Calendar is offered (`CAMPBOOKS_CONNECTORS__ZOHO_CALENDAR`,
     /// default off): its adapter is unverified against a live Zoho grant.
     pub zoho_calendar: bool,
@@ -78,6 +82,56 @@ pub struct CalendarConfig {
     /// every process (default 300). Google allows a user far more; this
     /// leaves room for a member's other apps.
     pub requests_per_minute: u32,
+}
+
+/// `CAMPBOOKS_CONNECTORS__MICROSOFT__*`: Outlook.com, Hotmail, Live, MSN
+/// and Microsoft 365 mail through Microsoft Graph (campbooks-cloud#309).
+/// Nothing here is checked while it is off: a server that does not offer
+/// Microsoft mail starts whatever these say (an unknown key or a tenant of
+/// any shape included).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct MicrosoftMailConfig {
+    /// Offer Microsoft mailboxes (default false). Also needs the Microsoft
+    /// OAuth client (`CAMPBOOKS_MICROSOFT__CLIENT_ID` and a secret) and the
+    /// instance secret key; without them it is not offered, with a warning.
+    pub enabled: bool,
+    /// The tenant a mail consent and its token refreshes go to (default
+    /// `common`: personal, work and school accounts), separate from
+    /// sign-in's `CAMPBOOKS_MICROSOFT__TENANT`: `common`, `organizations`,
+    /// `consumers` or a tenant id.
+    #[serde(deserialize_with = "any_text")]
+    pub tenant: String,
+}
+
+/// Any value as text, so its shape never stops a server that does not use
+/// it: a scalar as written, anything else as nothing (checked where used).
+fn any_text<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Raw {
+        Text(String),
+        Integer(i64),
+        Float(f64),
+        Bool(bool),
+        Other(serde::de::IgnoredAny),
+    }
+    Ok(match Raw::deserialize(deserializer)? {
+        Raw::Text(text) => text,
+        Raw::Integer(number) => number.to_string(),
+        Raw::Float(number) => number.to_string(),
+        Raw::Bool(value) => value.to_string(),
+        Raw::Other(_) => String::new(),
+    })
+}
+
+impl Default for MicrosoftMailConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            tenant: crate::microsoft::DEFAULT_TENANT.to_owned(),
+        }
+    }
 }
 
 /// `CAMPBOOKS_CONNECTORS__IMAP__*`: connecting any mailbox with its
@@ -214,6 +268,7 @@ impl Default for ConnectorsConfig {
             zoho: ZohoMailConfig::default(),
             imap: ImapConfig::default(),
             calendar: CalendarConfig::default(),
+            microsoft: MicrosoftMailConfig::default(),
             zoho_calendar: false,
             failing_after: 5,
             batch_retention_days: 7,
@@ -413,6 +468,15 @@ impl ConnectorsConfig {
         if imap.enabled {
             self.check_send()?;
         }
+        // Checked only while Microsoft mail is on: a stray value never stops
+        // an instance that does not offer it.
+        if self.microsoft.enabled && !crate::microsoft::is_tenant(self.microsoft.tenant.trim()) {
+            return Err(format!(
+                "CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT={}: use common, organizations, consumers \
+                 or a tenant id (or turn CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED off)",
+                self.microsoft.tenant
+            ));
+        }
         if self.failing_after == 0 {
             return Err("CAMPBOOKS_CONNECTORS__FAILING_AFTER must be positive".to_owned());
         }
@@ -541,7 +605,8 @@ impl ConnectorsConfig {
     }
 }
 
-/// A provider's OAuth client, `CAMPBOOKS_GOOGLE__*` or `CAMPBOOKS_ZOHO__*`.
+/// A provider's OAuth client, `CAMPBOOKS_GOOGLE__*`, `CAMPBOOKS_MICROSOFT__*`
+/// or `CAMPBOOKS_ZOHO__*`.
 /// The provider is offered only when the client id and a secret are set.
 /// The identity module reads the same settings (one OAuth app serves
 /// sign-in and mail); keys it alone uses are ignored here.
@@ -562,7 +627,7 @@ pub struct OAuthClientConfig {
 }
 
 impl OAuthClientConfig {
-    /// Load the `section` (`google`, `zoho`) of `figment`.
+    /// Load the `section` (`google`, `microsoft`, `zoho`) of `figment`.
     pub fn from_figment(figment: &Figment, section: &str) -> Result<Self, String> {
         if !figment.contains(section) {
             return Ok(Self::default());
@@ -614,7 +679,7 @@ mod tests {
 
     #[test]
     fn providers_are_unset_by_default() {
-        for section in ["google", "zoho"] {
+        for section in ["google", "microsoft", "zoho"] {
             let client = OAuthClientConfig::from_figment(&Figment::new(), section).unwrap();
             assert!(client.client_id.is_none() && client.client_secret_file.is_none());
         }
@@ -931,5 +996,75 @@ mod tests {
         )
         .unwrap();
         assert_eq!(client.client_id.as_deref(), Some("z"));
+    }
+
+    #[test]
+    fn microsoft_mail_is_off_by_default_and_checked_only_while_on() {
+        let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
+        assert!(!config.microsoft.enabled);
+        assert_eq!(config.microsoft.tenant, "common");
+        let on = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"microsoft": {"enabled": true, "tenant": "organizations"}}
+        })))
+        .unwrap();
+        assert!(on.microsoft.enabled);
+        assert_eq!(on.microsoft.tenant, "organizations");
+        for bad in ["not a tenant", "../evil", ""] {
+            // Off: it starts, whatever the value.
+            let off = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"microsoft": {"enabled": false, "tenant": bad}}
+            })))
+            .unwrap();
+            assert!(!off.microsoft.enabled);
+            ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"microsoft": {"tenant": bad}}
+            })))
+            .unwrap();
+            // On: the only setting that stops the server.
+            let refused = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"microsoft": {"enabled": true, "tenant": bad}}
+            })))
+            .unwrap_err();
+            assert!(
+                refused.contains("CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT"),
+                "{refused}"
+            );
+        }
+        // Production's settings (no Microsoft mail variable, its poll
+        // bounds) start, and so do they with the flag on.
+        for microsoft in [
+            serde_json::json!({}),
+            serde_json::json!({"enabled": false}),
+            serde_json::json!({"enabled": true}),
+        ] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {
+                    "poll": {"min_seconds": 60, "max_seconds": 120},
+                    "microsoft": microsoft
+                }
+            })))
+            .unwrap();
+            assert_eq!(
+                (config.poll.min_seconds, config.poll.max_seconds),
+                (60, 120)
+            );
+        }
+        // A tenant of any shape, or a key it does not know, never stops a
+        // server with the flag off.
+        for stray in [
+            serde_json::json!({"tenant": 1}),
+            serde_json::json!({"tenant": ["common"]}),
+            serde_json::json!({"client_id": "m", "enable": true}),
+        ] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"microsoft": stray}
+            })))
+            .unwrap();
+            assert!(!config.microsoft.enabled);
+        }
+        let shaped = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"microsoft": {"enabled": true, "tenant": 1}}
+        })));
+        assert!(shaped.unwrap_err().contains("MICROSOFT__TENANT"));
     }
 }

@@ -211,8 +211,8 @@ async fn refresh_locked(
     Ok(grant.access_token)
 }
 
-/// Ask connection `id`'s provider for a fresh access token: Google, or the
-/// accounts server of the Zoho grant's data centre.
+/// Ask connection `id`'s provider for a fresh access token: Google,
+/// Microsoft, or the accounts server of the Zoho grant's data centre.
 async fn refresh_at_provider(
     conn: &mut PgConnection,
     deps: &Deps,
@@ -238,6 +238,12 @@ async fn refresh_at_provider(
         }
         // An IMAP mailbox's password is not refreshed (`password`).
         Provider::Imap => Err(TokenError::NeedsReauth("credentials_unreadable")),
+        // At the mail tenant's token endpoint, only while Microsoft mail is
+        // offered.
+        Provider::Microsoft => {
+            let microsoft = deps.microsoft.as_ref().ok_or_else(not_configured)?;
+            Ok(microsoft.refresh(refresh).await)
+        }
         Provider::Zoho => {
             let zoho = deps.zoho.as_ref().ok_or_else(not_configured)?;
             let centre = row

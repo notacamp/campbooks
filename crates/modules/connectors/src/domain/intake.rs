@@ -20,7 +20,14 @@ use super::{
     grants::{Mailbox, ProviderGrant, Secret, create_or_refresh_connection},
     model::{Capability, ConnectionId, Health, Provider},
 };
-use crate::{MESSAGES, deps::Deps, google, provider::TokenGrant, zoho};
+use crate::{
+    MESSAGES,
+    deps::Deps,
+    google,
+    microsoft::{self, GraphUser},
+    provider::{ProviderError, TokenGrant},
+    zoho,
+};
 
 /// Takes sign-in grants into connections.
 #[derive(Debug, Clone)]
@@ -43,6 +50,11 @@ impl GrantIntake for Intake {
                     .collect()
             }
             "zoho" if self.deps.zoho.is_some() => zoho::MAIL_SCOPES.map(ToOwned::to_owned).to_vec(),
+            // Only while Microsoft mail is offered (its flag on): otherwise
+            // no round trip asks for it, and it is listed nowhere.
+            "microsoft" if self.deps.microsoft.is_some() => {
+                microsoft::MAIL_SCOPES.map(ToOwned::to_owned).to_vec()
+            }
             _ => Vec::new(),
         }
     }
@@ -74,7 +86,18 @@ impl GrantIntake for Intake {
         Box::pin(async move {
             let access = member(state, &grant.subject, grant.workspace).await?;
             let user = access.user.ok_or(Error::NotFound)?;
-            let address = grant.address.trim().to_lowercase();
+            let mut address = grant.address.trim().to_lowercase();
+            let mut address_verified = grant.address_verified;
+            let mut display_name = grant.display_name.clone();
+            let mut tokens = TokenGrant {
+                access_token: grant.access_token.expose_secret().to_owned(),
+                expires_in: grant.expires_in.and_then(|s| i64::try_from(s).ok()),
+                refresh_token: grant
+                    .refresh_token
+                    .as_ref()
+                    .map(|t| t.expose_secret().to_owned()),
+                scope: Some(grant.scopes.join(" ")),
+            };
             let (provider, capabilities, provider_server, mailboxes) = match grant.provider.as_str()
             {
                 "google" if self.deps.google.is_some() => {
@@ -108,6 +131,33 @@ impl GrantIntake for Intake {
                     }
                     (Provider::Zoho, capabilities, Some(server), mailboxes)
                 }
+                "microsoft" if self.deps.microsoft.is_some() => {
+                    if !microsoft::mail_granted(&grant.scopes) {
+                        return Err(Error::Denied(MESSAGES.reason("consent_incomplete")));
+                    }
+                    let mailbox = self.microsoft_mailbox(&mut tokens).await?;
+                    self.same_microsoft_mailbox(state, &grant, &mailbox).await?;
+                    // The proof the identity module checked (`xms_edov`) is
+                    // for the ID token's address: it vouches for the
+                    // mailbox's only when that is the same address.
+                    address_verified = grant.address_verified && mailbox.address == address;
+                    address = mailbox.address.clone();
+                    if mailbox.display_name.is_some() {
+                        display_name = mailbox.display_name.clone();
+                    }
+                    let mailbox = Mailbox {
+                        key: mailbox.id,
+                        address: address.clone(),
+                        address_verified,
+                        display_name: display_name.clone(),
+                    };
+                    (
+                        Provider::Microsoft,
+                        vec![Capability::Messages],
+                        None,
+                        vec![mailbox],
+                    )
+                }
                 _ => return Err(Error::Conflict(MESSAGES.reason("provider_not_configured"))),
             };
             if capabilities.is_empty() {
@@ -122,18 +172,10 @@ impl GrantIntake for Intake {
                     provider,
                     account_subject: grant.account_subject,
                     address,
-                    address_verified: grant.address_verified,
-                    display_name: grant.display_name,
+                    address_verified,
+                    display_name,
                     capabilities,
-                    secret: Secret::Tokens(TokenGrant {
-                        access_token: grant.access_token.expose_secret().to_owned(),
-                        expires_in: grant.expires_in.and_then(|s| i64::try_from(s).ok()),
-                        refresh_token: grant
-                            .refresh_token
-                            .as_ref()
-                            .map(|t| t.expose_secret().to_owned()),
-                        scope: Some(grant.scopes.join(" ")),
-                    }),
+                    secret: Secret::Tokens(tokens),
                     imap: None,
                     grantor_subject: Some(grant.subject.clone()),
                     extending: grant
@@ -232,6 +274,71 @@ impl GrantIntake for Intake {
 }
 
 impl Intake {
+    /// The mailbox a Microsoft grant reaches (Graph `/me`), read with its
+    /// access token. A held sign-in grant's access token may have expired:
+    /// then it is refreshed once with its own refresh token, and `tokens`
+    /// becomes what Microsoft answered (the refresh token kept when no new
+    /// one came).
+    async fn microsoft_mailbox(&self, tokens: &mut TokenGrant) -> Result<GraphUser, Error> {
+        let microsoft = self
+            .deps
+            .microsoft
+            .as_ref()
+            .ok_or_else(|| Error::Conflict(MESSAGES.reason("provider_not_configured")))?;
+        let mut answer = microsoft.me(&tokens.access_token).await;
+        if matches!(answer, Err(ProviderError::Unauthorized))
+            && let Some(refresh) = tokens.refresh_token.clone()
+        {
+            let TokenGrant {
+                access_token,
+                expires_in,
+                refresh_token: rotated,
+                scope: _,
+            } = microsoft
+                .refresh(&refresh)
+                .await
+                .map_err(|err| refused(&err))?;
+            // What the consent granted (the refresh asks for no more).
+            let scope = tokens.scope.take();
+            *tokens = TokenGrant {
+                access_token,
+                expires_in,
+                refresh_token: rotated.or(Some(refresh)),
+                scope,
+            };
+            answer = microsoft.me(&tokens.access_token).await;
+        }
+        answer.map_err(|err| refused(&err))
+    }
+
+    /// Refuse a Microsoft grant whose Graph user is not the mailbox the
+    /// workspace's connection of the same account reads (`account_mismatch`):
+    /// one account, one mailbox, never a second one beside it.
+    async fn same_microsoft_mailbox(
+        &self,
+        state: &AppState,
+        grant: &Grant,
+        mailbox: &GraphUser,
+    ) -> Result<(), Error> {
+        let mut tx = state.db.begin_for(grant.workspace).await?;
+        let keys: Vec<String> = sqlx::query_scalar(
+            "SELECT s.mailbox_key FROM connectors.streams s
+               JOIN connectors.connections c ON c.id = s.connection_id
+              WHERE c.workspace_id = $1 AND c.provider = 'microsoft'
+                AND c.account_subject = $2 AND s.capability = 'messages'",
+        )
+        .bind(grant.workspace)
+        .bind(&grant.account_subject)
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        if keys.iter().any(|key| *key != mailbox.id) {
+            tracing::info!(workspace = %grant.workspace, "refused a Microsoft grant for another mailbox of a connected account");
+            return Err(Error::Conflict(MESSAGES.reason("account_mismatch")));
+        }
+        Ok(())
+    }
+
     /// The data centre of a Zoho grant (its validated issuer) and the
     /// login's mail accounts, read with the grant's access token.
     async fn zoho_mailboxes(
@@ -277,6 +384,24 @@ impl Intake {
             return Err(Error::Conflict(MESSAGES.reason("no_mailbox")));
         }
         Ok((centre.issuer, mailboxes))
+    }
+}
+
+/// What a Microsoft call that failed while adopting a grant means for it:
+/// try again later, or this grant reaches no mailbox Campbooks can read.
+/// Never a token or an answer in the log.
+fn refused(err: &ProviderError) -> Error {
+    tracing::warn!(error = %err, "could not read a Microsoft grant's mailbox");
+    match err {
+        ProviderError::Unavailable(_) | ProviderError::RateLimited { .. } => {
+            Error::Unavailable(MESSAGES.reason("provider_unavailable"))
+        }
+        ProviderError::InvalidGrant | ProviderError::Unauthorized => {
+            Error::Denied(MESSAGES.reason("consent_incomplete"))
+        }
+        ProviderError::NotFound | ProviderError::Unexpected(_) => {
+            Error::Conflict(MESSAGES.reason("no_mailbox"))
+        }
     }
 }
 

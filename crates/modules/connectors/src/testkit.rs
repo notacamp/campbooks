@@ -50,10 +50,12 @@ use crate::{
         model::{InboxId, SendId},
     },
     google::{Endpoints, GMAIL_SCOPE, Google},
+    microsoft::Microsoft,
     provider::ClientSecret,
     zoho::{Centres, MAIL_SCOPES as ZOHO_SCOPES, Zoho},
 };
 
+pub use crate::testkit_microsoft::FakeMicrosoft;
 pub use crate::testkit_zoho::FakeZoho;
 
 /// Every scope of this module.
@@ -362,6 +364,9 @@ pub struct Kit {
     pub google: FakeGoogle,
     /// The fake Zoho (one data centre).
     pub zoho: FakeZoho,
+    /// The fake Microsoft (the mail tenant and Graph `/me`), configured
+    /// only when the kit's config turns Microsoft mail on.
+    pub microsoft: FakeMicrosoft,
     /// What the module was composed with.
     pub deps: Deps,
     /// The identity module's front door, faked.
@@ -388,6 +393,16 @@ impl Kit {
         Self::with_config(db, config).await
     }
 
+    /// The module as [`new`](Self::new), with Microsoft mail on against
+    /// the fake Microsoft.
+    pub async fn with_microsoft(db: PgPool) -> Self {
+        let mut config = ConnectorsConfig::default();
+        config.zoho.requests_per_minute = 1_000_000;
+        config.imap.enabled = false;
+        config.microsoft.enabled = true;
+        Self::with_config(db, config).await
+    }
+
     /// The module with `config`.
     pub async fn with_config(db: PgPool, config: ConnectorsConfig) -> Self {
         let imap_config = config.imap.clone();
@@ -396,6 +411,21 @@ impl Kit {
             DateTime::from_timestamp(Utc::now().timestamp(), 0).unwrap(),
         ));
         let zoho = FakeZoho::start(clock.clone()).await;
+        let microsoft = FakeMicrosoft::start().await;
+        let microsoft_client = config.microsoft.enabled.then(|| {
+            Arc::new(
+                Microsoft::new(
+                    "microsoft-client-1".into(),
+                    ClientSecret::Inline(crate::testkit_microsoft::CLIENT_SECRET.into()),
+                    crate::microsoft::Endpoints::under(
+                        &microsoft.base(),
+                        crate::testkit_microsoft::TENANT,
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            )
+        });
         let deps = Deps {
             config: Arc::new(config),
             google: Some(Arc::new(
@@ -414,6 +444,7 @@ impl Kit {
                 )
                 .unwrap(),
             )),
+            microsoft: microsoft_client,
             imap: Arc::new(crate::imap::Imap::new(imap_config)),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
@@ -421,7 +452,7 @@ impl Kit {
             ))),
             clock: clock.clone(),
         };
-        Self::assemble(db, deps, clock, google, zoho).await
+        Self::assemble(db, deps, clock, (google, zoho, microsoft)).await
     }
 
     /// The module as [`new`](Self::new), with the IMAP adapter `imap`.
@@ -434,10 +465,12 @@ impl Kit {
             DateTime::from_timestamp(Utc::now().timestamp(), 0).unwrap(),
         ));
         let zoho = FakeZoho::start(clock.clone()).await;
+        let microsoft = FakeMicrosoft::start().await;
         let deps = Deps {
             config: Arc::new(config),
             google: None,
             zoho: None,
+            microsoft: None,
             imap: Arc::new(imap),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
@@ -445,7 +478,7 @@ impl Kit {
             ))),
             clock: clock.clone(),
         };
-        Self::assemble(db, deps, clock, google, zoho).await
+        Self::assemble(db, deps, clock, (google, zoho, microsoft)).await
     }
 
     /// The module with no provider configured.
@@ -453,19 +486,19 @@ impl Kit {
         let google = FakeGoogle::start().await;
         let clock = Arc::new(FixedClock::new(Utc::now()));
         let zoho = FakeZoho::start(clock.clone()).await;
+        let microsoft = FakeMicrosoft::start().await;
         let deps = Deps {
             clock: clock.clone(),
             ..Deps::default()
         };
-        Self::assemble(db, deps, clock, google, zoho).await
+        Self::assemble(db, deps, clock, (google, zoho, microsoft)).await
     }
 
     async fn assemble(
         db: PgPool,
         deps: Deps,
         clock: Arc<FixedClock>,
-        google: FakeGoogle,
-        zoho: FakeZoho,
+        (google, zoho, microsoft): (FakeGoogle, FakeZoho, FakeMicrosoft),
     ) -> Self {
         let idp = TestIdp::start().await;
         let pool = testing::app_role_pool(&db).await;
@@ -490,6 +523,7 @@ impl Kit {
             clock,
             google,
             zoho,
+            microsoft,
             deps,
             door,
             outbound,
@@ -740,6 +774,81 @@ impl Kit {
                 },
             )
             .await
+    }
+
+    /// A Microsoft consent for `account_subject` (whose mailbox the fake's
+    /// Graph `/me` names), its address verified as `verified`, coming back
+    /// through the front door for `caller` in `workspace` (extending
+    /// `extending`), with `scopes` granted besides the identity ones: the
+    /// connection id.
+    pub async fn adopt_microsoft(
+        &self,
+        caller: &Caller,
+        workspace: WorkspaceId,
+        account_subject: &str,
+        verified: bool,
+        scopes: &[&str],
+        extending: Option<String>,
+    ) -> Result<String, Error> {
+        let (access, refresh) = self.microsoft.grant();
+        let mut granted = vec![
+            "openid".to_owned(),
+            "email".to_owned(),
+            "profile".to_owned(),
+        ];
+        granted.extend(scopes.iter().map(|s| (*s).to_owned()));
+        grant_intake(self.deps.clone())
+            .adopt(
+                &self.state,
+                ProviderGrant {
+                    workspace,
+                    subject: caller.subject.clone(),
+                    provider: "microsoft".to_owned(),
+                    account_subject: account_subject.to_owned(),
+                    issuer: "https://login.microsoftonline.com/72f988bf-86f1-41af-91ab-2d7cd011db47/v2.0"
+                        .to_owned(),
+                    address: "Ana.Rivera@Example.com".to_owned(),
+                    address_verified: verified,
+                    display_name: Some("Ana R.".to_owned()),
+                    scopes: granted,
+                    access_token: SecretString::from(access),
+                    refresh_token: Some(SecretString::from(refresh)),
+                    expires_in: Some(3599),
+                    extending,
+                },
+            )
+            .await
+    }
+
+    /// Connect the fake Microsoft account as `caller` in `workspace`,
+    /// granting every mail scope with the Graph prefix (as Microsoft may
+    /// answer): the connection JSON.
+    pub async fn connect_microsoft(
+        &self,
+        caller: &Caller,
+        workspace: WorkspaceId,
+    ) -> serde_json::Value {
+        let id = self
+            .adopt_microsoft(
+                caller,
+                workspace,
+                crate::testkit_microsoft::SUB,
+                true,
+                &[
+                    "https://graph.microsoft.com/Mail.ReadWrite",
+                    "https://graph.microsoft.com/Mail.Send",
+                    "https://graph.microsoft.com/User.Read",
+                    "offline_access",
+                ],
+                None,
+            )
+            .await
+            .unwrap_or_else(|e| panic!("adopting: {e:?}"));
+        let read = self
+            .get(caller, &format!("/api/v1/w/{workspace}/connections/{id}"))
+            .await;
+        assert_eq!(read.status.as_u16(), 200, "{:?}", read.json);
+        read.json
     }
 
     /// Connect the fake Zoho login as `caller` in `workspace`; the
