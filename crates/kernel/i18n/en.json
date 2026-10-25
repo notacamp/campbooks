@@ -41,6 +41,7 @@
     "upload_failed": "Reading the upload failed. Try again.",
     "too_many_streams": "You have too many live update connections open. Close some tabs or windows and try again.",
     "rate_limited": "Too many attempts. Wait a moment and try again.",
-    "mailbox_unsupported": "Connecting this kind of mailbox is not available on this instance."
+    "mailbox_unsupported": "Connecting this kind of mailbox is not available on this instance.",
+    "holds_unsupported": "Holding time on a calendar is not available on this instance."
   }
 }

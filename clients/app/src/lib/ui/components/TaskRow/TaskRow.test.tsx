@@ -49,6 +49,20 @@ describe("TaskRow", () => {
     expect(screen.getByText("Overdue · 2 days")).toBeInTheDocument();
   });
 
+  it("draws a held chip in its signal's colour", () => {
+    renderUi(
+      <TaskRow
+        title="Send the signed lease"
+        kind="Do"
+        meta="You wrote this"
+        chips={[{ text: "Held Wed 10:00–10:30", signal: "do" }]}
+        onOpen={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Held Wed 10:00–10:30")).toHaveAttribute("data-signal", "do");
+  });
+
   it("puts one action at the end of the row, a button of its own", () => {
     const onOpen = vi.fn();
     const onAction = vi.fn();

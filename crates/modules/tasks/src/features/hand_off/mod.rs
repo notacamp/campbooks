@@ -1,6 +1,8 @@
 //! `POST …/tasks/{task_id}/hand_off` and `/take_back` — give a task to one
 //! teammate, and have it back. Tasks stay personal: the assignee holds it,
 //! and the member who handed it off still sees it and may take it back.
+//! Time the member held for it that has not started yet goes from their
+//! calendar with it.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -10,16 +12,18 @@ use campbooks_kernel::{
     extract,
     tenancy::{UserId, Workspace, WorkspaceId},
 };
+use chrono::Utc;
 use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
     domain::{
         OffsetQuery, Outcome, TaskChange, TaskHistoryDetail, TaskId, TaskRevision, TaskView,
-        access, actor_of, finish,
+        access, actor_of, finish, holds, tracked,
     },
     features::get::TaskPath,
     scopes::TasksWrite,
+    tracking,
 };
 
 /// Who to hand it to.
@@ -96,6 +100,12 @@ pub async fn hand_off(
     if role.is_none() {
         return Err(Error::BadRequest(crate::MESSAGES.reason("not_a_member")));
     }
+    // It was on the member's own calendar: time ahead goes with the task.
+    let freed = holds::free_ahead(&state, &mut tx, access.workspace, &row, Utc::now()).await?;
+    let held_minutes = row
+        .held_from
+        .zip(row.held_to)
+        .map(|(from, to)| tracked::minutes(from, to));
     sqlx::query(
         "UPDATE tasks.tasks SET assignee = $2, handed_by = $3,
                 revision = revision + 1, updated_at = now()
@@ -114,6 +124,7 @@ pub async fn hand_off(
         &Outcome {
             actor: actor_of(workspace.invoked_by),
             change: TaskChange::HandedOff,
+            history: None,
             detail: TaskHistoryDetail {
                 member: Some(body.to),
                 ..TaskHistoryDetail::default()
@@ -125,6 +136,17 @@ pub async fn hand_off(
         today,
     )
     .await?;
+    if freed && let Some(minutes) = held_minutes {
+        tracked::hold_released(
+            &state,
+            &mut tx,
+            access.workspace,
+            path.task_id,
+            minutes,
+            tracking::HoldActor::Member,
+        )
+        .await?;
+    }
     tx.commit().await?;
     Ok(Json(view))
 }
@@ -200,6 +222,7 @@ pub async fn take_back(
         &Outcome {
             actor: actor_of(workspace.invoked_by),
             change: TaskChange::TakenBack,
+            history: None,
             detail: TaskHistoryDetail {
                 member: Some(row.assignee),
                 ..TaskHistoryDetail::default()

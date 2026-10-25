@@ -13722,6 +13722,138 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/hold": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Hold time for a task on your calendar.",
+        "operationId": "tasks.hold",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldTime"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards, held and planned for that day.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A start in the past or a length outside 15 to 240 minutes (`invalid_hold`), a bill (`pay_not_held`), or a calendar that cannot be written (`calendar_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task or calendar, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), it is closed (`task_closed`), or its block has a change still on its way to the provider (`change_pending`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low",
+          "undo": "tasks.release_hold"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/tasks/{task_id}/not_needed": {
       "post": {
         "tags": [
@@ -13972,6 +14104,138 @@
             "tasks.task"
           ],
           "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/release": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Release the time held for a task: the block goes from your calendar.",
+        "operationId": "tasks.release_hold",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards, with no hold and no plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No time is held for it (`not_held`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), it is closed (`task_closed`), or its block has a change still on its way to the provider (`change_pending`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low",
+          "undo": "tasks.hold"
         }
       }
     },
@@ -21059,6 +21323,41 @@
           }
         }
       },
+      "HoldTime": {
+        "type": "object",
+        "description": "The time to hold.",
+        "required": [
+          "revision",
+          "starts",
+          "ends"
+        ],
+        "properties": {
+          "calendar_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "One of your calendars that can be written; your Campbooks calendar\nwhen left out."
+          },
+          "ends": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it ends: 15 to 240 minutes after the start."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The revision you saw."
+          },
+          "starts": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it starts: an RFC 3339 time, not in the past."
+          }
+        },
+        "additionalProperties": false
+      },
       "ImagesHeld": {
         "type": "string",
         "description": "Why a message's remote images stay held back although its sender is, or\ncould be, trusted (campbooks-cloud#235).",
@@ -26254,21 +26553,6 @@
           "calendar"
         ]
       },
-      "TaskChange": {
-        "type": "string",
-        "description": "What changed: the event's `change` and the history's `what`.",
-        "enum": [
-          "created",
-          "edited",
-          "due_changed",
-          "planned",
-          "done",
-          "not_needed",
-          "reopened",
-          "handed_off",
-          "taken_back"
-        ]
-      },
       "TaskDetail": {
         "type": "object",
         "description": "A task and its history.",
@@ -26317,6 +26601,30 @@
               "$ref": "#/components/schemas/TaskEditedField"
             },
             "description": "The fields an edit changed."
+          },
+          "held_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the held time starts."
+          },
+          "held_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the held time ends."
+          },
+          "hold_event": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The calendar event of the time held or released (the schedule\nmodule's id)."
           },
           "later_until": {
             "type": [
@@ -26398,8 +26706,57 @@
             "description": "The entry."
           },
           "what": {
-            "$ref": "#/components/schemas/TaskChange",
+            "$ref": "#/components/schemas/TaskHistoryWhat",
             "description": "What changed."
+          }
+        }
+      },
+      "TaskHistoryWhat": {
+        "type": "string",
+        "description": "What a history entry records: the change, or, for a change of the\nplan that held or released time on the calendar, which of the two.",
+        "enum": [
+          "created",
+          "edited",
+          "due_changed",
+          "planned",
+          "done",
+          "not_needed",
+          "reopened",
+          "handed_off",
+          "taken_back",
+          "held",
+          "released"
+        ]
+      },
+      "TaskHold": {
+        "type": "object",
+        "description": "Time held for a task on the member's calendar.",
+        "required": [
+          "event_id",
+          "calendar_id",
+          "starts",
+          "ends"
+        ],
+        "properties": {
+          "calendar_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The calendar it is on."
+          },
+          "ends": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it ends."
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The calendar event that holds it (the schedule module's)."
+          },
+          "starts": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it starts."
           }
         }
       },
@@ -26575,6 +26932,17 @@
               {
                 "$ref": "#/components/schemas/UserId",
                 "description": "The member who handed it to the assignee, while it is handed off."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hold": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TaskHold",
+                "description": "Time held for it on the caller's calendar, while there is some."
               },
               {
                 "type": "null"

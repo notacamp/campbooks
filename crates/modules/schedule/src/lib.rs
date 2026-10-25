@@ -26,7 +26,8 @@
 //!   stored at once, marked pending, and asked of connectors in the same
 //!   transaction ([`domain::outbound`]); the kernel's calendar-requests port
 //!   ([`calendar_requests`]) tells connectors it still stands.
-//! - **Ports** for other modules: [`time_zones`] and [`availability`].
+//! - **Ports** for other modules: [`time_zones`], [`availability`] and
+//!   [`holds`] (time a member holds for a task, campbooks-cloud#362).
 
 #![forbid(unsafe_code)]
 
@@ -50,7 +51,8 @@ pub mod tracking;
 mod tracking_tests;
 
 pub use features::{
-    calendar_requests::calendar_requests, free_slots::availability, time_zones::time_zones,
+    calendar_requests::calendar_requests, free_slots::availability, holds::holds,
+    time_zones::time_zones,
 };
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.

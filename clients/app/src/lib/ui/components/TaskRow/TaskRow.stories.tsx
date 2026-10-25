@@ -52,6 +52,16 @@ export const OwnWithPlan: Story = {
   },
 };
 
+/** Time held for it on the calendar: the chip is in Do's colour, in place of its plan. */
+export const Held: Story = {
+  args: {
+    title: "Send the signed lease",
+    meta: "You wrote this",
+    chips: [{ text: "Due Fri 30" }, { text: "Held Wed 10:00–10:30", signal: "do" }],
+    checkLabel: "Mark done: Send the signed lease",
+  },
+};
+
 /** A task someone else holds has no check: only its assignee can close it. */
 export const WithSomeoneElse: Story = {
   args: { meta: "You wrote this", chips: [{ text: "With João" }] },

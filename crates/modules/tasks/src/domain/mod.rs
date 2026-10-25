@@ -6,8 +6,9 @@
 use std::str::FromStr;
 
 pub mod access;
+pub mod holds;
 pub mod resources;
-mod tracked;
+pub mod tracked;
 
 use campbooks_kernel::{
     AppState, Error, RecordRef, Result, define_id,
@@ -16,7 +17,7 @@ use campbooks_kernel::{
 };
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{Postgres, Transaction};
+use sqlx::{Postgres, Transaction, types::Uuid};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::events::TaskChanged;
@@ -150,6 +151,51 @@ words!(
 );
 
 words!(
+    /// What a history entry records: the change, or, for a change of the
+    /// plan that held or released time on the calendar, which of the two.
+    TaskHistoryWhat {
+        /// The task was made.
+        Created => "created",
+        /// Its title or verb changed.
+        Edited => "edited",
+        /// Its due date changed.
+        DueChanged => "due_changed",
+        /// Its plan changed.
+        Planned => "planned",
+        /// It was done (or paid).
+        Done => "done",
+        /// It was marked not needed.
+        NotNeeded => "not_needed",
+        /// It was opened again.
+        Reopened => "reopened",
+        /// It was handed to a teammate.
+        HandedOff => "handed_off",
+        /// The member who handed it off took it back.
+        TakenBack => "taken_back",
+        /// Time was held for it on the calendar, or the held block moved.
+        Held => "held",
+        /// Its held time was released.
+        Released => "released",
+    }
+);
+
+impl From<TaskChange> for TaskHistoryWhat {
+    fn from(change: TaskChange) -> Self {
+        match change {
+            TaskChange::Created => Self::Created,
+            TaskChange::Edited => Self::Edited,
+            TaskChange::DueChanged => Self::DueChanged,
+            TaskChange::Planned => Self::Planned,
+            TaskChange::Done => Self::Done,
+            TaskChange::NotNeeded => Self::NotNeeded,
+            TaskChange::Reopened => Self::Reopened,
+            TaskChange::HandedOff => Self::HandedOff,
+            TaskChange::TakenBack => Self::TakenBack,
+        }
+    }
+}
+
+words!(
     /// A field `tasks.update` changed.
     TaskEditedField {
         /// The title.
@@ -183,6 +229,29 @@ pub struct TaskHistoryDetail {
     /// The other member of a hand-off or a take-back.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub member: Option<UserId>,
+    /// The calendar event of the time held or released (the schedule
+    /// module's id).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hold_event: Option<Uuid>,
+    /// When the held time starts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held_from: Option<DateTime<Utc>>,
+    /// When the held time ends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held_to: Option<DateTime<Utc>>,
+}
+
+/// Time held for a task on the member's calendar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TaskHold {
+    /// The calendar event that holds it (the schedule module's).
+    pub event_id: Uuid,
+    /// The calendar it is on.
+    pub calendar_id: Uuid,
+    /// When it starts.
+    pub starts: DateTime<Utc>,
+    /// When it ends.
+    pub ends: DateTime<Utc>,
 }
 
 /// A task, as the caller sees it.
@@ -220,6 +289,8 @@ pub struct TaskView {
     pub handed_by: Option<UserId>,
     /// The record it came from, when it came from one.
     pub source: Option<RecordRef>,
+    /// Time held for it on the caller's calendar, while there is some.
+    pub hold: Option<TaskHold>,
     /// Grows with every change: send the one you saw with a change.
     pub revision: i64,
     /// When it was made.
@@ -240,7 +311,7 @@ pub struct TaskHistoryEntry {
     /// The member Scout or the calendar acted for, or who acted.
     pub actor_member: Option<UserId>,
     /// What changed.
-    pub what: TaskChange,
+    pub what: TaskHistoryWhat,
     /// Ids, enums and dates of the change.
     pub detail: TaskHistoryDetail,
 }
@@ -250,7 +321,7 @@ macro_rules! columns {
     () => {
         "id, title, verb, origin, due_on, due_at, plan, plan_on, later_until, state, closed_at, \
          assignee, created_by, handed_by, source_type, source_id, source_container, revision, \
-         created_at, updated_at"
+         created_at, updated_at, hold_event, hold_calendar, held_from, held_to"
     };
 }
 
@@ -289,6 +360,10 @@ pub struct TaskRow {
     pub revision: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub hold_event: Option<Uuid>,
+    pub hold_calendar: Option<Uuid>,
+    pub held_from: Option<DateTime<Utc>>,
+    pub held_to: Option<DateTime<Utc>>,
 }
 
 impl TaskRow {
@@ -303,6 +378,16 @@ impl TaskRow {
     /// Whether it is open.
     pub fn is_open(&self) -> bool {
         self.state == TaskState::Open.as_str()
+    }
+
+    /// The time held for it, while there is some.
+    pub fn hold(&self) -> Option<TaskHold> {
+        Some(TaskHold {
+            event_id: self.hold_event?,
+            calendar_id: self.hold_calendar?,
+            starts: self.held_from?,
+            ends: self.held_to?,
+        })
     }
 
     /// The view at `now`, with `today` (the caller's) deciding whether it is
@@ -334,6 +419,7 @@ impl TaskRow {
             created_by: self.created_by,
             handed_by: self.handed_by,
             source: self.source(),
+            hold: self.hold(),
             revision: self.revision,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -456,6 +542,9 @@ pub struct Outcome {
     pub actor: TaskActor,
     /// What it was.
     pub change: TaskChange,
+    /// What the history calls it, when that is not `change` itself (time
+    /// held or released, a change of the plan).
+    pub history: Option<TaskHistoryWhat>,
     /// What to keep in the history.
     pub detail: TaskHistoryDetail,
     /// The assignee before a hand-off or a take-back.
@@ -492,7 +581,12 @@ pub async fn finish(
     .bind(id)
     .bind(outcome.actor.as_str())
     .bind(access.user.map(|user| *user.as_uuid()))
-    .bind(outcome.change.as_str())
+    .bind(
+        outcome
+            .history
+            .unwrap_or_else(|| outcome.change.into())
+            .as_str(),
+    )
     .bind(sqlx::types::Json(&outcome.detail))
     .execute(&mut **tx)
     .await?;
@@ -520,7 +614,7 @@ pub async fn finish(
         state,
         tx,
         access.workspace,
-        outcome.change,
+        outcome,
         outcome.before.as_ref(),
         &row,
     )

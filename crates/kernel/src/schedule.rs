@@ -1,22 +1,26 @@
 //! What the module that keeps calendars tells the others: a member's time
-//! zone and when they are free.
+//! zone and when they are free, and the time they hold for a task.
 //!
 //! Reading an email's dates needs the zone its reader lives in (a relative
 //! "Thursday at 10" means 10:00 where they are), and holding time for a task
-//! needs a free slot. The `schedule` module implements [`TimeZones`] and
-//! [`Availability`]; the server registers them with
-//! [`AppState::with_time_zones`](crate::AppState::with_time_zones) and
-//! [`AppState::with_availability`](crate::AppState::with_availability).
-//! Until then no member has a zone (readers use UTC) and nobody is free.
+//! needs a free slot and a block on the member's calendar. The `schedule`
+//! module implements [`TimeZones`], [`Availability`] and [`Holds`]; the
+//! server registers them with
+//! [`AppState::with_time_zones`](crate::AppState::with_time_zones),
+//! [`AppState::with_availability`](crate::AppState::with_availability) and
+//! [`AppState::with_holds`](crate::AppState::with_holds). Until then no
+//! member has a zone (readers use UTC), nobody is free and no time can be
+//! held.
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use chrono::{DateTime, TimeDelta, Utc};
-use sqlx::PgConnection;
+use sqlx::{PgConnection, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::{
-    Error,
+    AppState, Error,
+    records::RecordRef,
     tenancy::{UserId, WorkspaceId},
 };
 
@@ -119,6 +123,107 @@ impl Availability for NoAvailability {
 /// Shared handle to the registered [`Availability`] port.
 pub type AvailabilityPort = Arc<dyn Availability>;
 
+/// Time a member holds on their calendar for a task.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HoldRequest<'a> {
+    /// The member whose calendar it goes on.
+    pub member: UserId,
+    /// The task it is held for (`tasks.task:<id>`): the event's source, so
+    /// opening the block leads back to it and its changes come back to it.
+    pub task: RecordRef,
+    /// What the block is called: the task's title. It stays in the module
+    /// that keeps calendars (and the provider's), never in an event or a job.
+    pub title: &'a str,
+    /// When it starts.
+    pub starts: DateTime<Utc>,
+    /// When it ends.
+    pub ends: DateTime<Utc>,
+    /// One of the member's writable calendars; `None`: their Campbooks
+    /// calendar.
+    pub calendar: Option<Uuid>,
+}
+
+/// The block a [`Holds::hold`] made.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Held {
+    /// The event (an id of the module that keeps calendars).
+    pub event: Uuid,
+    /// The calendar it is on.
+    pub calendar: Uuid,
+    /// Whether that calendar is a provider's (the block is asked of it) rather
+    /// than the member's Campbooks calendar.
+    pub at_provider: bool,
+}
+
+/// A future returned by [`Holds::hold`].
+pub type HoldFuture<'a> = Pin<Box<dyn Future<Output = Result<Held, Error>> + Send + 'a>>;
+
+/// A future returned by [`Holds::release`].
+pub type ReleaseFuture<'a> = Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>>;
+
+/// Puts time a member holds for a task on their calendar, and takes it off.
+pub trait Holds: std::fmt::Debug + Send + Sync + 'static {
+    /// Make a busy event of kind `hold` for `request` on the member's
+    /// calendar, in `tx` (a transaction working in `workspace`), so the
+    /// block exists exactly when the caller's change commits. A calendar that
+    /// is not the member's is [`Error::NotFound`]; one that cannot be written
+    /// is refused (`calendar_read_only`). A provider calendar is asked for it
+    /// like any event the member makes.
+    fn hold<'a>(
+        &'a self,
+        state: &'a AppState,
+        tx: &'a mut Transaction<'static, Postgres>,
+        workspace: WorkspaceId,
+        request: HoldRequest<'a>,
+    ) -> HoldFuture<'a>;
+
+    /// Take `member`'s hold `event` off their calendar, in `tx`. An event
+    /// that is gone, or that is not a hold of that member, is left alone.
+    fn release<'a>(
+        &'a self,
+        state: &'a AppState,
+        tx: &'a mut Transaction<'static, Postgres>,
+        workspace: WorkspaceId,
+        member: UserId,
+        event: Uuid,
+    ) -> ReleaseFuture<'a>;
+}
+
+/// What [`NoHolds`] answers.
+fn unsupported() -> Error {
+    Error::Unavailable(crate::i18n::MESSAGES.reason("holds_unsupported"))
+}
+
+/// The port before a module provides one: no time can be held.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoHolds;
+
+impl Holds for NoHolds {
+    fn hold<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _tx: &'a mut Transaction<'static, Postgres>,
+        _workspace: WorkspaceId,
+        _request: HoldRequest<'a>,
+    ) -> HoldFuture<'a> {
+        Box::pin(async { Err(unsupported()) })
+    }
+
+    fn release<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _tx: &'a mut Transaction<'static, Postgres>,
+        _workspace: WorkspaceId,
+        _member: UserId,
+        _event: Uuid,
+    ) -> ReleaseFuture<'a> {
+        Box::pin(async { Err(unsupported()) })
+    }
+}
+
+/// Shared handle to the registered [`Holds`] port.
+pub type HoldsPort = Arc<dyn Holds>;
+
 #[cfg(test)]
 mod tests {
     use sqlx::PgPool;
@@ -147,5 +252,38 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(free, FreeSlots::default());
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn before_a_module_provides_them_no_time_can_be_held(db: PgPool) {
+        let state = crate::testing::state(db.clone());
+        let mut tx = db.begin().await.unwrap();
+        let (workspace, member) = (WorkspaceId::new(), UserId::new());
+        let now = Utc::now();
+        let refused = NoHolds
+            .hold(
+                &state,
+                &mut tx,
+                workspace,
+                HoldRequest {
+                    member,
+                    task: RecordRef::new("tasks.task", &Uuid::nil()),
+                    title: "Send the signed lease",
+                    starts: now + TimeDelta::hours(1),
+                    ends: now + TimeDelta::hours(2),
+                    calendar: None,
+                },
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(refused.reason().code(), "holds_unsupported");
+        let release = NoHolds
+            .release(&state, &mut tx, workspace, member, Uuid::nil())
+            .await
+            .unwrap_err();
+        assert_eq!(
+            release.status(),
+            axum::http::StatusCode::SERVICE_UNAVAILABLE
+        );
     }
 }

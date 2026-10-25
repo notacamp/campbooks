@@ -25,7 +25,7 @@ use crate::{
     },
     preferences::{AskFirst, MemberPreferencesPort},
     rate_limit::{RateLimits, api::ApiLimits},
-    schedule::{AvailabilityPort, NoAvailability, NoTimeZones, TimeZonesPort},
+    schedule::{AvailabilityPort, HoldsPort, NoAvailability, NoHolds, NoTimeZones, TimeZonesPort},
     search::SearchSources,
     signup::{InvitationsPort, NoInvitations},
     tasks::{NoOpenTasks, OpenTasksPort},
@@ -83,6 +83,10 @@ pub struct AppState {
     /// Answers when a member is free ([`schedule`](crate::schedule)). The
     /// server registers the `schedule` module's; until then nobody is.
     pub availability: AvailabilityPort,
+    /// Puts time a member holds for a task on their calendar
+    /// ([`schedule`](crate::schedule)). The server registers the `schedule`
+    /// module's; until then no time can be held.
+    pub holds: HoldsPort,
     /// Answers which tasks are open for an email ([`tasks`](crate::tasks)).
     /// The server registers the owner of tasks'; until then none is.
     pub open_tasks: OpenTasksPort,
@@ -192,6 +196,7 @@ impl AppState {
             calendar_requests: Arc::new(NoCalendarRequests),
             time_zones: Arc::new(NoTimeZones),
             availability: Arc::new(NoAvailability),
+            holds: Arc::new(NoHolds),
             open_tasks: Arc::new(NoOpenTasks),
             grants: Arc::new(NoGrantIntake),
             consent: Arc::new(NoConsentDoor),
@@ -285,6 +290,13 @@ impl AppState {
     #[must_use]
     pub fn with_availability(mut self, availability: AvailabilityPort) -> Self {
         self.availability = availability;
+        self
+    }
+
+    /// The same state, holding members' time for tasks through `holds`.
+    #[must_use]
+    pub fn with_holds(mut self, holds: HoldsPort) -> Self {
+        self.holds = holds;
         self
     }
 

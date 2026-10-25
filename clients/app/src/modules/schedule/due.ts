@@ -5,7 +5,9 @@ import { daysBetween, nowIn, type Ymd } from "./model";
 /**
  * The tasks on the calendar. They are the member's own open tasks (the tasks
  * module's list, live through the change feed), drawn on the day each is due
- * (a Due row) and on the day the member planned it for (a Planned row).
+ * (a Due row) and on the day the member planned it for (a Planned row). A
+ * task with time held has its block on the calendar instead of a Planned
+ * row, and no Due row on the day it is held when that is its due day.
  */
 export interface TaskRow {
   /** `due:<task id>` or `plan:<task id>`: what the address holds for its sheet. */
@@ -46,8 +48,13 @@ export function taskRows(tasks: readonly TaskView[], today: Ymd, zone: string): 
     if (task.state !== "open") {
       return [];
     }
-    const due = task.due_on ?? undefined;
-    const plan = task.plan === "date" ? (task.plan_on ?? undefined) : undefined;
+    const hold = task.hold ?? undefined;
+    const heldOn = hold === undefined ? undefined : nowIn(zone, new Date(hold.starts)).day;
+    // The held block stands for the plan, and for the due date on its own day.
+    const due =
+      heldOn !== undefined && heldOn === task.due_on ? undefined : (task.due_on ?? undefined);
+    const plan =
+      task.plan === "date" && hold === undefined ? (task.plan_on ?? undefined) : undefined;
     const dueStands = due === undefined ? undefined : later(due, today);
     const planStands = plan === undefined ? undefined : later(plan, today);
     const rows: TaskRow[] = [];

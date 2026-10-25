@@ -1,15 +1,19 @@
 import type { ReactNode } from "react";
 
+import type { Signal } from "../../tokens/tokens";
 import { Icon } from "../Icon/Icon";
+import { Pill } from "../Pill/Pill";
 import { Tag } from "../Tag/Tag";
 
 import styles from "./TaskRow.module.css";
 
-/** A fact about the task, drawn as a chip: its due date, its plan. */
+/** A fact about the task, drawn as a chip: its due date, its plan, its held time. */
 export interface TaskRowChip {
   text: string;
   /** `danger` for a date that has passed. */
   tone?: "neutral" | "danger" | undefined;
+  /** Drawn in a signal's colour instead ("Held Wed 10:00–10:30" in Do's). */
+  signal?: Signal | undefined;
 }
 
 export interface TaskRowProps {
@@ -80,11 +84,17 @@ export function TaskRow({
         <span className={styles["meta"]}>{meta}</span>
         {chips.length === 0 ? null : (
           <span className={styles["chips"]}>
-            {chips.map((chip) => (
-              <Tag key={chip.text} tone={chip.tone ?? "neutral"}>
-                {chip.text}
-              </Tag>
-            ))}
+            {chips.map((chip) =>
+              chip.signal === undefined ? (
+                <Tag key={chip.text} tone={chip.tone ?? "neutral"}>
+                  {chip.text}
+                </Tag>
+              ) : (
+                <Pill key={chip.text} signal={chip.signal}>
+                  {chip.text}
+                </Pill>
+              ),
+            )}
           </span>
         )}
       </button>

@@ -19,7 +19,14 @@ import {
   type UseTaskSources,
 } from "~/modules/tasks";
 
-import { useCalendars, useEventActions, useEvents, useScheduleSettings } from "../../api/queries";
+import {
+  useCalendars,
+  useEventActions,
+  useEvents,
+  useFreeSlots,
+  useScheduleSettings,
+  useWritableCalendars,
+} from "../../api/queries";
 import type { NewEvent } from "../../api/types";
 import { useClock } from "../../clock";
 import { useTaskRows } from "../../due";
@@ -41,6 +48,9 @@ import { DuePane } from "./DuePane";
 import { EventDialog, type EventDraft } from "./EventDialog";
 import { EventPane } from "./EventPane";
 import { AgendaView, MonthView, WeekView } from "./Views";
+
+/** Where the task sheet's Hold time reads free time and calendars: this module's own. */
+const HOLD_SOURCES = { useFreeSlots, useWritableCalendars };
 
 /** What the address holds: the view, the day looked at, the open event. */
 export interface ScheduleSearch {
@@ -325,6 +335,7 @@ export function CalendarScreen({
           today={clock.day}
           source={sourceOf(selectedTask.task)}
           done={taskActions.done}
+          hold={{ sources: HOLD_SOURCES, run: taskActions.hold }}
           onClose={close}
         />
       )}

@@ -8,7 +8,10 @@
 //! to a teammate still sees it ("with <name>") and may take it back. Every
 //! change appends to the task's history and publishes
 //! `tasks.task_changed`, a snapshot of ids, enums and dates that `attention`
-//! projects into Home's Do and Pay. The module uses no model.
+//! projects into Home's Do and Pay. Time held for a task is a block on its
+//! assignee's calendar, made through the kernel's `Holds` port and followed
+//! from the schedule module's events (campbooks-cloud#362). The module uses
+//! no model.
 
 #![forbid(unsafe_code)]
 
@@ -48,6 +51,9 @@ pub fn module() -> Module {
         background: Background::new()
             .publishes::<events::TaskChanged>()
             .on_event::<features::add_read_asks::AddReadAsks>()
+            .on_event::<features::follow_holds::FollowHoldCreated>()
+            .on_event::<features::follow_holds::FollowHoldChanged>()
+            .on_event::<features::follow_holds::FollowHoldCancelled>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
         resources: domain::resources::resources(),
@@ -56,7 +62,7 @@ pub fn module() -> Module {
 
 /// Every route of the module, one per feature.
 fn router() -> OpenApiRouter<AppState> {
-    use features::{create, get, hand_off, list, plan, status, update};
+    use features::{create, get, hand_off, hold, list, plan, status, update};
     OpenApiRouter::new()
         .routes(routes!(list::handler, create::handler))
         .routes(routes!(get::handler, update::handler))
@@ -66,6 +72,8 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(status::reopen))
         .routes(routes!(hand_off::hand_off))
         .routes(routes!(hand_off::take_back))
+        .routes(routes!(hold::hold))
+        .routes(routes!(hold::release))
 }
 
 #[cfg(test)]
@@ -91,7 +99,13 @@ mod tests {
     fn its_background_work_registers() {
         let registry = campbooks_kernel::jobs::Registry::build(&[module()]).unwrap();
         let kinds = registry.kind_names();
-        for kind in ["tasks.schedule_workspace_purge", "tasks.purge_workspace"] {
+        for kind in [
+            "tasks.schedule_workspace_purge",
+            "tasks.purge_workspace",
+            "tasks.follow_hold_created",
+            "tasks.follow_hold_changed",
+            "tasks.follow_hold_cancelled",
+        ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
     }
