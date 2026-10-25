@@ -132,24 +132,17 @@ impl GrantIntake for Intake {
                     (Provider::Zoho, capabilities, Some(server), mailboxes)
                 }
                 "microsoft" if self.deps.microsoft.is_some() => {
-                    if !microsoft::mail_granted(&grant.scopes) {
-                        return Err(Error::Denied(MESSAGES.reason("consent_incomplete")));
-                    }
-                    let mailbox = self.microsoft_mailbox(&mut tokens).await?;
-                    self.same_microsoft_mailbox(state, &grant, &mailbox).await?;
-                    // The proof the identity module checked (`xms_edov`) is
-                    // for the ID token's address: it vouches for the
-                    // mailbox's only when that is the same address.
-                    address_verified = grant.address_verified && mailbox.address == address;
-                    address = mailbox.address.clone();
+                    let mailbox = self
+                        .microsoft_grant(state, &grant, &mut tokens, &address)
+                        .await?;
+                    address.clone_from(&mailbox.address);
+                    address_verified = mailbox.address_verified;
                     if mailbox.display_name.is_some() {
-                        display_name = mailbox.display_name.clone();
+                        display_name.clone_from(&mailbox.display_name);
                     }
                     let mailbox = Mailbox {
-                        key: mailbox.id,
-                        address: address.clone(),
-                        address_verified,
                         display_name: display_name.clone(),
+                        ..mailbox
                     };
                     (
                         Provider::Microsoft,
@@ -274,6 +267,32 @@ impl GrantIntake for Intake {
 }
 
 impl Intake {
+    /// The mailbox of a Microsoft grant whose ID token named `address`:
+    /// every mail scope granted, read from Graph `/me` (`tokens` refreshed if
+    /// its access token had expired), the same mailbox as the workspace's
+    /// connection of that account reads. Its address is verified only when
+    /// the proof the identity module checked (`xms_edov`), which is for the
+    /// ID token's address, is for this one.
+    async fn microsoft_grant(
+        &self,
+        state: &AppState,
+        grant: &Grant,
+        tokens: &mut TokenGrant,
+        address: &str,
+    ) -> Result<Mailbox, Error> {
+        if !microsoft::mail_granted(&grant.scopes) {
+            return Err(Error::Denied(MESSAGES.reason("consent_incomplete")));
+        }
+        let user = self.microsoft_mailbox(tokens).await?;
+        self.same_microsoft_mailbox(state, grant, &user).await?;
+        Ok(Mailbox {
+            address_verified: grant.address_verified && user.address == address,
+            key: user.id,
+            address: user.address,
+            display_name: user.display_name,
+        })
+    }
+
     /// The mailbox a Microsoft grant reaches (Graph `/me`), read with its
     /// access token. A held sign-in grant's access token may have expired:
     /// then it is refreshed once with its own refresh token, and `tokens`

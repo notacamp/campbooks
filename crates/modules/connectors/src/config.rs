@@ -468,15 +468,7 @@ impl ConnectorsConfig {
         if imap.enabled {
             self.check_send()?;
         }
-        // Checked only while Microsoft mail is on: a stray value never stops
-        // an instance that does not offer it.
-        if self.microsoft.enabled && !crate::microsoft::is_tenant(self.microsoft.tenant.trim()) {
-            return Err(format!(
-                "CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT={}: use common, organizations, consumers \
-                 or a tenant id (or turn CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED off)",
-                self.microsoft.tenant
-            ));
-        }
+        self.check_microsoft()?;
         if self.failing_after == 0 {
             return Err("CAMPBOOKS_CONNECTORS__FAILING_AFTER must be positive".to_owned());
         }
@@ -488,6 +480,19 @@ impl ConnectorsConfig {
 }
 
 impl ConnectorsConfig {
+    /// The Microsoft mail settings: checked only while Microsoft mail is on,
+    /// so a stray value never stops an instance that does not offer it.
+    fn check_microsoft(&self) -> Result<(), String> {
+        if self.microsoft.enabled && !crate::microsoft::is_tenant(self.microsoft.tenant.trim()) {
+            return Err(format!(
+                "CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT={}: use common, organizations, consumers \
+                 or a tenant id (or turn CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED off)",
+                self.microsoft.tenant
+            ));
+        }
+        Ok(())
+    }
+
     /// The IMAP send settings: checked only where IMAP runs, and tied to no
     /// poll bound.
     fn check_send(&self) -> Result<(), String> {
