@@ -92,7 +92,7 @@ async fn a_rename_tracks_the_fields_and_the_same_values_again_track_nothing(db: 
     let edited = tracked(&kit, "pages.page_edited").await;
     assert_eq!(edited.len(), 1);
     by_user(&edited[0], "pages.page_edited", workspace, "pages.update");
-    assert_eq!(edited[0].body["fields"], json!(["icon", "title"]));
+    assert_eq!(edited[0].body["fields"], json!(["title", "icon"]));
 
     let again = kit
         .patch(

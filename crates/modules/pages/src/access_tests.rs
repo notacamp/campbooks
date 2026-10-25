@@ -329,7 +329,7 @@ async fn search_reads_a_pages_title_and_text_and_a_trashed_page_leaves_the_index
         .page(context(&kit, &mut tx, workspace), None, 10)
         .await
         .unwrap();
-    assert_eq!(listed.groups, [id.clone()]);
+    assert_eq!(listed.groups, std::slice::from_ref(&id));
     assert_eq!(listed.next, None);
     tx.rollback().await.unwrap();
 

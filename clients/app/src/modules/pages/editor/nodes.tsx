@@ -357,7 +357,7 @@ export const Toggle = BlockNode.create({
     return {
       open: {
         default: false,
-        parseHTML: (element) => element.dataset.open === "true",
+        parseHTML: (element) => element.dataset["open"] === "true",
         renderHTML: (attributes) => ({ "data-open": String(attributes["open"] === true) }),
       },
     };

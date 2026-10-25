@@ -46,7 +46,7 @@ const ALIASES: Readonly<Record<string, (typeof CODE_LANGUAGES)[number]>> = {
 };
 
 /** A language a person typed, as one the server accepts; `null` when it is not one. */
-export function codeLanguage(typed: string | null | undefined): string | null {
+export function codeLanguage(typed?: string | null | undefined): string | null {
   const name = (typed ?? "").trim().toLowerCase();
   if (name === "") {
     return null;

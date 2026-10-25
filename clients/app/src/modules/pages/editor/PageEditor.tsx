@@ -1,7 +1,7 @@
 import type { Editor } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
@@ -30,6 +30,7 @@ import {
   type SlashId,
   type SlashItem,
 } from "./slash";
+import { Latest } from "./latest";
 import { useMenu } from "./use-menu";
 
 export interface PageEditorProps {
@@ -70,62 +71,53 @@ export function PageEditor({
   const undo = useUndoToast();
   const wrapper = useRef<HTMLDivElement>(null);
   const picker = useRef<HTMLInputElement>(null);
-  const embedNext = useRef(false);
+  const [embedNext] = useState(() => new Latest(false));
   const [images, setImages] = useState(false);
   const [handle, setHandle] = useState<Handle | undefined>();
   const [blockMenu, setBlockMenu] = useState<Handle | undefined>();
 
-  const editorRef = useRef<Editor | null>(null);
+  const [editorBox] = useState(() => new Latest<Editor | null>(null));
   const slash = useMenu<SlashItem>(() => {
-    editorRef.current?.commands.focus();
+    editorBox.current?.commands.focus();
   });
   const mention = useMenu<MentionCandidate>(() => {
-    editorRef.current?.commands.focus();
+    editorBox.current?.commands.focus();
   });
 
   const slashName = (id: SlashId) => t(`slash.${id}`);
-  const nameRef = useRef(slashName);
-  const pagesRef = useRef(pages);
-  const helpersRef = useRef<SlashHelpers>({
-    attach: () => {},
-    mention: () => {},
-    subPage: () => {},
-  });
-  // The menus are built once; these read the latest of what they need when
-  // they are called (never while rendering).
-  const getEditor = useCallback(() => editorRef.current, []);
-  const getPages = useCallback(() => pagesRef.current, []);
-  const getHelpers = useCallback(() => helpersRef.current, []);
-  const nameOf = useCallback((id: SlashId) => nameRef.current(id), []);
-  const takeEmbed = useCallback(() => {
-    const embed = embedNext.current;
-    embedNext.current = false;
-    return embed;
-  }, []);
+  const [nameBox] = useState(() => new Latest(slashName));
+  const [pagesBox] = useState(() => new Latest(pages));
+  const idle = (): void => {
+    // Nothing to do until the editor has mounted.
+  };
+  const [helpersBox] = useState(
+    () => new Latest<SlashHelpers>({ attach: idle, mention: idle, subPage: idle }),
+  );
 
   const [extensions] = useState(() => [
     createSlashMenu<SlashItem>(
       slash.bridge,
-      (query) => filterSlash(SLASH_ITEMS, query, nameOf),
+      (query) => filterSlash(SLASH_ITEMS, query, (id) => nameBox.current(id)),
       (item, range) => {
-        const current = getEditor();
+        const current = editorBox.current;
         if (current !== null) {
-          runSlash(current, range, item.id, getHelpers());
+          runSlash(current, range, item.id, helpersBox.current);
         }
       },
     ),
     createMentionMenu<MentionCandidate>(
       mention.bridge,
       async (query, signal) =>
-        (await searchMentions(environment.workspaceId, query, getPages(), signal)).flatMap(
+        (await searchMentions(environment.workspaceId, query, pagesBox.current, signal)).flatMap(
           (group) => group.candidates,
         ),
       (item, range) => {
-        const current = getEditor();
+        const current = editorBox.current;
         if (current === null) {
           return;
         }
-        const embed = takeEmbed();
+        const embed = embedNext.current;
+        embedNext.set(false);
         const node = {
           type: embed ? "embed" : "mention",
           attrs: { ref_type: item.type, ref_id: item.id },
@@ -140,7 +132,7 @@ export function PageEditor({
   ]);
 
   const insertFile = async (file: File) => {
-    const current = editorRef.current;
+    const current = editorBox.current;
     try {
       const stored = await upload(file);
       current
@@ -193,10 +185,10 @@ export function PageEditor({
 
   // The latest of everything the menus' callbacks reach for.
   useEffect(() => {
-    editorRef.current = editor;
-    pagesRef.current = pages;
-    nameRef.current = slashName;
-    helpersRef.current = {
+    editorBox.set(editor);
+    pagesBox.set(pages);
+    nameBox.set(slashName);
+    helpersBox.set({
       attach: (onlyImages) => {
         setImages(onlyImages);
         requestAnimationFrame(() => {
@@ -204,12 +196,12 @@ export function PageEditor({
         });
       },
       mention: (embed) => {
-        embedNext.current = embed;
+        embedNext.set(embed);
       },
       subPage: () => {
         void createSubPage().then(
           (id) => {
-            editorRef.current
+            editorBox.current
               ?.chain()
               .focus()
               .insertContent({ type: "pageLink", attrs: { page: id } })
@@ -220,15 +212,15 @@ export function PageEditor({
           },
         );
       },
-    };
+    });
   });
 
   const marks = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
-      bold: current.isActive("bold") ?? false,
-      italic: current.isActive("italic") ?? false,
-      todo: current.isActive("taskList") ?? false,
+      bold: current.isActive("bold"),
+      italic: current.isActive("italic"),
+      todo: current.isActive("taskList"),
     }),
   });
 
@@ -270,7 +262,7 @@ export function PageEditor({
     }
     const selection = NodeSelection.create(editor.state.doc, handle.pos);
     editor.view.dispatch(editor.state.tr.setSelection(selection));
-    const view = editorRef.current?.view;
+    const view = editorBox.current?.view;
     if (view !== undefined) {
       view.dragging = { slice: selection.content(), move: true };
     }
@@ -321,7 +313,7 @@ export function PageEditor({
     } else {
       const inside = blockMenu.pos + 1;
       editor.chain().focus().setTextSelection(inside).run();
-      runSlash(editor, { from: inside, to: inside }, id as SlashId, helpersRef.current);
+      runSlash(editor, { from: inside, to: inside }, id as SlashId, helpersBox.current);
     }
   };
 
@@ -471,21 +463,21 @@ export function PageEditor({
               id: "todo",
               label: t("format.todo"),
               icon: "check",
-              pressed: marks.todo ?? false,
+              pressed: marks.todo,
               onPress: () => editor.chain().focus().toggleTaskList().run(),
             },
             {
               id: "bold",
               label: t("format.bold"),
               icon: "bold",
-              pressed: marks.bold ?? false,
+              pressed: marks.bold,
               onPress: () => editor.chain().focus().toggleBold().run(),
             },
             {
               id: "italic",
               label: t("format.italic"),
               icon: "italic",
-              pressed: marks.italic ?? false,
+              pressed: marks.italic,
               onPress: () => editor.chain().focus().toggleItalic().run(),
             },
           ]}

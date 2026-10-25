@@ -30,6 +30,9 @@ import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
 const PATH = `/w/${DUARTE.id}/pages`;
 const P = `${W}/pages`;
 
+/** The page "New page" makes. */
+const MADE = { ...IDEAS, id: "0192f1a0-0000-7000-8000-0000000009ee", title: "", icon: null };
+
 /** The pages API over a list the calls change, as the server would. */
 function pages(overrides: Record<string, MockRoute> = {}) {
   let live = [...PAGES];
@@ -72,16 +75,13 @@ function pages(overrides: Record<string, MockRoute> = {}) {
       body: { pages: url.searchParams.get("trashed") === "true" ? trashed : live },
     }),
     [`GET ${P}/backlinks`]: { body: { pages: [] } },
-    [`POST ${P}`]: (body) => {
-      const made = {
-        ...IDEAS,
-        id: "0192f1a0-0000-7000-8000-0000000009ee",
-        title: "",
-        icon: null,
-        ...(body as object),
-      };
-      live = [...live, made];
-      return { status: 201, body: viewOf(made, []) };
+    [`POST ${P}`]: () => {
+      live = [...live, MADE];
+      return { status: 201, body: viewOf(MADE, []) };
+    },
+    [`GET ${P}/${MADE.id}`]: () => ({ body: viewOf(MADE, []) }),
+    [`POST ${P}/${MADE.id}/sync`]: {
+      body: { revision: 1, state_vector: "AA==", update: "AAA=" },
     },
     ...perPage,
     ...overrides,

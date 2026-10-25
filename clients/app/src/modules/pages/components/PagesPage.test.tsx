@@ -133,7 +133,7 @@ describe("the pages tree", () => {
     const { posts } = api();
     const { router } = renderPages();
     await screen.findByText("Team handbook");
-    fireEvent.click(screen.getByRole("button", { name: /^New page/u }));
+    fireEvent.click(screen.getAllByRole("button", { name: /^New page/u })[0] as HTMLElement);
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/pages/${MADE_ID}`);
     });

@@ -16,7 +16,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div className="relative ml-12 w-full max-w-measure">
+      <div className="relative w-full max-w-measure pl-12">
         <p>A block of text the handle sits beside.</p>
         <Story />
       </div>

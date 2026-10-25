@@ -53,5 +53,5 @@ export const MENTION_TYPES = [
 export type MentionType = (typeof MENTION_TYPES)[number];
 
 export function isMentionType(value: unknown): value is MentionType {
-  return MENTION_TYPES.includes(value);
+  return (MENTION_TYPES as readonly unknown[]).includes(value);
 }
