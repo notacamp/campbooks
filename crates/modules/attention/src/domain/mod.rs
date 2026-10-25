@@ -3,6 +3,7 @@
 
 use std::str::FromStr;
 
+pub mod bands;
 pub mod resources;
 
 use campbooks_kernel::{
@@ -14,12 +15,14 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use utoipa::ToSchema;
 
+use self::bands::{Band, BandReason};
+
 define_id!(
     /// One thing that needs the members who can see its container.
     ItemId
 );
 
-/// Why an item needs someone, in the order Home shows the groups.
+/// Why an item needs someone (Home orders items by band, not by reason).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Reason {
@@ -46,7 +49,7 @@ pub enum Reason {
 }
 
 impl Reason {
-    /// Every reason, in display order (`waiting` is never in the queue).
+    /// Every reason (`waiting` is never in the queue).
     pub const ALL: [Self; 8] = [
         Self::Review,
         Self::Reply,
@@ -58,7 +61,7 @@ impl Reason {
         Self::Waiting,
     ];
 
-    /// The reasons of the queue, in display order: all but `waiting`.
+    /// The reasons of the queue: all but `waiting`.
     pub const QUEUE: [Self; 7] = [
         Self::Review,
         Self::Reply,
@@ -175,6 +178,11 @@ pub struct ItemView {
     pub cleared_at: Option<DateTime<Utc>>,
     /// Until when the caller put it off ("Later"), when they did.
     pub snoozed_until: Option<DateTime<Utc>>,
+    /// Where it stands on Home (campbooks-cloud#358): `now`, `today`,
+    /// `week` or `whenever`. On the open list only.
+    pub band: Option<Band>,
+    /// Why it is in that band. On the open list only.
+    pub band_reason: Option<BandReason>,
 }
 
 /// An item row (`attention.items` with the caller's snooze).
@@ -200,7 +208,8 @@ pub struct ItemRow {
 }
 
 impl ItemRow {
-    /// The view, with `today` deciding whether it is overdue.
+    /// The view, with `today` deciding whether it is overdue, and no band
+    /// (the open list sets it).
     pub fn view(self, today: NaiveDate) -> Result<ItemView> {
         Ok(ItemView {
             id: self.id,
@@ -222,6 +231,8 @@ impl ItemRow {
             cleared_by: self.cleared_by,
             cleared_at: self.cleared_at,
             snoozed_until: self.snoozed_until,
+            band: None,
+            band_reason: None,
         })
     }
 }

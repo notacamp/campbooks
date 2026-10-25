@@ -448,3 +448,69 @@ export const BUILDS_NOTICE: Schema<"RuleNotice"> = {
   },
   shared: false,
 };
+
+/**
+ * Scout noticed for one kind of a sender's mail (campbooks-cloud#356): a
+ * fictional shop whose weekly deals Sam archives unread, while he reads its
+ * shipping notices. The kind is the deals' subject template.
+ */
+export const DEALS_NOTICE: Schema<"RuleNotice"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000e8",
+  inbox_id: INBOX.id,
+  kind: "archive_on_arrival",
+  sender: "orders@shop.example",
+  sender_name: "Northwind",
+  conditions: [
+    { field: "sender_address", value: "orders@shop.example" },
+    { field: "subject_template", value: "deals of the week #" },
+  ],
+  actions: [{ action: "archive" }, { action: "surface", value: "never" }],
+  evidence: {
+    received: 40,
+    opened: 2,
+    archived_unread: 36,
+    last_week: 5,
+    window_days: 60,
+    cadence: "daily",
+  },
+  pattern: {
+    source: "template",
+    example: "Deals of the week 40: up to half off garden tools",
+    search: 'subject:"deals of the week"',
+  },
+  shared: false,
+};
+
+/**
+ * The same shop's promotions, each with a subject of its own: the kind is
+ * the words the model proposed for them, checked against the mail.
+ */
+export const SALES_NOTICE: Schema<"RuleNotice"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000e9",
+  inbox_id: INBOX.id,
+  kind: "keep_off_home",
+  sender: "orders@shop.example",
+  sender_name: "Northwind",
+  conditions: [
+    { field: "sender_address", value: "orders@shop.example" },
+    { field: "subject_contains", value: "sale starts now" },
+  ],
+  actions: [
+    { action: "move_to_stream", stream: "updates" },
+    { action: "surface", value: "never" },
+  ],
+  evidence: {
+    received: 12,
+    opened: 1,
+    archived_unread: 0,
+    last_week: 2,
+    window_days: 60,
+    cadence: "weekly",
+  },
+  pattern: {
+    source: "phrase",
+    example: "Our boots sale starts now",
+    search: 'subject:"sale starts now"',
+  },
+  shared: false,
+};

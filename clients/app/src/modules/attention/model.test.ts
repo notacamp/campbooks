@@ -4,7 +4,10 @@ import type { ItemView } from "./api/queries";
 import {
   ageLabel,
   doneTodayKind,
-  groupByReason,
+  groupByBand,
+  reasonDay,
+  reasonSentence,
+  isPressing,
   remindTime,
   rowActionIds,
   rowChoices,
@@ -32,33 +35,82 @@ const item = (id: string, reason: ItemView["reason"], extra: Partial<ItemView> =
 });
 
 describe("attention model", () => {
-  it("groups by reason in Home's order and keeps the order inside", () => {
-    const groups = groupByReason([item("a", "pay"), item("b", "reply"), item("c", "pay")]);
-    expect(groups.map((g) => g.reason)).toEqual(["reply", "pay"]);
-    expect(groups[1]?.items.map((i) => i.id)).toEqual(["a", "c"]);
+  it("groups by band in Home's order, keeping the server's order inside", () => {
+    const groups = groupByBand([
+      item("a", "pay", { band: "week" }),
+      item("b", "reply", { band: "today" }),
+      item("c", "worth_a_look", { band: "whenever" }),
+      item("d", "review", { band: "now" }),
+      item("e", "do", { band: "week" }),
+    ]);
+    expect(groups.map((g) => g.band)).toEqual(["now", "today", "week", "whenever"]);
+    expect(groups[2]?.items.map((i) => i.id)).toEqual(["a", "e"]);
   });
 
-  it("puts Worth a look after Pay, in a colour of its own", () => {
-    const groups = groupByReason([
-      item("a", "worth_a_look"),
-      item("b", "pay"),
-      item("c", "review"),
-    ]);
-    expect(groups.map((g) => g.reason)).toEqual(["review", "pay", "worth_a_look"]);
+  it("puts an item without a band in Whenever, and never lists a wait", () => {
+    const groups = groupByBand([item("a", "pay"), item("b", "waiting", { band: "week" })]);
+    expect(groups).toEqual([{ band: "whenever", items: [expect.objectContaining({ id: "a" })] }]);
+  });
+
+  it("colours reasons by kind: Worth a look its own, a wait as a nudge", () => {
     expect(signalOf("worth_a_look")).toBe("look");
     expect(signalOf("pay")).toBe("pay");
-  });
-
-  it("puts Nudge after Pay and before Worth a look, and never lists a wait", () => {
-    const groups = groupByReason([
-      item("a", "worth_a_look"),
-      item("b", "nudge"),
-      item("c", "waiting"),
-      item("d", "pay"),
-    ]);
-    expect(groups.map((g) => g.reason)).toEqual(["pay", "nudge", "worth_a_look"]);
     expect(signalOf("nudge")).toBe("nudge");
     expect(signalOf("waiting")).toBe("nudge");
+  });
+
+  it("says why an item is in its band, naming the person when there is one", () => {
+    const today = new Date(2026, 9, 26, 10, 0);
+    const say = (reason: Parameters<typeof reasonSentence>[0], name?: string) =>
+      reasonSentence(reason, { name, today, locale: "en-GB" });
+    expect(say({ rule: "warning" })).toEqual({ key: "reason.warning", values: {} });
+    expect(say({ rule: "overdue", days: 2 })).toEqual({
+      key: "reason.overdue",
+      values: { count: 2 },
+    });
+    expect(say({ rule: "due_today" }).key).toBe("reason.dueToday");
+    expect(say({ rule: "due_tomorrow" }).key).toBe("reason.dueTomorrow");
+    expect(say({ rule: "planned_today" }).key).toBe("reason.plannedToday");
+    expect(say({ rule: "waited", days: 4 }, "Pedro")).toEqual({
+      key: "reason.waited",
+      values: { name: "Pedro", count: 4 },
+    });
+    expect(say({ rule: "waited", days: 4 })).toEqual({
+      key: "reason.waitedNoName",
+      values: { count: 4 },
+    });
+    expect(say({ rule: "waiting_answer" }, "Marta")).toEqual({
+      key: "reason.waitingAnswer",
+      values: { name: "Marta" },
+    });
+    expect(say({ rule: "waiting_answer" }, "").key).toBe("reason.waitingAnswerNoName");
+    expect(say({ rule: "due_on", on: "2026-10-28" })).toEqual({
+      key: "reason.dueOn",
+      values: { date: "Wed" },
+    });
+    expect(say({ rule: "nudge_due", on: "2026-10-23" }, "Rui")).toEqual({
+      key: "reason.nudgeDue",
+      values: { name: "Rui", date: "Fri" },
+    });
+    expect(say({ rule: "nudge_due", on: null }, "Rui").key).toBe("reason.nudgeDueToday");
+    expect(say({ rule: "nudge_due", on: "2026-10-26" }).key).toBe("reason.nudgeDueTodayNoName");
+    expect(say({ rule: "kept_by_rule" }).key).toBe("reason.keptByRule");
+    expect(say({ rule: "no_date" }).key).toBe("reason.noDate");
+    expect(say(null).key).toBe("reason.noDate");
+  });
+
+  it("names a day within the week by its weekday, further days by the month", () => {
+    const today = new Date(2026, 9, 26, 10, 0);
+    expect(reasonDay("2026-10-30", today, "en-GB")).toBe("Fri");
+    expect(reasonDay("2026-10-20", today, "en-GB")).toBe("Tue");
+    expect(reasonDay("2026-11-09", today, "en-GB")).toBe("9 Nov");
+  });
+
+  it("draws warnings and anything overdue in the danger colour", () => {
+    expect(isPressing({ rule: "warning" })).toBe(true);
+    expect(isPressing({ rule: "overdue", days: 1 })).toBe(true);
+    expect(isPressing({ rule: "due_today" })).toBe(false);
+    expect(isPressing(null)).toBe(false);
   });
 
   it("offers a nudge its own actions, whatever the catalogue rated", () => {

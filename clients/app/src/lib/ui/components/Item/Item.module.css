@@ -50,6 +50,55 @@
   grid-row: span 2;
 }
 
+/* With an eyebrow the row reads in three lines (the kind and why, who,
+   what): the avatar and the row's end span them all. */
+.item[data-eyebrow] > :first-child {
+  grid-column: 1 / 2;
+  grid-row: 1 / span 3;
+}
+
+/* The kind and why it is here, in small capitals; a long reason wraps
+   rather than being cut, so the whole sentence is always read. */
+.eyebrow {
+  grid-column: 2 / 3;
+  grid-row: 1 / 2;
+  min-width: 0;
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-tight) var(--font-sans);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+/* The kind's dot, on the first line. */
+.eyebrow > :first-child {
+  display: inline-block;
+  margin-inline-end: var(--space-1-5);
+  vertical-align: middle;
+}
+
+.eyebrowReason {
+  color: var(--text-secondary);
+}
+
+.eyebrowReason[data-danger] {
+  color: var(--danger);
+}
+
+.item[data-eyebrow] .who {
+  grid-column: 2 / 3;
+  grid-row: 2 / 3;
+}
+
+.item[data-eyebrow] .when {
+  grid-column: 3 / 4;
+  grid-row: 1 / span 3;
+}
+
+.item[data-eyebrow] .what {
+  grid-row: 3 / 4;
+}
+
 .who {
   min-width: 0;
   unicode-bidi: isolate;
@@ -169,6 +218,21 @@
   font-size: var(--text-md);
   line-height: var(--leading-relaxed);
   color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* Why it's here: the band and why, then what the band holds. */
+.whyText {
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.whyNote {
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
   overflow-wrap: anywhere;
 }
 

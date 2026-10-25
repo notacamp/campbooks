@@ -157,6 +157,34 @@ describe("ConversationReader", () => {
     expect(within(note).queryByRole("button", { name: "Reply" })).toBeNull();
   });
 
+  it("says the member replied, and offers no Reply, once they wrote after the message Scout read", async () => {
+    // campbooks-cloud#355: the answers are about the newest inbound message.
+    const sent = Q4_DETAIL.messages[1];
+    if (sent === undefined) {
+      throw new Error("the fixture has a reply");
+    }
+    const reply = {
+      ...sent,
+      id: "0192f1a0-0000-7000-8000-0000000000e9",
+      sent_at: "2026-10-23T15:38:00Z",
+    };
+    const detail = { ...Q4_DETAIL, conversation: Q4, messages: [...Q4_DETAIL.messages, reply] };
+    mockApi({
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`GET ${W}/conversations/${Q4.id}`]: { body: detail },
+      [`GET ${W}/conversations/${Q4.id}/messages/${NEWEST}/body`]: { body: Q4_BODY },
+      [`GET ${W}/conversations/${Q4.id}/messages/${reply.id}/body`]: { body: Q4_BODY },
+      [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4, unread_count: 0 } },
+      [`GET ${W}/drafts`]: { body: { drafts: [] } },
+    });
+    renderWithProviders(<Reader slot={vi.fn<RenderReplySlot>(() => null)} />);
+    await screen.findByRole("heading", { name: Q4.subject });
+    const note = await screen.findByRole("region", { name: "Where things stand" });
+    expect(note).toHaveTextContent("You replied on");
+    expect(note).not.toHaveTextContent("it needs a reply");
+    expect(within(note).queryByRole("button", { name: "Reply" })).toBeNull();
+  });
+
   it("says an ask that lapsed has expired, and offers nothing to resolve", async () => {
     // A sign-in link valid for ten minutes, long past (campbooks-cloud#275).
     // Read already: the read call's answer would replace it.

@@ -174,6 +174,23 @@ pub struct NoticeSettings {
     pub not_now_days: u32,
     /// Most suggestions kept per inbox (`MAX_PER_INBOX`, default 5).
     pub max_per_inbox: u32,
+    /// Conversations one kind of a sender's mail (a subject template, or
+    /// words the model proposed) needs to be offered on its own
+    /// (`MIN_KIND_MESSAGES`, default 4).
+    pub min_kind_messages: u32,
+    /// Distinct days that kind came on, at least (`MIN_KIND_DAYS`, default
+    /// 2).
+    pub min_kind_days: u32,
+    /// Senders whose subjects the `complete` model is asked to group, per
+    /// inbox and pass, the most frequent first (`MODEL_SENDERS_PER_PASS`,
+    /// default 3; 0 never asks it).
+    pub model_senders_per_pass: u32,
+    /// How long the model's grouping of a sender is reused before it is
+    /// asked again, in days (`REGROUP_DAYS`, default 7).
+    pub regroup_days: u32,
+    /// The most recent distinct subjects of a sender the model is given
+    /// (`MODEL_SUBJECTS`, default 40).
+    pub model_subjects: u32,
 }
 
 impl Default for NoticeSettings {
@@ -187,6 +204,11 @@ impl Default for NoticeSettings {
             every_hours: 24,
             not_now_days: 14,
             max_per_inbox: 5,
+            min_kind_messages: 4,
+            min_kind_days: 2,
+            model_senders_per_pass: 3,
+            regroup_days: 7,
+            model_subjects: 40,
         }
     }
 }
@@ -333,6 +355,23 @@ mod tests {
         })));
         let config = ConversationsConfig::from_figment(&figment).unwrap();
         assert_eq!(config.decide_backfill_days, 3);
+    }
+
+    #[test]
+    fn notices_split_a_senders_mail_and_ask_the_model_rarely() {
+        let config = ConversationsConfig::from_figment(&Figment::new()).unwrap();
+        assert_eq!(config.notices.min_kind_messages, 4);
+        assert_eq!(config.notices.min_kind_days, 2);
+        assert_eq!(config.notices.model_senders_per_pass, 3);
+        assert_eq!(config.notices.regroup_days, 7);
+        assert_eq!(config.notices.model_subjects, 40);
+        // An instance may turn the model's grouping off; the rest stays.
+        let figment = Figment::from(Serialized::defaults(serde_json::json!({
+            "conversations": {"notices": {"model_senders_per_pass": 0}}
+        })));
+        let off = ConversationsConfig::from_figment(&figment).unwrap();
+        assert_eq!(off.notices.model_senders_per_pass, 0);
+        assert_eq!(off.notices.min_kind_messages, 4);
     }
 
     #[test]

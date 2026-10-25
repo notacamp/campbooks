@@ -381,7 +381,7 @@ async fn search(_: Workspace<SearchRead>, Extension(mail): Extension<Shared>) ->
 async fn attention(_: Workspace<AttentionRead>, Extension(mail): Extension<Shared>) -> Json<Value> {
     let mut mail = mail.lock().unwrap();
     mail.called.push("attention.list".into());
-    Json(json!({ "items": mail.items, "counts": [] }))
+    Json(json!({ "items": mail.items, "counts": [], "tasks_elsewhere": 2 }))
 }
 
 #[utoipa::path(get, path = "/api/v1/w/{workspace_id}/inboxes",

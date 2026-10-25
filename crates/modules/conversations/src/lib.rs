@@ -234,8 +234,11 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_rule::ApplyRules::new(needs.clone()))
             .handler(features::fill_templates::FillTemplates)
+            // Scout noticed asks the `complete` model to group a mixed
+            // sender's subjects only while it may read mail here, as the read.
             .handler(features::rule_notices::NoticeRules::new(
                 deps.config.notices,
+                summaries.clone(),
             ))
             .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
             .handler(features::read_message::ReadMessage::new(

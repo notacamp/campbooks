@@ -2779,11 +2779,20 @@ export interface components {
              */
             counts: components["schemas"]["ReasonCount"][];
             /**
-             * @description Open: by reason (review, reply, decide, do, pay, nudge, worth a
-             *     look), then overdue, by due date, urgent first, oldest first.
+             * @description Open: by band (now, today, week, whenever), then inside a band
+             *     warnings first, dated before undated and the soonest date first,
+             *     people before services, oldest first; each with its band and why.
              *     Cleared: newest first. Waiting: soonest nudge first.
              */
             items: components["schemas"]["ItemView"][];
+            /**
+             * Format: int32
+             * @description Open task items left off the list because they are not for today:
+             *     not overdue, not due today or tomorrow, not planned for today or a
+             *     day before, not back from Later (campbooks-cloud#358). 0 for cleared
+             *     and waiting.
+             */
+            tasks_elsewhere: number;
         };
         /** @description `AuthenticatorAttestationResponseJSON`: what the authenticator made. */
         AttestationResponse: {
@@ -2835,6 +2844,35 @@ export interface components {
             /** @description The identity provider's signed logout token. */
             logout_token: string;
         };
+        /**
+         * @description Where an item stands on Home, in the order Home shows the bands.
+         * @enum {string}
+         */
+        Band: "now" | "today" | "week" | "whenever";
+        /**
+         * @description Why an item is in its band: the rule, with the number of days or the
+         *     day it names.
+         */
+        BandReason: {
+            /**
+             * Format: int32
+             * @description Days late (`overdue`) or waited (`waited`).
+             */
+            days?: number | null;
+            /**
+             * Format: date
+             * @description The day it names: the due date (`due_on`), or when an answer was
+             *     expected (`nudge_due`).
+             */
+            on?: string | null;
+            /** @description The rule. */
+            rule: components["schemas"]["BandRule"];
+        };
+        /**
+         * @description The rule that put an item in its band.
+         * @enum {string}
+         */
+        BandRule: "warning" | "overdue" | "due_today" | "due_tomorrow" | "planned_today" | "nudge_due" | "waited" | "due_on" | "waiting_answer" | "kept_by_rule" | "no_date";
         /**
          * @description How regularly a sender writes.
          * @enum {string}
@@ -4449,6 +4487,8 @@ export interface components {
          *     owning module renders who and what.
          */
         ItemView: {
+            band?: components["schemas"]["Band"] | null;
+            band_reason?: components["schemas"]["BandReason"] | null;
             /** @description The record that raised it. */
             cause: components["schemas"]["RecordRef"];
             /**
@@ -4538,7 +4578,7 @@ export interface components {
          * @description How a suggestion picks the mail that looks the same.
          * @enum {string}
          */
-        Likeness: "sender" | "list" | "sender_template" | "domain_template" | "domain" | "impersonation";
+        Likeness: "sender" | "list" | "sender_phrase" | "sender_template" | "domain_template" | "domain" | "impersonation";
         /**
          * @description What the round trip is for.
          * @enum {string}
@@ -4934,6 +4974,23 @@ export interface components {
          * @enum {string}
          */
         NoticeKind: "keep_off_home" | "archive_on_arrival";
+        /** @description The part of a sender's mail a suggestion is about (campbooks-cloud#356). */
+        NoticePattern: {
+            /** @description One recent subject of that mail, as plain text. */
+            example: string;
+            /**
+             * @description What narrows a search for the sender's mail to it, in the search
+             *     grammar (`subject:"…"`); empty when no words of it can.
+             */
+            search: string;
+            /** @description What picks it out. */
+            source: components["schemas"]["NoticePatternSource"];
+        };
+        /**
+         * @description What picks out the part of a sender's mail a suggestion is about.
+         * @enum {string}
+         */
+        NoticePatternSource: "template" | "phrase";
         /**
          * @description How a member resolves a need.
          * @enum {string}
@@ -5466,7 +5523,7 @@ export interface components {
          */
         ReadStatus: "none" | "queued" | "failed" | "done";
         /**
-         * @description Why an item needs someone, in the order Home shows the groups.
+         * @description Why an item needs someone (Home orders items by band, not by reason).
          * @enum {string}
          */
         Reason: "review" | "reply" | "decide" | "do" | "pay" | "nudge" | "worth_a_look" | "waiting";
@@ -5859,7 +5916,10 @@ export interface components {
             actions: components["schemas"]["RuleAction"][];
             /** @description The rule's conditions. */
             conditions: components["schemas"]["RuleCondition"][];
-            /** @description Why, in numbers. */
+            /**
+             * @description Why, in numbers: the counts of the part of the sender's mail it is
+             *     about.
+             */
             evidence: components["schemas"]["NoticeEvidence"];
             /** @description The suggestion. */
             id: components["schemas"]["RuleNoticeId"];
@@ -5867,6 +5927,7 @@ export interface components {
             inbox_id: components["schemas"]["InboxId"];
             /** @description What Scout noticed. */
             kind: components["schemas"]["NoticeKind"];
+            pattern?: components["schemas"]["NoticePattern"] | null;
             /** @description The sender's address. */
             sender: string;
             /** @description The name the sender gives, as plain text. */

@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 
 import type { UseMailboxConsent } from "~/modules/connectors";
+import type { UseTaskSources } from "~/modules/tasks";
 
 import { CalendarScreen, type ScheduleSearch } from "./components/Calendar/CalendarScreen";
 import { CalendarSettings } from "./components/Settings/CalendarSettings";
@@ -26,12 +27,14 @@ function validateScheduleSearch(search: Record<string, unknown>): ScheduleSearch
 export interface ScheduleRouteOptions {
   /** The front door, `identity`'s `useMailboxConsent`, handed over by the app shell. */
   useConsent: UseMailboxConsent;
+  /** Where tasks made from conversations came from, `conversations`' `useConversationSources`. */
+  useSources: UseTaskSources;
 }
 
 /** The module's pages; in the app, `parent` is the workspace layout (`/w/$workspaceId`). */
 export function buildScheduleRoutes<TParent extends AnyRoute>(
   parent: TParent,
-  { useConsent }: ScheduleRouteOptions,
+  { useConsent, useSources }: ScheduleRouteOptions,
 ) {
   function CalendarRoute() {
     const { workspaceId } = useParams({ strict: false });
@@ -41,6 +44,7 @@ export function buildScheduleRoutes<TParent extends AnyRoute>(
       <CalendarScreen
         workspaceId={workspaceId ?? ""}
         search={search}
+        useSources={useSources}
         onSearch={(next) => {
           void navigate({
             to: "/w/$workspaceId/schedule",

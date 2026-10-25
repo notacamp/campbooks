@@ -123,6 +123,10 @@ pub struct Need {
     pub latest: Option<String>,
     /// When what it asks stops being possible.
     pub lapses_at: Option<DateTime<Utc>>,
+    /// Whether it is the warning about suspicious mail.
+    pub warning: bool,
+    /// Whether a person sent its message; `None` when unknown.
+    pub from_person: Option<bool>,
 }
 
 /// A task as `tasks.task_changed` would carry it.
@@ -133,6 +137,8 @@ pub struct Task {
     pub state: TaskState,
     pub verb: TaskVerb,
     pub due_on: Option<NaiveDate>,
+    /// The day it is planned for (its plan is then `date`).
+    pub plan_on: Option<NaiveDate>,
     pub later_until: Option<DateTime<Utc>>,
     pub assignee: UserId,
     /// The conversation it came from.
@@ -148,6 +154,7 @@ impl Task {
             state: TaskState::Open,
             verb: TaskVerb::Do,
             due_on: None,
+            plan_on: None,
             later_until: None,
             assignee,
             source: None,
@@ -167,10 +174,13 @@ impl Kit {
             due_on: task.due_on,
             plan: if task.later_until.is_some() {
                 "later"
+            } else if task.plan_on.is_some() {
+                "date"
             } else {
                 "none"
             }
             .into(),
+            plan_on: task.plan_on,
             later_until: task.later_until,
             assignee: task.assignee,
             source: task
@@ -265,6 +275,8 @@ impl Kit {
                     due_on: need.due_on,
                     lapses_at: need.lapses_at,
                     urgent: false,
+                    warning: need.warning,
+                    from_person: need.from_person,
                 }),
                 cleared_because: None,
                 cleared_by: None,
