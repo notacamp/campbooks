@@ -89,7 +89,7 @@ pub struct CalendarConfig {
 /// Nothing here is checked while it is off: a server that does not offer
 /// Microsoft mail starts whatever these say (an unknown key or a tenant of
 /// any shape included).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default)]
 pub struct MicrosoftMailConfig {
     /// Offer Microsoft mailboxes (default false). Also needs the Microsoft
@@ -124,15 +124,6 @@ fn any_text<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<
         Raw::Bool(value) => value.to_string(),
         Raw::Other(_) => String::new(),
     }))
-}
-
-impl Default for MicrosoftMailConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            tenant: None,
-        }
-    }
 }
 
 /// `CAMPBOOKS_CONNECTORS__IMAP__*`: connecting any mailbox with its
