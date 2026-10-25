@@ -17,4 +17,4 @@
 - [x] 3.1 OpenAPI, client types and tracking plan unchanged (CI's drift checks); no Coverage row added
 - [x] 3.2 `deploy/README.md`: the rotation section says the secret keys idempotency hashes
 - [x] 3.3 Changelog entry `changelog/unreleased/security/335-keyed-idempotency-hash.md`
-- [ ] 3.4 Gates green in CI
+- [x] 3.4 Gates green in CI
