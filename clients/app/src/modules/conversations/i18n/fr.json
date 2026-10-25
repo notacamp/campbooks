@@ -173,6 +173,7 @@
     "sortedDefault": "Dans {{stream}} : rien ne l’a déplacée",
     "read": "La lecture de Campbooks, sous forme de suggestions : {{list}}.",
     "nothing": "Rien ici ne semble vous demander quoi que ce soit.",
+    "replied": "Vous avez répondu le {{date}} : rien ici ne vous attend.",
     "needsReply": "elle attend une réponse",
     "asksAction": "elle vous demande de faire quelque chose",
     "hasDeadline": "elle mentionne une date à respecter",

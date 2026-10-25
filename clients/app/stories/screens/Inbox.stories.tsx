@@ -204,6 +204,33 @@ export const ThreadIdle: Story = {
   args: { path: `${PATH}/primary/${Q4.id}`, api: inbox() },
 };
 
+/** Your reply after the message Scout read: the note says so and offers no Reply (campbooks-cloud#355). */
+const REPLY_TEXT = "Thanks Maya, v3 looks right. I will confirm the numbers by Thursday.";
+const sentReply = Q4_DETAIL.messages[1];
+const repliedMessage = sentReply && {
+  ...sentReply,
+  id: "0192f1a0-0000-7000-8000-0000000000e9",
+  sent_at: "2026-10-14T09:12:00Z",
+  text: { content: REPLY_TEXT, truncated: false },
+  has_html: false,
+};
+export const ThreadReplied: Story = {
+  args: {
+    path: `${PATH}/primary/${Q4.id}`,
+    api: inbox({
+      [`GET ${W}/conversations/${Q4.id}`]: {
+        body: {
+          ...Q4_DETAIL,
+          messages: [...Q4_DETAIL.messages, ...(repliedMessage ? [repliedMessage] : [])],
+        },
+      },
+      [`GET ${W}/conversations/${Q4.id}/messages/${repliedMessage?.id ?? ""}/body`]: {
+        body: { ...Q4_BODY, text: REPLY_TEXT, html: null },
+      },
+    }),
+  },
+};
+
 /** A mailbox disconnected with its mail kept: history, read-only, nothing to act on. */
 export const KeptHistory: Story = {
   args: {
