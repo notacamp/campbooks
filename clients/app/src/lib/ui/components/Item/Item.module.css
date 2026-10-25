@@ -129,6 +129,15 @@
   quotes: auto;
 }
 
+/* Scout's second line: plain words, wrapping rather than cut. */
+.note {
+  grid-column: 2 / 3;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+
 /* When: how long it has waited, then its due date, at the row's end. */
 .when {
   display: flex;

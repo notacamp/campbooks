@@ -184,16 +184,23 @@ export type OwnActionId =
   | "remind_when"
   | "open_attachment"
   | "forward"
-  | "nudge";
+  | "nudge"
+  // Scout isn't sure and the email went to other people (campbooks-cloud#372): put the
+  // move on the person it went to, write to the sender, or say it is nothing for the member.
+  | "wait"
+  | "reply_to"
+  | "nothing";
 export type UniversalActionId = "done" | "snooze" | "not_needed";
 
 /**
  * What a row is: a question, a warning, a bill Campbooks asks about ("Is it
  * paid?"), a bill the member said is still to pay, mail a rule they taught
  * keeps in front of them until opened ("Worth a look"), someone who has not
- * written back yet (a nudge), or any other need.
+ * written back yet (a nudge), a question about mail that went to other people
+ * (Scout isn't sure whose move it is), or any other need.
  */
-export type RowKind = "question" | "warning" | "need" | "bill" | "toPay" | "highlight" | "nudge";
+export type RowKind =
+  "question" | "unsure" | "warning" | "need" | "bill" | "toPay" | "highlight" | "nudge";
 
 /**
  * The actions Home offers for a need today. A question (`check`) is
@@ -220,6 +227,11 @@ export function rowActionIds(kind: RowKind): {
     }
     case "question": {
       return { own: ["yes", "no"], universal: ["snooze"] };
+    }
+    // Whose move it is: Nudge the person it went to, Reply to the sender, or
+    // Nothing for me; Later is the only universal one.
+    case "unsure": {
+      return { own: ["wait", "reply_to", "nothing"], universal: ["snooze"] };
     }
     case "warning": {
       return { own: ["report", "safe"], universal: ["done", "snooze"] };
@@ -370,7 +382,13 @@ export function rowChoices(
   };
   // Only a missing key means "not rated": `null` never comes from the server.
   // The catalogue rates nothing for a wait: a nudge keeps its own actions.
-  if (ranked === undefined || kind === "question" || kind === "highlight" || kind === "nudge") {
+  if (
+    ranked === undefined ||
+    kind === "question" ||
+    kind === "unsure" ||
+    kind === "highlight" ||
+    kind === "nudge"
+  ) {
     return fallback;
   }
   const own: OwnChoice[] = [];

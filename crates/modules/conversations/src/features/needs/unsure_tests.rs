@@ -45,6 +45,7 @@ async fn a_copy_of_mail_between_others_is_a_question_even_when_the_model_is_sure
     // natural party, how sure the model was and from where it is sure.
     let unsure = &need["unsure"];
     assert_eq!(unsure["in_to"], false, "{unsure}");
+    assert_eq!(unsure["in_cc"], true);
     assert_eq!(unsure["others"][0]["address"], ANA.1);
     assert_eq!(unsure["party"]["address"], ANA.1);
     assert_eq!(unsure["confidence"], 97);

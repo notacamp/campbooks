@@ -355,7 +355,8 @@
       "expired": "Expirado",
       "worth_a_look": "Vale a pena ver",
       "waiting": "À espera de {{name}}",
-      "nudge": "Relembrar"
+      "nudge": "Relembrar",
+      "unsure": "O Scout não tem a certeza"
     },
     "due": {
       "today": "Até hoje",
@@ -401,7 +402,10 @@
       "report": "Denunciar e apagar",
       "seen": "Visto",
       "heardBack": "Já tive notícias",
-      "notWaiting": "Não estou à espera"
+      "notWaiting": "Não estou à espera",
+      "nudgeParty": "Relembrar {{name}}…",
+      "replyTo": "Responder a {{name}}…",
+      "nothingForMe": "Nada para mim"
     },
     "toast": {
       "done": "Feito · {{name}}",
@@ -419,7 +423,8 @@
       "allPaidFailed_other": "Não foi possível marcar {{count}} faturas como pagas. Tente de novo.",
       "reported": "Denunciado · {{name}}. Está no spam",
       "heardBack": "Teve notícias de {{name}} · o Scout deixou de esperar",
-      "notWaiting": "Deixou de esperar por {{name}}"
+      "notWaiting": "Deixou de esperar por {{name}}",
+      "waiting": "À espera de {{name}}"
     },
     "summary": {
       "heading": "Resumo do Scout"
@@ -428,6 +433,21 @@
       "more": "Mostrar o email completo",
       "less": "Mostrar menos",
       "linksOff": "As ligações estão desativadas em emails que podem ser phishing."
+    },
+    "unsure": {
+      "lineTo": "{{name}} escreveu a {{others}} e a si.",
+      "lineCc": "{{name}} escreveu a {{others}}. Está em Cc.",
+      "lineNamed": "{{name}} escreveu a {{others}}. Não está em Para nem em Cc.",
+      "more_one": "{{names}} e mais {{count}} pessoa",
+      "more_other": "{{names}} e mais {{count}} pessoas",
+      "unanswered_one": "Não responderam há {{count}} dia.",
+      "unanswered_other": "Não responderam há {{count}} dias.",
+      "ask": "O Scout não sabe de quem é a vez. O que vem a seguir para si?",
+      "howQuestion": "Quanta certeza tinha o Scout",
+      "howReply": "{{confidence}}% de certeza de que precisa de resposta. Só conta como certo a partir de {{bar}}%.",
+      "howAction": "{{confidence}}% de certeza de que lhe pediram para fazer algo. Só conta como certo a partir de {{bar}}%.",
+      "howCc": "Está em Cc, não em Para.",
+      "howNotTo": "Não está em Para nem em Cc."
     }
   },
   "rules": {

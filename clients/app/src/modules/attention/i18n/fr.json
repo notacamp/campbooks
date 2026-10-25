@@ -20,7 +20,8 @@
     "worth_a_look": "À voir",
     "nudge": "À relancer",
     "doTask": "Tâche à faire",
-    "payTask": "Tâche à payer"
+    "payTask": "Tâche à payer",
+    "unsure": "Scout n’est pas sûr"
   },
   "bands": {
     "now": "Maintenant",
@@ -108,7 +109,8 @@
     "seen": "Vu · {{name}}",
     "nudged": "Relance envoyée à {{name}}",
     "heardBack": "Nouvelles de {{name}}",
-    "notWaiting": "Vous n’attendez plus {{name}}"
+    "notWaiting": "Vous n’attendez plus {{name}}",
+    "waiting": "En attente de {{name}}"
   },
   "error": {
     "title": "Impossible de charger ce qui a besoin de vous",

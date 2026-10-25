@@ -24,6 +24,13 @@ describe("Item", () => {
     expect(screen.getByText("Held Wed 10:00–10:30")).toHaveAttribute("data-signal", "do");
   });
 
+  it("shows Scout's own second line as plain words, not as a quote", () => {
+    renderUi(<Item {...base} note="Scout can’t tell whose move this is." />);
+
+    const note = screen.getByText("Scout can’t tell whose move this is.");
+    expect(note.tagName).not.toBe("Q");
+  });
+
   it("expands its detail and says so", () => {
     const onToggle = vi.fn();
     renderUi(

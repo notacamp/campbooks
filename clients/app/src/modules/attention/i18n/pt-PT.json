@@ -20,7 +20,8 @@
     "worth_a_look": "Vale a pena ver",
     "nudge": "Relembrar",
     "doTask": "Tarefa a fazer",
-    "payTask": "Tarefa a pagar"
+    "payTask": "Tarefa a pagar",
+    "unsure": "O Scout não tem a certeza"
   },
   "bands": {
     "now": "Agora",
@@ -108,7 +109,8 @@
     "seen": "Visto · {{name}}",
     "nudged": "Lembrete enviado a {{name}}",
     "heardBack": "Teve notícias de {{name}}",
-    "notWaiting": "Deixou de esperar por {{name}}"
+    "notWaiting": "Deixou de esperar por {{name}}",
+    "waiting": "À espera de {{name}}"
   },
   "error": {
     "title": "Não foi possível carregar o que precisa de si",

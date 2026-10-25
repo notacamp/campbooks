@@ -2251,6 +2251,9 @@ pub struct Unsure {
     /// Whether the inbox is in `To`; `false` when it is only copied, or not
     /// named at all.
     pub in_to: bool,
+    /// Whether the inbox is in `Cc`: copied. When it is in neither, it was not
+    /// named (a blind copy, a list or an alias).
+    pub in_cc: bool,
     /// The one person it is natural to put the move on: the person the
     /// model's `awaited` answer named, else the only other person in `To`.
     /// None when there is no obvious one.
@@ -2354,6 +2357,13 @@ async fn unsure(
         .sure_bar(question.as_str())
         .and_then(|bar| (0..=100_u32).find(|n| f64::from(*n) >= bar * 100.0 - 1e-9));
     let in_to = addressed_to_inbox(&envelope).unwrap_or(true);
+    let in_cc = envelope.recipient.as_ref().is_some_and(|mine| {
+        envelope.cc.iter().any(|copied| {
+            mine.addresses
+                .iter()
+                .any(|own| own.trim().eq_ignore_ascii_case(copied.address.trim()))
+        })
+    });
     // The person the model named, when its option still names that address;
     // else the only other person in `To`.
     let named = stored
@@ -2407,6 +2417,7 @@ async fn unsure(
     Ok(Some(Unsure {
         others: others.iter().map(to_address).collect(),
         in_to,
+        in_cc,
         party: party.as_ref().map(to_address),
         unanswered_days,
         confidence,

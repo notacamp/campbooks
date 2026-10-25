@@ -50,6 +50,8 @@ import {
   quoteAttribution,
   ReplyDialog,
   ScoutNoticed,
+  unsureNote,
+  unsureOf,
   useAheadOffer,
   useConversation,
   useConversationsByIds,
@@ -253,6 +255,10 @@ const kindOf = (need: NeedView): RowKind => {
   // A rule the member taught keeps it here until they open it: no question.
   if (need.question === "worth_a_look") {
     return "highlight";
+  }
+  // Scout isn't sure, and the email went to other people: whose move is it?
+  if (unsureOf(need) !== undefined) {
+    return "unsure";
   }
   // A bill: asked "Is it paid?" until the member answers, then "Pay …".
   const bill = billKind(need);
@@ -530,6 +536,13 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       return next;
     });
   };
+  // Nudge: Scout's few lines to the person not written yet, in a dialog over Home.
+  const nudge = (target: NudgeTarget, resume?: NudgeResume) => {
+    keepFocus();
+    setHighlight(undefined);
+    replies.current += 1;
+    setNudging({ target, resume, opened: replies.current });
+  };
   const ahead = useAheadOffer(workspaceId);
   const needActions = useNeedActions(workspaceId, {
     onChanged: refresh,
@@ -563,6 +576,13 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     // it. Only once the server agreed; the confirmation alone saves.
     onPaid: (conversation) => {
       ahead.offer(conversation, { kind: "paid" });
+    },
+    // Now it waits: the nudge to that person is a dialog away (it is optional).
+    onWaiting: (conversation) => {
+      const waiting = conversation.need;
+      if (waiting?.reason === "waiting" && waiting.waiting_on !== null) {
+        nudge({ conversation, need: waiting, name: displayName(waiting.waiting_on) });
+      }
     },
     onReported: (conversation) => {
       ahead.offer(conversation, { kind: "report" });
@@ -631,6 +651,18 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   };
   const confirm = (row: Row) => {
     needActions.confirm(row.conversation);
+  };
+  // Someone else on the email has the move: the conversation waits on them (the row folds
+  // away with Undo), and the nudge to them is offered once the server agreed.
+  const waitOn = (row: Row) => {
+    const party = unsureOf(row.need)?.party;
+    if (party === null || party === undefined) {
+      return;
+    }
+    const name = displayName(party);
+    setHighlight(undefined);
+    hide(row, t("confirm.waiting", { name }));
+    needActions.waitOn(row.conversation, { address: party.address, name });
   };
   const report = (row: Row) => {
     hide(row, t("confirm.reported", { name: row.name }));
@@ -722,13 +754,6 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     const inbox = inboxes.find((candidate) => candidate.id === row.conversation.inbox_id);
     return inbox !== undefined && !inbox.read_only && inbox.role !== "reader";
   };
-  // Nudge: Scout's few lines to the person not written yet, in a dialog over Home.
-  const nudge = (target: NudgeTarget, resume?: NudgeResume) => {
-    keepFocus();
-    setHighlight(undefined);
-    replies.current += 1;
-    setNudging({ target, resume, opened: replies.current });
-  };
   const openConversation = (row: { conversation: ConversationSummary }) => {
     void navigate({
       to: "/w/$workspaceId/inbox/$stream/$conversationId",
@@ -748,6 +773,11 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     return asked ? { ...age, text: t("nudge.asked", { date: age.text }) } : age;
   };
 
+  // Scout's second line on a question it is unsure of: they haven't answered, whose move is it.
+  const unsureNoteOf = (row: Row) => {
+    const unsure = unsureOf(row.need);
+    return unsure === undefined ? undefined : unsureNote(tc, unsure);
+  };
   const reminder = (row: Row) => remindTime(row.need.due_on, now ?? new Date());
   // Said from the time it gives: today or tomorrow at 09:00, else the date.
   const remindLabel = (row: Row) => {
@@ -806,7 +836,13 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     }
     const row = entry;
     const kind = kindOf(row.need);
-    const all = rowChoices(kind, row.need.actions);
+    const unsure = unsureOf(row.need);
+    const ranked = rowChoices(kind, row.need.actions);
+    // Nudge needs someone it is natural to nudge: with nobody obvious, it is not offered.
+    const all =
+      kind === "unsure" && unsure?.party == null
+        ? { ...ranked, own: ranked.own.filter((choice) => choice.id !== "wait") }
+        : ranked;
     // An inbox the member may only read: nothing that writes there (Reply,
     // Yes, No, It's safe, Already paid, Forward, Done, Not needed); Snooze,
     // Remind and Open attachment are the member's own.
@@ -851,6 +887,16 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
         }
         case "nudge": {
           return t("actions.nudge", { name: firstNameOf(row.name) });
+        }
+        // Scout isn't sure: the person it went to, the person who wrote, or nothing.
+        case "wait": {
+          return t("actions.nudge", { name: firstNameOf(displayName(unsure?.party)) });
+        }
+        case "reply_to": {
+          return tc("needs.actions.replyTo", { name: firstNameOf(row.name) });
+        }
+        case "nothing": {
+          return tc("needs.actions.nothingForMe");
         }
       }
     };
@@ -995,6 +1041,21 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       }
       case "nudge": {
         nudge({ conversation: row.conversation, need: row.need, name: row.name, row });
+        return;
+      }
+      case "wait": {
+        waitOn(row);
+        return;
+      }
+      case "reply_to": {
+        // Yes first, so the reply is a correction of what Scout was unsure of; then the dialog.
+        setHighlight(undefined);
+        confirm(row);
+        reply(row);
+        return;
+      }
+      case "nothing": {
+        notNeeded(row);
         return;
       }
       case "no":
@@ -1272,6 +1333,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     let kind = `kinds.${item.reason}`;
     if (isTask(entry)) {
       kind = entry.task.verb === "pay" ? "kinds.payTask" : "kinds.doTask";
+    } else if (kindOf(entry.need) === "unsure") {
+      kind = "kinds.unsure";
     }
     return {
       signal: signalOf(item.reason),
@@ -1680,6 +1743,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
                   row.conversation,
                 )}
                 excerpt={row.need.quote?.text}
+                note={unsureNoteOf(row)}
                 avatar={{
                   name: row.name,
                   kind:
@@ -2009,6 +2073,7 @@ function NeedDetail({
   const detail = useConversation(workspaceId, row.conversation.id);
   const decisions = detail.data?.decisions ?? [];
   const { need } = row;
+  const unsure = unsureOf(need);
   const warning = need.question === "suspicious";
   const box = useRef<HTMLDivElement>(null);
   const loaded = detail.data !== undefined;
@@ -2056,7 +2121,15 @@ function NeedDetail({
           </Button>
         }
         how={
-          <HowDecided rows={howRows(tc, exists, decisions)} footnote={tc("needs.how.footnote")} />
+          <HowDecided
+            rows={howRows(
+              tc,
+              exists,
+              decisions,
+              unsure === undefined ? undefined : { unsure, question: need.question },
+            )}
+            footnote={tc("needs.how.footnote")}
+          />
         }
       />
     </div>

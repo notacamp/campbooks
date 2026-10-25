@@ -32,6 +32,7 @@ import {
   type ConversationPlace,
   type ConversationSummary,
   type MessageView,
+  type NeedView,
 } from "../../api/queries";
 import {
   archiveMove,
@@ -56,6 +57,8 @@ import {
   needSender,
   needSentence,
   quoteAttribution,
+  unsureNote,
+  unsureOf,
   warningReasons,
 } from "../../needs";
 import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
@@ -65,6 +68,8 @@ import { useTeachOnce } from "../TeachOnce/TeachOnce";
 import { useRuleActions } from "../TeachOnce/use-rule-actions";
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 
+import { firstName } from "../../compose/dialog";
+import { NudgeDialog } from "../NudgeDialog/NudgeDialog";
 import { ReplyDialog } from "../ReplyDialog/ReplyDialog";
 import { SmartRuleConfirm, type SmartRuleDraft } from "../SmartRule/SmartRuleConfirm";
 
@@ -139,7 +144,17 @@ export function ConversationReader({
   const query = useConversation(workspaceId, conversationId);
   const detail = query.data;
   const conversation = detail?.conversation;
-  const needActions = useNeedActions(workspaceId);
+  // The wait the member just asked for (campbooks-cloud#372): the nudge to that person is a
+  // dialog away, and optional.
+  const [nudging, setNudging] = useState<{ need: NeedView; opened: number } | undefined>();
+  const needActions = useNeedActions(workspaceId, {
+    onWaiting: (summary) => {
+      const waiting = summary.need;
+      if (waiting?.reason === "waiting" && waiting.waiting_on !== null) {
+        setNudging((current) => ({ need: waiting, opened: (current?.opened ?? 0) + 1 }));
+      }
+    },
+  });
   // An inbox kept as history after its mailbox was disconnected (or one you
   // only read): nothing is written to it or sent from it, so no action is
   // offered (the server would answer `inbox_read_only`).
@@ -174,10 +189,14 @@ export function ConversationReader({
       {t("rules.reader.stop")}
     </Button>
   ) : null;
-  const choiceKey = (id: "item.choice1" | "item.choice2") => (offering ? {} : { shortcut: id });
+  const choiceKey = (id: "item.choice1" | "item.choice2" | "item.choice3") =>
+    offering ? {} : { shortcut: id };
   const footerLine = (summary: NonNullable<typeof conversation>) =>
     ruleMark === undefined ? placementLine(t, summary) : ruleLine(t, ruleMark, i18n.language);
   const question = need?.trust === "check";
+  // Scout isn't sure and the email went to other people: whose move is it?
+  const unsure = need === undefined ? undefined : unsureOf(need);
+  const unsureParty = unsure?.party ?? undefined;
   // A bill: Campbooks can't see the bank, so it asks whether it is paid;
   // once still to pay, Mark paid is its Done.
   const bill = need !== undefined && billKind(need) === "ask";
@@ -805,25 +824,69 @@ export function ConversationReader({
                           },
                         ],
                       }
-                    : {
-                        prompt: t("needs.actions.questionPrompt"),
-                        options: [
-                          {
-                            label: t("needs.actions.yes"),
-                            ...choiceKey("item.choice1"),
-                            onSelect: () => {
-                              needActions.confirm(conversation);
+                    : unsure !== undefined
+                      ? {
+                          prompt: unsureNote(t, unsure),
+                          options: [
+                            ...(unsureParty === undefined
+                              ? []
+                              : [
+                                  {
+                                    label: t("needs.actions.nudgeParty", {
+                                      name: firstName(displayName(unsureParty)),
+                                    }),
+                                    ...choiceKey("item.choice1"),
+                                    onSelect: () => {
+                                      needActions.waitOn(conversation, {
+                                        address: unsureParty.address,
+                                        name: displayName(unsureParty),
+                                      });
+                                    },
+                                  },
+                                ]),
+                            {
+                              label: t("needs.actions.replyTo", {
+                                name: firstName(needSender(need, conversation)),
+                              }),
+                              ...choiceKey(
+                                unsureParty === undefined ? "item.choice1" : "item.choice2",
+                              ),
+                              onSelect: () => {
+                                // Yes first, so the reply corrects what Scout was unsure of.
+                                needActions.confirm(conversation);
+                                openReply();
+                              },
                             },
-                          },
-                          {
-                            label: t("needs.actions.no"),
-                            ...choiceKey("item.choice2"),
-                            onSelect: () => {
-                              needActions.notNeeded(conversation);
+                            {
+                              label: t("needs.actions.nothingForMe"),
+                              ...choiceKey(
+                                unsureParty === undefined ? "item.choice2" : "item.choice3",
+                              ),
+                              onSelect: () => {
+                                needActions.notNeeded(conversation);
+                              },
                             },
-                          },
-                        ],
-                      },
+                          ],
+                        }
+                      : {
+                          prompt: t("needs.actions.questionPrompt"),
+                          options: [
+                            {
+                              label: t("needs.actions.yes"),
+                              ...choiceKey("item.choice1"),
+                              onSelect: () => {
+                                needActions.confirm(conversation);
+                              },
+                            },
+                            {
+                              label: t("needs.actions.no"),
+                              ...choiceKey("item.choice2"),
+                              onSelect: () => {
+                                needActions.notNeeded(conversation);
+                              },
+                            },
+                          ],
+                        },
                   // A bill can also be not needed (X): shown, as every key is.
                   ...(bill
                     ? {
@@ -881,7 +944,15 @@ export function ConversationReader({
                 })}
             footer={footerLine(conversation)}
             how={
-              <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
+              <HowDecided
+                rows={howRows(
+                  t,
+                  exists,
+                  decisions,
+                  unsure === undefined ? undefined : { unsure, question: need.question },
+                )}
+                footnote={t("needs.how.footnote")}
+              />
             }
           >
             {needSentence(t, need, needSender(need, conversation), {
@@ -992,6 +1063,21 @@ export function ConversationReader({
           onUndone={(resume) => {
             // The reply slot reopens the undone draft in the composer.
             askReply("reply", resume.draft.message_id);
+          }}
+        />
+      )}
+      {nudging === undefined ? null : (
+        <NudgeDialog
+          key={nudging.opened}
+          workspaceId={workspaceId}
+          conversationId={conversation.id}
+          need={nudging.need}
+          onClose={() => {
+            setNudging(undefined);
+          }}
+          onOpenDraft={(draft) => {
+            setNudging(undefined);
+            askReply("reply_all", draft.message_id);
           }}
         />
       )}

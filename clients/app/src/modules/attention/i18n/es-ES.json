@@ -20,7 +20,8 @@
     "worth_a_look": "Merece un vistazo",
     "nudge": "Recordar",
     "doTask": "Tarea por hacer",
-    "payTask": "Tarea por pagar"
+    "payTask": "Tarea por pagar",
+    "unsure": "Scout no está seguro"
   },
   "bands": {
     "now": "Ahora",
@@ -108,7 +109,8 @@
     "seen": "Visto · {{name}}",
     "nudged": "Recordatorio enviado a {{name}}",
     "heardBack": "Noticias de {{name}}",
-    "notWaiting": "Ya no esperas a {{name}}"
+    "notWaiting": "Ya no esperas a {{name}}",
+    "waiting": "Esperando a {{name}}"
   },
   "error": {
     "title": "No se ha podido cargar lo que te necesita",

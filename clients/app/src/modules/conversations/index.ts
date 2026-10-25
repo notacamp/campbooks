@@ -25,6 +25,8 @@ export {
   needSender,
   needSentence,
   quoteAttribution,
+  unsureNote,
+  unsureOf,
   warningReasons,
 } from "./needs";
 export { useInboxes } from "./api/queries";

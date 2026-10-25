@@ -159,6 +159,10 @@ describe("attention model", () => {
       universal: ["done", "snooze", "not_needed"],
     });
     expect(rowActionIds("question")).toEqual({ own: ["yes", "no"], universal: ["snooze"] });
+    expect(rowActionIds("unsure")).toEqual({
+      own: ["wait", "reply_to", "nothing"],
+      universal: ["snooze"],
+    });
     expect(rowActionIds("bill")).toEqual({
       own: ["paid", "to_pay"],
       universal: ["snooze", "not_needed"],

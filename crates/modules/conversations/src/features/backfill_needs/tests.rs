@@ -968,3 +968,58 @@ async fn the_upgrade_asks_recent_mail_whose_move_it_is_once(db: PgPool) {
     tick_reporting(&kit).await;
     assert_eq!(recording.asked.lock().unwrap().len(), 1);
 }
+
+/// What the scheduler does every minute, with whose move it is switched `moves`.
+async fn dispatch(kit: &Kit, moves: bool) {
+    let mut tx = kit.state.db.begin().await.unwrap();
+    jobs::enqueue(
+        &mut tx,
+        &DispatchNeedsBackfills { moves },
+        EnqueueOptions::default(),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+}
+
+/// campbooks-cloud#372: a backfill that finished before whose move it is was
+/// switched on runs once more when it is, and not before, and not twice.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn switching_whose_move_it_is_on_runs_finished_backfills_once_more(db: PgPool) {
+    use crate::testkit::{joao_asks_ana, waiting_deps};
+
+    let kit = Kit::with_deps(db.clone(), waiting_deps()).await;
+    joao_asks_ana(&kit).await;
+    seed(&db).await;
+    tick(&kit).await;
+    let state = || async {
+        sqlx::query_as::<_, (String, bool, Option<chrono::DateTime<chrono::Utc>>)>(
+            "SELECT state, moves_asked, finished_at FROM conversations.needs_backfills",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap()
+    };
+    let (done, asked, _) = state().await;
+    assert_eq!((done.as_str(), asked), ("done", true));
+
+    // As it was before the switch: finished without asking whose move it is.
+    sqlx::query("UPDATE conversations.needs_backfills SET moves_asked = false")
+        .execute(&db)
+        .await
+        .unwrap();
+    // Switched off: nothing is put back.
+    dispatch(&kit, false).await;
+    let (done, asked, off) = state().await;
+    assert_eq!((done.as_str(), asked), ("done", false));
+    // Switched on: it runs once more, asking whose move it is.
+    dispatch(&kit, true).await;
+    let (done, asked, on) = state().await;
+    assert_eq!((done.as_str(), asked), ("done", true));
+    assert!(on > off, "it ran again");
+    // And is not run again.
+    dispatch(&kit, true).await;
+    let (_, _, later) = state().await;
+    assert_eq!(later, on);
+}

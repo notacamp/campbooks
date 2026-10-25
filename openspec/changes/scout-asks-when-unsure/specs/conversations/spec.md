@@ -245,7 +245,7 @@ A need that is a question about a reply or an action (`review`, trust
 `check`, question `needs_reply` or `asks_action`) on a message that went to
 people besides the inbox SHALL carry `unsure` in its summary: those people
 (`To` before `Cc`, as the headers gave them, without the inbox, the sender and
-no-reply or service addresses, at most six), whether the inbox is in `To`, the
+no-reply or service addresses, at most six), whether the inbox is in `To` and whether it is in `Cc`, the
 one natural party (the person the model's `awaited` answer named, when its
 stored option still names that address, else the only other person in `To`;
 none when neither exists), the days since the message when none of those

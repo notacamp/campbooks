@@ -355,7 +355,8 @@
       "expired": "Caducado",
       "worth_a_look": "Merece un vistazo",
       "waiting": "Esperando a {{name}}",
-      "nudge": "Recordar"
+      "nudge": "Recordar",
+      "unsure": "Scout no está seguro"
     },
     "due": {
       "today": "Vence hoy",
@@ -401,7 +402,10 @@
       "report": "Denunciar y eliminar",
       "seen": "Visto",
       "heardBack": "Ya hay noticias",
-      "notWaiting": "No estoy esperando"
+      "notWaiting": "No estoy esperando",
+      "nudgeParty": "Recordar a {{name}}…",
+      "replyTo": "Responder a {{name}}…",
+      "nothingForMe": "Nada para mí"
     },
     "toast": {
       "done": "Hecho · {{name}}",
@@ -419,7 +423,8 @@
       "allPaidFailed_other": "No se han podido marcar {{count}} facturas como pagadas. Inténtalo de nuevo.",
       "reported": "Denunciado · {{name}}. Está en spam",
       "heardBack": "Noticias de {{name}} · Scout ha dejado de esperar",
-      "notWaiting": "Ya no esperas a {{name}}"
+      "notWaiting": "Ya no esperas a {{name}}",
+      "waiting": "Esperando a {{name}}"
     },
     "summary": {
       "heading": "Resumen de Scout"
@@ -428,6 +433,21 @@
       "more": "Mostrar el correo completo",
       "less": "Mostrar menos",
       "linksOff": "Los enlaces están desactivados en los correos que pueden ser phishing."
+    },
+    "unsure": {
+      "lineTo": "{{name}} escribió a {{others}} y a ti.",
+      "lineCc": "{{name}} escribió a {{others}}. Estás en Cc.",
+      "lineNamed": "{{name}} escribió a {{others}}. No estás en Para ni en Cc.",
+      "more_one": "{{names}} y {{count}} persona más",
+      "more_other": "{{names}} y {{count}} personas más",
+      "unanswered_one": "No han respondido en {{count}} día.",
+      "unanswered_other": "No han respondido en {{count}} días.",
+      "ask": "Scout no sabe a quién le toca. ¿Qué quieres hacer tú?",
+      "howQuestion": "Qué seguro estaba Scout",
+      "howReply": "{{confidence}}% seguro de que hace falta responder. Cuenta como seguro desde {{bar}}%.",
+      "howAction": "{{confidence}}% seguro de que te pidieron hacer algo. Cuenta como seguro desde {{bar}}%.",
+      "howCc": "Estás en Cc, no en Para.",
+      "howNotTo": "No estás en Para ni en Cc."
     }
   },
   "rules": {

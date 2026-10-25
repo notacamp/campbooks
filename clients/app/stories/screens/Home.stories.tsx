@@ -12,6 +12,10 @@ import {
   ANA_DETAIL,
   ANA_ITEM,
   CLEARED,
+  COPIED,
+  COPIED_DETAIL,
+  COPIED_ITEM,
+  COPIED_WAITING,
   COUNTS,
   INES,
   ITEMS,
@@ -594,4 +598,84 @@ export const YourDayPhone: Story = {
       globalThis.innerWidth,
     );
   },
+};
+
+// Scout isn't sure whose move it is (campbooks-cloud#372): Ana Costa wrote to
+// Águas do Ribatejo nine days ago, copying Sam. The model read a reply for Sam
+// at 85%, short of the 90% a reply needs to count as sure.
+function copied(): Record<string, MockRoute> {
+  return home({
+    [`GET ${W}/attention`]: (_body, url) =>
+      url.searchParams.get("state") === "cleared"
+        ? { body: { items: CLEARED, counts: [] } }
+        : { body: { items: [COPIED_ITEM, ...ITEMS], counts: COUNTS } },
+    [`GET ${W}/conversations`]: {
+      body: { conversations: [COPIED, ...NEEDS, SOFIA], next_cursor: null },
+    },
+    [`GET ${W}/conversations/${COPIED.id}`]: { body: COPIED_DETAIL },
+    [`POST ${W}/conversations/${COPIED.id}/need/resolve`]: { body: COPIED_WAITING },
+    [`POST ${W}/conversations/${COPIED.id}/need/reopen`]: { body: COPIED },
+    [`GET ${W}/drafts`]: { body: { drafts: [] } },
+    [`POST ${W}/conversations/${COPIED.id}/nudge/draft`]: {
+      body: {
+        message_id: COPIED.need?.message_id,
+        text: "Hello,\n\nCould you confirm the meter reading for the studio? Ana asked about it nine days ago.\n\nThanks,\nSam Rivera",
+      },
+    },
+  });
+}
+
+const copiedPlay: Story["play"] = async ({ canvasElement }) => {
+  const canvas = within(canvasElement);
+  await expect(
+    await canvas.findByText("Ana Costa wrote to Águas do Ribatejo. You’re in Cc."),
+  ).toBeVisible();
+  await expect(
+    canvas.getByText(
+      "They haven’t answered in 9 days. Scout can’t tell whose move this is. What’s next for you?",
+    ),
+  ).toBeVisible();
+  const actions = await canvas.findByRole("group", { name: "Actions for Ana Costa" });
+  await expect(within(actions).getByRole("button", { name: /^Nudge Águas…/u })).toBeVisible();
+  await expect(within(actions).getByRole("button", { name: /^Reply to Ana…/u })).toBeVisible();
+  await expect(within(actions).getByRole("button", { name: /^Nothing for me/u })).toBeVisible();
+};
+
+/** Scout isn't sure: who wrote to whom, that they are quiet, and the three ways to answer. */
+export const ScoutIsntSure: Story = {
+  args: { path: PATH, api: copied() },
+  play: copiedPlay,
+};
+
+/** The same card on a phone: the buttons stack, nothing scrolls sideways. */
+export const ScoutIsntSurePhone: Story = {
+  args: { path: PATH, api: copied() },
+  ...at("phone", 375, 812),
+  play: async (context) => {
+    await copiedPlay(context);
+    await expect(
+      context.canvasElement.ownerDocument.documentElement.scrollWidth,
+    ).toBeLessThanOrEqual(globalThis.innerWidth);
+  },
+};
+
+/** 1: the conversation waits on Águas do Ribatejo, and Scout offers the nudge to them. */
+export const ScoutIsntSureNudge: Story = {
+  args: { path: PATH, api: copied() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("Ana Costa wrote to Águas do Ribatejo. You’re in Cc.");
+    await userEvent.keyboard("1");
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByRole("dialog", { name: "Nudge Águas" })).toBeVisible();
+  },
+};
+
+// Twins for the recording (no play function): the same screens, left for the
+// recording script to drive.
+export const ScoutIsntSureRecording: Story = { args: { path: PATH, api: copied() } };
+
+export const ScoutIsntSurePhoneRecording: Story = {
+  args: { path: PATH, api: copied() },
+  ...at("phone", 375, 812),
 };
