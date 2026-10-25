@@ -25,6 +25,10 @@
 //! announced in a change batch exactly as sync would (so it shows in its
 //! conversation now, and the next sync knows it), the send is marked sent,
 //! `connectors.send_completed` is published, and the stream is due at once.
+//!
+//! Gmail and Zoho send through their APIs; an IMAP mailbox through its SMTP
+//! submission server (`via_imap`, campbooks-cloud#313), whose sent copy the
+//! stream's next run appends to Sent.
 
 use std::{collections::HashMap, time::Duration};
 
@@ -54,15 +58,21 @@ use crate::{
     events::{SendCompleted, SendOutcome},
     gmail::{self, compose},
     google::{MessageMeta, MessageRaw},
+    imap,
     mail::{self, Fetched},
     provider::{HTTP_TIMEOUT, ProviderError},
     zoho,
 };
 
+mod via_imap;
 mod via_zoho;
 
 /// The blob owner type of a send (its outgoing document).
 pub const SEND_OWNER: &str = "connectors.send";
+
+/// The blob owner type of a sent IMAP message's copy waiting to be appended
+/// to Sent (the bytes as sent, Bcc kept).
+pub use crate::domain::removal::SENT_COPY_OWNER;
 
 /// The largest message sent, in bytes once encoded (Gmail's limit).
 pub const MAX_MESSAGE_BYTES: usize = 35 * 1024 * 1024;
@@ -177,9 +187,8 @@ impl SendMessage {
         let configured = match provider {
             Some(Provider::Google) => self.deps.google.is_some(),
             Some(Provider::Zoho) => self.deps.zoho.is_some(),
-            // Sending through an IMAP mailbox's SMTP server lands with
-            // campbooks-cloud#313: until then a send fails as not connected.
-            Some(Provider::Imap) | None => false,
+            Some(Provider::Imap) => self.deps.imap_enabled(),
+            None => false,
         };
         let (Some(stream), Some(connection), Some(provider), true) =
             (target.stream, target.connection, provider, configured)
@@ -195,7 +204,13 @@ impl SendMessage {
         // A runner that lost its lease may still be in its call to the
         // provider: never call again before that call has surely ended.
         if let Some(at) = target.attempted_at {
-            let quiet = TimeDelta::from_std(HTTP_TIMEOUT + UNCLEAR_WAIT).unwrap_or(TimeDelta::MAX);
+            let call = match provider {
+                Provider::Imap => {
+                    Duration::from_secs(u64::from(self.deps.imap.config.send_timeout_seconds))
+                }
+                Provider::Google | Provider::Zoho => HTTP_TIMEOUT,
+            };
+            let quiet = TimeDelta::from_std(call + UNCLEAR_WAIT).unwrap_or(TimeDelta::MAX);
             let wait = at + quiet - now;
             if wait > TimeDelta::zero() {
                 return Err(JobError::retry_after(
@@ -213,6 +228,21 @@ impl SendMessage {
         let stands = port.as_ref() == Some(&target.document);
         if !stands && !target.unclear {
             return not_standing(ctx, workspace, send, &target).await;
+        }
+        if provider == Provider::Imap {
+            let document =
+                read_document(ctx, workspace, port.as_ref().unwrap_or(&target.document)).await?;
+            let attempt = via_imap::ImapSend {
+                workspace,
+                send,
+                stream,
+                connection,
+                document: &document,
+                give_up,
+                stands,
+                now,
+            };
+            return Box::pin(self.attempt_imap(ctx, target, attempt)).await;
         }
         let Some(token) = self
             .token(ctx, workspace, send, &target, connection)
@@ -353,13 +383,24 @@ struct Attempt<'a> {
     now: DateTime<Utc>,
 }
 
-/// A message the provider accepted, as the send records it: its id, and
-/// the message to index and announce when it could be had.
+/// A message the provider accepted, as the send records it: its id, the
+/// message to index and announce when it could be had, and (IMAP) what
+/// becomes of its copy in Sent.
 #[derive(Debug)]
 struct Sent {
     id: Option<String>,
     thread_key: Option<String>,
     fetched: Option<Fetched>,
+    copy: Option<SentCopy>,
+}
+
+/// What becomes of a sent IMAP message's copy in the mailbox's Sent folder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SentCopy {
+    /// The stream's next run appends it.
+    Pending,
+    /// The SMTP server keeps one itself.
+    Provider,
 }
 
 /// A message Gmail has (`meta`), sent as `raw` (indexed and announced when
@@ -375,6 +416,7 @@ fn gmail_sent(meta: &MessageMeta, raw: Option<Vec<u8>>, now: DateTime<Utc>) -> S
     Sent {
         id: Some(meta.id.clone()),
         thread_key: Some(meta.thread_id.clone()),
+        copy: None,
         fetched: raw.map(|raw| {
             let fetched_bytes = u64::try_from(raw.len()).unwrap_or(u64::MAX);
             gmail::fetched(
@@ -484,11 +526,13 @@ impl SendMessage {
         let ws = workspace.to_string();
         let (token, generation) = cursor_of(target)?;
         // Blobs are stored before the transaction that references them.
+        let mut raw = None;
         let stored = match accepted.fetched {
             Some(fetched) => {
                 let (message, op) = mail::store_message(&state.blobs, &ws, fetched, generation)
                     .await
                     .map_err(|e| JobError::retry(e.to_string()))?;
+                raw.clone_from(&message.raw);
                 let batch = MessageChangeBatch::new(
                     target.inbox,
                     vec![MessageChange::Upsert {
@@ -518,6 +562,9 @@ impl SendMessage {
         .await?;
         if first.is_none() {
             return Ok(());
+        }
+        if let Some(copy) = accepted.copy {
+            record_copy(tx, &state, workspace, send, copy, raw).await?;
         }
         if let Some((op, batch)) = stored {
             emit::apply_index(tx, &state, workspace, stream, vec![op]).await?;
@@ -574,8 +621,59 @@ fn cursor_of(target: &Target) -> Result<(String, i32), JobError> {
         let cursor: zoho::read::Cursor = serde_json::from_value(cursor).map_err(unreadable)?;
         return Ok((cursor.token(), cursor.generation));
     }
+    if target.provider.as_deref() == Some(Provider::Imap.as_str()) {
+        let cursor: imap::state::Cursor = serde_json::from_value(cursor).map_err(unreadable)?;
+        return Ok((cursor.token(), cursor.generation));
+    }
     let cursor: gmail::Cursor = serde_json::from_value(cursor).map_err(unreadable)?;
     Ok((cursor.token(), cursor.generation))
+}
+
+/// Record, in `tx`, what becomes of sent IMAP message `send`'s copy in
+/// Sent: left for the stream's next run to append (`raw`, held until then),
+/// or kept by the server itself. Without the bytes, there is nothing to
+/// append (`skipped`).
+async fn record_copy(
+    tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    state: &campbooks_kernel::AppState,
+    workspace: WorkspaceId,
+    send: SendId,
+    copy: SentCopy,
+    raw: Option<BlobRef>,
+) -> Result<(), JobError> {
+    let (sent_copy, raw, reason) = match (copy, raw) {
+        (SentCopy::Provider, _) => ("provider", None, None),
+        (SentCopy::Pending, Some(raw)) => ("pending", Some(raw), None),
+        (SentCopy::Pending, None) => ("skipped", None, Some("copy_unreadable")),
+    };
+    let held = raw
+        .as_ref()
+        .map(serde_json::to_value)
+        .transpose()
+        .map_err(|_| JobError::fatal("a blob reference does not encode"))?;
+    sqlx::query(
+        "UPDATE connectors.sends
+            SET sent_copy = $2, sent_copy_raw = $3, sent_copy_reason = $4
+          WHERE id = $1",
+    )
+    .bind(send)
+    .bind(sent_copy)
+    .bind(held)
+    .bind(reason)
+    .execute(&mut **tx)
+    .await?;
+    if let Some(raw) = raw {
+        state
+            .blobs
+            .attach(
+                tx,
+                &workspace.to_string(),
+                &raw,
+                &BlobOwner::new(SENT_COPY_OWNER, send),
+            )
+            .await?;
+    }
+    Ok(())
 }
 
 /// The send and its stream, read in a short transaction of its own.
@@ -912,5 +1010,7 @@ async fn settle(ctx: &JobContext, workspace: WorkspaceId, send: SendId) -> Resul
     Ok(())
 }
 
+#[cfg(test)]
+mod imap_tests;
 #[cfg(test)]
 mod tests;

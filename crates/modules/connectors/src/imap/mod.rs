@@ -4,7 +4,9 @@
 //! reading it (campbooks-cloud#311, [`read`]): its folders as places
 //! ([`folders`]), each message once wherever it is ([`state`]); and making
 //! members' changes there (campbooks-cloud#312, [`write`]), over the same
-//! [`session::Session`]. Sending (#313) comes later.
+//! [`session::Session`]; sending through its SMTP server
+//! (campbooks-cloud#313, [`smtp::Submission`]) and keeping the sent copy in
+//! its Sent folder ([`sent`]).
 //!
 //! Every host is reached through the kernel's SSRF guard
 //! ([`campbooks_kernel::net::guard`]), at the address it checked, on a mail
@@ -18,6 +20,7 @@ mod ispdb;
 mod ispdb_files;
 pub mod net;
 pub mod read;
+pub mod sent;
 pub mod session;
 pub mod smtp;
 pub mod state;
@@ -229,6 +232,10 @@ pub struct Imap {
     pub web: Arc<dyn net::Web>,
     /// How certificates are checked.
     pub trust: Trust,
+    /// SMTP hosts known to keep a copy of what they send, besides
+    /// [`SENT_KEEPERS`]: empty in production (the list changes only with a
+    /// release); tests name their fakes here.
+    pub sent_keepers: Vec<String>,
 }
 
 impl std::fmt::Debug for Imap {
@@ -256,6 +263,7 @@ impl Imap {
             dns: Arc::new(net::SystemDns::default()),
             web: Arc::new(net::GuardedWeb),
             trust: Trust::Platform,
+            sent_keepers: Vec::new(),
         }
     }
 
@@ -283,7 +291,57 @@ impl Imap {
     pub async fn reach(&self, server: &Server) -> Result<SocketAddr, Refused> {
         guard::resolve_socket_with(&*self.resolver, &server.host, server.port, self.policy()).await
     }
+
+    /// Whether the SMTP host `host` keeps a copy of what it sends in the
+    /// mailbox's Sent folder ([`SENT_KEEPERS`]): Campbooks then appends none.
+    pub fn keeps_sent_copy(&self, host: &str) -> bool {
+        let host = host.trim_end_matches('.').to_ascii_lowercase();
+        SENT_KEEPERS.contains(&host.as_str()) || self.sent_keepers.contains(&host)
+    }
 }
+
+/// The SMTP submission hosts of the big mail providers, which limit sending
+/// per account themselves: no instance-wide hourly cap applies to them, as
+/// it does to a small or self-hosted server (which it protects). A short
+/// list kept by hand, matched exactly.
+pub const SMTP_PROVIDER_HOSTS: [&str; 17] = [
+    "mail.gmx.com",
+    "mail.gmx.net",
+    "smtp-mail.outlook.com",
+    "smtp.aol.com",
+    "smtp.fastmail.com",
+    "smtp.gmail.com",
+    "smtp.googlemail.com",
+    "smtp.mail.com",
+    "smtp.mail.me.com",
+    "smtp.mail.ru",
+    "smtp.mail.yahoo.com",
+    "smtp.office365.com",
+    "smtp.web.de",
+    "smtp.yandex.com",
+    "smtp.yandex.ru",
+    "smtp.zoho.com",
+    "smtp.zoho.eu",
+];
+
+/// Whether `host` is one of [`SMTP_PROVIDER_HOSTS`].
+pub fn is_smtp_provider_host(host: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    SMTP_PROVIDER_HOSTS.contains(&host.as_str())
+}
+
+/// The SMTP submission hosts of providers that file every message they send
+/// in the mailbox's Sent folder themselves: a copy Campbooks appended would
+/// be a second one. A short list kept by hand, matched exactly; every other
+/// host gets the copy appended (after a look in Sent for it).
+pub const SENT_KEEPERS: [&str; 6] = [
+    "smtp-mail.outlook.com",
+    "smtp.aol.com",
+    "smtp.gmail.com",
+    "smtp.googlemail.com",
+    "smtp.mail.yahoo.com",
+    "smtp.office365.com",
+];
 
 /// The IMAP hosts of the big mail providers, which serve millions of
 /// mailboxes each: their sessions are capped as a provider's rather than as
@@ -389,6 +447,41 @@ mod tests {
                 .iter()
                 .all(|host| guard::is_host_name(host) && *host == host.to_ascii_lowercase())
         );
+    }
+
+    #[test]
+    fn big_smtp_providers_are_a_short_list_matched_exactly() {
+        assert!(is_smtp_provider_host("smtp.mail.me.com"));
+        assert!(is_smtp_provider_host("SMTP.fastmail.com."));
+        assert!(!is_smtp_provider_host("imap.mail.me.com"));
+        assert!(!is_smtp_provider_host("smtp.fastmail.com.example.com"));
+        assert!(!is_smtp_provider_host("smtp.example.com"));
+        assert!(
+            SMTP_PROVIDER_HOSTS
+                .iter()
+                .all(|host| guard::is_host_name(host) && *host == host.to_ascii_lowercase())
+        );
+    }
+
+    #[test]
+    fn hosts_that_keep_their_copy_are_a_short_list_matched_exactly() {
+        let imap = Imap::default();
+        assert!(imap.keeps_sent_copy("smtp.mail.yahoo.com"));
+        assert!(imap.keeps_sent_copy("SMTP.gmail.com."));
+        assert!(!imap.keeps_sent_copy("imap.mail.yahoo.com"));
+        assert!(!imap.keeps_sent_copy("smtp.gmail.com.example.com"));
+        assert!(!imap.keeps_sent_copy("evil.smtp.gmail.com"));
+        assert!(!imap.keeps_sent_copy("smtp.example.com"));
+        assert!(
+            SENT_KEEPERS
+                .iter()
+                .all(|host| guard::is_host_name(host) && *host == host.to_ascii_lowercase())
+        );
+        let test = Imap {
+            sent_keepers: vec!["smtp.example.com".to_owned()],
+            ..Imap::default()
+        };
+        assert!(test.keeps_sent_copy("smtp.example.com"));
     }
 
     #[test]

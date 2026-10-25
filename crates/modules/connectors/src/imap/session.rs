@@ -364,6 +364,74 @@ impl Session {
         done
     }
 
+    /// `APPEND` `message` to `folder` (an IMAP quoted string) with `flags`
+    /// (atoms such as `\Seen`), as a synchronising literal: the size is
+    /// announced and the bytes are sent only once the server asks for them
+    /// (`+`), so a server that refuses the size takes none of them. How it
+    /// ended, within `limits` (`time` for the whole command, the bytes
+    /// included); `Err` when it was cut short, after which the session must
+    /// not be used again.
+    pub async fn append(
+        &mut self,
+        folder: &str,
+        flags: &str,
+        message: &[u8],
+        limits: Limits,
+    ) -> Result<Done, WireError> {
+        if self.broken {
+            return Err(WireError::Closed);
+        }
+        let done = self.exchange_append(folder, flags, message, limits).await;
+        self.broken = done.is_err();
+        done
+    }
+
+    /// [`append`](Self::append), on a session in step.
+    async fn exchange_append(
+        &mut self,
+        folder: &str,
+        flags: &str,
+        message: &[u8],
+        limits: Limits,
+    ) -> Result<Done, WireError> {
+        let tag = self.next_tag();
+        let deadline = Instant::now() + limits.time;
+        let line = format!("{tag} APPEND {folder} ({flags}) {{{}}}\r\n", message.len());
+        self.write(line.as_bytes(), deadline).await?;
+        let mut total = 0_usize;
+        let mut count = 0_usize;
+        loop {
+            let response = self.response(limits.response, deadline).await?;
+            total = total.saturating_add(response.len());
+            if total > limits.total {
+                return Err(WireError::TooMany);
+            }
+            match syntax::parse(&response).map_err(|_| WireError::Malformed)? {
+                Response::Continue => break,
+                // Refused before the bytes: the session is in step.
+                Response::Tagged {
+                    tag: done,
+                    status,
+                    code,
+                } if done == tag.as_bytes() => return Ok(Done { status, code }),
+                Response::Tagged { .. } => return Err(WireError::Malformed),
+                Response::Untagged(Untagged::Status {
+                    status: Status::Bye,
+                    ..
+                }) => return Err(WireError::Closed),
+                Response::Untagged(_) => {
+                    count += 1;
+                    if count > limits.responses {
+                        return Err(WireError::TooMany);
+                    }
+                }
+            }
+        }
+        self.write(message, deadline).await?;
+        self.write(b"\r\n", deadline).await?;
+        self.read_tagged(&tag, limits, deadline, &mut ignore).await
+    }
+
     /// [`command`](Self::command), on a session in step.
     async fn exchange<F>(
         &mut self,
@@ -691,6 +759,9 @@ impl Session {
     }
 }
 
+/// An untagged response nobody reads.
+fn ignore(_: Untagged<'_>) {}
+
 /// Sign in to `server` as `username`, list the inbox and log out, within
 /// the configured time.
 pub async fn verify(
@@ -785,7 +856,7 @@ const LOGGED_CODES: [&str; 27] = [
 
 /// `code` as a log may carry it: one of [`LOGGED_CODES`], `other`, or empty
 /// when there is none.
-fn logged_code(code: Option<&Code>) -> &'static str {
+pub(crate) fn logged_code(code: Option<&Code>) -> &'static str {
     match code {
         None => "",
         Some(code) => LOGGED_CODES

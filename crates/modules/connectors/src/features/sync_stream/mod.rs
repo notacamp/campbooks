@@ -16,8 +16,10 @@
 //! An IMAP stream (`imap::read`) reads over one session to its server,
 //! holding one of the host's few session slots, and keeps where each
 //! message is (`connectors.imap_locations`) with the index. Its pending
-//! changes are made over that session first (`imap::write`), and how they
-//! ended (the locations and index they leave) recorded before it reads.
+//! changes are made over that session first (`imap::write`), then the
+//! copies in Sent of messages sent through its SMTP server (`imap::sent`),
+//! and how they ended (the locations and index they leave) recorded before
+//! it reads.
 
 mod calendar;
 
@@ -44,7 +46,7 @@ use crate::{
         health::{self, LOGIN_REFUSALS},
         imap_servers,
         marks::MarkIds,
-        model::{ConnectionId, Health, InboxId, Phase, Provider, StreamId},
+        model::{ConnectionId, Health, InboxId, Phase, Provider, SendId, StreamId},
         outbound::{self, Backlog},
         push::Push,
         removal::BATCH_OWNER,
@@ -56,6 +58,7 @@ use crate::{
     imap::{
         self, Refusal,
         read::{Failure, Page},
+        sent::{self, Pending},
         session::Session,
         state::{Cursor, LocationOp},
     },
@@ -658,6 +661,7 @@ impl SyncStream {
                 .await?
                 .flatten();
         let opened = credentials::password(&mut tx, &cipher, target.connection).await;
+        let copies = pending_copies(&mut tx, target.stream).await?;
         tx.commit().await?;
         let password = match opened {
             Ok(password) => password,
@@ -729,6 +733,7 @@ impl SyncStream {
             cursor,
             now,
             address,
+            copies,
         };
         let read = tokio::time::timeout(IMAP_RUN_LIMIT, Box::pin(read_imap(run)))
             .await
@@ -1296,7 +1301,65 @@ struct ImapRun<'a> {
     cursor: Cursor,
     now: DateTime<Utc>,
     address: Option<String>,
+    /// The copies in Sent still to be made (`imap::sent`), and the sends
+    /// whose copy cannot be read back.
+    copies: Copies,
 }
+
+/// The copies in Sent a run makes: those it can, and the sends whose
+/// recorded copy is unreadable (failed without contacting the server).
+#[derive(Debug, Default)]
+struct Copies {
+    pending: Vec<Pending>,
+    broken: Vec<SendId>,
+}
+
+/// The copies in Sent stream `stream` still has to make, oldest first, at
+/// most [`sent::COPIES_PER_RUN`].
+async fn pending_copies(
+    conn: &mut sqlx::PgConnection,
+    stream: StreamId,
+) -> Result<Copies, JobError> {
+    let rows: Vec<CopyRow> = sqlx::query_as(
+        "SELECT s.id, s.provider_message_id, s.sent_copy_raw, s.sent_copy_attempts,
+                m.rfc_message_id
+           FROM connectors.sends s
+           LEFT JOIN connectors.messages m
+             ON m.stream_id = s.stream_id AND m.provider_message_id = s.provider_message_id
+          WHERE s.stream_id = $1 AND s.sent_copy = 'pending'
+          ORDER BY s.updated_at, s.id
+          LIMIT $2",
+    )
+    .bind(stream)
+    .bind(sent::COPIES_PER_RUN)
+    .fetch_all(conn)
+    .await?;
+    let mut copies = Copies::default();
+    for (id, key, raw, attempts, rfc_message_id) in rows {
+        let send = SendId::from_uuid(id);
+        let raw = raw.and_then(|raw| serde_json::from_value(raw).ok());
+        match (key, raw) {
+            (Some(key), Some(raw)) => copies.pending.push(Pending {
+                send,
+                key,
+                rfc_message_id,
+                raw,
+                attempts,
+            }),
+            _ => copies.broken.push(send),
+        }
+    }
+    Ok(copies)
+}
+
+/// A pending copy's row: send, index key, bytes, attempts, `Message-ID`.
+type CopyRow = (
+    uuid::Uuid,
+    Option<String>,
+    Option<serde_json::Value>,
+    i32,
+    Option<String>,
+);
 
 /// Why an IMAP run read nothing.
 #[derive(Debug)]
@@ -1334,10 +1397,17 @@ async fn read_imap(run: ImapRun<'_>) -> Result<Page, ImapTrouble> {
         cursor,
         now: run.now,
         config: &run.imap.config,
-        address: run.address,
+        address: run.address.clone(),
     }
     .read()
     .await;
+    // Copies in Sent once the read is done: one that will not go never holds
+    // up inbound mail.
+    if let Ok(read) = &page
+        && (!run.copies.pending.is_empty() || !run.copies.broken.is_empty())
+    {
+        copy_imap(&run, &mut session, &read.cursor).await;
+    }
     session.logout().await;
     page.map_err(ImapTrouble::Failed)
 }
@@ -1397,6 +1467,37 @@ async fn record_imap_push(
         .await?;
     tx.commit().await?;
     Ok(pushed.cursor)
+}
+
+/// Make `run`'s copies in Sent over `session`, each recorded as it ends
+/// (`imap::sent`), after the read. Trouble is logged, never the run's: the
+/// copies left wait for the next run.
+async fn copy_imap(run: &ImapRun<'_>, session: &mut Session, cursor: &Cursor) {
+    let copied = sent::Appender {
+        session,
+        pool: run.pool,
+        blobs: run.blobs,
+        workspace: run.workspace,
+        connection: run.connection,
+        stream: run.stream,
+        cursor,
+        config: &run.imap.config,
+    }
+    .append(run.copies.pending.clone(), &run.copies.broken)
+    .await;
+    match copied {
+        Ok(copied) => tracing::info!(
+            stream = %run.stream,
+            appended = copied.appended,
+            trouble = copied.trouble.map_or("", imap::write::Trouble::code),
+            "copies made in Sent"
+        ),
+        Err(err) => tracing::warn!(
+            stream = %run.stream,
+            error = %redact::error(&err),
+            "the copies made in Sent could not be recorded"
+        ),
+    }
 }
 
 /// An IMAP page as the run applies it.

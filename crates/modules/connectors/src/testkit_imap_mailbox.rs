@@ -123,6 +123,25 @@ impl Store {
             .unwrap_or_else(|| panic!("no fake folder {name}"))
     }
 
+    /// Append `raw` to folder `name` (`APPEND`), `\Seen` when `seen`: its
+    /// folder's UIDVALIDITY and its UID; `None` when there is no such
+    /// folder.
+    pub fn append_mail(
+        &mut self,
+        name: &str,
+        raw: Vec<u8>,
+        at: DateTime<Utc>,
+        seen: bool,
+    ) -> Option<(u32, u32)> {
+        let uidvalidity = self.folders.iter().find(|f| f.name == name)?.uidvalidity;
+        self.ids += 1;
+        let email_id = format!("M{:08}", self.ids);
+        Some((
+            uidvalidity,
+            self.append(name, raw, at, email_id, seen, false),
+        ))
+    }
+
     /// Put `raw` in folder `name`, received `at`; its UID.
     pub fn deliver(&mut self, name: &str, raw: &[u8], at: DateTime<Utc>) -> u32 {
         self.ids += 1;
@@ -349,6 +368,17 @@ pub struct Offers {
     pub refuse_uid_expunge: bool,
     /// `UID FETCH … (UID FLAGS)` answers with no message.
     pub hide_flags: bool,
+    /// It announces `APPENDLIMIT=<n>` (RFC 7889), and refuses a larger
+    /// `APPEND` before its bytes.
+    pub append_limit: Option<u64>,
+    /// `APPEND` is answered `NO [UNAVAILABLE]` before its bytes.
+    pub append_busy: bool,
+    /// `APPEND` is answered `NO [OVERQUOTA]` after its bytes.
+    pub append_refused: bool,
+    /// `APPEND` takes the bytes and never answers.
+    pub append_hang: bool,
+    /// `APPEND` makes it hang up at once.
+    pub append_drop: bool,
 }
 
 /// The answer to one signed-in command (`verb` and its `args`), on a

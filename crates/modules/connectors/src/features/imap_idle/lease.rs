@@ -47,7 +47,7 @@ pub struct Offer {
 
 /// A digest of `value` under the instance's signer, for `context`: 32 hex
 /// characters that only the instance can link back to `value`.
-fn keyed(signer: &Signer, context: &[u8], value: &str) -> String {
+pub(crate) fn keyed(signer: &Signer, context: &[u8], value: &str) -> String {
     let tag = signer.sign(context, value.as_bytes());
     let mut out = String::with_capacity(32);
     for byte in tag.iter().take(16) {

@@ -138,6 +138,7 @@ impl SendMessage {
                         id: None,
                         thread_key: None,
                         fetched: None,
+                        copy: None,
                     },
                 };
                 self.finish_sent(ctx, workspace, send, &target, stream, sent, now)
@@ -214,6 +215,7 @@ impl SendMessage {
             id: Some(id),
             thread_key: None,
             fetched,
+            copy: None,
         }
     }
 }
