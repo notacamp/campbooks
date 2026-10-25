@@ -2327,6 +2327,7 @@ const ATTACH: &str = "SELECT n.conversation_id, n.message_id, n.reason, n.trust,
 /// The people behind a question about a reply or an action on `message`
 /// (campbooks-cloud#372), read from its headers and the model's stored
 /// answers; `None` when the email went to nobody besides the inbox.
+#[allow(clippy::too_many_lines)]
 async fn unsure(
     conn: &mut PgConnection,
     inbox: InboxId,
