@@ -24,12 +24,12 @@ record of the changes themselves.
 
 ## What Changes
 
-- Tracking plan version 10 (`tracking/patches/0010-tasks.yaml`): 9 new
+- Tracking plan version 10 (`tracking/patches/0010-tasks.yaml`): 8 new
   live events of `tasks`: `task_created`, `task_edited` (which fields, by
   name), `task_due_changed` (with the due date before), `task_planned`
   (with the plan before), `task_done`, `task_not_needed`, `task_reopened`
-  (with the state before), `task_handed_off` and `task_taken_back` (with
-  the member who had it).
+  (with the state before), and `task_reassigned` (handed off or taken
+  back, with the member who had it).
 - The records `tasks.task`, `tasks.task_due` and `tasks.task_plan`, their
   enums, and a Coverage row for each of the module's 8 mutating
   operations, its job and its 2 event handlers.

@@ -45,18 +45,12 @@ task is `task`, the other member `previous_assignee` /
 | `tasks.task_done` | `tasks.done` closes an open task (paid, for a bill) | `user`, `assistant`, `automation` | `task` (after) |
 | `tasks.task_not_needed` | `tasks.not_needed` closes an open task as not needed | `user`, `assistant`, `automation` | `task` (after) |
 | `tasks.task_reopened` | `tasks.reopen` opens a closed task again | `user`, `assistant`, `automation` | `task` (after), `before` (`tasks.task_state`: done or not needed) |
-| `tasks.task_handed_off` | `tasks.hand_off` gives an open task to a teammate | `user`, `assistant`, `automation` | `task` (after: `assignee` the teammate, `handed_by` the giver), `previous_assignee`, `previous_handed_by`? (a re-hand-off: who had handed it before) |
-| `tasks.task_taken_back` | `tasks.take_back` gives a handed-off task back to the member who handed it | `user`, `assistant`, `automation` | `task` (after), `previous_assignee` (the teammate who had it) |
+| `tasks.task_reassigned` | `tasks.hand_off` gives an open task to a teammate, or `tasks.take_back` gives a handed-off task back to the member who handed it | `user`, `assistant`, `automation` | `task` (after: on a hand-off `assignee` the teammate, `handed_by` the giver), `reassignment` (`tasks.reassignment`: handed_off, taken_back), `previous_assignee` (who had it), `previous_handed_by`? (who had handed it off before this change, if anyone) |
 
 A client token acts for no member: it can make no task and see none, so
 `client` is no actor type of these events. Scout's own asks
 (`tasks.add_read_asks`) run as the handler, so their actor is `system` on
 behalf of whoever caused the read.
-
-One `PATCH` that renames a task and moves its due date tracks both
-`task_edited` (`fields: [title]`) and `task_due_changed`: the due date is
-the transition that matters (it drives Home's Do and Pay), so it has its
-own event with the date before, as schedule's moved events do.
 
 Records:
 
@@ -73,7 +67,31 @@ The plan is the stored one: a Later whose time has passed still reads as
 
 Enums: `tasks.task_verb` (do, pay), `tasks.task_origin` (own, ask,
 deadline), `tasks.task_state` (open, done, not_needed), `tasks.plan_kind`
-(none, date, later), `tasks.task_field` (title, verb).
+(none, date, later), `tasks.task_field` (title, verb),
+`tasks.reassignment` (handed_off, taken_back).
+
+### Handed off and taken back: one event
+
+The plan's rule wants an action that is a past participle (`handed_off`
+and `taken_back` end in `off` and `back`), so a hand-off and a take-back
+are both `tasks.task_reassigned`, told apart by `reassignment`
+(`handed_off`, `taken_back`, the module's own words). Both move the task
+to another member, and both carry who had it (`previous_assignee`) and,
+for a re-hand-off, who had handed it to them (`previous_handed_by`).
+
+### Edited and due changed
+
+One `PATCH` that renames a task and moves its due date tracks both
+`task_edited` (`fields: [title]`) and `task_due_changed`: the due date is
+the transition that matters (it drives Home's Do and Pay), so it has its
+own event with the date before, as schedule's moved events do.
+
+### A plan set again
+
+`tasks.plan` stores what it is sent, and the module appends a history
+entry and bumps the revision even when the plan is the one the task had.
+Nothing changed, so nothing is tracked; the module's behaviour is
+unchanged.
 
 ### Where each is tracked
 
@@ -97,8 +115,8 @@ and `tasks.get` need no row):
 | `tasks.done` | `task_done` |
 | `tasks.not_needed` | `task_not_needed` |
 | `tasks.reopen` | `task_reopened` |
-| `tasks.hand_off` | `task_handed_off` |
-| `tasks.take_back` | `task_taken_back` |
+| `tasks.hand_off` | `task_reassigned` |
+| `tasks.take_back` | `task_reassigned` |
 
 Event handlers:
 

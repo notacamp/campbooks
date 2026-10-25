@@ -15,7 +15,7 @@ use axum::{
 };
 use campbooks_kernel::{
     AppState, Error, RecordRef,
-    auth::{Principal, PrincipalKind},
+    auth::{Principal, PrincipalKind, Scope},
     authz::{
         Catalogue, Facts, FactsFuture, Owner, OwnerFact, ResourceFacts, ResourceType, Resources,
         Tenancy,
@@ -25,6 +25,7 @@ use campbooks_kernel::{
     config::BlobsConfig,
     db::BeginFor as _,
     jobs::{Registry, Worker, WorkerStats},
+    operations,
     tenancy::{Access, Membership, MembershipFuture, Role, RoleFuture, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
 };
@@ -191,6 +192,45 @@ impl Kit {
             membership,
             inboxes,
         }
+    }
+
+    /// The same kit, writing tracked events to the outbox (ADR 0020), read
+    /// back with [`testing::tracked_events`].
+    #[must_use]
+    pub fn tracking(mut self) -> Self {
+        self.state = testing::tracking_outbox(self.state);
+        self.app = testing::app(crate::module(), self.state.clone());
+        self
+    }
+
+    /// Invoke `operation` with `input` (path parameters and body) as Scout,
+    /// for the already-registered member `sub`.
+    pub async fn as_assistant(
+        &self,
+        sub: &str,
+        workspace: WorkspaceId,
+        (operation, input): (&str, serde_json::Value),
+    ) -> Result<operations::Output, operations::InvokeError> {
+        let composed = operations::compose(crate::module().router, self.state.clone());
+        let principal = Principal {
+            subject: sub.to_owned(),
+            kind: PrincipalKind::User,
+            client_id: None,
+            scopes: ALL_SCOPES.split(' ').map(Scope::new).collect(),
+            workspace: None,
+            email: Some(format!("{sub}@example.com")),
+            email_verified: true,
+            name: None,
+            expires_at: None,
+            issued_at: None,
+            auth_time: None,
+            sign_in: None,
+        };
+        let invocation =
+            operations::Invocation::new(operations::Caller::Assistant, principal, operation, input)
+                .in_workspace(workspace.to_string())
+                .idempotency_key(sqlx::types::Uuid::now_v7().to_string());
+        operations::invoke(&composed.state, invocation).await
     }
 
     /// A user `sub`, member of `workspace`, with every scope of the module.

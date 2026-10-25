@@ -21,7 +21,10 @@ use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{Postgres, Transaction};
 
 use crate::{
-    domain::{Outcome, TaskActor, TaskChange, TaskHistoryDetail, TaskId, TaskVerb, finish},
+    domain::{
+        Outcome, SELECT_LOCKED, TaskActor, TaskChange, TaskHistoryDetail, TaskId, TaskRow,
+        TaskVerb, finish,
+    },
     inbound::{AskAmount, AskText, MessageRead, ReadAsk, ReadTexts},
 };
 
@@ -272,6 +275,7 @@ async fn add_ask(
             },
             previous_assignee: None,
             previous_handed_by: None,
+            before: None,
         },
         Utc::now().date_naive(),
     )
@@ -294,6 +298,14 @@ async fn fill_due(
     if task.state != "open" || task.due_on.is_some() {
         return Ok(());
     }
+    // Locked and read before the change, for what its tracked event says.
+    let Some(before) = sqlx::query_as::<_, TaskRow>(SELECT_LOCKED)
+        .bind(task.id)
+        .fetch_optional(&mut **tx)
+        .await?
+    else {
+        return Ok(());
+    };
     let changed = sqlx::query(
         "UPDATE tasks.tasks SET due_on = $2, due_at = $3, revision = revision + 1,
                 updated_at = now()
@@ -320,6 +332,7 @@ async fn fill_due(
                 },
                 previous_assignee: None,
                 previous_handed_by: None,
+                before: Some(before),
             },
             Utc::now().date_naive(),
         )
