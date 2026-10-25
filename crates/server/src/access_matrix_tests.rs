@@ -548,6 +548,88 @@ impl World {
         task
     }
 
+    /// A workspace page `member` made, with a file and a grant for the
+    /// reader, and another one in the trash (campbooks-cloud#363). Returns
+    /// the page, the trashed page and the file's hash.
+    async fn seed_pages(&self, member: UserId, reader: UserId) -> (Uuid, Uuid, String) {
+        let (page, trashed) = (Uuid::now_v7(), Uuid::now_v7());
+        for (id, title, in_trash) in [
+            (page, "Matrix page", false),
+            (trashed, "Deleted page", true),
+        ] {
+            sqlx::query(
+                "INSERT INTO pages.pages
+                     (id, workspace_id, place, position, title, created_by, edited_by,
+                      trashed_at, trash_root)
+                 VALUES ($1, $2, 'workspace', 'a0', $3, $4, $4,
+                         CASE WHEN $5 THEN now() - interval '1 day' END,
+                         CASE WHEN $5 THEN $1 END)",
+            )
+            .bind(id)
+            .bind(self.a.as_uuid())
+            .bind(title)
+            .bind(member.as_uuid())
+            .bind(in_trash)
+            .execute(&self.db)
+            .await
+            .unwrap();
+        }
+        sqlx::query(
+            "INSERT INTO pages.grants (page_id, workspace_id, member_id, role, granted_by)
+             VALUES ($1, $2, $3, 'reader', $4)",
+        )
+        .bind(page)
+        .bind(self.a.as_uuid())
+        .bind(reader.as_uuid())
+        .bind(member.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        let workspace = self.a.to_string();
+        let blob = self
+            .state
+            .blobs
+            .put(&workspace, b"matrix file".as_slice(), "text/plain")
+            .await
+            .unwrap();
+        let mut tx = self.state.db.begin_for(self.a).await.unwrap();
+        sqlx::query(
+            "INSERT INTO pages.files (page_id, workspace_id, hash, size, content_type, uploaded_by)
+             VALUES ($1, $2, $3, $4, 'text/plain', $5)",
+        )
+        .bind(page)
+        .bind(self.a.as_uuid())
+        .bind(blob.hash.to_string())
+        .bind(i64::try_from(blob.size).unwrap())
+        .bind(member.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        self.state
+            .blobs
+            .attach(
+                &mut tx,
+                &workspace,
+                &blob,
+                &campbooks_kernel::blobs::BlobOwner::new("pages.page", page),
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        // Their search index is built: a caller who reads pages hears of no
+        // backfill in progress.
+        sqlx::query(
+            "INSERT INTO search.backfills (workspace_id, group_type, state, index_version, finished_at)
+             VALUES ($1, 'pages.page', 'done', $2, now())",
+        )
+        .bind(self.a.as_uuid())
+        .bind(campbooks_search::domain::index::INDEX_VERSION)
+        .execute(&self.db)
+        .await
+        .unwrap();
+        (page, trashed, blob.hash.to_string())
+    }
+
     /// `member`'s chat with Scout, about nothing (campbooks-cloud#305), with
     /// a question, and Scout's answer holding a pending proposal whose id is
     /// the chat's (so one instance fills both).
@@ -658,6 +740,7 @@ impl World {
         let (note, task) = self.seed_personal(u(Who::Member)).await;
         let chat = self.seed_chat(u(Who::Member)).await;
         let (calendar, calendar_event) = self.seed_calendar(u(Who::Member)).await;
+        let (page, trashed_page, file) = self.seed_pages(u(Who::Member), u(Who::Reader)).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
@@ -714,6 +797,11 @@ impl World {
             // (campbooks-cloud#42).
             ("schedule.calendar", calendar.to_string()),
             ("schedule.event", calendar_event.to_string()),
+            // A workspace page its member made, shared with the reader as a
+            // reader; one in the trash; and the hash of a file on the first.
+            ("pages.page", page.to_string()),
+            ("pages.trashed", trashed_page.to_string()),
+            ("pages.file", file),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
             "SELECT id::text FROM conversations.conversations WHERE inbox_id = $1
@@ -764,6 +852,19 @@ impl World {
             | "schedule.event"
             | "conversations.person_note"
             | "tasks.task" => Facts::owned_by(OwnerFact::User(u(Who::Member))),
+            // A workspace page its member made: every member writes it, and
+            // its creator and the workspace's owner also share and delete it.
+            "pages.page" => {
+                let role = match who.person() {
+                    None => None,
+                    Some(Who::Member | Who::Owner) => Some("manager".to_owned()),
+                    Some(_) => Some("writer".to_owned()),
+                };
+                Facts::owned_by(OwnerFact::Nobody).within(
+                    RecordRef::new("pages.page", &self.instances["pages.page"]),
+                    role,
+                )
+            }
             "connectors.connection" => Facts::owned_by(OwnerFact::User(u(Who::Connector))),
             "conversations.inbox" => {
                 Facts::owned_by(OwnerFact::User(u(Who::Connector))).within(inbox, role)
@@ -1061,6 +1162,14 @@ fn body(world: &World, id: &str) -> Option<Value> {
             json!({"revision": 1, "starts": starts, "ends": starts + chrono::TimeDelta::minutes(30)})
         }
         "tasks.hand_off" => json!({"revision": 1, "to": world.users[&Who::Owner]}),
+        "pages.create" => json!({"title": "Matrix page"}),
+        "pages.update" => json!({"meta_revision": 1, "title": "Renamed"}),
+        "pages.move" => json!({"meta_revision": 1, "parent": null, "place": "workspace"}),
+        // An empty state vector and an update with nothing in it.
+        "pages.sync" => json!({"state_vector": "AA==", "update": "AAA="}),
+        "pages.share" => json!({"role": "reader"}),
+        // The bytes of a file: this text.
+        "pages.upload_file" => json!({"file": "matrix"}),
         "assistant.ask_chat" | "assistant.stream_chat" => json!({"text": "Why is this here?"}),
         "assistant.settle_proposal" => json!({"state": "declined"}),
         "conversations.write_reply" | "conversations.stream_reply" => {
@@ -1089,6 +1198,7 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
         "schedule.event" => "{event_id}",
         "attention.item" => "{item_id}",
         "tasks.task" => "{task_id}",
+        "pages.page" => "{page_id}",
         "conversations.inbox" if acts_in_the_inbox(id) => {
             return world.instances.get(resource).cloned();
         }
@@ -1145,6 +1255,7 @@ fn query_of(id: &str) -> &'static str {
     match id {
         "conversations.suggest_rules" => "?action=archive",
         "conversations.list_correspondents" => "?q=example",
+        "pages.backlinks" => "?type=person&id=matrix@example.com",
         "schedule.list_events" => "?from=2026-11-01&to=2026-11-08",
         "schedule.free_slots" => "?from=2026-11-03&to=2026-11-04&minutes=60",
         _ => "",
@@ -1152,9 +1263,18 @@ fn query_of(id: &str) -> &'static str {
 }
 
 /// The path with the seeded ids of workspace A.
-fn fill(world: &World, path: &str) -> String {
+fn fill(world: &World, path: &str, id: &str) -> String {
     let message_conversation = &world.instances["conversations.conversation"];
+    // Restoring and deleting for good act on the page in the trash.
+    let page = if matches!(id, "pages.restore" | "pages.purge") {
+        &world.instances["pages.trashed"]
+    } else {
+        &world.instances["pages.page"]
+    };
     path.replace("{workspace_id}", &world.a.to_string())
+        .replace("{page_id}", page)
+        .replace("{hash}", &world.instances["pages.file"])
+        .replace("{member_id}", &world.users[&Who::Reader].to_string())
         .replace("{conversation_id}", message_conversation)
         .replace("{message_id}", &world.instances["conversations.message"])
         .replace(
@@ -1270,7 +1390,7 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
         let what = format!("{method} {path} ({id})");
         let call = |world: &World| {
             (
-                format!("{}{}", fill(world, &path), query_of(&id)),
+                format!("{}{}", fill(world, &path, &id), query_of(&id)),
                 body(world, &id),
             )
         };
@@ -1494,7 +1614,7 @@ async fn a_disconnected_mailbox_answers_as_declared(db: PgPool) {
                     if decision == Decision::Allow && mail == Mail::Kept {
                         world.seed_disconnected(mail).await;
                     }
-                    let uri = format!("{}{}", fill(&world, path), query_of(&id));
+                    let uri = format!("{}{}", fill(&world, path, &id), query_of(&id));
                     let body_now = body(&world, &id);
                     let token = match who {
                         Who::Client => world.client(world.a),

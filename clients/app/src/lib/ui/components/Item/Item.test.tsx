@@ -89,6 +89,24 @@ describe("Item", () => {
     expect(why).toHaveTextContent("Scam warnings and anything overdue.");
   });
 
+  it("draws an event's kind in place of an avatar, with no dot in its eyebrow", () => {
+    const { container } = renderUi(
+      <Item
+        kind="meeting"
+        eyebrow={{ kind: "Meeting", reason: "In 20 min" }}
+        who="Call with Marta Silva"
+        what="meet.example.com"
+        due="11:20 – 11:50"
+      />,
+    );
+    const row = screen.getByRole("button", { name: /Call with Marta Silva/u });
+
+    expect(row.querySelector("[data-kind='meeting'][data-size='md']")).not.toBeNull();
+    expect(row.querySelector("[data-avatar-hue]")).toBeNull();
+    expect(container.querySelector("[data-signal]")).toBeNull();
+    expect(row.textContent).toMatch(/Meeting · In 20 min Call with Marta Silva 11:20 – 11:50/u);
+  });
+
   it("draws no eyebrow without one", () => {
     renderUi(<Item {...base} />);
 

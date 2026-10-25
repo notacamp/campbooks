@@ -30,12 +30,36 @@ export const KIND_ICONS: Record<CalendarKind, IconName> = {
 /** CSS custom properties a block is placed with (unitless numbers, read by the stylesheet). */
 const place = (values: Record<string, number>) => values as unknown as CSSProperties;
 
-/** A kind's icon in its colour, on a soft square. */
-export function KindIcon({ kind }: { kind: CalendarKind }) {
+/**
+ * A kind's icon in its colour, on a soft square. `md` takes an avatar's
+ * place at the start of a row (an event among Home's items).
+ */
+export function KindIcon({ kind, size = "sm" }: { kind: CalendarKind; size?: "sm" | "md" }) {
   return (
-    <span className={styles["kindIcon"]} data-kind={kind} aria-hidden="true">
+    <span className={styles["kindIcon"]} data-kind={kind} data-size={size} aria-hidden="true">
       <Icon name={KIND_ICONS[kind]} />
     </span>
+  );
+}
+
+export interface KindDotProps {
+  kind: CalendarKind;
+  /** A ring rather than a dot: on no calendar of the member's provider, only they see it. */
+  hollow?: boolean | undefined;
+  /** Says what the ring means, for those who cannot see it; none for a filled dot. */
+  label?: string | undefined;
+}
+
+/** A kind as a small dot in its colour, before a line (Home's Coming up). */
+export function KindDot({ kind, hollow = false, label }: KindDotProps) {
+  return (
+    <span
+      className={styles["kindDot"]}
+      data-kind={kind}
+      data-hollow={hollow || undefined}
+      {...(label === undefined ? { "aria-hidden": true } : { role: "img", "aria-label": label })}
+      title={label}
+    />
   );
 }
 

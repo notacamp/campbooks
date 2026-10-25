@@ -26,6 +26,7 @@ import {
   Item,
   ItemActions,
   ItemDetail,
+  KindDot,
   Line,
   LineMeta,
   PageHero,
@@ -60,6 +61,7 @@ import {
   type NudgeResume,
   type ReplyResume,
 } from "~/modules/conversations";
+import { useHomeDay, type DayEvent, type DayLine } from "~/modules/schedule";
 import {
   heldText,
   holdable,
@@ -155,7 +157,25 @@ interface TaskEntry {
 /** What Home lists: a conversation's need, or a task. */
 type Entry = Row | TaskEntry;
 
-const isTask = (entry: Entry): entry is TaskEntry => "task" in entry;
+/**
+ * An event of the member's calendar among the rows (campbooks-cloud#359):
+ * Next up, or one of today's at the end of Today. Never counted, never acted
+ * on like a need: the keys move onto it, Enter opens it in Calendar.
+ */
+interface EventEntry {
+  /** `event:<event key>`, so it never meets an attention item's id. */
+  id: string;
+  event: DayEvent;
+}
+
+/** What the keys move through: the needs and tasks, and the calendar's rows. */
+type Listed = Entry | EventEntry;
+
+const EVENT_PREFIX = "event:";
+
+const isTask = (entry: Listed): entry is TaskEntry => "task" in entry;
+const isEvent = (entry: Listed): entry is EventEntry => "event" in entry;
+const idOf = (entry: Listed): string => (isEvent(entry) ? entry.id : entry.item.id);
 
 type ActionId = OwnActionId | UniversalActionId;
 
@@ -372,17 +392,50 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   // catches up; keyed by the wait's message, so a later wait shows.
   const [waitsGone, setWaitsGone] = useState<ReadonlySet<string>>(new Set());
   const inboxes = useInboxes(workspaceId).data;
-  const foundAt = order.findIndex((row) => row.item.id === selection.id);
-  if (order.length > 0 && (foundAt === -1 || foundAt !== selection.index)) {
+  // The member's calendar (campbooks-cloud#359): Next up above the bands,
+  // the rest of today at the end of Today, Coming up in the aside. The
+  // schedule module reads it; Home only places it.
+  const day = useHomeDay(workspaceId, {
+    now,
+    selected:
+      selection.id?.startsWith(EVENT_PREFIX) === true
+        ? selection.id.slice(EVENT_PREFIX.length)
+        : undefined,
+  });
+  const asEntry = (event: DayEvent): EventEntry => ({ id: `${EVENT_PREFIX}${event.id}`, event });
+  const nextEntry = day.nextUp === undefined ? undefined : asEntry(day.nextUp);
+  const todayEvents = day.today.map((event) => asEntry(event));
+  // Today shows for its events even when no item is in it.
+  const bands =
+    todayEvents.length === 0 || groups.some((group) => group.band === "today")
+      ? groups
+      : [
+          ...groups.filter((group) => group.band === "now"),
+          { band: "today" as const, rows: [] as Entry[] },
+          ...groups.filter((group) => group.band !== "now"),
+        ];
+  // The order on screen, which the keys follow: Next up, then each band
+  // with today's events at the end of Today.
+  const nav: Listed[] = [
+    ...(nextEntry === undefined ? [] : [nextEntry]),
+    ...bands.flatMap((group): Listed[] => [
+      ...group.rows.filter((row) => row.confirmation === undefined),
+      ...(group.band === "today" ? todayEvents : []),
+    ]),
+  ];
+  const foundAt = nav.findIndex((row) => idOf(row) === selection.id);
+  if (nav.length > 0 && (foundAt === -1 || foundAt !== selection.index)) {
     // Adjusting state while rendering, so the change never shows a stale frame.
-    const index = foundAt === -1 ? Math.min(selection.index, order.length - 1) : foundAt;
-    const next = order[index];
-    if (next !== undefined && (next.item.id !== selection.id || index !== selection.index)) {
-      setSelection({ id: next.item.id, index });
+    const index = foundAt === -1 ? Math.min(selection.index, nav.length - 1) : foundAt;
+    const next = nav[index];
+    if (next !== undefined && (idOf(next) !== selection.id || index !== selection.index)) {
+      setSelection({ id: idOf(next), index });
       setHighlight(undefined);
     }
   }
-  const selected = order.find((row) => row.item.id === selection.id);
+  const selected = nav.find((row) => idOf(row) === selection.id);
+  // The selected need or task (an event is acted on through its own buttons).
+  const selectedEntry = selected === undefined || isEvent(selected) ? undefined : selected;
 
   // Keyboard focus follows the selection when it was on the list (a row or
   // its actions), so a screen reader hears where it went.
@@ -396,7 +449,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     }
     focusFollows.current = active !== null && list.current?.contains(active) === true;
   };
-  const selectedId = selected?.item.id;
+  const selectedId = selected === undefined ? undefined : idOf(selected);
   useEffect(() => {
     // The dialog holds the focus while it is open; it comes back here after.
     if (
@@ -419,7 +472,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       id,
       index: Math.max(
         0,
-        order.findIndex((row) => row.item.id === id),
+        nav.findIndex((row) => idOf(row) === id),
       ),
     });
     setHighlight(undefined);
@@ -429,15 +482,15 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     keepFocus();
     const at = openItems.findIndex((item) => goneKey(item) === goneKey(row.item));
     setGone((current) => new Map([...current, [goneKey(row.item), { ...row, confirmation, at }]]));
-    const index = order.findIndex((r) => r.item.id === row.item.id);
+    const index = nav.findIndex((r) => idOf(r) === row.item.id);
     // The row below takes its place (or the one above, at the end).
-    const next = order[index + 1] ?? order[index - 1];
+    const next = nav[index + 1] ?? nav[index - 1];
     setSelection({
-      ...(next === undefined ? {} : { id: next.item.id }),
-      index: order[index + 1] === undefined ? Math.max(0, index - 1) : index,
+      ...(next === undefined ? {} : { id: idOf(next) }),
+      index: nav[index + 1] === undefined ? Math.max(0, index - 1) : index,
     });
     // Reading item by item: the one taking its place opens too.
-    setExpandedId((open) => (open === row.item.id ? next?.item.id : undefined));
+    setExpandedId((open) => (open === row.item.id && next !== undefined ? idOf(next) : undefined));
     setHighlight(undefined);
   };
   // The confirmation has folded away: the row is simply hidden now.
@@ -835,6 +888,45 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       picked: all.picked && own.length > 0,
     };
   };
+  // An event's row (campbooks-cloud#359): Join (its web place) and Open
+  // email (the email it was read from) on 1 and 2, then Open in Calendar on
+  // Enter.
+  const eventActionsOf = (entry: EventEntry): ReturnType<typeof actionsOf> => {
+    const { event } = entry;
+    const choices = [
+      ...(event.join === undefined ? [] : [{ id: "join", label: t("calendar.join") }]),
+      ...(event.openEmail === undefined ? [] : [{ id: "email", label: t("calendar.openEmail") }]),
+    ];
+    return {
+      own: choices.map((choice, index) => ({
+        ...choice,
+        key: CHOICE_KEYS[index] ?? "item.choice1",
+      })),
+      after: [],
+      universal: [{ id: "calendar", label: t("calendar.openInCalendar"), key: "list.open" }],
+      choices: [],
+      picked: false,
+    };
+  };
+  const runEvent = ({ event }: EventEntry, id: string) => {
+    switch (id) {
+      case "join": {
+        event.join?.();
+        return;
+      }
+      case "email": {
+        event.openEmail?.();
+        return;
+      }
+      case "calendar": {
+        event.openInCalendar();
+        return;
+      }
+      default: {
+        return;
+      }
+    }
+  };
   const startSnooze = (entry: Entry, remind = false) => {
     keepFocus();
     setHighlight(undefined);
@@ -925,7 +1017,11 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
    * An action of the row: one of its own (a pair runs both, in order, with
    * at most one dialog) or a universal one.
    */
-  const run = (entry: Entry, id: string) => {
+  const run = (entry: Listed, id: string) => {
+    if (isEvent(entry)) {
+      runEvent(entry, id);
+      return;
+    }
     if (isTask(entry)) {
       switch (id) {
         case "done": {
@@ -978,7 +1074,10 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       list.current?.querySelector<HTMLElement>(`[data-action="${CSS.escape(SCOUT)}"]`) ?? null;
     scout?.(conversationRef(row.conversation.id), { from: button });
   };
-  const selectedActions = selected === undefined ? undefined : actionsOf(selected);
+  let selectedActions: ReturnType<typeof actionsOf> | undefined;
+  if (selected !== undefined) {
+    selectedActions = isEvent(selected) ? eventActionsOf(selected) : actionsOf(selected);
+  }
   // Offered alone or within a pair (R presses Reply wherever it sits).
   const offered = (id: ActionId) =>
     selectedActions !== undefined &&
@@ -990,16 +1089,16 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
 
   const move = (step: number) => {
     keepFocus();
-    const index = order.findIndex((row) => row.item.id === selected?.item.id);
-    const target = Math.min(order.length - 1, Math.max(0, index + step));
-    const next = order[target];
+    const index = nav.findIndex((row) => idOf(row) === selectedId);
+    const target = Math.min(nav.length - 1, Math.max(0, index + step));
+    const next = nav[target];
     if (next !== undefined) {
-      setSelection({ id: next.item.id, index: target });
+      setSelection({ id: idOf(next), index: target });
       setHighlight(undefined);
       // The row stepped onto opens, as a click on it does.
-      setExpandedId(next.item.id);
+      setExpandedId(idOf(next));
       const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
-        document.getElementById(itemId(next.item.id));
+        document.getElementById(itemId(idOf(next)));
       // Not every environment scrolls (tests run without layout).
       element?.scrollIntoView?.({ block: "nearest" });
     }
@@ -1059,11 +1158,16 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       if (selected === undefined) {
         return;
       }
-      if (highlight === undefined) {
-        setExpandedId((id) => (id === selected.item.id ? undefined : selected.item.id));
-      } else {
+      if (highlight !== undefined) {
         run(selected, highlight);
+        return;
       }
+      // An event opens in Calendar, on its day.
+      if (isEvent(selected)) {
+        selected.event.openInCalendar();
+        return;
+      }
+      setExpandedId((id) => (id === selected.item.id ? undefined : selected.item.id));
     },
     { enabled: hasRows },
   );
@@ -1095,8 +1199,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   useShortcut(
     "item.done",
     () => {
-      if (selected !== undefined) {
-        done(selected);
+      if (selectedEntry !== undefined) {
+        done(selectedEntry);
       }
     },
     { enabled: offered("done") },
@@ -1104,8 +1208,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   useShortcut(
     "item.snooze",
     () => {
-      if (selected !== undefined) {
-        startSnooze(selected);
+      if (selectedEntry !== undefined) {
+        startSnooze(selectedEntry);
       }
     },
     { enabled: offered("snooze") },
@@ -1124,8 +1228,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   useShortcut(
     "conversations.resolve_need",
     () => {
-      if (selected !== undefined) {
-        notNeeded(selected);
+      if (selectedEntry !== undefined) {
+        notNeeded(selectedEntry);
       }
     },
     { enabled: offered("not_needed") || offered("no") || offered("safe") },
@@ -1142,8 +1246,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   useShortcut(
     "item.reply",
     () => {
-      if (selected !== undefined && !isTask(selected)) {
-        reply(selected);
+      if (selectedEntry !== undefined && !isTask(selectedEntry)) {
+        reply(selectedEntry);
       }
     },
     { enabled: offered("reply") },
@@ -1151,8 +1255,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   useShortcut(
     SCOUT_KEY,
     () => {
-      if (selected !== undefined && !isTask(selected)) {
-        continueWithScout(selected);
+      if (selectedEntry !== undefined && !isTask(selectedEntry)) {
+        continueWithScout(selectedEntry);
       }
     },
     { enabled: hasRows && scout !== undefined },
@@ -1224,10 +1328,20 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   // count, and stays out of "N things need you" (campbooks-cloud#282).
   const count = order.filter((row) => row.item.reason !== "worth_a_look").length;
   const looks = order.length - count;
+  // The day's facts when the calendar has some (campbooks-cloud#359): the
+  // next event and how many more today, in place of the general line.
+  const facts =
+    day.facts === undefined
+      ? undefined
+      : [
+          t("calendar.next", { title: day.facts.title, time: day.facts.time }),
+          ...(day.facts.more > 0 ? [t("calendar.more", { count: day.facts.more })] : []),
+        ].join(" ");
   // Nothing asks anything of them: say so, and what is only worth a look.
-  let subline = t("hero.subline");
+  let subline = facts ?? t("hero.subline");
   if (count === 0 && !loading) {
-    subline = looks > 0 ? t("hero.lookSubline", { count: looks }) : t("hero.clearSubline");
+    subline =
+      looks > 0 ? t("hero.lookSubline", { count: looks }) : (facts ?? t("hero.clearSubline"));
   }
   const review = order.some((row) => row.item.reason === "review");
   const times = snoozeOptions(today);
@@ -1303,8 +1417,55 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       />
     );
 
+  // A Coming up line's end: "Add to my calendar" for what only the member
+  // sees, else its time.
+  const comingEnd = (line: DayLine): ReactNode => {
+    if (line.add !== undefined) {
+      return (
+        <Button variant="link" aria-label={line.add.name} onClick={line.add.run}>
+          {line.add.label}
+        </Button>
+      );
+    }
+    return line.meta === undefined ? undefined : <LineMeta>{line.meta}</LineMeta>;
+  };
+  // Coming up (campbooks-cloud#359): the week after today, soonest first;
+  // "Add to my calendar" on what only the member sees.
+  const coming =
+    day.coming.length === 0 ? null : (
+      <AsideSection title={t("calendar.comingTitle")}>
+        <LineMeta>{t("calendar.comingSub")}</LineMeta>
+        {day.coming.map((line) => (
+          <Line
+            key={line.id}
+            time={line.day}
+            leading={
+              <KindDot kind={line.kind} hollow={line.onlyYou !== undefined} label={line.onlyYou} />
+            }
+            trailing={comingEnd(line)}
+          >
+            {line.title}
+          </Line>
+        ))}
+        <div className="flex">
+          <ButtonLink
+            variant="link"
+            shortcut="nav.schedule"
+            href={day.calendarHref}
+            onClick={(event) => {
+              event.preventDefault();
+              day.openCalendar();
+            }}
+          >
+            {t("calendar.openCalendar")}
+          </ButtonLink>
+        </div>
+      </AsideSection>
+    );
+
   const aside = (
     <>
+      {coming}
       {narrow || waitingList === null ? null : (
         <AsideSection title={t("waiting.title")}>
           <LineMeta>{t("waiting.sub")}</LineMeta>
@@ -1331,7 +1492,7 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   // among them), where it came from, its title; the row opens it in Tasks.
   const renderTask = (entry: TaskEntry) => {
     const { task, conversation } = entry;
-    const isSelected = entry.item.id === selected?.item.id;
+    const isSelected = entry.item.id === selectedId;
     const actions = isSelected ? actionsOf(entry) : undefined;
     const held = heldText(task, tt, i18n.language);
     const from = conversation === undefined ? undefined : displayName(conversation.latest_from);
@@ -1364,6 +1525,43 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
               onHighlight={setHighlight}
               onAction={(id) => {
                 run(entry, id);
+              }}
+            />
+          )
+        }
+      />
+    );
+  };
+
+  // An event as a row (campbooks-cloud#359): its kind's square, the kind and
+  // when, its title and where, its time at the end; selected, its actions.
+  const renderEvent = (entry: EventEntry) => {
+    const { event } = entry;
+    const isSelected = entry.id === selectedId;
+    const actions = isSelected ? eventActionsOf(entry) : undefined;
+    return (
+      <Item
+        key={entry.id}
+        id={itemId(entry.id)}
+        kind={event.kind}
+        eyebrow={event.eyebrow}
+        who={event.title}
+        what={event.meta}
+        due={event.when}
+        selected={isSelected}
+        onToggle={() => {
+          select(entry.id);
+        }}
+        actions={
+          actions === undefined ? undefined : (
+            <ItemActions
+              label={t("actions.label", { name: event.title })}
+              own={actions.own}
+              universal={actions.universal}
+              highlighted={highlight}
+              onHighlight={setHighlight}
+              onAction={(id) => {
+                runEvent(entry, id);
               }}
             />
           )
@@ -1453,14 +1651,20 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       {loading ? <SkeletonList rows={4} /> : null}
       {/* Groups, Scout noticed and an opened item each keep a section's room. */}
       <div ref={list} className="flex flex-col gap-6">
-        {groups.map((group, position) => {
+        {nextEntry === undefined ? null : (
+          <QueueGroup name={t("calendar.nextUp")}>{renderEvent(nextEntry)}</QueueGroup>
+        )}
+        {bands.map((group, position) => {
           const live = group.rows.filter((row) => row.confirmation === undefined);
+          // Today's events close Today, after its items; they are not counted.
+          const events =
+            group.band === "today" ? todayEvents.map((entry) => renderEvent(entry)) : [];
           const items = group.rows.map((row) => {
             if (isTask(row)) {
               return renderTask(row);
             }
             const expanded = expandedId === row.item.id;
-            const isSelected = row.item.id === selected?.item.id;
+            const isSelected = row.item.id === selectedId;
             const actions = isSelected ? actionsOf(row) : undefined;
             return (
               <Item
@@ -1537,24 +1741,26 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
             );
           });
           // The last row folding away takes its group with it: no "Today 0".
+          // A Today of events only is headed by its name alone.
           return (
             <Fragment key={group.band}>
-              {live.length === 0 ? (
+              {live.length === 0 && events.length === 0 ? (
                 <div className="flex flex-col">{items}</div>
               ) : (
                 <QueueGroup
                   tone={group.band === "now" ? "danger" : undefined}
                   name={t(`bands.${group.band}`)}
-                  count={live.length}
+                  count={live.length === 0 ? undefined : live.length}
                 >
                   {items}
+                  {events}
                 </QueueGroup>
               )}
               {position === 0 ? noticed : null}
             </Fragment>
           );
         })}
-        {groups.length === 0 ? noticed : null}
+        {bands.length === 0 ? noticed : null}
         {ends}
       </div>
       {narrow && waitingList !== null ? (

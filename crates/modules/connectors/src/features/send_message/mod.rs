@@ -28,7 +28,9 @@
 //!
 //! Gmail and Zoho send through their APIs; an IMAP mailbox through its SMTP
 //! submission server (`via_imap`, campbooks-cloud#313), whose sent copy the
-//! stream's next run appends to Sent.
+//! stream's next run appends to Sent; a Microsoft mailbox through Graph's
+//! `sendMail` (`via_microsoft`, campbooks-cloud#317), which files its own
+//! copy in Sent Items.
 
 use std::{collections::HashMap, time::Duration};
 
@@ -65,6 +67,7 @@ use crate::{
 };
 
 pub(crate) mod via_imap;
+mod via_microsoft;
 mod via_zoho;
 
 /// The blob owner type of a send (its outgoing document).
@@ -188,8 +191,8 @@ impl SendMessage {
             Some(Provider::Google) => self.deps.google.is_some(),
             Some(Provider::Zoho) => self.deps.zoho.is_some(),
             Some(Provider::Imap) => self.deps.imap_enabled(),
-            // Sending through Microsoft lands with campbooks-cloud#317.
-            Some(Provider::Microsoft) | None => false,
+            Some(Provider::Microsoft) => self.deps.microsoft.is_some(),
+            None => false,
         };
         let (Some(stream), Some(connection), Some(provider), true) =
             (target.stream, target.connection, provider, configured)
@@ -268,9 +271,8 @@ impl SendMessage {
         match provider {
             Provider::Google => self.attempt_gmail(ctx, target, attempt).await,
             Provider::Zoho => self.attempt_zoho(ctx, target, attempt).await,
-            Provider::Imap | Provider::Microsoft => {
-                finish_failed(ctx, workspace, send, &target, "not_connected").await
-            }
+            Provider::Microsoft => Box::pin(self.attempt_microsoft(ctx, target, attempt)).await,
+            Provider::Imap => finish_failed(ctx, workspace, send, &target, "not_connected").await,
         }
     }
 
@@ -637,6 +639,11 @@ fn cursor_of(target: &Target) -> Result<(String, i32), JobError> {
     }
     if target.provider.as_deref() == Some(Provider::Imap.as_str()) {
         let cursor: imap::state::Cursor = serde_json::from_value(cursor).map_err(unreadable)?;
+        return Ok((cursor.token(), cursor.generation));
+    }
+    if target.provider.as_deref() == Some(Provider::Microsoft.as_str()) {
+        let cursor: crate::microsoft::state::Cursor =
+            serde_json::from_value(cursor).map_err(unreadable)?;
         return Ok((cursor.token(), cursor.generation));
     }
     let cursor: gmail::Cursor = serde_json::from_value(cursor).map_err(unreadable)?;
@@ -1038,5 +1045,7 @@ async fn settle(ctx: &JobContext, workspace: WorkspaceId, send: SendId) -> Resul
 
 #[cfg(test)]
 mod imap_tests;
+#[cfg(test)]
+mod microsoft_tests;
 #[cfg(test)]
 mod tests;

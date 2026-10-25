@@ -202,3 +202,20 @@ export const Layout: Story = {
     </HomeLayout>
   ),
 };
+
+/** A group of events only (Home's Next up, campbooks-cloud#359): its name, no count. */
+export const EventsOnly: Story = {
+  args: { signal: undefined, name: "Next up", count: undefined },
+  render: (args) => (
+    <QueueGroup {...args}>
+      <Item
+        kind="meeting"
+        eyebrow={{ kind: "Meeting", reason: "In 20 min" }}
+        who="Call with Marta Silva"
+        what="meet.example.com"
+        due="11:20 – 11:50"
+        selected
+      />
+    </QueueGroup>
+  ),
+};

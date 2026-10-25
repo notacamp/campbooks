@@ -1,0 +1,203 @@
+{
+  "title": "Páginas",
+  "untitled": "Sin título",
+  "shortcuts": {
+    "create": "Nueva página"
+  },
+  "tree": {
+    "label": "Páginas",
+    "workspace": "Espacio de trabajo",
+    "private": "Privadas",
+    "shared": "Compartidas contigo",
+    "trash": "Papelera",
+    "newPage": "Nueva página",
+    "addSubPage": "Añadir una subpágina a {{title}}",
+    "showSubPages": "Mostrar las subpáginas de {{title}}",
+    "hideSubPages": "Ocultar las subpáginas de {{title}}",
+    "workspaceEmpty": "Páginas que todos aquí pueden leer y editar.",
+    "privateEmpty": "Solo tú las ves, hasta que compartas una."
+  },
+  "empty": {
+    "title": "Escríbelo una vez",
+    "body": "Notas, planes y listas, junto a tu correo y tus tareas. Enlaza una página con un correo, una tarea o un evento con @.",
+    "add": "Escribir una página"
+  },
+  "error": {
+    "title": "No se pudieron cargar tus páginas",
+    "body": "No se cambió nada. Inténtalo de nuevo.",
+    "retry": "Reintentar"
+  },
+  "screen": {
+    "label": "Página",
+    "back": "Volver a las páginas",
+    "trail": "Dónde está esta página",
+    "more": "Más",
+    "trash": "Mover a la papelera",
+    "inTrash": "Esta página está en la papelera.",
+    "icon": "Icono",
+    "iconCurrent": "Icono de la página: {{name}}",
+    "titleLabel": "Título de la página",
+    "edited": "Editada {{when}}",
+    "emptyTitle": "Elige una página",
+    "emptyBody": "Elige una de la lista o escribe una nueva.",
+    "missingTitle": "Esta página no está aquí",
+    "missingBody": "Puede que se haya eliminado, o que nunca se compartiera contigo."
+  },
+  "save": {
+    "saved": "Guardado",
+    "saving": "Guardando…",
+    "retrying": "Sin conexión, se reintentará",
+    "rejected": "No se pudo guardar este cambio"
+  },
+  "backlinks": {
+    "title_one": "Enlazada desde {{count}} lugar",
+    "title_other": "Enlazada desde {{count}} lugares"
+  },
+  "share": {
+    "title": "Compartir {{title}}",
+    "button": "Compartir",
+    "placeWorkspace": "Todo el espacio de trabajo",
+    "placeWorkspaceNote": "Cualquiera aquí puede leer y editar esta página.",
+    "placePrivate": "Página privada",
+    "placePrivateNote": "Solo las personas de abajo pueden abrirla.",
+    "people": "Personas con acceso",
+    "someone": "Alguien",
+    "owner": "Propietario",
+    "accessOf": "Acceso de {{name}}",
+    "remove": "Quitar a {{name}}",
+    "add": "Añadir una persona",
+    "who": "Persona",
+    "access": "Acceso",
+    "invite": "Compartir",
+    "mentions": "Mencionar a alguien en una página no la comparte con esa persona.",
+    "role": {
+      "reader": "Puede leer",
+      "writer": "Puede editar",
+      "manager": "Puede gestionar"
+    }
+  },
+  "trash": {
+    "label": "Páginas en la papelera",
+    "note": "Las páginas de aquí se eliminan definitivamente a los 30 días.",
+    "emptyTitle": "La papelera está vacía",
+    "emptyBody": "Las páginas que elimines esperan aquí 30 días.",
+    "deletedOn": "Eliminada {{date}}",
+    "restore": "Restaurar",
+    "purge": "Eliminar definitivamente",
+    "purgeConfirm": "Eliminar definitivamente",
+    "cancel": "Conservar",
+    "purgeWarning": "¿Eliminar definitivamente {{title}} y sus subpáginas? No se puede deshacer."
+  },
+  "toast": {
+    "created": "Página creada",
+    "createFailed": "No se pudo crear la página. No se guardó nada.",
+    "renameFailed": "No se pudo cambiar el nombre de la página. No se cambió nada.",
+    "trashed": "{{title}} movida a la papelera",
+    "trashFailed": "No se pudo mover {{title}} a la papelera. No se cambió nada.",
+    "restored": "{{title}} restaurada",
+    "restoreFailed": "No se pudo restaurar {{title}}. No se cambió nada.",
+    "purged": "{{title}} eliminada definitivamente",
+    "purgeFailed": "No se pudo eliminar {{title}}. No se cambió nada.",
+    "moved": "{{title}} movida",
+    "moveFailed": "No se pudo mover {{title}}. No se cambió nada.",
+    "shared": "Compartida con {{name}}",
+    "shareFailed": "No se pudo cambiar el acceso de {{name}}. No se cambió nada.",
+    "unshared": "{{name}} quitado",
+    "unshareFailed": "No se pudo quitar a {{name}}. No se cambió nada."
+  },
+  "editor": {
+    "label": "Texto de la página",
+    "placeholder": "Escribe, o pulsa / para ver los bloques",
+    "heading": "Título"
+  },
+  "block": {
+    "add": "Añadir un bloque",
+    "menu": "Opciones del bloque",
+    "turnInto": "Convertir en",
+    "block": "Bloque",
+    "duplicate": "Duplicar",
+    "delete": "Eliminar"
+  },
+  "format": {
+    "label": "Formato",
+    "block": "Convertir en",
+    "mention": "Mencionar",
+    "todo": "Tarea",
+    "bold": "Negrita",
+    "italic": "Cursiva",
+    "hide": "Cerrar"
+  },
+  "mention": {
+    "label": "Mencionar",
+    "empty": "No se encontró nada",
+    "searching": "Buscando…",
+    "closed": "Algo que no puedes abrir",
+    "group": {
+      "people": "Personas",
+      "threads": "Conversaciones",
+      "tasks": "Tareas",
+      "events": "Eventos",
+      "pages": "Páginas"
+    }
+  },
+  "embed": {
+    "page": "Página",
+    "person": "Persona",
+    "thread": "Conversación",
+    "task": "Tarea",
+    "event": "Evento"
+  },
+  "toggle": {
+    "show": "Mostrar",
+    "hide": "Ocultar"
+  },
+  "slash": {
+    "label": "Bloques",
+    "empty": "Ningún bloque coincide",
+    "group": {
+      "basic": "Básicos",
+      "campbooks": "De tu trabajo"
+    },
+    "text": "Texto",
+    "heading1": "Título 1",
+    "heading2": "Título 2",
+    "heading3": "Título 3",
+    "todo": "Lista de tareas",
+    "bullets": "Lista con viñetas",
+    "numbers": "Lista numerada",
+    "toggle": "Sección plegable",
+    "quote": "Cita",
+    "callout": "Destacado",
+    "divider": "Separador",
+    "code": "Código",
+    "mention": "Mención",
+    "embed": "Insertar un registro",
+    "subpage": "Subpágina",
+    "file": "Archivo",
+    "image": "Imagen"
+  },
+  "upload": {
+    "failed": "No se pudo subir {{name}}."
+  },
+  "subpage": {
+    "failed": "No se pudo añadir la subpágina."
+  },
+  "icon": {
+    "document": "Documento",
+    "tasks": "Tareas",
+    "schedule": "Calendario",
+    "people": "Personas",
+    "star": "Estrella",
+    "pin": "Chincheta",
+    "mail": "Correo",
+    "money": "Dinero",
+    "home": "Casa",
+    "inbox": "Bandeja de entrada",
+    "archive": "Archivo",
+    "image": "Imagen",
+    "travel": "Viaje",
+    "dining": "Comida",
+    "parcel": "Paquete",
+    "ticket": "Entrada"
+  }
+}

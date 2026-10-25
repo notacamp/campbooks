@@ -1,0 +1,25 @@
+{
+  "errors": {
+    "page_forbidden": "Puedes leer esta página, pero no hacer eso con ella.",
+    "invalid_title": "El título de una página tiene como máximo 200 caracteres.",
+    "invalid_icon": "Ese no es uno de los iconos de página.",
+    "invalid_position": "Esa posición no es válida.",
+    "place_mismatch": "Una subpágina siempre está en el mismo lugar que la página en la que está.",
+    "page_changed": "Esta página cambió desde que la viste. Vuelve a cargarla e inténtalo de nuevo.",
+    "page_trashed": "Esta página está en la papelera. Restáurala primero.",
+    "page_not_trashed": "Solo se puede eliminar definitivamente una página que está en la papelera.",
+    "page_not_trash_root": "Esta página se eliminó junto con otra. Usa esa página.",
+    "page_too_deep": "Las páginas pueden anidarse como máximo 12 niveles.",
+    "page_cycle": "Una página no se puede mover dentro de sí misma ni de una de sus subpáginas.",
+    "invalid_update": "Ese cambio en la página no es válido.",
+    "update_too_large": "Un cambio en una página puede ocupar como máximo 256 KiB.",
+    "document_too_large": "La página sería demasiado grande: como máximo 4 MiB, 20 000 bloques y 32 niveles.",
+    "unknown_block": "El cambio usa un bloque o un ajuste que una página no puede tener.",
+    "link_scheme": "Los enlaces solo pueden empezar por https, http o mailto.",
+    "foreign_blob": "El cambio indica un archivo que no se subió a esta página.",
+    "not_a_member": "Solo puedes compartir una página con un miembro de este espacio de trabajo.",
+    "share_yourself": "Elige a otra persona con quien compartirla.",
+    "invalid_ref": "Una página no puede enlazar a ese tipo de registro.",
+    "file_empty": "El archivo no tiene contenido."
+  }
+}

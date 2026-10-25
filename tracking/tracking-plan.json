@@ -104,9 +104,15 @@
       "pr": "#674"
     },
     {
-      "change": "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check and the kernel's maintenance schedules and change-feed sequencer.",
+      "change": "The pages module instrumented (campbooks-cloud#363): 8 events for a page made, edited (which fields), moved (where it was), shared with a member (their role, and the one they had), unshared, trashed, restored and deleted for good; records page and page_location; Coverage for every operation, job, schedule and handler of the module.",
       "date": "2026-10-25",
       "plan_version": 12,
+      "pr": "#672"
+    },
+    {
+      "change": "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check and the kernel's maintenance schedules and change-feed sequencer.",
+      "date": "2026-10-25",
+      "plan_version": 13,
       "pr": "#666"
     }
   ],
@@ -306,6 +312,18 @@
       "exemption": "",
       "kind": "handler",
       "name": "identity.revoke_departed_consents"
+    },
+    {
+      "events": [],
+      "exemption": "cleanup after a member left: their grants on pages are deleted; the departure is tracked by workspaces",
+      "kind": "handler",
+      "name": "pages.forget_member"
+    },
+    {
+      "events": [],
+      "exemption": "projection of workspaces.workspace_deleted: it only schedules the purge",
+      "kind": "handler",
+      "name": "pages.schedule_workspace_purge"
     },
     {
       "events": [
@@ -612,6 +630,24 @@
       "exemption": "projection: numbers a workspace's change-feed entries for clients to follow; the changes are tracked by the modules that make them",
       "kind": "job",
       "name": "kernel.sequence_changes"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: a page's saved edits folded into one snapshot",
+      "kind": "job",
+      "name": "pages.compact"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: pages 30 days in the trash deleted for good",
+      "kind": "job",
+      "name": "pages.purge_trash"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance: a deleted workspace's pages and history deleted; the deletion is tracked by workspaces",
+      "kind": "job",
+      "name": "pages.purge_workspace"
     },
     {
       "events": [],
@@ -1425,6 +1461,82 @@
     },
     {
       "events": [
+        "pages.page_created"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.create"
+    },
+    {
+      "events": [
+        "pages.page_moved"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.move"
+    },
+    {
+      "events": [
+        "pages.page_purged"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.purge"
+    },
+    {
+      "events": [
+        "pages.page_restored"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.restore"
+    },
+    {
+      "events": [
+        "pages.page_shared"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.share"
+    },
+    {
+      "events": [],
+      "exemption": "a page's body is written by typing: many small edits, each carrying what the member wrote; the page's meta changes are tracked by the operations above",
+      "kind": "operation",
+      "name": "pages.sync"
+    },
+    {
+      "events": [
+        "pages.page_trashed"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.trash"
+    },
+    {
+      "events": [
+        "pages.page_unshared"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.unshare"
+    },
+    {
+      "events": [
+        "pages.page_edited"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.update"
+    },
+    {
+      "events": [],
+      "exemption": "a file put in a page's body; the file is held by the blob store and its name and bytes are content, so nothing is tracked",
+      "kind": "operation",
+      "name": "pages.upload_file"
+    },
+    {
+      "events": [
         "schedule.calendar_event_created"
       ],
       "exemption": "",
@@ -1822,6 +1934,12 @@
       "exemption": "maintenance: what reached the kernel's tables of a purged workspace after its purge deleted; the purge is tracked as workspaces.workspace_purged",
       "kind": "schedule",
       "name": "kernel.sweep_purged_workspaces"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: only enqueues the purge of each workspace's old trash, which tracks nothing",
+      "kind": "schedule",
+      "name": "pages.dispatch_purge_trash"
     }
   ],
   "description": "The tracking plan (ADR 0020), generated from tracking/tracking-plan.xlsx by campbooks-tracking-plan. Do not edit: change the workbook and regenerate. Every event's `schema` is the JSON Schema of its body; `envelope` is the schema of what the kernel adds around it.",
@@ -3435,6 +3553,41 @@
       "description": "Claimed by a worker.",
       "enum": "kernel.job_state",
       "value": "running"
+    },
+    {
+      "description": "Its icon.",
+      "enum": "pages.page_field",
+      "value": "icon"
+    },
+    {
+      "description": "Its title.",
+      "enum": "pages.page_field",
+      "value": "title"
+    },
+    {
+      "description": "Can also share and delete it.",
+      "enum": "pages.page_role",
+      "value": "manager"
+    },
+    {
+      "description": "Can read it.",
+      "enum": "pages.page_role",
+      "value": "reader"
+    },
+    {
+      "description": "Can also write it.",
+      "enum": "pages.page_role",
+      "value": "writer"
+    },
+    {
+      "description": "Its creator's, and whoever it is shared with.",
+      "enum": "pages.place",
+      "value": "private"
+    },
+    {
+      "description": "Every member's.",
+      "enum": "pages.place",
+      "value": "workspace"
     },
     {
       "description": "Make the event at the provider.",
@@ -14886,6 +15039,714 @@
       "version": 1
     },
     {
+      "action": "created",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 12,
+      "description": "A page was made, at the top level of a place or under another page, with or without a body. Never its title.",
+      "fires_when": "pages.create makes it, in the transaction that inserts it.",
+      "module": "pages",
+      "name": "pages.page_created",
+      "object": "page",
+      "openspec_change": "add-pages-module",
+      "rust_type": "PageCreated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.page_created:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page was made, at the top level of a place or under another page, with or without a body. Never its title.",
+        "properties": {
+          "page": {
+            "additionalProperties": false,
+            "description": "The new page.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "pages.page_created",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "edited",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 12,
+      "description": "A page's title or icon changed: which fields, never their values. Edits to the body are not tracked.",
+      "fires_when": "pages.update changes the title or the icon, in the transaction of the change; the same values again track nothing.",
+      "module": "pages",
+      "name": "pages.page_edited",
+      "object": "page",
+      "openspec_change": "add-pages-module",
+      "rust_type": "PageEdited",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.page_edited:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page's title or icon changed: which fields, never their values. Edits to the body are not tracked.",
+        "properties": {
+          "fields": {
+            "description": "The fields that changed (at least one).",
+            "items": {
+              "enum": [
+                "icon",
+                "title"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "fields",
+          "page"
+        ],
+        "title": "pages.page_edited",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "moved",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 12,
+      "description": "A page was moved or reordered: under another page, to another place, or among its siblings; before is where it was.",
+      "fires_when": "pages.move stores the page's new place, parent and position, in that transaction.",
+      "module": "pages",
+      "name": "pages.page_moved",
+      "object": "page",
+      "openspec_change": "add-pages-module",
+      "rust_type": "PageMoved",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.page_moved:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page was moved or reordered: under another page, to another place, or among its siblings; before is where it was.",
+        "properties": {
+          "before": {
+            "additionalProperties": false,
+            "description": "Where it was.",
+            "properties": {
+              "parent": {
+                "description": "The page it was under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "The place it was in.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "place"
+            ],
+            "title": "pages.page_location",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards, where it now is.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "page"
+        ],
+        "title": "pages.page_moved",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "purged",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 12,
+      "description": "A page in the trash was deleted for good, by a member, with what was deleted with it. The pages the 30-day purge removes are not tracked.",
+      "fires_when": "pages.purge deletes it, in that transaction.",
+      "module": "pages",
+      "name": "pages.page_purged",
+      "object": "page",
+      "openspec_change": "add-pages-module",
+      "rust_type": "PagePurged",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.page_purged:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page in the trash was deleted for good, by a member, with what was deleted with it. The pages the 30-day purge removes are not tracked.",
+        "properties": {
+          "page": {
+            "additionalProperties": false,
+            "description": "The page as it was just before it was deleted.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "pages.page_purged",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "restored",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 12,
+      "description": "A page in the trash was brought back, with the pages deleted with it.",
+      "fires_when": "pages.restore brings it back, in that transaction.",
+      "module": "pages",
+      "name": "pages.page_restored",
+      "object": "page",
+      "openspec_change": "add-pages-module",
+      "rust_type": "PageRestored",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.page_restored:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page in the trash was brought back, with the pages deleted with it.",
+        "properties": {
+          "page": {
+            "additionalProperties": false,
+            "description": "The page, back.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "pages.page_restored",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "shared",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 12,
+      "description": "A page was shared with a member, or the member's role on it changed; previous_role is the role they had on it, if any.",
+      "fires_when": "pages.share stores the grant, in that transaction.",
+      "module": "pages",
+      "name": "pages.page_shared",
+      "object": "page",
+      "openspec_change": "add-pages-module",
+      "rust_type": "PageShared",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.page_shared:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page was shared with a member, or the member's role on it changed; previous_role is the role they had on it, if any.",
+        "properties": {
+          "member": {
+            "description": "The member it is shared with: their user id.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "pseudonymous"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "previous_role": {
+            "description": "The role they had on it, when it was shared with them already.",
+            "enum": [
+              "manager",
+              "reader",
+              "writer"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "role": {
+            "description": "Their role on it now.",
+            "enum": [
+              "manager",
+              "reader",
+              "writer"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "member",
+          "page",
+          "role"
+        ],
+        "title": "pages.page_shared",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "trashed",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 12,
+      "description": "A page was moved to the trash, with the pages under it.",
+      "fires_when": "pages.trash puts it in the trash, in that transaction; a page already in the trash tracks nothing.",
+      "module": "pages",
+      "name": "pages.page_trashed",
+      "object": "page",
+      "openspec_change": "add-pages-module",
+      "rust_type": "PageTrashed",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.page_trashed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page was moved to the trash, with the pages under it.",
+        "properties": {
+          "page": {
+            "additionalProperties": false,
+            "description": "The page, in the trash.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "pages.page_trashed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "unshared",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 12,
+      "description": "A page stopped being shared with a member.",
+      "fires_when": "pages.unshare removes the grant, in that transaction.",
+      "module": "pages",
+      "name": "pages.page_unshared",
+      "object": "page",
+      "openspec_change": "add-pages-module",
+      "rust_type": "PageUnshared",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.page_unshared:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page stopped being shared with a member.",
+        "properties": {
+          "member": {
+            "description": "The member it is no longer shared with: their user id.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "pseudonymous"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "member",
+          "page"
+        ],
+        "title": "pages.page_unshared",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "added",
       "actor_types": [
         "system"
@@ -21718,7 +22579,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-25",
-  "plan_version": 12,
+  "plan_version": 13,
   "properties": [
     {
       "classification": "operational",
@@ -24621,6 +25482,188 @@
     },
     {
       "classification": "operational",
+      "description": "The new page.",
+      "event": "pages.page_created",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The fields that changed (at least one).",
+      "event": "pages.page_edited",
+      "example": "",
+      "list": true,
+      "of": "pages.page_field",
+      "pattern": "",
+      "property": "fields",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.page_edited",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Where it was.",
+      "event": "pages.page_moved",
+      "example": "",
+      "list": false,
+      "of": "pages.page_location",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards, where it now is.",
+      "event": "pages.page_moved",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page as it was just before it was deleted.",
+      "event": "pages.page_purged",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page, back.",
+      "event": "pages.page_restored",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member it is shared with: their user id.",
+      "event": "pages.page_shared",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "member",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page.",
+      "event": "pages.page_shared",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The role they had on it, when it was shared with them already.",
+      "event": "pages.page_shared",
+      "example": "",
+      "list": false,
+      "of": "pages.page_role",
+      "pattern": "",
+      "property": "previous_role",
+      "required": false,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Their role on it now.",
+      "event": "pages.page_shared",
+      "example": "",
+      "list": false,
+      "of": "pages.page_role",
+      "pattern": "",
+      "property": "role",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page, in the trash.",
+      "event": "pages.page_trashed",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member it is no longer shared with: their user id.",
+      "event": "pages.page_unshared",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "member",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page.",
+      "event": "pages.page_unshared",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "The new calendar.",
       "event": "schedule.calendar_added",
       "example": "",
@@ -27492,6 +28535,83 @@
       "record": "kernel.job",
       "required": false,
       "type": "id"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member who made it: their user id.",
+      "enum": "",
+      "field": "created_by",
+      "list": false,
+      "pattern": "",
+      "record": "pages.page",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "id",
+      "description": "The page's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "pages.page",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "id",
+      "description": "The page it is under, if any.",
+      "enum": "",
+      "field": "parent",
+      "list": false,
+      "pattern": "",
+      "record": "pages.page",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "Private or the workspace's.",
+      "enum": "pages.place",
+      "field": "place",
+      "list": false,
+      "pattern": "",
+      "record": "pages.page",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "Grows with every change of the page.",
+      "enum": "",
+      "field": "revision",
+      "list": false,
+      "pattern": "",
+      "record": "pages.page",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "id",
+      "description": "The page it was under, if any.",
+      "enum": "",
+      "field": "parent",
+      "list": false,
+      "pattern": "",
+      "record": "pages.page_location",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "The place it was in.",
+      "enum": "pages.place",
+      "field": "place",
+      "list": false,
+      "pattern": "",
+      "record": "pages.page_location",
+      "required": true,
+      "type": "enum"
     },
     {
       "classification": "id",

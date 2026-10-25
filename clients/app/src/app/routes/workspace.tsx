@@ -43,6 +43,7 @@ import {
   type Place,
   type ReplyResume,
 } from "~/modules/conversations";
+import { usePagesAvailable } from "~/modules/pages";
 import { useTaskCount } from "~/modules/tasks";
 import { useWorkspaces, type Workspace } from "~/modules/workspaces";
 
@@ -222,7 +223,10 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const inSearch = pathname.startsWith(`${base}/search`);
   const inTasks = pathname.startsWith(`${base}/tasks`);
   const inSchedule = pathname.startsWith(`${base}/schedule`);
-  const atHome = !inSettings && !inInbox && !inSearch && !inTasks && !inSchedule;
+  const inPages = pathname.startsWith(`${base}/pages`);
+  const atHome = !inSettings && !inInbox && !inSearch && !inTasks && !inSchedule && !inPages;
+  const pagesOn = usePagesAvailable(workspace.id) === true;
+  const pagesPath = `${base}/pages`;
   const needsYou = useAttentionCount(workspace.id);
   const openTasks = useTaskCount(workspace.id);
   const tasksPath = `${base}/tasks`;
@@ -248,6 +252,17 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   // N T, from anywhere: Tasks, with the new-task form open.
   useShortcut("tasks.create", () => {
     void navigate({ to: tasksPath, search: { new: 1 } });
+  });
+  useShortcut("nav.pages", () => {
+    if (pagesOn) {
+      void navigate({ to: pagesPath });
+    }
+  });
+  // N P, from anywhere: a new private page, open for writing.
+  useShortcut("pages.create", () => {
+    if (pagesOn) {
+      void navigate({ to: pagesPath, search: { new: 1 } });
+    }
   });
   useShortcut("nav.schedule", () => {
     void navigate({ to: schedulePath });
@@ -345,6 +360,15 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
               count={openTasks}
               {...link(tasksPath)}
             />
+            {pagesOn ? (
+              <NavItem
+                label={tNav("nav.pages")}
+                icon="document"
+                shortcut="nav.pages"
+                current={inPages}
+                {...link(pagesPath)}
+              />
+            ) : null}
             <NavItem
               label={tNav("nav.schedule")}
               icon="schedule"

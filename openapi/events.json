@@ -1371,6 +1371,65 @@
       }
     },
     {
+      "name": "pages.page_changed",
+      "module": "pages",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "`pages.page_changed` v1 (`contracts/pages.page_changed.v1.schema.json`):\na page was made or changed. A snapshot, so a consumer applies only newer\nrevisions and stays order-proof. Body changes are announced at most once\nevery 5 seconds per page.",
+        "required": [
+          "workspace",
+          "page",
+          "revision",
+          "place",
+          "trashed",
+          "kinds"
+        ],
+        "properties": {
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageChangeKind"
+            },
+            "description": "What changed."
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The page."
+          },
+          "parent": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PageId",
+                "description": "Its parent."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "place": {
+            "$ref": "#/components/schemas/Place",
+            "description": "Private or workspace."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change of this page."
+          },
+          "trashed": {
+            "type": "boolean",
+            "description": "Whether it is in the trash."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "schedule.calendar_sync_changed",
       "module": "schedule",
       "version": 1,
@@ -2518,6 +2577,31 @@
         "enum": [
           "provider",
           "member"
+        ]
+      },
+      "PageChangeKind": {
+        "type": "string",
+        "description": "What changed in a page.",
+        "enum": [
+          "meta",
+          "body",
+          "share",
+          "move",
+          "trash",
+          "purge"
+        ]
+      },
+      "PageId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "PageId (UUIDv7)"
+      },
+      "Place": {
+        "type": "string",
+        "description": "Where a top-level page lives; sub-pages are always in their parent's.",
+        "enum": [
+          "private",
+          "workspace"
         ]
       },
       "Provider": {

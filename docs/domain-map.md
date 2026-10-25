@@ -104,6 +104,7 @@ tenancy).
 | `notifications` | Getting a notice to the right person on the right device. | M1 |
 | `schedule` | Calendars, events, availability. | M2 |
 | `tasks` | What someone owes or has to do, and when they'll do it. | M2 |
+| `pages` | What members write for themselves and their team: pages, merged block documents, mentions, sharing. | M2 |
 | `automation` | Rules over any declared event and action. | M2 |
 | `documents` | Files, folders, document types and the facts read from them. | M3 |
 | `money` | Bank accounts, statement lines, reconciliation, loans. | M3 |
@@ -342,6 +343,28 @@ pass), `DocumentRead`, `EventChanged`.
 `complete` extracts title, party and due date only for items the pass
 flagged.
 
+### pages
+
+What members write for themselves and their team, next to the mail, people,
+tasks and events it is about.
+
+**Language**
+- **Page** — something a member writes, in a tree. _Avoid_: document (in
+  `documents` that means a file Campbooks has read), note (taken by the
+  person notes of `conversations`), doc.
+- **Block** — one piece of a page's body (paragraph, heading, to-do, ...).
+- **Mention** — an inline pointer to a record inside a page; an **embed** is
+  a block that shows a record. Both are references and grant nothing.
+- **Backlink** — a page that mentions or embeds a record, seen from that
+  record.
+- **Place** — where a top-level page lives, `private` or `workspace`.
+  _Avoid_: space, teamspace.
+- **Trash** — pages deleted in the last 30 days.
+
+**Publishes** `pages.page_changed` (ids and enums only, never a title or any
+text). **Consumes** `workspaces.workspace_deleting`; `search` consumes
+`pages.page_changed`. **AI** none.
+
 ### automation
 
 **Language**
@@ -417,7 +440,7 @@ lines in PDF statements.
 | --- | --- | --- |
 | **M0 Foundations** | `workspaces`, `connectors` (engine + Google), IdP, BFF, native sign-in, outbox and queue, AI gateway with Laya, change feed | sign in, create a workspace, connect Google |
 | **M1 An inbox that sorts itself** | `conversations` (email), `parties`, `attention`, `search`, `notifications`; Microsoft and IMAP adapters | read and send mail sorted into streams, see what needs them |
-| **M2 The day** | `schedule`, `tasks`, `automation` | see their day, turn messages into tasks, hold time, write rules |
+| **M2 The day** | `schedule`, `tasks`, `pages`, `automation` | see their day, turn messages into tasks, hold time, write rules |
 | **M3 Paperwork** | `documents`, `money` | keep documents read and searchable, reconcile a bank account |
 | **M4 Assistant** | `assistant`, MCP from declarations | ask Campbooks to act across everything |
 | **M5 Platform** | `records`, `views` | define their own records, fields, views and dashboards |
@@ -451,6 +474,10 @@ behind it. The purposes and requirements below seed those changes.
   recurring occurrences; availability.
 - **tasks** — one task per real obligation across origins; holds live on the
   calendar; hand-off.
+- **pages** — the body is a Yjs document merged by the server, every update
+  read against the block schema before it is stored; who may open a page
+  follows its place, its ancestors and its grants; a mention is a reference,
+  never a copy; deleted pages wait 30 days.
 - **automation** — dry run; runs recorded with undo; a rule can only do what
   its author may do; loop protection.
 - **documents** — blobs content-addressed in object storage (one copy per
