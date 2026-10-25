@@ -13546,17 +13546,6 @@
             "description": "Calls of the cap kept for what people ask, which background work may not use.",
             "type": "integer",
             "x-classification": "operational"
-          },
-          "role": {
-            "description": "The AI role of the refused call.",
-            "enum": [
-              "complete",
-              "decide",
-              "embed",
-              "vision"
-            ],
-            "type": "string",
-            "x-classification": "operational"
           }
         },
         "required": [
@@ -13564,8 +13553,7 @@
           "cap",
           "day",
           "interactive",
-          "reserve",
-          "role"
+          "reserve"
         ],
         "title": "system.ai_limit_reached",
         "type": "object"
@@ -17903,19 +17891,6 @@
       "property": "reserve",
       "required": true,
       "type": "int",
-      "version": 1
-    },
-    {
-      "classification": "operational",
-      "description": "The AI role of the refused call.",
-      "event": "system.ai_limit_reached",
-      "example": "",
-      "list": false,
-      "of": "system.ai_role",
-      "pattern": "",
-      "property": "role",
-      "required": true,
-      "type": "enum",
       "version": 1
     },
     {

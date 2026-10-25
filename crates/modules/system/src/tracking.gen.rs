@@ -26,8 +26,6 @@ pub struct AiLimitReached {
     pub interactive: bool,
     /// Calls of the cap kept for what people ask, which background work may not use.
     pub reserve: i64,
-    /// The AI role of the refused call.
-    pub role: AiRole,
 }
 
 impl types::TrackedEvent for AiLimitReached {
