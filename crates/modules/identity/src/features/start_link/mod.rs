@@ -66,6 +66,10 @@ pub struct StartLink {
     /// The connection, for `reconnect`.
     #[serde(default)]
     pub connection_id: Option<String>,
+    /// Besides the mailbox, what to ask for (`calendar`); a reconnect also
+    /// asks for what the connection already has.
+    #[serde(default)]
+    pub capabilities: Vec<String>,
     /// For `connect`: also sign in with the account (default `true`).
     /// `false` for a shared mailbox (support@): it is connected, never
     /// added as a way in. Ignored by the other purposes.
@@ -156,6 +160,7 @@ pub async fn execute_asking(
 ) -> Result<StartedLink> {
     let (issuer, account) = super::account(deps, principal)?;
     let now = issuer.now();
+    let capabilities = &asked_capabilities(&input, capabilities)?;
     let return_to = web::return_to(input.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
     let incomplete = || Error::BadRequest(MESSAGES.reason("link_incomplete"));
@@ -232,6 +237,13 @@ pub async fn execute_asking(
             }
         }
     };
+    issue(state, &ticket, now).await
+}
+
+/// Issues `ticket` within the account's link rate limit: the URL that starts
+/// the round trip.
+async fn issue(state: &AppState, ticket: &Ticket, now: DateTime<Utc>) -> Result<StartedLink> {
+    let account = ticket.account_id;
     state
         .rate_limits
         .check(
@@ -240,7 +252,7 @@ pub async fn execute_asking(
             &RateKey::text(&format!("account:{account}")),
         )
         .await?;
-    let (token, expires_at) = links::issue(&state.db, &ticket, now).await?;
+    let (token, expires_at) = links::issue(&state.db, ticket, now).await?;
     tracing::info!(
         purpose = ticket.purpose.as_str(),
         provider = ticket.provider.as_str(),
@@ -254,6 +266,15 @@ pub async fn execute_asking(
         ),
         expires_at,
     })
+}
+
+/// What a consent asks for besides the mailbox: the door's `capabilities` and
+/// the request's own, which may only name `calendar`.
+fn asked_capabilities(input: &StartLink, door: &[String]) -> Result<Vec<String>> {
+    if input.capabilities.iter().any(|name| name != "calendar") {
+        return Err(Error::BadRequest(MESSAGES.reason("link_incomplete")));
+    }
+    Ok(door.iter().chain(&input.capabilities).cloned().collect())
 }
 
 /// The capabilities of `asked` and `held` other than the mailbox, once each:
