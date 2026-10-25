@@ -2,7 +2,7 @@ import type { TaskView } from "./api/queries";
 import { addDays, isoDay } from "./model";
 
 /** A free stretch of the member's calendar, as the module that keeps calendars answers it. */
-export interface FreeSlot {
+interface FreeSlot {
   /** RFC 3339. */
   starts: string;
   ends: string;
