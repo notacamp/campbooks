@@ -1,5 +1,5 @@
 /** The code languages a page may name: the server's list, and nothing else. */
-export const CODE_LANGUAGES = [
+const CODE_LANGUAGES = [
   "bash",
   "c",
   "cpp",
@@ -46,7 +46,7 @@ const ALIASES: Readonly<Record<string, (typeof CODE_LANGUAGES)[number]>> = {
 };
 
 /** A language a person typed, as one the server accepts; `null` when it is not one. */
-export function codeLanguage(typed?: string | null | undefined): string | null {
+export function codeLanguage(typed?: string | null): string | null {
   const name = (typed ?? "").trim().toLowerCase();
   if (name === "") {
     return null;

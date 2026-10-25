@@ -264,7 +264,7 @@ export function PageEditor({
     editor.view.dispatch(editor.state.tr.setSelection(selection));
     const view = editorBox.current?.view;
     if (view !== undefined) {
-      view.dragging = { slice: selection.content(), move: true };
+      Object.assign(view, { dragging: { slice: selection.content(), move: true } });
     }
     event.dataTransfer.effectAllowed = "copyMove";
     event.dataTransfer.setData("text/plain", "");

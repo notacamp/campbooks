@@ -68,7 +68,12 @@ function api(start = [...PAGES]) {
   let live = start;
   let trashed = [OLD_NOTES];
   const posts: unknown[] = [];
+  const moves: unknown[] = [];
   const routes = mockApi({
+    [`POST ${P}/${IDEAS.id}/move`]: (_request, body) => {
+      moves.push(body);
+      return { body: { ...IDEAS, meta_revision: 2 } };
+    },
     [`GET ${W}/members`]: { body: { members: TEAM } },
     [`GET ${P}`]: (request) => ({
       body: {
@@ -98,7 +103,7 @@ function api(start = [...PAGES]) {
       return { body: OLD_NOTES };
     },
   });
-  return { routes, posts };
+  return { routes, posts, moves };
 }
 
 describe("the pages tree", () => {
@@ -133,7 +138,8 @@ describe("the pages tree", () => {
     const { posts } = api();
     const { router } = renderPages();
     await screen.findByText("Team handbook");
-    fireEvent.click(screen.getAllByRole("button", { name: /^New page/u })[0] as HTMLElement);
+    const [header = document.body] = screen.getAllByRole("button", { name: /^New page/u });
+    fireEvent.click(header);
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/pages/${MADE_ID}`);
     });
@@ -187,5 +193,29 @@ describe("the pages tree", () => {
     expect(await screen.findByText(/can’t be undone/u)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
     expect(screen.queryByText(/can’t be undone/u)).toBeNull();
+  });
+
+  it("drops a page onto another to nest it, and pages that cannot be edited do not drag", async () => {
+    const { moves } = api();
+    renderPages();
+    await screen.findByText("Team handbook");
+    const row = (title: string) => {
+      const found = screen.getByText(title).closest("div[draggable]");
+      if (found === null) {
+        throw new Error(`${title} is not a row`);
+      }
+      return found;
+    };
+    expect(screen.getByText(BUDGET.title).closest("div[draggable='true']")).toBeNull();
+    const dataTransfer = { effectAllowed: "", setData: () => undefined };
+    const source = row(IDEAS.title);
+    const target = row(HANDBOOK.title);
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer, clientY: 0 });
+    fireEvent.drop(target, { dataTransfer });
+    await waitFor(() => {
+      expect(moves).toHaveLength(1);
+    });
+    expect(moves[0]).toMatchObject({ parent: HANDBOOK.id, place: "workspace" });
   });
 });

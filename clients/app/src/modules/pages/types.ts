@@ -41,7 +41,7 @@ export function iconOf(icon: string | null | undefined): PageIcon {
 }
 
 /** The record types a page may mention (the server's list). */
-export const MENTION_TYPES = [
+const MENTION_TYPES = [
   "workspaces.member",
   "conversations.conversation",
   "tasks.task",

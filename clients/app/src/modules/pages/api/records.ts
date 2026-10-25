@@ -102,7 +102,7 @@ async function read(
 export function pageLabel(
   workspaceId: string,
   id: string,
-  pages?: readonly PageSummary[] | undefined,
+  pages?: readonly PageSummary[],
 ): RecordLabel {
   if (pages === undefined) {
     return { state: "loading", label: "" };

@@ -185,11 +185,9 @@ export function usePageActions(workspaceId: string) {
         label: t("toast.shared", { name }),
         undo: () => {
           void attempt(t("toast.shareFailed", { name }), async () => {
-            if (before === undefined) {
-              await calls.unshare(page.id, member);
-            } else {
-              await calls.share(page.id, member, before);
-            }
+            await (before === undefined
+              ? calls.unshare(page.id, member)
+              : calls.share(page.id, member, before));
           });
         },
         redo: () => {

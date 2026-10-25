@@ -59,7 +59,7 @@
 }
 
 .row[data-dragging] {
-  opacity: var(--opacity-muted);
+  background: var(--surface-hover);
 }
 
 .row[data-drop="inside"] {

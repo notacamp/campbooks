@@ -64,7 +64,7 @@ export function SuggestionMenu({
   return (
     <div
       className={styles["menu"]}
-      role="listbox"
+      role={any ? "listbox" : "status"}
       aria-label={label}
       style={{ "--x": `${String(anchor.x)}px`, "--y": `${String(anchor.y)}px` } as CSSProperties}
     >

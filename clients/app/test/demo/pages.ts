@@ -72,7 +72,7 @@ export const OLD_NOTES = page(6, {
 export const PAGES: readonly Summary[] = [HANDBOOK, ONBOARDING, HOLIDAYS, IDEAS, BUDGET];
 
 /** A document of two paragraphs, as the server stores it. */
-export function demoDocument(...lines: string[]): { update: string; state_vector: string } {
+function demoDocument(...lines: string[]): { update: string; state_vector: string } {
   const doc = new Y.Doc();
   const fragment = doc.getXmlFragment("default");
   for (const line of lines) {

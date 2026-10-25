@@ -105,7 +105,7 @@ export const Mentions: Story = {
 export const WideCode: Story = {
   render: (args) => (
     <RichDocument {...args}>
-      <pre>
+      <pre tabIndex={0}>
         <code>
           {
             "const a = 'a very long line that goes well past the edge of a phone screen and keeps going and going';"
