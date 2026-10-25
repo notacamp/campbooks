@@ -58,9 +58,10 @@ const FAKE_BFF = `(() => {
     );
     const route = request.method + " " + url.pathname;
     await sleep(60);
-    const respond = route.match(/^POST .*\\/schedule\\/events\\/([^/]+)\\/response$/);
+    const parts = url.pathname.split("/");
+    const respond = request.method === "POST" && parts.at(-1) === "response" ? parts.at(-2) : undefined;
     if (respond) {
-      const id = respond[1];
+      const id = respond;
       const before = answered(id);
       const body = await request.json();
       answers[id] = body.response;

@@ -26,7 +26,7 @@ export interface InvitationRef {
 }
 
 /** An answer Home offers, in the order of its keys (1, 2, 3). */
-export const ANSWERS = ["accepted", "declined", "tentative"] as const satisfies readonly Response[];
+const ANSWERS = ["accepted", "declined", "tentative"] as const satisfies readonly Response[];
 export type Answer = (typeof ANSWERS)[number];
 
 /** An invitation as Home's row says it. */
@@ -112,7 +112,8 @@ export function invitationWindow(
   if (to <= week) {
     return { from: today, to: week };
   }
-  return { from: today, to: to > year ? year : to };
+  // The earlier of the two (dates sort as text).
+  return { from: today, to: [to, year].toSorted()[0] ?? year };
 }
 
 /** The organiser in words: their name, else address, else the calendar's name. */
