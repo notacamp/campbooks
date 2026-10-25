@@ -627,14 +627,15 @@ function copied(): Record<string, MockRoute> {
 
 const copiedPlay: Story["play"] = async ({ canvasElement }) => {
   const canvas = within(canvasElement);
-  await expect(
-    await canvas.findByText("Ana Costa wrote to Águas do Ribatejo. You’re in Cc."),
-  ).toBeVisible();
+  const line = await canvas.findByText("Ana Costa wrote to Águas do Ribatejo. You’re in Cc.");
+  await expect(line).toBeVisible();
   await expect(
     canvas.getByText(
       "They haven’t answered in 9 days. Scout can’t tell whose move this is. What’s next for you?",
     ),
   ).toBeVisible();
+  // Selected, its actions show under it.
+  await userEvent.click(line);
   const actions = await canvas.findByRole("group", { name: "Actions for Ana Costa" });
   await expect(within(actions).getByRole("button", { name: /^Nudge Águas…/u })).toBeVisible();
   await expect(within(actions).getByRole("button", { name: /^Reply to Ana…/u })).toBeVisible();
@@ -664,7 +665,9 @@ export const ScoutIsntSureNudge: Story = {
   args: { path: PATH, api: copied() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await canvas.findByText("Ana Costa wrote to Águas do Ribatejo. You’re in Cc.");
+    await userEvent.click(
+      await canvas.findByText("Ana Costa wrote to Águas do Ribatejo. You’re in Cc."),
+    );
     await userEvent.keyboard("1");
     const body = within(canvasElement.ownerDocument.body);
     await expect(await body.findByRole("dialog", { name: "Nudge Águas" })).toBeVisible();

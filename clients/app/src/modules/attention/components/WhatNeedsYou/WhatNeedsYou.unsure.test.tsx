@@ -92,9 +92,9 @@ function api({
   });
 }
 
-/** The unsure row is the first: it is selected, with its actions under it. */
+/** Select the unsure row (a click, as the stories do): its actions show under it. */
 async function selected(name = "Actions for Ana Costa") {
-  await screen.findByText("Ana Costa wrote to Águas do Ribatejo. You’re in Cc.");
+  fireEvent.click(await screen.findByText("Ana Costa wrote to Águas do Ribatejo. You’re in Cc."));
   return within(await screen.findByRole("group", { name }));
 }
 
