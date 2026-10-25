@@ -90,6 +90,42 @@ export const SOFIA_CONNECTION: Schema<"ConnectionView"> = {
   health_reason: "rate_limited",
 };
 
+/**
+ * The shop's mailbox at its hosting company, connected over IMAP with a
+ * username that is not its address: its address is being checked.
+ */
+export const IMAP_CONNECTION: Schema<"ConnectionView"> = {
+  ...CONNECTION,
+  id: "0192f1a0-0000-7000-8000-0000000000c5",
+  provider: "imap",
+  address: "ana@bakery.example",
+  address_verified: false,
+  address_check: "checking",
+  display_name: null,
+};
+
+/** Discovery for a Yahoo address: Yahoo's servers, and an app password. */
+export const YAHOO_DISCOVERY: Schema<"DiscoveredImap"> = {
+  kind: "settings",
+  imap: { host: "imap.mail.yahoo.com", port: 993, security: "tls" },
+  smtp: { host: "smtp.mail.yahoo.com", port: 465, security: "tls" },
+  username_hint: "ana@yahoo.example",
+  source: "ispdb",
+  provider_hint: "yahoo.com",
+  password: "app_password",
+};
+
+/** Discovery for a GMX address (its German site): GMX's servers, and an app password. */
+export const GMX_DISCOVERY: Schema<"DiscoveredImap"> = {
+  kind: "settings",
+  imap: { host: "imap.gmx.net", port: 993, security: "tls" },
+  smtp: { host: "mail.gmx.net", port: 587, security: "starttls" },
+  username_hint: "ana@gmx.example",
+  source: "ispdb",
+  provider_hint: "gmx.net",
+  password: "app_password",
+};
+
 /** A request an MCP agent made: unverified, on this device, bound to a workspace. */
 export const AGENT_CONSENT: Schema<"ConsentRequest"> = {
   client: {

@@ -2,7 +2,8 @@
   "provider": {
     "google": "Gmail",
     "zoho": "Zoho Mail",
-    "microsoft": "Microsoft 365"
+    "microsoft": "Microsoft 365",
+    "imap": "IMAP"
   },
   "mail": {
     "title": "Tu correo",
@@ -31,7 +32,11 @@
     "reconnect": "Volver a conectar",
     "reconnectLabel": "Volver a conectar {{address}}",
     "disconnect": "Desconectar",
-    "disconnectLabel": "Desconectar {{address}}"
+    "disconnectLabel": "Desconectar {{address}}",
+    "checking": "Verificando tu dirección…",
+    "unverified": "No hemos podido verificar esta dirección: el envío sigue desactivado",
+    "retry": "Volver a intentarlo",
+    "retryLabel": "Verificar {{address}} de nuevo"
   },
   "health": {
     "ok": "Sincronizando",
@@ -69,14 +74,13 @@
     }
   },
   "connect": {
-    "title": "Conectar un buzón",
-    "lead": "Irás al proveedor para permitir el acceso y luego volverás aquí.",
+    "title": "Añadir un buzón",
+    "lead": "Escribe su dirección y Campbooks averigua cómo se conecta: con el inicio de sesión de tu proveedor o con una contraseña de aplicación.",
     "provider": "Conectar {{provider}}",
     "none": "Este Campbooks todavía no tiene ningún proveedor de correo configurado. Quien lo gestiona puede añadir Gmail o Zoho Mail.",
-    "loading": "Cargando los proveedores",
-    "loadError": "No se han podido cargar los proveedores que puedes conectar. Recarga la página para volver a intentarlo.",
     "signIn": "Usar también esta cuenta para iniciar sesión",
-    "signInHint": "Déjalo marcado para tu propio buzón. Desmárcalo para uno compartido, como support@: queda conectado, pero no se convierte en una nueva forma de iniciar sesión en Campbooks."
+    "signInHint": "Déjalo marcado para tu propio buzón. Desmárcalo para uno compartido, como support@: queda conectado, pero no se convierte en una nueva forma de iniciar sesión en Campbooks.",
+    "add": "Añadir un buzón"
   },
   "connected": {
     "title": "Tu buzón está conectado",
@@ -156,7 +160,7 @@
     }
   },
   "shortcuts": {
-    "connect": "Conectar un buzón",
+    "connect": "Añadir un buzón",
     "reconnect": "Volver a conectar el buzón",
     "disconnect": "Desconectar el buzón"
   },
@@ -189,5 +193,150 @@
     "paused": "En pausa",
     "failures_one": "{{count}} ejecución fallida seguida",
     "failures_other": "{{count}} ejecuciones fallidas seguidas"
+  },
+  "add": {
+    "title": "Añadir un buzón",
+    "address": {
+      "label": "Dirección de correo",
+      "hint": "La dirección del buzón que quieres en Campbooks.",
+      "invalid": "Escribe una dirección de correo válida, como nombre@example.com."
+    },
+    "continue": "Continuar",
+    "cancel": "Cancelar",
+    "back": "Atrás",
+    "finding": "Averiguando cómo se conecta este buzón…",
+    "native": {
+      "title": "Conectar {{provider}}",
+      "lead": "{{address}} es un buzón de {{provider}}. Se conecta con el inicio de sesión del propio {{provider}}, así que aquí no se escribe ninguna contraseña.",
+      "notHere": "Este Campbooks aún no tiene {{provider}} configurado. Pregunta a quien lo gestiona."
+    },
+    "outlook": {
+      "title": "Outlook llegará pronto",
+      "lead": "{{address}} es un buzón de Outlook o Microsoft 365. Campbooks aún no puede conectarlos; podrá pronto."
+    },
+    "fallback": {
+      "title": "Conectar un buzón",
+      "lead": "Este Campbooks conecta buzones de estos proveedores:"
+    },
+    "password": {
+      "title": "Conectar {{address}}",
+      "appLead": "{{provider}} pide una contraseña de aplicación: una contraseña solo para Campbooks, que puedes eliminar en {{provider}} cuando quieras.",
+      "lead": "Usa una contraseña de aplicación si tu proveedor las ofrece. Si no, usa la contraseña del propio buzón.",
+      "label": "Contraseña",
+      "appLabel": "Contraseña de aplicación",
+      "hint": "Campbooks la guarda cifrada y nunca la vuelve a mostrar.",
+      "required": "Escribe la contraseña.",
+      "connect": "Conectar",
+      "connecting": "Conectando…"
+    },
+    "guide": {
+      "label": "Cómo obtener una contraseña de aplicación en {{provider}}",
+      "help": "Página de ayuda de {{provider}}",
+      "imap": "Activar IMAP en {{provider}}"
+    },
+    "guides": {
+      "yahoo": {
+        "name": "Yahoo",
+        "s1": "Inicia sesión en Yahoo y abre Seguridad de la cuenta.",
+        "s2": "En Conexiones externas, elige Crear contraseña de aplicación, llámala Campbooks y elige Generar contraseña.",
+        "s3": "Copia la contraseña que muestra Yahoo y pégala aquí."
+      },
+      "aol": {
+        "name": "AOL",
+        "s1": "Inicia sesión en AOL y abre Seguridad de la cuenta.",
+        "s2": "Elige Generar contraseña de aplicación, luego Empezar, llámala Campbooks y elige Generar contraseña.",
+        "s3": "Copia la contraseña que muestra AOL y pégala aquí."
+      },
+      "icloud": {
+        "name": "iCloud",
+        "s1": "Inicia sesión en account.apple.com y abre Inicio de sesión y seguridad. La autenticación de doble factor debe estar activada.",
+        "s2": "Elige Contraseñas específicas de apps y crea una llamada Campbooks.",
+        "s3": "Copia la contraseña que muestra Apple y pégala aquí."
+      },
+      "fastmail": {
+        "name": "Fastmail",
+        "s1": "En Fastmail, abre Ajustes y luego Privacidad y seguridad.",
+        "s2": "En Apps conectadas y tokens de API, elige Gestionar contraseñas de aplicación y acceso, y luego Nueva contraseña de aplicación.",
+        "s3": "Llámala Campbooks, mantén el acceso al correo, genérala y pégala aquí."
+      },
+      "gmx": {
+        "name": "GMX",
+        "s1": "Primero activa IMAP: en los ajustes de correo de GMX, abre POP3 e IMAP y permite el acceso.",
+        "s2": "Abre los ajustes de seguridad de tu cuenta y busca las contraseñas de aplicación.",
+        "s3": "Crea una llamada Campbooks. GMX solo la muestra una vez.",
+        "s4": "Pégala aquí."
+      },
+      "webde": {
+        "name": "WEB.DE",
+        "s1": "Primero activa IMAP: en los ajustes de correo de WEB.DE, abre POP3/IMAP y actívalo.",
+        "s2": "Abre tu cuenta, luego Inicio de sesión y seguridad, y luego Contraseñas de aplicación.",
+        "s3": "Crea una llamada Campbooks. WEB.DE solo la muestra una vez.",
+        "s4": "Pégala aquí."
+      },
+      "yandex": {
+        "name": "Yandex",
+        "s1": "Primero activa IMAP: en los ajustes de Yandex Mail, abre Clientes de correo, marca IMAP y Contraseñas de aplicación y tokens OAuth, y guarda.",
+        "s2": "En Yandex ID, abre Seguridad, luego Contraseñas de aplicación, y crea una contraseña de correo llamada Campbooks.",
+        "s3": "Cópiala y pégala aquí. Yandex solo la muestra una vez.",
+        "s4": "Una contraseña de aplicación nueva puede tardar unas horas en funcionar: si se rechaza el inicio de sesión, inténtalo más tarde."
+      },
+      "custom": {
+        "name": "tu proveedor",
+        "s1": "Si tu servicio de correo ofrece contraseñas de aplicación, crea una para Campbooks en sus ajustes y úsala aquí.",
+        "s2": "Si no, usa la contraseña del buzón. Si no se encuentran sus servidores, escríbelos en Avanzado: las páginas de ayuda de tu servicio los indican."
+      }
+    },
+    "advanced": {
+      "summary": "Avanzado: nombre de usuario y servidores",
+      "username": "Nombre de usuario",
+      "usernameHint": "Suele ser la propia dirección.",
+      "imap": "Correo entrante (IMAP)",
+      "smtp": "Correo saliente (SMTP)",
+      "host": "Servidor",
+      "port": "Puerto",
+      "security": "Seguridad",
+      "tls": "TLS",
+      "starttls": "STARTTLS",
+      "invalid": "Revisa los servidores: cada uno necesita un nombre y un puerto del 1 al 65535."
+    },
+    "errors": {
+      "imap_login_refused": "El servidor de correo ha rechazado el inicio de sesión. Revisa el nombre de usuario y la contraseña.",
+      "imap_login_refused_app": "El servidor de correo ha rechazado el inicio de sesión. {{provider}} pide una contraseña de aplicación, no tu contraseña habitual: sigue los pasos de arriba.",
+      "smtp_login_refused": "El servidor de envío ha rechazado el inicio de sesión. Revisa la contraseña y que este buzón pueda enviar correo.",
+      "imap_unreachable": "Campbooks no ha podido contactar con el servidor de correo. Revisa su nombre y su puerto en Avanzado y vuelve a intentarlo.",
+      "smtp_unreachable": "Campbooks no ha podido contactar con el servidor de envío. Revisa su nombre y su puerto en Avanzado y vuelve a intentarlo.",
+      "imap_tls_failed": "El certificado del servidor de correo no es válido para su nombre, así que Campbooks no se ha conectado. Revisa el nombre del servidor.",
+      "smtp_tls_failed": "El certificado del servidor de envío no es válido para su nombre, así que Campbooks no se ha conectado. Revisa el nombre del servidor.",
+      "imap_not_an_imap_server": "Ese servidor y ese puerto no son un servidor de correo IMAP. Revísalos en Avanzado.",
+      "imap_busy": "El servidor de correo está ocupado. Vuelve a intentarlo dentro de unos minutos.",
+      "host_refused": "Campbooks no puede contactar con ese servidor: está en una red privada o el puerto no es de correo (993, 143, 465 o 587).",
+      "starttls_missing": "Ese servidor no ofrece una conexión cifrada, así que Campbooks no ha enviado tu contraseña. Usa el puerto 993 para IMAP y el 465 para SMTP.",
+      "imap_servers_required": "Campbooks no ha encontrado los servidores de este buzón. Escríbelos en Avanzado.",
+      "use_native_provider": "Este buzón se conecta con el inicio de sesión de su propio proveedor. Vuelve atrás y usa ese.",
+      "imap_address_invalid": "Escribe una dirección de correo válida.",
+      "imap_username_invalid": "Revisa el nombre de usuario en Avanzado.",
+      "imap_password_invalid": "Escribe la contraseña en una sola línea, con 1024 caracteres como máximo.",
+      "too_many_attempts": "Demasiados inicios de sesión fallidos en este buzón. Espera una hora y vuelve a intentarlo.",
+      "rate_limited": "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.",
+      "account_connected_by_another_member": "Otro miembro de este espacio de trabajo ya ha conectado este buzón.",
+      "account_mismatch": "Ese buzón no es el que estás volviendo a conectar.",
+      "provider_not_configured": "Este Campbooks no puede conectar buzones con contraseña.",
+      "connection_needs_user": "Solo un miembro con la sesión iniciada puede conectar un buzón.",
+      "unknown": "El buzón no se ha conectado. Vuelve a intentarlo."
+    },
+    "connected": "{{address}} está conectado. Campbooks está trayendo su correo.",
+    "check": {
+      "title": "Verificando {{address}}",
+      "checking": "Verificando tu dirección…",
+      "checkingLead": "Campbooks ha enviado un mensaje a {{address}} a través de este buzón y lo está buscando en su bandeja de entrada. Tarda uno o dos minutos; puedes cerrar esta ventana.",
+      "verified": "Verificada",
+      "verifiedLead": "{{address}} puede enviar correo desde Campbooks.",
+      "failed": "No hemos podido verificar esta dirección: el envío sigue desactivado",
+      "failedLead": "Campbooks no ha encontrado su mensaje en el buzón. Leer el correo funciona; enviar desde {{address}} sigue desactivado hasta que se verifique la dirección.",
+      "retry": "Volver a intentarlo",
+      "retryFailed": "No se ha podido iniciar la verificación. Vuelve a intentarlo dentro de un rato.",
+      "retryLimited": "Esta dirección ya se ha verificado demasiadas veces hoy. Inténtalo mañana.",
+      "done": "Hecho"
+    }
   }
 }

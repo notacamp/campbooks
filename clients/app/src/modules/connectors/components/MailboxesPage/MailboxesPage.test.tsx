@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   CONNECTION,
+  IMAP_CONNECTION,
   SHARED_CONNECTION,
   SOFIA_CONNECTION,
   ZOHO_CONNECTION,
@@ -85,36 +86,62 @@ describe("MailboxesPage", () => {
     expect(await screen.findByText("Needs Sofia Pessoa to sign in again")).toBeVisible();
   });
 
-  it("connects through the front door, for each provider the server lists", async () => {
-    api([CONNECTION]);
+  it("adds a mailbox from its address, with ⇧C shown on the button", async () => {
+    api([CONNECTION], {
+      [`POST /bff/api/v1/w/${DUARTE.id}/connections/imap/discover`]: {
+        body: { kind: "use_provider", provider: "zoho" },
+      },
+    });
     const door = renderPage();
 
+    const add = await screen.findByRole("button", { name: /Add a mailbox/u });
+    expect(add).toHaveAttribute("aria-keyshortcuts", "Shift+C");
+    fireEvent.keyDown(document, { key: "C", shiftKey: true });
+    const dialog = await screen.findByRole("dialog", { name: "Add a mailbox" });
+    fireEvent.change(within(dialog).getByLabelText("Email address"), {
+      target: { value: "ana@zohomail.com" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Continue/u }));
     fireEvent.click(await screen.findByRole("button", { name: /Connect Zoho Mail/u }));
     expect(door.start).toHaveBeenCalledWith({ purpose: "connect", provider: "zoho", signIn: true });
-    expect(screen.queryByRole("button", { name: /Connect Microsoft/u })).toBeNull();
   });
 
-  it("connects a shared mailbox without making it a way in", async () => {
-    api([CONNECTION]);
-    const door = renderPage();
-
-    const box = await screen.findByRole("checkbox", { name: "Also use this account to sign in" });
-    expect(box).toBeChecked();
-    fireEvent.click(box);
-    fireEvent.click(screen.getByRole("button", { name: /Connect Gmail/u }));
-    expect(door.start).toHaveBeenCalledWith({
-      purpose: "connect",
-      provider: "google",
-      signIn: false,
-    });
-  });
-
-  it("says when no provider is set up", async () => {
+  it("opens Add a mailbox at once when asked to", async () => {
     api([]);
-    renderPage({ consent: consent({ providers: [] }) });
+    renderPage({ adding: true });
 
-    expect(await screen.findByText("No mailboxes yet")).toBeVisible();
-    expect(screen.getByText(/has no mail provider set up yet/u)).toBeVisible();
+    expect(await screen.findByRole("dialog", { name: "Add a mailbox" })).toBeVisible();
+    expect(screen.getByText("No mailboxes yet")).toBeVisible();
+  });
+
+  it("says when a mailbox's address is being checked", async () => {
+    api([IMAP_CONNECTION]);
+    renderPage();
+
+    const imap = await row(0);
+    expect(within(imap).getByText("Checking your address…")).toBeVisible();
+    expect(within(imap).queryByRole("button", { name: /again/u })).toBeNull();
+  });
+
+  it("says sending stays off when the check failed, and checks again", async () => {
+    const asked: string[] = [];
+    api([{ ...IMAP_CONNECTION, address_check: "failed" }], {
+      [`POST /bff/api/v1/w/${DUARTE.id}/connections/${IMAP_CONNECTION.id}/address-check`]: (
+        request: Request,
+      ) => {
+        asked.push(request.method);
+        return { status: 202, body: IMAP_CONNECTION };
+      },
+    });
+    renderPage();
+
+    const imap = await row(0);
+    expect(
+      within(imap).getByText("We couldn't verify this address: sending stays off"),
+    ).toBeVisible();
+    fireEvent.click(within(imap).getByRole("button", { name: "Check ana@bakery.example again" }));
+    expect(await within(imap).findByText("Checking your address…")).toBeVisible();
+    expect(asked).toEqual(["POST"]);
   });
 
   it("reconnects your mailbox that needs it, with R on the chosen row", async () => {

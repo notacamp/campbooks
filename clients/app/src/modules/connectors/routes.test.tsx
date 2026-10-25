@@ -58,6 +58,15 @@ describe("buildConnectorsRoutes", () => {
     expect(useConsent).toHaveBeenCalledWith({ workspaceId: DUARTE.id, returnTo: PAGE });
   });
 
+  it("opens Add a mailbox when asked to, then clears the address bar", async () => {
+    const { history } = renderAt(`${PAGE}?add=1`);
+
+    expect(await screen.findByRole("dialog", { name: "Add a mailbox" })).toBeVisible();
+    await waitFor(() => {
+      expect(history.location.search).toBe("");
+    });
+  });
+
   it("reads the front door's answer once, then clears it", async () => {
     const { history } = renderAt(`${PAGE}?connected=${CONNECTION.id}`);
 
