@@ -1,7 +1,7 @@
 ## 0. Design gate
 
 - [x] 0.1 Owner decisions (direction, scope, who); proposal, design with alternatives, spec deltas; prototype board "Sync with Notion"
-- [ ] 0.2 Owner sign-off on the prototype and design
+- [x] 0.2 Owner sign-off on the prototype and design ("looks good", 2026-10-25, relayed by the coordinating session)
 - [ ] 0.3 Owner: public Notion integration registered (redirect URI, capabilities), client id and secret plus webhook verification token in Infisical `/campbooks-next`
 
 ## 1. Connectors: provider and auth
