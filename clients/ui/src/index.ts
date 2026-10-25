@@ -80,6 +80,7 @@ export {
   type CalendarColourProps,
   type CalendarHeaderProps,
   type DayStripDay,
+  type EventSheetProps,
   type FoundItemProps,
   type FoundStripProps,
   type KindDotProps,

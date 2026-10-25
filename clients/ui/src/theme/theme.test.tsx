@@ -179,7 +179,7 @@ describe("localStoragePrefs", () => {
   });
 
   it("reads no storage at all as empty", () => {
-    vi.stubGlobal("localStorage", undefined);
+    vi.stubGlobal("localStorage", null);
 
     expect(prefs.read("density")).toBeNull();
   });

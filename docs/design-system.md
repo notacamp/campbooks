@@ -14,7 +14,7 @@ Campbooks uses it from source, with no package build, through two doors in
   plus the components that name a Campbooks concept (ConversationRow,
   Message, MessageComposer, Composer, ReplyDraft, RecipientField,
   Attachments, Chat, Queue, TaskRow, Offer, HowDecided, RulePreview,
-  ThinkingTrace, ProviderMark, WorkspaceMenu), which stay in
+  ThinkingTrace, ProviderMark, WorkspaceMenu, PageTree, RichDocument), which stay in
   `lib/ui/components/` and are built from the package's. It also wires the
   package to the app: the theme remembers through `lib/storage` (the prefix
   `public/theme-boot.js` reads), and the app's strings join the package's

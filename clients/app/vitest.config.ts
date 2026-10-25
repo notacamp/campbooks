@@ -1,6 +1,12 @@
+import { fileURLToPath, URL } from "node:url";
+
 import { defineConfig, mergeConfig } from "vitest/config";
 
 import viteConfig from "./vite.config.ts";
+
+// The design system's source (clients/ui/src). Coverage matches a file outside
+// this package's root by its absolute path, so its pattern is absolute too.
+const designSystem = fileURLToPath(new URL("../ui/src", import.meta.url)).replaceAll("\\", "/");
 
 export default mergeConfig(
   viteConfig,
@@ -27,7 +33,9 @@ export default mergeConfig(
       unstubGlobals: true,
       coverage: {
         provider: "v8",
-        include: ["src/lib/**", "src/modules/**", "../ui/src/**"],
+        // `../ui/src/**` finds its files that no test loads, the absolute one
+        // matches those that are loaded.
+        include: ["src/lib/**", "src/modules/**", "../ui/src/**", `${designSystem}/**`],
         // clients/ui is outside this package's root.
         allowExternal: true,
         exclude: ["**/*.gen.ts", "**/*.test.{ts,tsx}", "**/*.stories.tsx", "**/*.json", "**/*.css"],
