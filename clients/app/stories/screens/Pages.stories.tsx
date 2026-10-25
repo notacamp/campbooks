@@ -280,7 +280,34 @@ export const PageOpen: Story = {
   },
 };
 
-/** New page (or N P) makes a private page and opens it. */
+/**
+ * Clicking the end of a page and typing lands the text there (not at the
+ * start), and keeps landing there after the text has been saved.
+ */
+export const TypingKeepsTheCaret: Story = {
+  args: { path: `${PATH}/${HANDBOOK.id}`, api: pages() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const editor = await canvas.findByRole("textbox", { name: "Page text" });
+    const last = await within(editor).findByText("Notes from the kickoff go below.");
+    await userEvent.click(last);
+    await userEvent.keyboard("{End}{Enter}Pages save as you type.");
+    // The save goes out and is answered...
+    await canvas.findByText("Saving…");
+    await canvas.findByText("Saved");
+    // ...and the caret is where it was.
+    await userEvent.keyboard("{Enter}Second line");
+    await expect(editor.querySelector("h1")).toHaveTextContent("How we work");
+    const paragraphs = [...editor.querySelectorAll(":scope > p")].map((p) => p.textContent);
+    await expect(paragraphs.slice(-3)).toEqual([
+      "Notes from the kickoff go below.",
+      "Pages save as you type.",
+      "Second line",
+    ]);
+  },
+};
+
+/** New page (or N G) makes a private page and opens it. */
 export const NewPage: Story = {
   args: { path: `${PATH}?new=1`, api: pages() },
   play: async ({ canvasElement }) => {

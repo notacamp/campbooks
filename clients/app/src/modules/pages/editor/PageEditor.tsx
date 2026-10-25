@@ -1,7 +1,7 @@
 import type { Editor } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
@@ -148,13 +148,23 @@ export function PageEditor({
     }
   };
 
-  const editor = useEditor(
-    {
-      extensions: createExtensions({
+  // Made once per document (and language). New extension objects on every
+  // render make the editor rebuild its plugins when it re-renders (the save
+  // status changes as you type), which drops the caret to the start.
+  const placeholder = t("editor.placeholder");
+  const headingPlaceholder = t("editor.heading");
+  const editorExtensions = useMemo(
+    () =>
+      createExtensions({
         doc,
-        placeholders: { paragraph: t("editor.placeholder"), heading: t("editor.heading") },
+        placeholders: { paragraph: placeholder, heading: headingPlaceholder },
         menus: extensions,
       }),
+    [doc, extensions, placeholder, headingPlaceholder],
+  );
+  const editor = useEditor(
+    {
+      extensions: editorExtensions,
       editable,
       editorProps: {
         attributes: { "aria-label": t("editor.label"), role: "textbox", "aria-multiline": "true" },
