@@ -8,6 +8,7 @@ use axum::{Json, extract::State};
 use campbooks_kernel::{
     AppState, Error, Problem, Result,
     admin::{Admin, AdminOperation, permission::SignupsReview},
+    db::begin_admin,
     extract,
 };
 use chrono::Utc;
@@ -48,11 +49,12 @@ pub struct CodePath {
     )
 )]
 pub async fn handler(
-    _admin: Admin<SignupsReview>,
+    admin: Admin<SignupsReview>,
     State(state): State<AppState>,
     extract::Path(path): extract::Path<CodePath>,
 ) -> Result<Json<SignupCodeView>> {
-    let mut tx = state.db.begin().await?;
+    // An administrator's transaction, as deciding a request is.
+    let mut tx = begin_admin(&state.db, &admin.grant).await?;
     // Whether it was revoked already: a retry changes nothing, and tracks
     // nothing.
     let revoked_before: Option<bool> = sqlx::query_scalar(

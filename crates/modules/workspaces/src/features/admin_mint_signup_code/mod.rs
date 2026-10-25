@@ -8,6 +8,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Problem, Result,
     admin::{Admin, AdminOperation, permission::SignupsReview},
+    db::begin_admin,
     extract,
 };
 use chrono::{DateTime, Utc};
@@ -99,7 +100,8 @@ pub async fn handler(
     }
     let (code, digest) = new_code()?;
     let id = SignupCodeId::new();
-    let mut tx = state.db.begin().await?;
+    // An administrator's transaction, as deciding a request is.
+    let mut tx = begin_admin(&state.db, &admin.grant).await?;
     let row = sqlx::query_as!(
         CodeRow,
         r#"INSERT INTO workspaces.signup_codes
