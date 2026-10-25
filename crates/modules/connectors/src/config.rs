@@ -103,6 +103,133 @@ pub struct MicrosoftMailConfig {
     /// widens.
     #[serde(deserialize_with = "any_text")]
     pub tenant: Option<String>,
+    /// How far back a new mailbox reads, in days (default 90).
+    #[serde(deserialize_with = "any_text")]
+    pub backfill_days: Option<String>,
+    /// Messages larger than this (bytes, as Graph sends their MIME) are
+    /// recorded as oversized and not stored (default 50 MiB).
+    #[serde(deserialize_with = "any_text")]
+    pub max_message_bytes: Option<String>,
+    /// One run starts no download once it has fetched this many bytes
+    /// (default 64 MiB), so a run's memory stays bounded.
+    #[serde(deserialize_with = "any_text")]
+    pub run_budget_bytes: Option<String>,
+    /// Requests per minute each Microsoft connection may make, shared by
+    /// every process (default 600; Graph allows a mailbox 10000 in ten
+    /// minutes).
+    #[serde(deserialize_with = "any_text")]
+    pub requests_per_minute: Option<String>,
+    /// Most folders of one mailbox read (default 100).
+    #[serde(deserialize_with = "any_text")]
+    pub max_folders: Option<String>,
+    /// Subscribe to Graph's change notifications (default false), so new
+    /// mail is read as it arrives. Needs an `https` `CAMPBOOKS_PUBLIC_URL`
+    /// that Microsoft can reach, forwarding `/hooks/microsoft/mail`; without
+    /// one the mailboxes are polled.
+    #[serde(deserialize_with = "any_text")]
+    pub notifications: Option<String>,
+}
+
+/// The Microsoft adapter's settings, read (defaults for what is unset).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MicrosoftAdapter {
+    pub backfill_days: u32,
+    pub max_message_bytes: u64,
+    pub run_budget_bytes: u64,
+    pub requests_per_minute: u32,
+    pub max_folders: u32,
+    pub notifications: bool,
+}
+
+impl Default for MicrosoftAdapter {
+    fn default() -> Self {
+        Self {
+            backfill_days: 90,
+            max_message_bytes: 50 * 1024 * 1024,
+            run_budget_bytes: 64 * 1024 * 1024,
+            requests_per_minute: 600,
+            max_folders: 100,
+            notifications: false,
+        }
+    }
+}
+
+impl MicrosoftMailConfig {
+    /// The adapter's settings, each checked: the first one that is not
+    /// usable is an error naming it. Only called while Microsoft mail is
+    /// on ([`ConnectorsConfig::check`]); [`adapter`](Self::adapter) reads
+    /// them where they are used.
+    pub fn read_adapter(&self) -> Result<MicrosoftAdapter, String> {
+        let defaults = MicrosoftAdapter::default();
+        let number = |value: Option<&str>, name: &str, low: u64, high: u64, default: u64| {
+            let Some(text) = value.map(str::trim) else {
+                return Ok(default);
+            };
+            text.parse::<u64>()
+                .ok()
+                .filter(|n| (low..=high).contains(n))
+                .ok_or_else(|| {
+                    format!("CAMPBOOKS_CONNECTORS__MICROSOFT__{name} must be {low} to {high}")
+                })
+        };
+        let small = |n: u64| u32::try_from(n).unwrap_or(u32::MAX);
+        let notifications = match self.notifications.as_deref().map(str::trim) {
+            None => defaults.notifications,
+            Some(text) if text.eq_ignore_ascii_case("true") || text == "1" => true,
+            Some(text) if text.eq_ignore_ascii_case("false") || text == "0" => false,
+            Some(_) => {
+                return Err(
+                    "CAMPBOOKS_CONNECTORS__MICROSOFT__NOTIFICATIONS must be true or false"
+                        .to_owned(),
+                );
+            }
+        };
+        Ok(MicrosoftAdapter {
+            backfill_days: small(number(
+                self.backfill_days.as_deref(),
+                "BACKFILL_DAYS",
+                1,
+                3650,
+                u64::from(defaults.backfill_days),
+            )?),
+            max_message_bytes: number(
+                self.max_message_bytes.as_deref(),
+                "MAX_MESSAGE_BYTES",
+                1,
+                1024 * 1024 * 1024,
+                defaults.max_message_bytes,
+            )?,
+            run_budget_bytes: number(
+                self.run_budget_bytes.as_deref(),
+                "RUN_BUDGET_BYTES",
+                1,
+                u64::MAX,
+                defaults.run_budget_bytes,
+            )?,
+            requests_per_minute: small(number(
+                self.requests_per_minute.as_deref(),
+                "REQUESTS_PER_MINUTE",
+                1,
+                100_000,
+                u64::from(defaults.requests_per_minute),
+            )?),
+            max_folders: small(number(
+                self.max_folders.as_deref(),
+                "MAX_FOLDERS",
+                1,
+                1000,
+                u64::from(defaults.max_folders),
+            )?),
+            notifications,
+        })
+    }
+
+    /// The adapter's settings as used: what [`read_adapter`](Self::read_adapter)
+    /// reads, or the defaults where a value is unusable (never the case
+    /// while Microsoft mail is on: the server would not have started).
+    pub fn adapter(&self) -> MicrosoftAdapter {
+        self.read_adapter().unwrap_or_default()
+    }
 }
 
 /// Any value as text, so its shape never stops a server that does not use
@@ -483,6 +610,12 @@ impl ConnectorsConfig {
                 "CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT={tenant}: use common, organizations, \
                  consumers or a tenant id (or turn CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED off)"
             ));
+        }
+        if self.microsoft.enabled {
+            // Tied to no poll bound: the poll bounds never stop it.
+            self.microsoft.read_adapter().map_err(|e| {
+                format!("{e} (or turn CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED off)")
+            })?;
         }
         Ok(())
     }
@@ -1066,5 +1199,73 @@ mod tests {
             "connectors": {"microsoft": {"enabled": true, "tenant": 1}}
         })));
         assert!(shaped.unwrap_err().contains("MICROSOFT__TENANT"));
+    }
+
+    #[test]
+    fn microsoft_adapter_settings_never_stop_a_server_that_does_not_offer_it() {
+        // Production's settings (cloud#316): its poll bounds, no Microsoft
+        // mail, subscription or callback variable.
+        let production = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}}
+        })))
+        .unwrap();
+        assert!(!production.microsoft.enabled);
+        assert_eq!(production.microsoft.adapter(), MicrosoftAdapter::default());
+        assert!(!production.microsoft.adapter().notifications);
+        // Off: any shape of any adapter setting starts.
+        for stray in [
+            serde_json::json!({"max_folders": "lots", "notifications": "maybe"}),
+            serde_json::json!({"backfill_days": 0, "requests_per_minute": -3}),
+            serde_json::json!({"max_message_bytes": ["big"], "run_budget_bytes": {"a": 1}}),
+            serde_json::json!({"enabled": false, "max_folders": 0, "notifications": 7}),
+        ] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}, "microsoft": stray}
+            })))
+            .unwrap();
+            assert!(!config.microsoft.enabled);
+            assert_eq!(config.microsoft.adapter(), MicrosoftAdapter::default());
+        }
+        // On: read, with production's poll bounds whatever they are.
+        let on = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {
+                "poll": {"min_seconds": 60, "max_seconds": 120},
+                "microsoft": {"enabled": true, "max_folders": "40", "notifications": true,
+                              "backfill_days": 30, "requests_per_minute": 100}
+            }
+        })))
+        .unwrap();
+        let adapter = on.microsoft.adapter();
+        assert_eq!(
+            (
+                adapter.max_folders,
+                adapter.backfill_days,
+                adapter.requests_per_minute
+            ),
+            (40, 30, 100)
+        );
+        assert!(adapter.notifications);
+        // On with a broken value: refused, naming it.
+        for (bad, name) in [
+            (serde_json::json!({"max_folders": 0}), "MAX_FOLDERS"),
+            (serde_json::json!({"max_folders": "lots"}), "MAX_FOLDERS"),
+            (serde_json::json!({"backfill_days": 4000}), "BACKFILL_DAYS"),
+            (
+                serde_json::json!({"notifications": "maybe"}),
+                "NOTIFICATIONS",
+            ),
+            (
+                serde_json::json!({"requests_per_minute": 0}),
+                "REQUESTS_PER_MINUTE",
+            ),
+        ] {
+            let mut microsoft = bad;
+            microsoft["enabled"] = true.into();
+            let refused = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"microsoft": microsoft}
+            })))
+            .unwrap_err();
+            assert!(refused.contains(name), "{refused}");
+        }
     }
 }

@@ -923,7 +923,7 @@ the code to the address's real mailbox and keeps no copy the member can read.
 mailboxes) connect through Microsoft Graph with the app of Sign in with Microsoft (above):
 the same client, secret and redirect URI (`/auth/callback/microsoft`, or
 `CAMPBOOKS_MICROSOFT__REDIRECT_PATH` behind a proxy that rewrites it). It is **off by
-default** while reading mail is being built: `CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED=true`
+default** while it is being finished: `CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED=true`
 turns it on, and then Settings → Mailboxes → Add a mailbox sends an Outlook or Microsoft 365
 address to Microsoft's own sign-in ("Connect Outlook") instead of saying it is coming soon.
 With the flag off nothing about Microsoft mail is read or checked, so a server with the
@@ -958,8 +958,29 @@ Campbooks reads the mailbox's id and primary address from Graph (`/me`) and call
 again. Microsoft has no way to revoke one app's grant without signing the person out of
 every app, so disconnecting deletes its tokens and the member removes the app at
 `https://account.live.com/consent/Manage` (personal) or `https://myapps.microsoft.com`
-(work and school). Reading the mail lands in a later release: until then a connected Outlook
-mailbox keeps its grant alive and shows no mail.
+(work and school).
+
+A connected Outlook mailbox is read through Graph: its Inbox, Sent Items, Junk Email,
+Deleted Items, Archive and the member's own folders (never Drafts or Outbox), each followed
+by its own change log, first the last 90 days (`CAMPBOOKS_CONNECTORS__MICROSOFT__BACKFILL_DAYS`),
+then what changes. Reading never changes, moves or deletes anything in the mailbox; writing
+back (read, archive, move) and sending come in a later release. A message larger than
+`CAMPBOOKS_CONNECTORS__MICROSOFT__MAX_MESSAGE_BYTES` (50 MiB) is skipped, and Microsoft's own
+throttling (`Retry-After`, honoured for up to an hour) shows the mailbox as throttled.
+
+**New mail as it arrives** (optional): with
+`CAMPBOOKS_CONNECTORS__MICROSOFT__NOTIFICATIONS=true`, each mailbox subscribes to Graph's
+change notifications, which Microsoft posts to `${CAMPBOOKS_PUBLIC_URL}/hooks/microsoft/mail`
+(e.g. `https://campbooks.example.com/hooks/microsoft/mail`). Nothing is registered in Entra
+for it, but the URL must be `https` with a public host name, reachable from the internet, and
+your proxy must forward `/hooks/*` to Campbooks: Microsoft checks it each time a subscription
+is made, and refuses the subscription when it cannot reach it. Subscriptions last about three
+days and are renewed by the mailbox's runs; while one is live the mailbox is polled only at
+`CAMPBOOKS_CONNECTORS__POLL__MAX_SECONDS`. The callback needs no sign-in: each subscription
+has its own random secret, which Campbooks keeps only as a keyed hash and checks on every
+notification, and a notification only makes that mailbox read early. Without the setting, or
+without such a URL (a warning at start), the mailboxes are polled as usual; nothing about
+notifications ever stops the server.
 
 Connecting needs the built-in sign-in: an install that sets `CAMPBOOKS_AUTH__ISSUER` to an
 outside issuer cannot connect mail. `connectors.start_connection` answers with the

@@ -97,3 +97,83 @@ async fn a_workspace_transaction_sees_only_its_workspace(db: PgPool) {
     assert_eq!(due, 0);
     tx.rollback().await.unwrap();
 }
+
+/// Microsoft subscriptions (campbooks-cloud#316): a workspace sees its own;
+/// the maintenance scope (the notification callback's) reads them across
+/// workspaces and changes none; nothing set, none.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn microsoft_subscriptions_are_isolated_and_only_read_across_workspaces(db: PgPool) {
+    let kit = Kit::with_microsoft_notifications(db).await;
+    let a = WorkspaceId::new();
+    let ana = kit.user("ana");
+    kit.join(&ana, a, Role::Member);
+    kit.connect_microsoft(&ana, a).await;
+    kit.run_jobs().await;
+    let b = WorkspaceId::new();
+
+    let app = testing::app_role_pool(&kit.db).await;
+    let mut tx = app.begin_for(a).await.unwrap();
+    assert_eq!(subscriptions(&mut tx).await, 1);
+    tx.rollback().await.unwrap();
+
+    let mut tx = app.begin_for(b).await.unwrap();
+    assert_eq!(subscriptions(&mut tx).await, 0);
+    let changed = sqlx::query("UPDATE connectors.microsoft_subscriptions SET retry_at = now()")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(changed.rows_affected(), 0);
+    tx.rollback().await.unwrap();
+
+    let mut tx = app.begin().await.unwrap();
+    assert_eq!(subscriptions(&mut tx).await, 0);
+    tx.rollback().await.unwrap();
+
+    let mut tx = campbooks_kernel::db::begin_maintenance(&app).await.unwrap();
+    assert_eq!(subscriptions(&mut tx).await, 1);
+    let changed = sqlx::query("UPDATE connectors.microsoft_subscriptions SET retry_at = now()")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(
+        changed.rows_affected(),
+        0,
+        "the maintenance scope only reads"
+    );
+    let deleted = sqlx::query("DELETE FROM connectors.microsoft_subscriptions")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(deleted.rows_affected(), 0);
+    tx.rollback().await.unwrap();
+
+    let mut tx = campbooks_kernel::db::begin_kernel(&app).await.unwrap();
+    assert_eq!(subscriptions(&mut tx).await, 0);
+    tx.rollback().await.unwrap();
+
+    // A row cannot pair one workspace's connection with another's stream.
+    let stream: uuid::Uuid =
+        sqlx::query_scalar("SELECT stream_id FROM connectors.microsoft_subscriptions")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    let forged = sqlx::query(
+        "INSERT INTO connectors.microsoft_subscriptions
+             (connection_id, workspace_id, stream_id, retry_at, updated_at)
+         VALUES ($1, $2, $3, now(), now())",
+    )
+    .bind(uuid::Uuid::now_v7())
+    .bind(b)
+    .bind(stream)
+    .execute(&kit.db)
+    .await;
+    assert!(forged.is_err());
+}
+
+/// The Microsoft subscriptions `conn` sees.
+async fn subscriptions(conn: &mut sqlx::PgConnection) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM connectors.microsoft_subscriptions")
+        .fetch_one(conn)
+        .await
+        .unwrap()
+}

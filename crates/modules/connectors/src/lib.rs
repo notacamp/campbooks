@@ -9,7 +9,8 @@
 //! **cursor**, run by one engine: a one-minute dispatcher over a due index,
 //! one bounded page per job, adaptive intervals, request budgets, and
 //! **health** (`ok`, `needs_reauth`, `throttled`, `failing`). **Adapters**
-//! read a page from a cursor; the Gmail and Zoho Mail adapters produce
+//! read a page from a cursor; the Gmail, Zoho Mail, IMAP and Microsoft
+//! adapters produce
 //! `MessageChangeBatch` v1 documents (`contracts/`) announced by
 //! `connectors.messages_changed`. Members' changes
 //! (`conversations.changes_requested`) are recorded as **outbound changes**
@@ -28,7 +29,9 @@
 //! `features/`, shared rules live in `domain/`, what the mail adapters share
 //! in `mail/`, Google's HTTP in `google/`, the Gmail adapter in `gmail/`,
 //! Zoho (HTTP and adapter) in `zoho/`, Microsoft's HTTP in `microsoft/`, and
-//! the IMAP adapter in `imap/`. The module is composed with its
+//! the IMAP adapter in `imap/`. Microsoft Graph's change notifications
+//! arrive at a public callback the server mounts beside the API
+//! ([`notifications_router`]). The module is composed with its
 //! dependencies ([`Deps`]): handlers reach them as an axum extension, jobs
 //! and consumers own a copy.
 
@@ -90,6 +93,15 @@ pub const NAME: &str = "connectors";
 
 /// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
 pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
+
+/// The public callback Microsoft Graph posts change notifications to
+/// (`POST /hooks/microsoft/mail`, campbooks-cloud#316), over `state` and
+/// `deps`, ready for the server to merge beside the module's API. Outside
+/// the operation catalogue; it answers 404 unless this instance takes
+/// Microsoft notifications.
+pub fn notifications_router(state: campbooks_kernel::AppState, deps: Deps) -> axum::Router {
+    features::microsoft_notifications::router(state, deps)
+}
 
 /// The connectors module, composed with `deps`, ready for the server to
 /// mount.

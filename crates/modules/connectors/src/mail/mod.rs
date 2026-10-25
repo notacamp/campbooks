@@ -124,12 +124,17 @@ pub enum Receiver {
     /// Any mailbox over IMAP: whoever runs its server, so no
     /// `Authentication-Results` is known to be its own.
     Imap,
+    /// Microsoft (Outlook.com, Microsoft 365), through Graph.
+    Microsoft,
 }
 
 impl Receiver {
     /// The authserv-ids the provider stamps its own results with. An id not
     /// listed here is not trusted, so an unknown one reads as no result at
     /// all.
+    ///
+    /// Microsoft trusts none yet, for the same reason as Zoho: nobody has
+    /// seen which authserv-ids its own results carry on a recorded message.
     ///
     /// Zoho trusts none yet: nobody has seen which `Authentication-Results`
     /// (if any, rather than only `ARC-Authentication-Results`) Zoho adds on
@@ -140,7 +145,7 @@ impl Receiver {
     pub const fn authserv_ids(self) -> &'static [&'static str] {
         match self {
             Self::Gmail => &["mx.google.com"],
-            Self::Zoho | Self::Imap => &[],
+            Self::Zoho | Self::Imap | Self::Microsoft => &[],
         }
     }
 }

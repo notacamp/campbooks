@@ -351,6 +351,9 @@ impl CalendarRequests for FakeCalendar {
     }
 }
 
+/// Where the kit's instance takes Graph's change notifications.
+pub const NOTIFICATION_URL: &str = "https://campbooks.example.com/hooks/microsoft/mail";
+
 /// The module over a fresh database, with a fake Google.
 pub struct Kit {
     /// The test database as its owner (no row-level security), for
@@ -396,11 +399,37 @@ impl Kit {
     /// The module as [`new`](Self::new), with Microsoft mail on against
     /// the fake Microsoft.
     pub async fn with_microsoft(db: PgPool) -> Self {
+        Self::with_config(db, Self::microsoft_config()).await
+    }
+
+    /// The module as [`with_microsoft`](Self::with_microsoft), taking
+    /// Graph's change notifications at [`NOTIFICATION_URL`].
+    pub async fn with_microsoft_notifications(db: PgPool) -> Self {
+        let mut config = Self::microsoft_config();
+        config.microsoft.notifications = Some("true".into());
+        Self::with_config(db, config).await
+    }
+
+    /// Microsoft mail on, the fake's budget never in the way.
+    pub fn microsoft_config() -> ConnectorsConfig {
         let mut config = ConnectorsConfig::default();
         config.zoho.requests_per_minute = 1_000_000;
         config.imap.enabled = false;
         config.microsoft.enabled = true;
-        Self::with_config(db, config).await
+        config.microsoft.requests_per_minute = Some("100000".into());
+        config
+    }
+
+    /// `POST uri` to the Microsoft notification callback, with `body`.
+    pub async fn hook(&self, uri: &str, body: &str) -> TestResponse {
+        let router = crate::notifications_router(self.state.clone(), self.deps.clone());
+        let request = Request::builder()
+            .method(Method::POST)
+            .uri(uri)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_owned()))
+            .unwrap();
+        testing::send(&router, request).await
     }
 
     /// The module with `config`.
@@ -413,18 +442,21 @@ impl Kit {
         let zoho = FakeZoho::start(clock.clone()).await;
         let microsoft = FakeMicrosoft::start().await;
         let microsoft_client = config.microsoft.enabled.then(|| {
-            Arc::new(
-                Microsoft::new(
-                    "microsoft-client-1".into(),
-                    ClientSecret::Inline(crate::testkit_microsoft::CLIENT_SECRET.into()),
-                    crate::microsoft::Endpoints::under(
-                        &microsoft.base(),
-                        crate::testkit_microsoft::TENANT,
-                    )
-                    .unwrap(),
+            let client = Microsoft::new(
+                "microsoft-client-1".into(),
+                ClientSecret::Inline(crate::testkit_microsoft::CLIENT_SECRET.into()),
+                crate::microsoft::Endpoints::under(
+                    &microsoft.base(),
+                    crate::testkit_microsoft::TENANT,
                 )
                 .unwrap(),
             )
+            .unwrap();
+            Arc::new(if config.microsoft.adapter().notifications {
+                client.with_notifications(url::Url::parse(NOTIFICATION_URL).unwrap())
+            } else {
+                client
+            })
         });
         let deps = Deps {
             config: Arc::new(config),

@@ -1,15 +1,24 @@
 //! Microsoft: the identity platform's token endpoint and Microsoft Graph,
 //! as this module calls them. The only code here that speaks HTTP to
-//! Microsoft (campbooks-cloud#315; reading mail is #316).
+//! Microsoft (campbooks-cloud#315), and the messages adapter (#316:
+//! `read.rs`, `state.rs`, change notifications in `subscriptions.rs`).
 //!
 //! The consent itself is the identity module's front door. This refreshes a
-//! connection's access token at the mail tenant's token endpoint and reads
-//! Graph `/me`, which names the mailbox a grant reaches. Hosts are
+//! connection's access token at the mail tenant's token endpoint, reads
+//! Graph `/me`, which names the mailbox a grant reaches, and reads mail
+//! (`graph.rs`: folders, delta, `$value`, subscriptions). Hosts are
 //! constants (`login.microsoftonline.com`, `graph.microsoft.com`), the
 //! tenant a checked setting; nothing in a request or an answer builds a
-//! URL. Calls follow no redirect, time out after [`CALL_TIMEOUT`] and read
-//! at most [`MAX_ANSWER_BYTES`]. Errors never carry a token, a code or an
+//! URL (ids are validated path segments; of Graph's links only their token
+//! is kept). Calls follow no redirect, time out after [`CALL_TIMEOUT`] and
+//! read at most [`MAX_ANSWER_BYTES`] (a listing [`graph::LIST_ANSWER_BYTES`],
+//! a message its size limit). Errors never carry a token, a code or an
 //! answer's body.
+
+pub mod graph;
+pub mod read;
+pub mod state;
+pub mod subscriptions;
 
 use std::time::Duration;
 
@@ -45,6 +54,37 @@ pub const CALL_TIMEOUT: Duration = Duration::from_secs(15);
 /// The largest answer read from Microsoft (a token answer or `/me` is a
 /// few kilobytes).
 pub const MAX_ANSWER_BYTES: usize = 64 * 1024;
+
+/// The longest `Retry-After` honoured: a longer one waits this long.
+pub const MAX_RETRY_AFTER: Duration = Duration::from_hours(1);
+
+/// Where Graph's change notifications are posted, under the instance's
+/// public URL.
+pub const NOTIFICATION_PATH: &str = "/hooks/microsoft/mail";
+
+/// The URL Graph posts this instance's change notifications to, when
+/// `public_url` (`CAMPBOOKS_PUBLIC_URL`) can take them: `https`, a host
+/// name (not an address, not `localhost`), no credentials, query or
+/// fragment.
+pub fn notification_url(public_url: &str) -> Option<Url> {
+    let base = Url::parse(public_url.trim()).ok()?;
+    let named = match base.host() {
+        Some(url::Host::Domain(host)) => {
+            let host = host.to_ascii_lowercase();
+            host.contains('.') && host != "localhost" && !host.ends_with(".localhost")
+        }
+        _ => false,
+    };
+    let plain = base.username().is_empty()
+        && base.password().is_none()
+        && base.query().is_none()
+        && base.fragment().is_none();
+    if base.scheme() != "https" || !named || !plain {
+        return None;
+    }
+    let root = base.as_str().trim_end_matches('/');
+    Url::parse(&format!("{root}{NOTIFICATION_PATH}")).ok()
+}
 
 /// The tenant of a mail connection when neither
 /// `CAMPBOOKS_CONNECTORS__MICROSOFT__TENANT` nor sign-in's
@@ -169,6 +209,9 @@ pub struct Microsoft {
     client_id: String,
     client_secret: ClientSecret,
     endpoints: Endpoints,
+    /// Where Graph posts change notifications, when this instance takes
+    /// them ([`notification_url`]); `None`: its mailboxes are polled.
+    notifications: Option<Url>,
 }
 
 impl Microsoft {
@@ -184,7 +227,21 @@ impl Microsoft {
             client_id,
             client_secret,
             endpoints,
+            notifications: None,
         })
+    }
+
+    /// This client, with Graph posting change notifications to `url`.
+    #[must_use]
+    pub fn with_notifications(mut self, url: Url) -> Self {
+        self.notifications = Some(url);
+        self
+    }
+
+    /// Where Graph posts change notifications, when this instance takes
+    /// them.
+    pub fn notification_url(&self) -> Option<&Url> {
+        self.notifications.as_ref()
     }
 
     /// A fresh access token for `refresh_token`, at the mail tenant's token
@@ -217,7 +274,7 @@ impl Microsoft {
             .map_err(transport)?;
         let status = response.status();
         let headers = response.headers().clone();
-        let body = bounded(response).await?;
+        let body = bounded(response, MAX_ANSWER_BYTES).await?;
         if !status.is_success() {
             return Err(token_failure(status, &headers, &body));
         }
@@ -257,7 +314,7 @@ impl Microsoft {
             .map_err(transport)?;
         let status = response.status();
         let headers = response.headers().clone();
-        let body = bounded(response).await?;
+        let body = bounded(response, MAX_ANSWER_BYTES).await?;
         if !status.is_success() {
             return Err(graph_failure(status, &headers, &body));
         }
@@ -317,24 +374,38 @@ impl MeAnswer {
     }
 }
 
-/// An answer's body, refused above [`MAX_ANSWER_BYTES`].
-async fn bounded(mut response: reqwest::Response) -> Result<Vec<u8>, ProviderError> {
-    let too_large = || ProviderError::Unexpected("the answer is too large".to_owned());
-    let limit = u64::try_from(MAX_ANSWER_BYTES).unwrap_or(u64::MAX);
+/// An answer's body, refused above `limit` bytes.
+async fn bounded(response: reqwest::Response, limit: usize) -> Result<Vec<u8>, ProviderError> {
+    within(response, limit)
+        .await?
+        .ok_or_else(|| ProviderError::Unexpected("the answer is too large".to_owned()))
+}
+
+/// An answer's body, or `None` once it is over `limit` bytes (stated or
+/// sent): what is over is never read.
+async fn within(
+    mut response: reqwest::Response,
+    limit: usize,
+) -> Result<Option<Vec<u8>>, ProviderError> {
     if response
         .content_length()
-        .is_some_and(|length| length > limit)
+        .is_some_and(|length| length > u64::try_from(limit).unwrap_or(u64::MAX))
     {
-        return Err(too_large());
+        return Ok(None);
     }
     let mut body = Vec::new();
     while let Some(chunk) = response.chunk().await.map_err(transport)? {
-        if body.len() + chunk.len() > MAX_ANSWER_BYTES {
-            return Err(too_large());
+        if body.len().saturating_add(chunk.len()) > limit {
+            return Ok(None);
         }
         body.extend_from_slice(&chunk);
     }
-    Ok(body)
+    Ok(Some(body))
+}
+
+/// The `Retry-After` of an answer, at most [`MAX_RETRY_AFTER`].
+fn capped_retry_after(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
+    retry_after(headers).map(|wait| wait.min(MAX_RETRY_AFTER))
 }
 
 /// A token endpoint's error answer (RFC 6749 §5.2, with Microsoft's
@@ -402,7 +473,7 @@ fn token_failure(
 ) -> ProviderError {
     if throttled(status, headers) {
         return ProviderError::RateLimited {
-            retry_after: retry_after(headers),
+            retry_after: capped_retry_after(headers),
         };
     }
     let answer = serde_json::from_slice::<TokenError>(body).ok();
@@ -437,7 +508,7 @@ fn graph_failure(
     }
     if throttled(status, headers) {
         return ProviderError::RateLimited {
-            retry_after: retry_after(headers),
+            retry_after: capped_retry_after(headers),
         };
     }
     match status {
