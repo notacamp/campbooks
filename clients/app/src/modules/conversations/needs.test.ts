@@ -251,7 +251,7 @@ describe("needs in words", () => {
       { locale: "en" },
     );
     expect(sentence).toBe(
-      'needs.unsure.lineCc{"name":"Ana Costa","others":"needs.unsure.more{\\"names\\":\\"Rui Matos, Inês Cardoso\\",\\"count\\":1}"}',
+      String.raw`needs.unsure.lineCc{"name":"Ana Costa","others":"needs.unsure.more{\"names\":\"Rui Matos, Inês Cardoso\",\"count\":1}"}`,
     );
   });
 

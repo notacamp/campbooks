@@ -550,6 +550,29 @@ export const TIAGO_DETAIL: Detail = {
  * the 90% a reply needs to count as sure, so it asks whose move it is. Not
  * among NEEDS.
  */
+const COPIED_NEED: Need = {
+  reason: "review",
+  trust: "check",
+  basis: "model",
+  question: "needs_reply",
+  rule: "model.decide",
+  due_on: null,
+  overdue: false,
+  urgent: false,
+  message_id: `0192f1a0-0000-7000-8000-${hex(0x20_30)}`,
+  sent_at: "2026-10-04T09:40:00Z",
+  quote: null,
+  unsure: {
+    others: [{ name: "Águas do Ribatejo", address: "geral@aguas-ribatejo.example" }],
+    in_to: false,
+    in_cc: true,
+    party: { name: "Águas do Ribatejo", address: "geral@aguas-ribatejo.example" },
+    unanswered_days: 9,
+    confidence: 85,
+    sure_bar: 90,
+  },
+};
+
 export const COPIED: Summary = {
   ...base,
   id: `0192f1a0-0000-7000-8000-${hex(0x10_30)}`,
@@ -559,28 +582,7 @@ export const COPIED: Summary = {
   unread_count: 1,
   latest_from: { name: "Ana Costa", address: "ana@costa-arquitetos.example" },
   snippet: "Could you confirm the reading by Friday?",
-  need: {
-    reason: "review",
-    trust: "check",
-    basis: "model",
-    question: "needs_reply",
-    rule: "model.decide",
-    due_on: null,
-    overdue: false,
-    urgent: false,
-    message_id: `0192f1a0-0000-7000-8000-${hex(0x20_30)}`,
-    sent_at: "2026-10-04T09:40:00Z",
-    quote: null,
-    unsure: {
-      others: [{ name: "Águas do Ribatejo", address: "geral@aguas-ribatejo.example" }],
-      in_to: false,
-      in_cc: true,
-      party: { name: "Águas do Ribatejo", address: "geral@aguas-ribatejo.example" },
-      unanswered_days: 9,
-      confidence: 85,
-      sure_bar: 90,
-    },
-  },
+  need: COPIED_NEED,
 };
 
 export const COPIED_ITEM: Item = item(COPIED, {
@@ -629,7 +631,7 @@ export const COPIED_DETAIL: Detail = {
 export const COPIED_WAITING: Summary = {
   ...COPIED,
   need: {
-    ...(COPIED.need as Need),
+    ...COPIED_NEED,
     reason: "waiting",
     trust: "sure",
     basis: "member",

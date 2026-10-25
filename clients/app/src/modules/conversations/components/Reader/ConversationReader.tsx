@@ -201,6 +201,49 @@ export function ConversationReader({
   // once still to pay, Mark paid is its Done.
   const bill = need !== undefined && billKind(need) === "ask";
   const toPay = need !== undefined && billKind(need) === "toPay";
+  // Scout isn't sure whose move it is: Nudge the person it went to, Reply, or Nothing for me.
+  const unsureChoice =
+    conversation === undefined || need === undefined || unsure === undefined
+      ? undefined
+      : {
+          prompt: unsureNote(t, unsure),
+          options: [
+            ...(unsureParty === undefined
+              ? []
+              : [
+                  {
+                    label: t("needs.actions.nudgeParty", {
+                      name: firstName(displayName(unsureParty)),
+                    }),
+                    ...choiceKey("item.choice1"),
+                    onSelect: () => {
+                      needActions.waitOn(conversation, {
+                        address: unsureParty.address,
+                        name: displayName(unsureParty),
+                      });
+                    },
+                  },
+                ]),
+            {
+              label: t("needs.actions.replyTo", {
+                name: firstName(needSender(need, conversation)),
+              }),
+              ...choiceKey(unsureParty === undefined ? "item.choice1" : "item.choice2"),
+              onSelect: () => {
+                // Yes first, so the reply corrects what Scout was unsure of.
+                needActions.confirm(conversation);
+                openReply();
+              },
+            },
+            {
+              label: t("needs.actions.nothingForMe"),
+              ...choiceKey(unsureParty === undefined ? "item.choice2" : "item.choice3"),
+              onSelect: () => {
+                needActions.notNeeded(conversation);
+              },
+            },
+          ],
+        };
 
   const [opened, setOpened] = useState<Set<string>>(new Set());
   // Messages "N more messages" showed (folded) in its place.
@@ -824,69 +867,25 @@ export function ConversationReader({
                           },
                         ],
                       }
-                    : unsure !== undefined
-                      ? {
-                          prompt: unsureNote(t, unsure),
-                          options: [
-                            ...(unsureParty === undefined
-                              ? []
-                              : [
-                                  {
-                                    label: t("needs.actions.nudgeParty", {
-                                      name: firstName(displayName(unsureParty)),
-                                    }),
-                                    ...choiceKey("item.choice1"),
-                                    onSelect: () => {
-                                      needActions.waitOn(conversation, {
-                                        address: unsureParty.address,
-                                        name: displayName(unsureParty),
-                                      });
-                                    },
-                                  },
-                                ]),
-                            {
-                              label: t("needs.actions.replyTo", {
-                                name: firstName(needSender(need, conversation)),
-                              }),
-                              ...choiceKey(
-                                unsureParty === undefined ? "item.choice1" : "item.choice2",
-                              ),
-                              onSelect: () => {
-                                // Yes first, so the reply corrects what Scout was unsure of.
-                                needActions.confirm(conversation);
-                                openReply();
-                              },
+                    : (unsureChoice ?? {
+                        prompt: t("needs.actions.questionPrompt"),
+                        options: [
+                          {
+                            label: t("needs.actions.yes"),
+                            ...choiceKey("item.choice1"),
+                            onSelect: () => {
+                              needActions.confirm(conversation);
                             },
-                            {
-                              label: t("needs.actions.nothingForMe"),
-                              ...choiceKey(
-                                unsureParty === undefined ? "item.choice2" : "item.choice3",
-                              ),
-                              onSelect: () => {
-                                needActions.notNeeded(conversation);
-                              },
+                          },
+                          {
+                            label: t("needs.actions.no"),
+                            ...choiceKey("item.choice2"),
+                            onSelect: () => {
+                              needActions.notNeeded(conversation);
                             },
-                          ],
-                        }
-                      : {
-                          prompt: t("needs.actions.questionPrompt"),
-                          options: [
-                            {
-                              label: t("needs.actions.yes"),
-                              ...choiceKey("item.choice1"),
-                              onSelect: () => {
-                                needActions.confirm(conversation);
-                              },
-                            },
-                            {
-                              label: t("needs.actions.no"),
-                              ...choiceKey("item.choice2"),
-                              onSelect: () => {
-                                needActions.notNeeded(conversation);
-                              },
-                            },
-                          ],
-                        },
+                          },
+                        ],
+                      }),
                   // A bill can also be not needed (X): shown, as every key is.
                   ...(bill
                     ? {

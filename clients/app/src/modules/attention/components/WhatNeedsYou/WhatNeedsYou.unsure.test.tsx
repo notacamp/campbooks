@@ -134,7 +134,7 @@ describe("What needs you: Scout isn't sure", () => {
     const labels = row.getAllByRole("button").map((b) => b.textContent);
     expect(labels[0]).toMatch(/^Reply to Ana…/u);
     expect(labels[1]).toMatch(/^Nothing for me/u);
-    expect(labels.some((label) => /^Nudge/u.test(label ?? ""))).toBe(false);
+    expect(labels.some((label) => label.startsWith("Nudge"))).toBe(false);
   });
 
   it("offers nothing to write in an inbox the member only reads", async () => {
@@ -142,7 +142,7 @@ describe("What needs you: Scout isn't sure", () => {
     renderHome();
     const row = await selected();
     const labels = row.getAllByRole("button").map((b) => b.textContent);
-    expect(labels.some((label) => /^(Nudge|Reply|Nothing)/u.test(label ?? ""))).toBe(false);
+    expect(labels.some((label) => /^(Nudge|Reply|Nothing)/u.test(label))).toBe(false);
     expect(labels[0]).toMatch(/^Snooze…/u);
   });
 
