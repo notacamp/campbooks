@@ -12,7 +12,7 @@ changelog:
   - date: "2026-10-25"
     plan_version: 9
     change: "The schedule module instrumented (campbooks-cloud#349): 16 events for events of a calendar created, edited (which fields), moved (the times before), cancelled by a later email, deleted, restored, answered (the answer before), pushed to a provider calendar and unpushed, calendars added by a grant, enabled, disabled, recoloured and removed with their connection, settings updated (which settings), and one summary per batch of a provider's changes applied (counts); records calendar_event, calendar_event_times, calendar and settings; Coverage for every operation, job and handler of the module, apply_outcome and release_delete naming connectors.calendar_change_completed."
-    pr: ""
+    pr: "#663"
 
 events:
   - name: "schedule.calendar_event_created"
