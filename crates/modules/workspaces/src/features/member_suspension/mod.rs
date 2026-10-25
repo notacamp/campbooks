@@ -170,7 +170,10 @@ pub(crate) async fn publish(
     suspension::announce(&state.events, &mut tx, &workspace.to_string(), user, change).await?;
     // Listed under the user's lock, so still a member; one who is not any
     // more has nothing to track.
-    if fresh && let Some(member) = tracked::member(&mut tx, workspace, user).await? {
+    if fresh && let Some(mut member) = tracked::member(&mut tx, workspace, user).await? {
+        // The user's row is changed in the job's transaction, which has not
+        // committed yet: this one still reads the state before.
+        member.suspended = change.suspended;
         if change.suspended {
             state
                 .tracker
