@@ -15,8 +15,9 @@
 //!
 //! A Microsoft stream (`microsoft::read`) reads each folder's Graph delta,
 //! after making sure of its change-notification subscription where the
-//! instance takes them (`microsoft::subscriptions`); while one is live, its
-//! next poll is the longest interval.
+//! instance takes them (`microsoft::subscriptions`) and making its pending
+//! changes (`microsoft::write`, at most 50 messages' a run); while a
+//! subscription is live, its next poll is the longest interval.
 //!
 //! An IMAP stream (`imap::read`) reads over one session to its server,
 //! holding one of the host's few session slots, and keeps where each
@@ -214,6 +215,13 @@ impl JobHandler for SyncStream {
             now,
         )
         .await?;
+        // A Microsoft run writes a bounded part; the rest is newer, so the
+        // run is followed by another at once.
+        let backlog = if target.provider == Provider::Microsoft {
+            microsoft::write::bounded(&backlog)
+        } else {
+            backlog
+        };
         let read = match target.provider {
             Provider::Google => {
                 self.run_gmail(ctx, workspace, &target, &token, &backlog, now)
@@ -224,7 +232,7 @@ impl JobHandler for SyncStream {
                     .await
             }
             Provider::Microsoft => {
-                self.run_microsoft(ctx, workspace, &target, &token, now)
+                self.run_microsoft(ctx, workspace, &target, &token, &backlog, now)
                     .await
             }
             Provider::Imap => Ok(None),
@@ -326,8 +334,8 @@ impl SyncStream {
                      VALUES ($1, $2, $3, $4, now())
                      ON CONFLICT (stream_id, label_id) DO UPDATE SET name = EXCLUDED.name",
                 ),
-                // IMAP has no label cache (its stream folders are in the cursor),
-                // and nothing is written to Microsoft yet.
+                // IMAP and Microsoft have no label cache (their stream
+                // folders are in the cursor), and create no mark.
                 Provider::Imap | Provider::Microsoft => continue,
             };
             insert
@@ -676,12 +684,13 @@ impl SyncStream {
     }
 
     /// A Microsoft run: the connection's budget, its subscription to change
-    /// notifications where this instance takes them, then one page of every
-    /// folder's delta. `None` once the run has ended without a page
-    /// (waiting, trouble recorded). Nothing is written to Microsoft.
+    /// notifications where this instance takes them, `backlog`'s changes
+    /// (recorded before anything is read), then one page of every folder's
+    /// delta. `None` once the run has ended without a page (waiting, trouble
+    /// recorded).
     #[allow(
         clippy::too_many_lines,
-        reason = "one run read top to bottom: budget, subscription, read"
+        reason = "one run read top to bottom: budget, subscription, push, read"
     )]
     async fn run_microsoft(
         &self,
@@ -689,12 +698,13 @@ impl SyncStream {
         workspace: WorkspaceId,
         target: &Target,
         token: &str,
+        backlog: &Backlog,
         now: DateTime<Utc>,
     ) -> Result<Option<RunPage>, JobError> {
         let Some(client) = self.deps.microsoft.clone() else {
             return Ok(None);
         };
-        let cursor: microsoft::state::Cursor = serde_json::from_value(target.cursor.clone())
+        let mut cursor: microsoft::state::Cursor = serde_json::from_value(target.cursor.clone())
             .map_err(|e| {
                 JobError::fatal(format!(
                     "stream {} has an unreadable cursor: {}",
@@ -706,7 +716,8 @@ impl SyncStream {
         let cost = microsoft::read::requests_per_run(
             cursor.folders.len(),
             microsoft::read::lists_folders(&cursor, now),
-        );
+        )
+        .saturating_add(microsoft::write::requests(Self::messages(backlog)));
         let key = schedule::microsoft_budget(target.connection);
         let rate = Rate::per_minute(settings.requests_per_minute);
         if let Err(wait) = schedule::take(ctx.pool(), &key, cost, rate).await? {
@@ -741,6 +752,32 @@ impl SyncStream {
             );
         }
         let notified = ensured.live;
+        if backlog.last().is_some() {
+            // Made, and recorded, before the read: the read never takes our
+            // writes for Graph's.
+            let pushed = microsoft::write::push(&client, token, backlog, &cursor).await;
+            for id in pushed.lookups {
+                if !cursor.lookups.contains(&id) {
+                    cursor.lookups.push(id);
+                }
+            }
+            if pushed.relist {
+                cursor.listed_at = None;
+            }
+            if let Some(err) = Self::record_push(
+                ctx,
+                workspace,
+                target,
+                Provider::Microsoft,
+                pushed.push,
+                now,
+            )
+            .await?
+            {
+                self.trouble(ctx, workspace, target, &err, now).await?;
+                return Ok(None);
+            }
+        }
         let reader = microsoft::read::Reader {
             microsoft: &client,
             token,
@@ -2253,5 +2290,7 @@ mod imap_tests;
 mod imap_write_tests;
 #[cfg(test)]
 mod microsoft_tests;
+#[cfg(test)]
+mod microsoft_write_tests;
 #[cfg(test)]
 mod tests;

@@ -135,6 +135,20 @@ impl Cursor {
         self.folder(id).is_some() || self.skipped.iter().any(|s| s == id)
     }
 
+    /// The first folder read with `role`.
+    pub fn folder_of_role(&self, role: Role) -> Option<&Folder> {
+        self.folders.iter().find(|f| f.role == role)
+    }
+
+    /// The stream folder read for `stream` (`Campbooks/<Stream>`, under any
+    /// parent), the first by name when there are several.
+    pub fn stream_folder(&self, stream: ProviderStream) -> Option<&Folder> {
+        self.folders
+            .iter()
+            .filter(|f| f.role == Role::Stream && marks::of_name(&f.display) == Some(stream))
+            .min_by(|a, b| a.display.cmp(&b.display).then_with(|| a.id.cmp(&b.id)))
+    }
+
     /// The stream that folder `id` files, when it is a stream folder read.
     fn stream_of(&self, id: &str) -> Option<ProviderStream> {
         self.folder(id)
@@ -189,6 +203,33 @@ pub fn tokens(cursor: &Cursor, folder: &str, state: &MessageState) -> Vec<String
     tokens.sort();
     tokens.dedup();
     tokens
+}
+
+/// `tokens` as an outbound change's plan sees them (`write.rs`,
+/// campbooks-cloud#317): read (`UNREAD`) and starred as they are; `INBOX`
+/// in the Inbox or a stream folder; `TRASH` in Deleted Items; `SPAM` in Junk
+/// Email; and the mark (`mark:updates`) of each stream its stream folder or
+/// a stream category says. Sorted.
+pub fn view(tokens: &[String], cursor: &Cursor) -> Vec<String> {
+    let has = |token: &str| tokens.iter().any(|t| t == token);
+    let mut view = Vec::new();
+    for token in [UNREAD, STARRED] {
+        if has(token) {
+            view.push(token.to_owned());
+        }
+    }
+    if has(Role::Inbox.token()) || has(Role::Stream.token()) {
+        view.push("INBOX".to_owned());
+    }
+    if has(Role::Trash.token()) {
+        view.push("TRASH".to_owned());
+    }
+    if has(Role::Junk.token()) {
+        view.push("SPAM".to_owned());
+    }
+    view.extend(streams_in(tokens, cursor).into_iter().map(marks::token));
+    view.sort();
+    view
 }
 
 /// The streams `tokens` mark: a stream folder's, and a category named like
@@ -360,6 +401,34 @@ mod tests {
             &cursor,
         );
         assert_eq!(both.provider_stream, Some(None));
+    }
+
+    #[test]
+    fn the_plan_sees_the_inbox_the_bins_and_the_marks() {
+        let cursor = cursor();
+        let view_of =
+            |folder: &str, state: &MessageState| view(&tokens(&cursor, folder, state), &cursor);
+        assert_eq!(
+            view_of("in", &state(false, true, &["Red"])),
+            ["INBOX", "STARRED", "UNREAD"]
+        );
+        assert_eq!(
+            view_of("st", &state(true, false, &[])),
+            ["INBOX", "mark:updates"]
+        );
+        assert_eq!(
+            view_of("in", &state(true, false, &["Campbooks/Receipts"])),
+            ["INBOX", "mark:receipts"]
+        );
+        assert_eq!(view_of("tr", &state(true, false, &[])), ["TRASH"]);
+        assert_eq!(view_of("ju", &state(true, false, &[])), ["SPAM"]);
+        assert!(view_of("ar", &state(true, false, &[])).is_empty());
+        assert_eq!(cursor.folder_of_role(Role::Archive).unwrap().id, "ar");
+        assert_eq!(
+            cursor.stream_folder(ProviderStream::Updates).unwrap().id,
+            "st"
+        );
+        assert!(cursor.stream_folder(ProviderStream::Receipts).is_none());
     }
 
     #[test]

@@ -31,7 +31,7 @@ use crate::{
         schedule,
     },
     events::{ChangesRequested, RequestedItem},
-    imap, zoho,
+    imap, microsoft, zoho,
 };
 
 /// Records a member's changes for the connector to make.
@@ -114,9 +114,11 @@ impl EventConsumer for RequestChanges {
         .await?;
         let mut pending = 0;
         let mut recorded = Vec::new();
+        // Microsoft mail turned off: nothing is written to Microsoft.
+        let offered = target.provider != Provider::Microsoft || self.deps.microsoft.is_some();
         for item in items {
             let (state, reason, add, remove) =
-                outcome(target.provider, &item.change, known.as_ref());
+                outcome(target.provider, &item.change, known.as_ref(), offered);
             let id = Uuid::now_v7();
             let inserted = sqlx::query!(
                 r#"INSERT INTO connectors.outbound_changes
@@ -240,27 +242,29 @@ async fn destination_of(
 
 /// How `change` is recorded for `provider` (`known`: the provider's user
 /// labels other than stream marks; `None` for a Zoho grant without the
-/// labels scope): its state, the reason when it is not pending, and the
-/// labels to add and remove. Defence in depth: only the flag labels,
-/// categories, stream marks and user labels (Gmail), read, flag, inbox,
-/// labels and stream marks (Zoho), or read, flag, inbox, trash, spam and
-/// stream marks (IMAP), are ever written.
+/// labels scope; `offered`: the instance offers the provider's mail, false
+/// only for Microsoft with Microsoft mail off): its state, the reason when
+/// it is not pending, and the labels to add and remove. Defence in depth:
+/// only the flag labels, categories, stream marks and user labels (Gmail),
+/// read, flag, inbox, labels and stream marks (Zoho), or read, flag, inbox,
+/// trash, spam and stream marks (IMAP and Microsoft), are ever written.
 fn outcome(
     provider: Provider,
     change: &crate::events::RequestedChange,
     known: Option<&HashSet<String>>,
+    offered: bool,
 ) -> (State, Option<&'static str>, Vec<String>, Vec<String>) {
     let writable = |label: &str| match provider {
         Provider::Google => outbound::writable(label),
         Provider::Zoho => zoho::state::writable(label),
         Provider::Imap => imap::write::writable(label),
-        // Nothing is written to Microsoft yet (campbooks-cloud#317).
-        Provider::Microsoft => false,
+        Provider::Microsoft => microsoft::write::writable(label),
     };
     let mapped = match provider {
         Provider::Google => outbound::map(change, known.unwrap_or(&HashSet::new())),
         Provider::Zoho => outbound::map_zoho(change, known),
         Provider::Imap => outbound::map_imap(change),
+        Provider::Microsoft if offered => outbound::map_microsoft(change),
         Provider::Microsoft => Mapped::Skip("unsupported"),
     };
     match mapped {

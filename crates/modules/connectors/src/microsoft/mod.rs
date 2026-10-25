@@ -1,12 +1,15 @@
 //! Microsoft: the identity platform's token endpoint and Microsoft Graph,
 //! as this module calls them. The only code here that speaks HTTP to
 //! Microsoft (campbooks-cloud#315), and the messages adapter (#316:
-//! `read.rs`, `state.rs`, change notifications in `subscriptions.rs`).
+//! `read.rs`, `state.rs`, change notifications in `subscriptions.rs`; #317:
+//! the member's changes in `write.rs`).
 //!
 //! The consent itself is the identity module's front door. This refreshes a
 //! connection's access token at the mail tenant's token endpoint, reads
-//! Graph `/me`, which names the mailbox a grant reaches, and reads mail
-//! (`graph.rs`: folders, delta, `$value`, subscriptions). Hosts are
+//! Graph `/me`, which names the mailbox a grant reaches, reads mail
+//! (`graph.rs`: folders, delta, `$value`, subscriptions), and changes and
+//! sends it (`graph_write.rs`: a patch checked against the message's
+//! version, a move, `sendMail`; never a delete). Hosts are
 //! constants (`login.microsoftonline.com`, `graph.microsoft.com`), the
 //! tenant a checked setting; nothing in a request or an answer builds a
 //! URL (ids are validated path segments; of Graph's links only their token
@@ -16,9 +19,11 @@
 //! answer's body.
 
 pub mod graph;
+pub mod graph_write;
 pub mod read;
 pub mod state;
 pub mod subscriptions;
+pub mod write;
 
 use std::time::Duration;
 

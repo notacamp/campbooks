@@ -95,8 +95,8 @@ reads the new id as new.
 - **THEN** Graph answers 412, the push reads the message again, patches it with the new etag, and the change ends `applied`
 
 #### Scenario: Graph's later change wins
-- **WHEN** a member stars a message and then takes the star off again, and before the run the message was flagged in Outlook after the last read
-- **THEN** the change ends `superseded` (`changed_at_provider`), the flag stays, and the message is announced flagged
+- **WHEN** a member deletes a message that was moved to Junk Email in Outlook after the last read
+- **THEN** nothing is moved, the change ends `superseded` (`changed_at_provider`), and the message is announced as spam
 
 #### Scenario: Graph already did it
 - **WHEN** a member marks a message read that was marked read in Outlook after the last read

@@ -8,7 +8,8 @@
 //! `@odata.deltaLink` only the `$skiptoken` or `$deltatoken` is kept: an
 //! answer never chooses where the next request goes. Message ids are
 //! Graph's immutable ids (`Prefer: IdType="ImmutableId"`), so a move keeps
-//! a message's id. Nothing here changes, moves or deletes mail.
+//! a message's id. Nothing here changes, moves or deletes mail: what writes
+//! (a patch, a move, a send) is `graph_write.rs` (campbooks-cloud#317).
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::Deserialize;
@@ -42,11 +43,11 @@ pub const MAX_CATEGORY: usize = 255;
 pub const MAX_CATEGORIES: usize = 50;
 
 /// What a delta page asks Graph to say of each message.
-const SELECT: &str = "id,parentFolderId,conversationId,receivedDateTime,isRead,isDraft,flag,\
+pub(super) const SELECT: &str = "id,parentFolderId,conversationId,receivedDateTime,isRead,isDraft,flag,\
                       categories";
 
 /// The `Prefer` header of every call about messages.
-const PREFER: &str = "odata.maxpagesize=50, IdType=\"ImmutableId\"";
+pub(super) const PREFER: &str = "odata.maxpagesize=50, IdType=\"ImmutableId\"";
 
 /// Error codes Graph answers when it no longer has a delta's state.
 const EXPIRED_CODES: [&str; 3] = ["syncStateNotFound", "resyncRequired", "syncStateInvalid"];
@@ -210,7 +211,7 @@ pub fn valid_subscription_id(id: &str) -> bool {
 
 impl Microsoft {
     /// The Graph URL of `segments`, each a path segment (encoded).
-    fn graph_url(&self, segments: &[&str]) -> Result<Url, ProviderError> {
+    pub(super) fn graph_url(&self, segments: &[&str]) -> Result<Url, ProviderError> {
         let mut url = self.endpoints.graph.clone();
         url.path_segments_mut()
             .map_err(|()| ProviderError::Unexpected("the Graph URL has no path".to_owned()))?
@@ -220,7 +221,12 @@ impl Microsoft {
     }
 
     /// GET `url`: its body, at most `limit` bytes, or the Graph error.
-    async fn get(&self, url: Url, token: &str, limit: usize) -> Result<Vec<u8>, ProviderError> {
+    pub(super) async fn get(
+        &self,
+        url: Url,
+        token: &str,
+        limit: usize,
+    ) -> Result<Vec<u8>, ProviderError> {
         let response = self
             .http
             .get(url)
@@ -577,9 +583,9 @@ fn token_of(link: &str, name: &str) -> Option<String> {
 
 /// A message, as Graph answers it.
 #[derive(Deserialize)]
-struct ItemAnswer {
+pub(super) struct ItemAnswer {
     #[serde(default)]
-    id: Option<String>,
+    pub(super) id: Option<String>,
     #[serde(default, rename = "@removed")]
     removed: Option<serde::de::IgnoredAny>,
     #[serde(default, rename = "parentFolderId")]
@@ -596,6 +602,12 @@ struct ItemAnswer {
     flag: Option<FlagAnswer>,
     #[serde(default)]
     categories: Option<Vec<String>>,
+    /// Its version (`W/"<changeKey>"`), when asked for (`graph_write.rs`).
+    #[serde(default, rename = "@odata.etag")]
+    pub(super) etag: Option<String>,
+    /// Its `changeKey`, when asked for.
+    #[serde(default, rename = "changeKey")]
+    pub(super) change_key: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -605,7 +617,7 @@ struct FlagAnswer {
 }
 
 impl ItemAnswer {
-    fn state(self) -> MessageState {
+    pub(super) fn state(self) -> MessageState {
         let mut categories: Vec<String> = self
             .categories
             .unwrap_or_default()
