@@ -26,8 +26,9 @@ presets and is in the snapshot.
 that workspace (`begin_for`, the purge job's `tx()`). Signup requests and
 signup codes belong to no workspace, so their events are instance-wide,
 written from the user's or the administrator's transaction; minting and
-revoking a code now run in a transaction of their own (they ran on the
-pool) so the event commits with the change. A code is redeemed in the
+revoking a code now run in an administrator's transaction (`begin_admin`,
+as deciding a request does; they ran on the pool) so the event commits with
+the change. A code is redeemed in the
 transaction that creates the workspace, where the tracker refuses an
 instance-wide event, so `signup_code_redeemed` is workspace-scoped: the
 workspace the code opened.
