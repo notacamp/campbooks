@@ -25,4 +25,4 @@
 ## 5. Finish
 - [x] 5.1 OpenAPI, events and tracking plan unchanged (CI's drift checks); no Coverage row added
 - [x] 5.2 Changelog entry `changelog/unreleased/added/313-imap-send.md` (still off by default)
-- [ ] 5.3 Gates green in CI; recording
+- [x] 5.3 Gates green in CI; recording
