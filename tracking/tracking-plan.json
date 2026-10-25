@@ -83,7 +83,7 @@
       "change": "The admin module instrumented (campbooks-cloud#331): 2 instance-wide events for an administrator's profile granted (created or given more permissions) and revoked (permissions taken away or the profile removed) by the server's admin command, as system; record profile and enum permission; no Coverage rows (the module serves no operation and runs no job, schedule or handler).",
       "date": "2026-10-25",
       "plan_version": 8,
-      "pr": ""
+      "pr": "#662"
     }
   ],
   "coverage": [
