@@ -214,6 +214,7 @@ async fn set_state(
             detail: TaskHistoryDetail::default(),
             previous_assignee: None,
             previous_handed_by: None,
+            before: Some(row),
         },
         today,
     )

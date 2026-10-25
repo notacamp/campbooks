@@ -92,6 +92,12 @@
       "pr": "#663"
     },
     {
+      "change": "The tasks module instrumented (campbooks-cloud#340): 8 events for a task created (by a member, or by Scout from an ask), edited (which fields), its due date changed (the date before), planned (the plan before), done, not needed, reopened (the state before) and reassigned (handed off or taken back, with the member who had it); records task, task_due and task_plan; Coverage for every operation, job and handler of the module.",
+      "date": "2026-10-25",
+      "plan_version": 10,
+      "pr": "#665"
+    },
+    {
       "change": "Coverage required with no baseline (campbooks-cloud#332): 2 connectors events for an IMAP mailbox's address check asked for again and its message sent or not (with why); Coverage rows for connectors.check_address, connectors.send_address_check and the kernel's maintenance schedules and change-feed sequencer.",
       "date": "2026-10-25",
       "plan_version": 11,
@@ -383,6 +389,21 @@
     },
     {
       "events": [
+        "tasks.task_created",
+        "tasks.task_due_changed"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "tasks.add_read_asks"
+    },
+    {
+      "events": [],
+      "exemption": "projection of workspaces.workspace_deleted: it only schedules the purge",
+      "kind": "handler",
+      "name": "tasks.schedule_workspace_purge"
+    },
+    {
+      "events": [
         "workspaces.member_suspended"
       ],
       "exemption": "",
@@ -592,6 +613,12 @@
       "exemption": "maintenance: a deleted workspace's index deleted; the deletion is tracked by workspaces",
       "kind": "job",
       "name": "search.purge_workspace"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance: a deleted workspace's tasks and history deleted; the deletion is tracked by workspaces",
+      "kind": "job",
+      "name": "tasks.purge_workspace"
     },
     {
       "events": [
@@ -1483,6 +1510,71 @@
       "exemption": "telemetry itself: a screen the app shows, relayed to the operator's usage analytics and never stored; tracking it would record it twice",
       "kind": "operation",
       "name": "system.report_screen_view"
+    },
+    {
+      "events": [
+        "tasks.task_created"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.create"
+    },
+    {
+      "events": [
+        "tasks.task_done"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.done"
+    },
+    {
+      "events": [
+        "tasks.task_reassigned"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.hand_off"
+    },
+    {
+      "events": [
+        "tasks.task_not_needed"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.not_needed"
+    },
+    {
+      "events": [
+        "tasks.task_planned"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.plan"
+    },
+    {
+      "events": [
+        "tasks.task_reopened"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.reopen"
+    },
+    {
+      "events": [
+        "tasks.task_reassigned"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.take_back"
+    },
+    {
+      "events": [
+        "tasks.task_edited",
+        "tasks.task_due_changed"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.update"
     },
     {
       "events": [
@@ -3548,6 +3640,81 @@
       "description": "Understanding images and scanned documents.",
       "enum": "system.ai_role",
       "value": "vision"
+    },
+    {
+      "description": "A day.",
+      "enum": "tasks.plan_kind",
+      "value": "date"
+    },
+    {
+      "description": "Later: put off until a time.",
+      "enum": "tasks.plan_kind",
+      "value": "later"
+    },
+    {
+      "description": "No plan.",
+      "enum": "tasks.plan_kind",
+      "value": "none"
+    },
+    {
+      "description": "Handed to a teammate (tasks.hand_off).",
+      "enum": "tasks.reassignment",
+      "value": "handed_off"
+    },
+    {
+      "description": "Taken back by the member who handed it off (tasks.take_back).",
+      "enum": "tasks.reassignment",
+      "value": "taken_back"
+    },
+    {
+      "description": "Its title.",
+      "enum": "tasks.task_field",
+      "value": "title"
+    },
+    {
+      "description": "Do or Pay.",
+      "enum": "tasks.task_field",
+      "value": "verb"
+    },
+    {
+      "description": "Asked of the member in an email, read by Scout.",
+      "enum": "tasks.task_origin",
+      "value": "ask"
+    },
+    {
+      "description": "A deadline found in an email.",
+      "enum": "tasks.task_origin",
+      "value": "deadline"
+    },
+    {
+      "description": "The member wrote it.",
+      "enum": "tasks.task_origin",
+      "value": "own"
+    },
+    {
+      "description": "It was done (or paid).",
+      "enum": "tasks.task_state",
+      "value": "done"
+    },
+    {
+      "description": "It is not needed after all.",
+      "enum": "tasks.task_state",
+      "value": "not_needed"
+    },
+    {
+      "description": "It still needs doing.",
+      "enum": "tasks.task_state",
+      "value": "open"
+    },
+    {
+      "description": "Something to do.",
+      "enum": "tasks.task_verb",
+      "value": "do"
+    },
+    {
+      "description": "Money is owed (Campbooks never pays).",
+      "enum": "tasks.task_verb",
+      "value": "pay"
     },
     {
       "description": "The business preset.",
@@ -17933,6 +18100,1626 @@
     {
       "action": "created",
       "actor_types": [
+        "user",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 10,
+      "description": "A task was made: written by a member, or made by Scout of an ask (something to do or pay) it read in an email to the inbox's owner. Never its title or amount.",
+      "fires_when": "tasks.create makes it, or tasks.add_read_asks makes a task of an ask it did not know, in the transaction that inserts it; an ask already known, or one that repeats an open task, makes none.",
+      "module": "tasks",
+      "name": "tasks.task_created",
+      "object": "task",
+      "openspec_change": "track-tasks-events",
+      "rust_type": "TaskCreated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_created:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A task was made: written by a member, or made by Scout of an ask (something to do or pay) it read in an email to the inbox's owner. Never its title or amount.",
+        "properties": {
+          "task": {
+            "additionalProperties": false,
+            "description": "The new task.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "tasks.task_created",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "done",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 10,
+      "description": "An open task was done (paid, for a bill: Campbooks never pays, this marks it paid).",
+      "fires_when": "tasks.done closes it, in that transaction.",
+      "module": "tasks",
+      "name": "tasks.task_done",
+      "object": "task",
+      "openspec_change": "track-tasks-events",
+      "rust_type": "TaskDone",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_done:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An open task was done (paid, for a bill: Campbooks never pays, this marks it paid).",
+        "properties": {
+          "task": {
+            "additionalProperties": false,
+            "description": "The task, done.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "tasks.task_done",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "due_changed",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation",
+        "system"
+      ],
+      "added_in": 10,
+      "description": "A task's due day or time changed (or was set, or cleared); before is the due date it had.",
+      "fires_when": "tasks.update changes the due day or time, or tasks.add_read_asks gives an open task with no due date the one a later ask names, in the transaction of the change; the same due date again tracks nothing.",
+      "module": "tasks",
+      "name": "tasks.task_due_changed",
+      "object": "task",
+      "openspec_change": "track-tasks-events",
+      "rust_type": "TaskDueChanged",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_due_changed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A task's due day or time changed (or was set, or cleared); before is the due date it had.",
+        "properties": {
+          "before": {
+            "additionalProperties": false,
+            "description": "Its due date before.",
+            "properties": {
+              "due_at": {
+                "description": "The time it was due, if it had one.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it was due, if any.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [],
+            "title": "tasks.task_due",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "The task afterwards, with its new due date.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "task"
+        ],
+        "title": "tasks.task_due_changed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "edited",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 10,
+      "description": "A task's title or verb changed: which fields, never their values (the verb is in the snapshot, and before_verb when it changed). A change of its due date is tasks.task_due_changed.",
+      "fires_when": "tasks.update changes the title or the verb, in the transaction of the change; the same values again track nothing.",
+      "module": "tasks",
+      "name": "tasks.task_edited",
+      "object": "task",
+      "openspec_change": "track-tasks-events",
+      "rust_type": "TaskEdited",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_edited:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A task's title or verb changed: which fields, never their values (the verb is in the snapshot, and before_verb when it changed). A change of its due date is tasks.task_due_changed.",
+        "properties": {
+          "before_verb": {
+            "description": "Its verb before, when the verb changed.",
+            "enum": [
+              "do",
+              "pay"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "fields": {
+            "description": "The fields that changed (at least one).",
+            "items": {
+              "enum": [
+                "title",
+                "verb"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "x-classification": "operational"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "The task afterwards.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "fields",
+          "task"
+        ],
+        "title": "tasks.task_edited",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "not_needed",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 10,
+      "description": "An open task was marked not needed after all.",
+      "fires_when": "tasks.not_needed closes it, in that transaction.",
+      "module": "tasks",
+      "name": "tasks.task_not_needed",
+      "object": "task",
+      "openspec_change": "track-tasks-events",
+      "rust_type": "TaskNotNeeded",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_not_needed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An open task was marked not needed after all.",
+        "properties": {
+          "task": {
+            "additionalProperties": false,
+            "description": "The task, not needed.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "tasks.task_not_needed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "planned",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 10,
+      "description": "When the member will do a task changed: a day, Later until a time, or no plan; before is the plan it had.",
+      "fires_when": "tasks.plan stores another plan than the task had, in that transaction; the same plan again tracks nothing.",
+      "module": "tasks",
+      "name": "tasks.task_planned",
+      "object": "task",
+      "openspec_change": "track-tasks-events",
+      "rust_type": "TaskPlanned",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_planned:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "When the member will do a task changed: a day, Later until a time, or no plan; before is the plan it had.",
+        "properties": {
+          "before": {
+            "additionalProperties": false,
+            "description": "Its plan before.",
+            "properties": {
+              "later_until": {
+                "description": "When Later ended, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan.",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "plan"
+            ],
+            "title": "tasks.task_plan",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "The task afterwards, with its new plan.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "task"
+        ],
+        "title": "tasks.task_planned",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "reassigned",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 10,
+      "description": "An open task went to another member: handed to a teammate (reassignment handed_off: the snapshot's assignee is the teammate, handed_by the member who handed it), or taken back by the member who had handed it off (taken_back). previous_assignee is who had it.",
+      "fires_when": "tasks.hand_off gives it to another member of the workspace, or tasks.take_back gives it back to the member who handed it, in that transaction.",
+      "module": "tasks",
+      "name": "tasks.task_reassigned",
+      "object": "task",
+      "openspec_change": "track-tasks-events",
+      "rust_type": "TaskReassigned",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_reassigned:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An open task went to another member: handed to a teammate (reassignment handed_off: the snapshot's assignee is the teammate, handed_by the member who handed it), or taken back by the member who had handed it off (taken_back). previous_assignee is who had it.",
+        "properties": {
+          "previous_assignee": {
+            "description": "The member who had it: their user id.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "pseudonymous"
+          },
+          "previous_handed_by": {
+            "description": "The member who had handed it off before this change, if anyone (their user id): on a re-hand-off, who gave it to the member handing it on.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "pseudonymous"
+          },
+          "reassignment": {
+            "description": "Handed off to a teammate, or taken back.",
+            "enum": [
+              "handed_off",
+              "taken_back"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "The task afterwards, with its new assignee.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "previous_assignee",
+          "reassignment",
+          "task"
+        ],
+        "title": "tasks.task_reassigned",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "reopened",
+      "actor_types": [
+        "user",
+        "assistant",
+        "automation"
+      ],
+      "added_in": 10,
+      "description": "A closed task was opened again, with its plan; before is the state it had (done or not needed).",
+      "fires_when": "tasks.reopen opens it, in that transaction.",
+      "module": "tasks",
+      "name": "tasks.task_reopened",
+      "object": "task",
+      "openspec_change": "track-tasks-events",
+      "rust_type": "TaskReopened",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_reopened:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A closed task was opened again, with its plan; before is the state it had (done or not needed).",
+        "properties": {
+          "before": {
+            "description": "The state it was reopened from (done or not_needed).",
+            "enum": [
+              "done",
+              "not_needed",
+              "open"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "task": {
+            "additionalProperties": false,
+            "description": "The task, open again.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "before",
+          "task"
+        ],
+        "title": "tasks.task_reopened",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "created",
+      "actor_types": [
         "user"
       ],
       "added_in": 5,
@@ -22783,6 +24570,214 @@
     },
     {
       "classification": "operational",
+      "description": "The new task.",
+      "event": "tasks.task_created",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task, done.",
+      "event": "tasks.task_done",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Its due date before.",
+      "event": "tasks.task_due_changed",
+      "example": "",
+      "list": false,
+      "of": "tasks.task_due",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task afterwards, with its new due date.",
+      "event": "tasks.task_due_changed",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Its verb before, when the verb changed.",
+      "event": "tasks.task_edited",
+      "example": "",
+      "list": false,
+      "of": "tasks.task_verb",
+      "pattern": "",
+      "property": "before_verb",
+      "required": false,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The fields that changed (at least one).",
+      "event": "tasks.task_edited",
+      "example": "",
+      "list": true,
+      "of": "tasks.task_field",
+      "pattern": "",
+      "property": "fields",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task afterwards.",
+      "event": "tasks.task_edited",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task, not needed.",
+      "event": "tasks.task_not_needed",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Its plan before.",
+      "event": "tasks.task_planned",
+      "example": "",
+      "list": false,
+      "of": "tasks.task_plan",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task afterwards, with its new plan.",
+      "event": "tasks.task_planned",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member who had it: their user id.",
+      "event": "tasks.task_reassigned",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "previous_assignee",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member who had handed it off before this change, if anyone (their user id): on a re-hand-off, who gave it to the member handing it on.",
+      "event": "tasks.task_reassigned",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "previous_handed_by",
+      "required": false,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Handed off to a teammate, or taken back.",
+      "event": "tasks.task_reassigned",
+      "example": "",
+      "list": false,
+      "of": "tasks.reassignment",
+      "pattern": "",
+      "property": "reassignment",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task afterwards, with its new assignee.",
+      "event": "tasks.task_reassigned",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The state it was reopened from (done or not_needed).",
+      "event": "tasks.task_reopened",
+      "example": "",
+      "list": false,
+      "of": "tasks.task_state",
+      "pattern": "",
+      "property": "before",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task, open again.",
+      "event": "tasks.task_reopened",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "The new invitation.",
       "event": "workspaces.invitation_created",
       "example": "",
@@ -25417,6 +27412,259 @@
       "record": "schedule.settings",
       "required": true,
       "type": "bool"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member it is with: their user id.",
+      "enum": "",
+      "field": "assignee",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was closed, while it is.",
+      "enum": "",
+      "field": "closed_at",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "When it was made.",
+      "enum": "",
+      "field": "created_at",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member who made it, or for whom Scout made it: their user id.",
+      "enum": "",
+      "field": "created_by",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "The time it is due, when it has one (due_on is its local day).",
+      "enum": "",
+      "field": "due_at",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "The day it is due.",
+      "enum": "",
+      "field": "due_on",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": false,
+      "type": "date"
+    },
+    {
+      "classification": "pseudonymous",
+      "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+      "enum": "",
+      "field": "handed_by",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": false,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+      "enum": "",
+      "field": "has_amount",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "bool"
+    },
+    {
+      "classification": "id",
+      "description": "The task's id.",
+      "enum": "",
+      "field": "id",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "id"
+    },
+    {
+      "classification": "operational",
+      "description": "When Later ends, for a later plan.",
+      "enum": "",
+      "field": "later_until",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "How it came to be.",
+      "enum": "tasks.task_origin",
+      "field": "origin",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "The plan as stored (a Later whose time has passed still says later).",
+      "enum": "tasks.plan_kind",
+      "field": "plan",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "The planned day, for a date plan.",
+      "enum": "",
+      "field": "plan_on",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": false,
+      "type": "date"
+    },
+    {
+      "classification": "operational",
+      "description": "Grows with every change of the task.",
+      "enum": "",
+      "field": "revision",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "int"
+    },
+    {
+      "classification": "id",
+      "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+      "enum": "",
+      "field": "source",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": false,
+      "type": "record_ref"
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it still needs doing.",
+      "enum": "tasks.task_state",
+      "field": "state",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "When it last changed.",
+      "enum": "",
+      "field": "updated_at",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "Something to do, or a bill to pay.",
+      "enum": "tasks.task_verb",
+      "field": "verb",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "The time it was due, if it had one.",
+      "enum": "",
+      "field": "due_at",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task_due",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "The day it was due, if any.",
+      "enum": "",
+      "field": "due_on",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task_due",
+      "required": false,
+      "type": "date"
+    },
+    {
+      "classification": "operational",
+      "description": "When Later ended, for a later plan.",
+      "enum": "",
+      "field": "later_until",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task_plan",
+      "required": false,
+      "type": "timestamp"
+    },
+    {
+      "classification": "operational",
+      "description": "The plan.",
+      "enum": "tasks.plan_kind",
+      "field": "plan",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task_plan",
+      "required": true,
+      "type": "enum"
+    },
+    {
+      "classification": "operational",
+      "description": "The planned day, for a date plan.",
+      "enum": "",
+      "field": "plan_on",
+      "list": false,
+      "pattern": "",
+      "record": "tasks.task_plan",
+      "required": false,
+      "type": "date"
     },
     {
       "classification": "operational",

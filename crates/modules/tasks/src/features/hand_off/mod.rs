@@ -120,6 +120,7 @@ pub async fn hand_off(
             },
             previous_assignee: Some(row.assignee),
             previous_handed_by: row.handed_by,
+            before: Some(row),
         },
         today,
     )
@@ -205,6 +206,7 @@ pub async fn take_back(
             },
             previous_assignee: Some(row.assignee),
             previous_handed_by: row.handed_by,
+            before: Some(row),
         },
         today,
     )
