@@ -243,9 +243,16 @@ impl World {
 
     async fn grant_ada(&self) {
         let mut conn = self.db.acquire().await.unwrap();
-        campbooks_admin::cli::grant(&mut conn, "ada", &[Permission::Super], None, Utc::now())
-            .await
-            .unwrap();
+        campbooks_admin::cli::grant(
+            &mut conn,
+            &campbooks_kernel::tracking::Tracker::default(),
+            "ada",
+            &[Permission::Super],
+            None,
+            Utc::now(),
+        )
+        .await
+        .unwrap();
     }
 }
 
