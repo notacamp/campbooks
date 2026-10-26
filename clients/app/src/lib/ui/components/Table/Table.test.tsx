@@ -307,7 +307,7 @@ describe("the toolbar", () => {
     expect(screen.queryByRole("button", { name: "More views" })).toBeNull();
   });
 
-  /** Lays the row out at a width: tabs 120, the "+" box 80, the chips 200, "More views" 40. */
+  /** Lays the row out at a width: tabs 120, the "+" box 80, the actions 60, the chips 200, "More views" 40. */
   function atWidth(width: number) {
     const parts = vi
       .spyOn(HTMLElement.prototype, "offsetWidth", "get")
@@ -316,7 +316,15 @@ describe("the toolbar", () => {
           return 120;
         }
         const part = this.dataset["part"];
-        return part === "rest" ? 80 : part === "chips" ? 200 : part === "more" ? 40 : 0;
+        return part === "rest"
+          ? 80
+          : part === "chips"
+            ? 200
+            : part === "more"
+              ? 40
+              : part === "actions"
+                ? 60
+                : 0;
       });
     const scroll = vi
       .spyOn(HTMLElement.prototype, "scrollWidth", "get")

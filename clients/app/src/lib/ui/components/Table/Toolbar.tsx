@@ -69,7 +69,7 @@ export function TableToolbar({
   const list = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<Fit>(WIDE);
   // What each part took when it was last drawn: a part that is folded keeps its last width.
-  const sizes = useRef({ tabs: new Map<string, number>(), chips: 0, rest: 0, more: 0 });
+  const sizes = useRef({ tabs: new Map<string, number>(), chips: 0, rest: 0, actions: 0, more: 0 });
 
   const hasChips = chips !== undefined;
   const key = tabs.map((tab) => `${tab.id}:${tab.label}:${String(tab.current)}`).join("|");
@@ -92,6 +92,7 @@ export function TableToolbar({
         seen.chips = chipsBox.scrollWidth;
       }
       seen.rest = widthOf(box.querySelector("[data-part='rest']"));
+      seen.actions = widthOf(box.querySelector("[data-part='actions']"));
       const more = box.querySelector("[data-part='more']");
       if (more !== null) {
         seen.more = widthOf(more);
@@ -100,9 +101,11 @@ export function TableToolbar({
       const available = box.clientWidth;
       const tabWidths = tabs.map((tab) => seen.tabs.get(tab.id) ?? 0);
       const all = tabWidths.reduce((sum, width) => sum + width, 0);
-      const parts = (chipsOn: boolean) => 3 + (chipsOn ? 1 : 0);
+      // The tab list, the "+" box, the spacer and the actions, and the chips when they show.
+      const parts = (chipsOn: boolean) => 4 + (chipsOn ? 1 : 0);
       const fits = (chipsOn: boolean) =>
-        all + seen.rest + (chipsOn ? seen.chips : 0) + gap * (parts(chipsOn) - 1) <= available;
+        all + seen.rest + seen.actions + (chipsOn ? seen.chips : 0) + gap * (parts(chipsOn) - 1) <=
+        available;
       let next: Fit;
       if (fits(true) || (!hasChips && fits(false))) {
         next = WIDE;
@@ -110,7 +113,8 @@ export function TableToolbar({
         next = { chips: false, shown: null };
       } else {
         // Keep the current tab, then as many of the others as fit beside the "More views" button.
-        const room = available - seen.rest - (seen.more === 0 ? 44 : seen.more) - gap * 3;
+        const room =
+          available - seen.rest - seen.actions - (seen.more === 0 ? 44 : seen.more) - gap * 4;
         let used = 0;
         const keep = new Set<string>();
         const current = tabs.find((tab) => tab.current);
@@ -147,7 +151,7 @@ export function TableToolbar({
       observer.disconnect();
     };
     // The measure reads the latest tabs and chips; it runs again when they change.
-  }, [key, hasChips, chips, trailing, actions, tabs]);
+  }, [key, hasChips, chips, trailing, actions, tabs, fit]);
 
   const shown = fit.shown === null ? null : new Set(fit.shown.split("|"));
   const inRow = tabs.filter((tab) => shown === null || shown.has(tab.id));
@@ -241,7 +245,9 @@ export function TableToolbar({
           {chips}
         </div>
       ) : null}
-      <div className={styles["actions"]}>{actions}</div>
+      <div data-part="actions" className={styles["actions"]}>
+        {actions}
+      </div>
     </div>
   );
 }
