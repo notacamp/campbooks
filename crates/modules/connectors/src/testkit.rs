@@ -28,8 +28,9 @@ use campbooks_kernel::{
     crypto::{Cipher, SecretKey},
     jobs::{Registry, Worker},
     outbound::{
-        CalendarRequests, Destination, OutboundRequests, Resolved, StandingFuture,
-        StoredCalendarChange, StoredCalendarChangeFuture, StoredSend, StoredSendFuture,
+        CalendarRequests, Destination, LinkStandingFuture, OutboundRequests, PageRequests,
+        Resolved, StandingFuture, StoredCalendarChange, StoredCalendarChangeFuture,
+        StoredPageChanges, StoredPageChangesFuture, StoredSend, StoredSendFuture,
     },
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
@@ -56,7 +57,14 @@ use crate::{
 };
 
 pub use crate::testkit_microsoft::FakeMicrosoft;
+pub use crate::testkit_notion::FakeNotion;
 pub use crate::testkit_zoho::FakeZoho;
+
+/// Where the fake Notion sends members back to.
+pub const NOTION_REDIRECT: &str = "http://localhost:3000/auth/callback/notion";
+
+/// The webhook secret of the kit's Notion.
+pub const NOTION_HOOK_SECRET: &str = "notion-hook-secret-1";
 
 /// Every scope of this module.
 const ALL_SCOPES: &str = "connectors:read connectors:write";
@@ -316,6 +324,74 @@ impl OutboundRequests for FakeOutbound {
     }
 }
 
+/// What the pages module stored, faked: the page links and block changes it
+/// confirms through the kernel's page-requests port.
+#[derive(Debug, Default)]
+pub struct FakePages {
+    stored: Mutex<HashMap<uuid::Uuid, StoredPageChanges>>,
+    links: Mutex<HashSet<(uuid::Uuid, uuid::Uuid, uuid::Uuid)>>,
+}
+
+impl FakePages {
+    /// Request `request` stands as `changes`.
+    pub fn release(&self, request: uuid::Uuid, changes: StoredPageChanges) {
+        self.stored
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(request, changes);
+    }
+
+    /// `page` is linked to `external_page` through `connection`, syncing.
+    pub fn link(&self, page: uuid::Uuid, connection: uuid::Uuid, external_page: uuid::Uuid) {
+        self.links
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert((page, connection, external_page));
+    }
+
+    /// The link of `page` no longer stands.
+    pub fn unlink(&self, page: uuid::Uuid) {
+        self.links
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .retain(|(linked, _, _)| *linked != page);
+    }
+}
+
+impl PageRequests for FakePages {
+    fn stored_changes<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _conn: &'a mut sqlx::PgConnection,
+        _workspace: WorkspaceId,
+        request: uuid::Uuid,
+    ) -> StoredPageChangesFuture<'a> {
+        let stored = self
+            .stored
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&request)
+            .cloned();
+        Box::pin(async move { Ok(stored) })
+    }
+
+    fn link_standing<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        _workspace: WorkspaceId,
+        page: uuid::Uuid,
+        connection: uuid::Uuid,
+        external_page: uuid::Uuid,
+    ) -> LinkStandingFuture<'a> {
+        let stands = self
+            .links
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&(page, connection, external_page));
+        Box::pin(async move { Ok(stands) })
+    }
+}
+
 /// What the schedule module stored, faked: the calendar changes it confirms
 /// through the kernel's calendar-requests port.
 #[derive(Debug, Default)]
@@ -370,6 +446,9 @@ pub struct Kit {
     /// The fake Microsoft (the mail tenant and Graph `/me`), configured
     /// only when the kit's config turns Microsoft mail on.
     pub microsoft: FakeMicrosoft,
+    /// The fake Notion, configured only when the kit's config turns Notion
+    /// on.
+    pub notion: FakeNotion,
     /// What the module was composed with.
     pub deps: Deps,
     /// The identity module's front door, faked.
@@ -378,6 +457,8 @@ pub struct Kit {
     pub outbound: Arc<FakeOutbound>,
     /// What the schedule module stored, faked.
     pub calendar: Arc<FakeCalendar>,
+    /// What the pages module stored, faked.
+    pub pages: Arc<FakePages>,
     app: Router,
     idp: TestIdp,
     membership: Arc<FakeMembership>,
@@ -432,6 +513,127 @@ impl Kit {
         testing::send(&router, request).await
     }
 
+    /// The module with Notion on, against the fake.
+    pub async fn with_notion(db: PgPool) -> Self {
+        let mut config = ConnectorsConfig::default();
+        config.imap.enabled = false;
+        config.notion.enabled = Some("true".to_owned());
+        Self::with_config(db, config).await
+    }
+
+    /// `GET uri` on the public Notion routes, with `cookie` as the browser's
+    /// `Cookie` header.
+    pub async fn notion_get(&self, uri: &str, cookie: Option<&str>) -> TestResponse {
+        let router = crate::notion_router(self.state.clone(), self.deps.clone());
+        let mut request = Request::builder().method(Method::GET).uri(uri);
+        if let Some(cookie) = cookie {
+            request = request.header(header::COOKIE, cookie);
+        }
+        testing::send(&router, request.body(Body::empty()).unwrap()).await
+    }
+
+    /// `POST /hooks/notion` with `body` and the `X-Notion-Signature`
+    /// `signature`.
+    pub async fn notion_hook(&self, body: &[u8], signature: Option<&str>) -> TestResponse {
+        let router = crate::notion_router(self.state.clone(), self.deps.clone());
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri(crate::notion::HOOK_PATH)
+            .header(header::CONTENT_TYPE, "application/json");
+        if let Some(signature) = signature {
+            request = request.header("x-notion-signature", signature);
+        }
+        testing::send(&router, request.body(Body::from(body.to_vec())).unwrap()).await
+    }
+
+    /// The signature Notion would send for `body`.
+    pub fn notion_signature(body: &[u8]) -> String {
+        let tag = campbooks_kernel::crypto::hmac_sha256(NOTION_HOOK_SECRET.as_bytes(), body);
+        let hex = tag.iter().fold(String::new(), |mut hex, byte| {
+            use std::fmt::Write as _;
+            let _ = write!(hex, "{byte:02x}");
+            hex
+        });
+        format!("sha256={hex}")
+    }
+
+    /// Start connecting Notion as `caller`: the `/auth/start/notion?ticket=`
+    /// path.
+    pub async fn notion_start(
+        &self,
+        caller: &Caller,
+        workspace: WorkspaceId,
+        body: serde_json::Value,
+    ) -> TestResponse {
+        self.post(
+            caller,
+            &format!("/api/v1/w/{workspace}/connections/notion/authorizations"),
+            body,
+        )
+        .await
+    }
+
+    /// The browser goes through the whole consent: the ticket, Notion, the
+    /// callback with the browser's cookie. The callback's `Location`.
+    pub async fn connect_notion_browser(
+        &self,
+        caller: &Caller,
+        workspace: WorkspaceId,
+        body: serde_json::Value,
+    ) -> String {
+        let started = self.notion_start(caller, workspace, body).await;
+        assert_eq!(started.status.as_u16(), 201, "{:?}", started.json);
+        let ticket = started.json["authorize_url"].as_str().unwrap().to_owned();
+        let sent = self.notion_get(&ticket, None).await;
+        assert_eq!(sent.status.as_u16(), 303, "{:?}", sent.json);
+        let (state, cookie) = Self::consent_of(&sent);
+        let code = self.notion.issue_code();
+        let back = self
+            .notion_get(
+                &format!("{}?code={code}&state={state}", crate::notion::CALLBACK_PATH),
+                Some(&cookie),
+            )
+            .await;
+        back.headers[header::LOCATION].to_str().unwrap().to_owned()
+    }
+
+    /// The `state` Notion was sent and the cookie to bring back, from the
+    /// response to the ticket.
+    pub fn consent_of(sent: &TestResponse) -> (String, String) {
+        let location = sent.headers[header::LOCATION].to_str().unwrap();
+        let url = url::Url::parse(location).unwrap();
+        let state = url
+            .query_pairs()
+            .find(|(k, _)| k == "state")
+            .map(|(_, v)| v.into_owned())
+            .unwrap();
+        let cookie = sent.headers[header::SET_COOKIE].to_str().unwrap();
+        let cookie = cookie.split(';').next().unwrap().to_owned();
+        (state, cookie)
+    }
+
+    /// Connect Notion as `caller` in `workspace`, end to end through the
+    /// browser's round trip; the connection JSON.
+    pub async fn connect_notion(
+        &self,
+        caller: &Caller,
+        workspace: WorkspaceId,
+    ) -> serde_json::Value {
+        let to = self
+            .connect_notion_browser(caller, workspace, serde_json::json!({}))
+            .await;
+        let id = to
+            .split("connected=")
+            .nth(1)
+            .unwrap_or_else(|| panic!("not connected: {to}"))
+            .to_owned();
+        let read = self
+            .get(caller, &format!("/api/v1/w/{workspace}/connections/{id}"))
+            .await;
+        assert_eq!(read.status.as_u16(), 200, "{:?}", read.json);
+        read.json
+    }
+
     /// The module with `config`.
     pub async fn with_config(db: PgPool, config: ConnectorsConfig) -> Self {
         Self::with_filter_limit(db, config, None).await
@@ -452,6 +654,18 @@ impl Kit {
         ));
         let zoho = FakeZoho::start(clock.clone()).await;
         let microsoft = FakeMicrosoft::start().await;
+        let notion = FakeNotion::start().await;
+        let notion_client = config.notion.is_enabled().then(|| {
+            Arc::new(
+                crate::notion::Notion::new(
+                    crate::testkit_notion::CLIENT_ID.into(),
+                    ClientSecret::Inline(crate::testkit_notion::CLIENT_SECRET.into()),
+                    crate::notion::Endpoints::under(&notion.base()).unwrap(),
+                    NOTION_REDIRECT.into(),
+                )
+                .unwrap(),
+            )
+        });
         let microsoft_client = config.microsoft.enabled.then(|| {
             let client = Microsoft::new(
                 "microsoft-client-1".into(),
@@ -492,8 +706,10 @@ impl Kit {
                 .unwrap(),
             )),
             microsoft: microsoft_client,
-            notion: None,
-            notion_webhook: None,
+            notion: notion_client.clone(),
+            notion_webhook: notion_client
+                .is_some()
+                .then(|| ClientSecret::Inline(NOTION_HOOK_SECRET.into())),
             imap: Arc::new(crate::imap::Imap::new(imap_config)),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
@@ -501,7 +717,7 @@ impl Kit {
             ))),
             clock: clock.clone(),
         };
-        Self::assemble(db, deps, clock, (google, zoho, microsoft)).await
+        Self::assemble(db, deps, clock, (google, zoho, microsoft, notion)).await
     }
 
     /// The module as [`new`](Self::new), with the IMAP adapter `imap`.
@@ -515,6 +731,7 @@ impl Kit {
         ));
         let zoho = FakeZoho::start(clock.clone()).await;
         let microsoft = FakeMicrosoft::start().await;
+        let notion = FakeNotion::start().await;
         let deps = Deps {
             config: Arc::new(config),
             google: None,
@@ -529,7 +746,7 @@ impl Kit {
             ))),
             clock: clock.clone(),
         };
-        Self::assemble(db, deps, clock, (google, zoho, microsoft)).await
+        Self::assemble(db, deps, clock, (google, zoho, microsoft, notion)).await
     }
 
     /// The module with no provider configured.
@@ -538,18 +755,19 @@ impl Kit {
         let clock = Arc::new(FixedClock::new(Utc::now()));
         let zoho = FakeZoho::start(clock.clone()).await;
         let microsoft = FakeMicrosoft::start().await;
+        let notion = FakeNotion::start().await;
         let deps = Deps {
             clock: clock.clone(),
             ..Deps::default()
         };
-        Self::assemble(db, deps, clock, (google, zoho, microsoft)).await
+        Self::assemble(db, deps, clock, (google, zoho, microsoft, notion)).await
     }
 
     async fn assemble(
         db: PgPool,
         deps: Deps,
         clock: Arc<FixedClock>,
-        (google, zoho, microsoft): (FakeGoogle, FakeZoho, FakeMicrosoft),
+        (google, zoho, microsoft, notion): (FakeGoogle, FakeZoho, FakeMicrosoft, FakeNotion),
     ) -> Self {
         let idp = TestIdp::start().await;
         let pool = testing::app_role_pool(&db).await;
@@ -558,6 +776,7 @@ impl Kit {
         let door = Arc::new(FakeDoor::default());
         let outbound = Arc::new(FakeOutbound::default());
         let calendar = Arc::new(FakeCalendar::default());
+        let pages = Arc::new(FakePages::default());
         // Tracked events go to the outbox, so every test runs the tracking
         // code and can read events back (`tracking_tests.rs`).
         let state = testing::tracking_outbox(idp.state(pool))
@@ -566,6 +785,7 @@ impl Kit {
             .with_consent_door(door.clone())
             .with_outbound(outbound.clone())
             .with_calendar_requests(calendar.clone())
+            .with_page_requests(pages.clone())
             .with_registry(Registry::build(&[crate::module(deps.clone())]).unwrap());
         let app = testing::app(crate::module(deps.clone()), state.clone());
         Self {
@@ -575,10 +795,12 @@ impl Kit {
             google,
             zoho,
             microsoft,
+            notion,
             deps,
             door,
             outbound,
             calendar,
+            pages,
             app,
             idp,
             membership,

@@ -93,6 +93,8 @@ struct State {
     page_size: Option<usize>,
     /// Where the fake is served (files point back at it).
     base: String,
+    /// Codes are exchanged for an access token only.
+    withhold_refresh: bool,
 }
 
 /// Notion, faked.
@@ -126,6 +128,7 @@ impl FakeNotion {
             refresh_refusal: None,
             page_size: None,
             base: server.uri(),
+            withhold_refresh: false,
         }));
         Mock::given(any())
             .respond_with(Responder(state.clone()))
@@ -175,6 +178,12 @@ impl FakeNotion {
     /// The next API call answers 429 with this `Retry-After`.
     pub fn throttle_next(&self, seconds: u64) {
         self.lock().throttle_next = Some(seconds);
+    }
+
+    /// The next code exchanges give no refresh token (the integration was
+    /// not granted offline access).
+    pub fn withhold_refresh_token(&self) {
+        self.lock().withhold_refresh = true;
     }
 
     /// Listings come in pages of `size`, whatever the client asks.
@@ -622,6 +631,7 @@ fn token(state: &mut State, request: &wiremock::Request) -> ResponseTemplate {
             };
             state.codes.remove(at);
             let (access, refresh) = issue(state);
+            let refresh = (!state.withhold_refresh).then_some(refresh);
             json_response(
                 200,
                 &json!({
@@ -792,4 +802,219 @@ fn delete(state: &mut State, id: &str) -> ResponseTemplate {
     }
     touch_page(state, id, edited);
     json_response(200, &block_json(state, id))
+}
+
+// --- the kit's side of a linked page -----------------------------------------
+
+use campbooks_kernel::{
+    blobs::BlobRef,
+    db::BeginFor as _,
+    outbound::{PageItemKind, StoredPageChanges, StoredPageItem},
+    tenancy::WorkspaceId,
+};
+
+use crate::{
+    domain::model::ConnectionId,
+    events::{NotionLinkEnded, NotionLinkRequested},
+    testkit::Kit,
+};
+
+/// A change document's content type.
+pub const CHANGE_TYPE: &str = "application/vnd.campbooks.notion-block-changes+json; version=1";
+
+impl Kit {
+    /// The pages module links `page` to `notion_page` through `connection`
+    /// (its port confirms the link) and asks for a stream; the jobs run:
+    /// the stream's id.
+    pub async fn link_notion(
+        &self,
+        workspace: WorkspaceId,
+        connection: &serde_json::Value,
+        page: Uuid,
+        notion_page: Uuid,
+    ) -> Uuid {
+        let connection: ConnectionId = connection["id"].as_str().unwrap().parse().unwrap();
+        self.pages.link(page, *connection.as_uuid(), notion_page);
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        self.state
+            .events
+            .publish(
+                &mut tx,
+                &NotionLinkRequested {
+                    workspace: workspace.to_string(),
+                    page,
+                    connection,
+                    notion_page,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        self.run_jobs().await;
+        self.notion_stream(notion_page).await
+    }
+
+    /// The pages module ended the link of `page`: its stream goes.
+    pub async fn unlink_notion(
+        &self,
+        workspace: WorkspaceId,
+        connection: &serde_json::Value,
+        page: Uuid,
+        notion_page: Uuid,
+    ) {
+        let connection: ConnectionId = connection["id"].as_str().unwrap().parse().unwrap();
+        self.pages.unlink(page);
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        self.state
+            .events
+            .publish(
+                &mut tx,
+                &NotionLinkEnded {
+                    workspace: workspace.to_string(),
+                    page,
+                    connection,
+                    notion_page,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        self.run_jobs().await;
+    }
+
+    /// The stream that reads `notion_page` (panics without one).
+    pub async fn notion_stream(&self, notion_page: Uuid) -> Uuid {
+        self.notion_stream_opt(notion_page)
+            .await
+            .expect("a stream reads the page")
+    }
+
+    /// The stream that reads `notion_page`, if any.
+    pub async fn notion_stream_opt(&self, notion_page: Uuid) -> Option<Uuid> {
+        sqlx::query_scalar("SELECT stream_id FROM connectors.notion_links WHERE notion_page_id = $1")
+            .bind(notion_page)
+            .fetch_optional(&self.db)
+            .await
+            .unwrap()
+    }
+
+    /// When the stream next runs.
+    pub async fn notion_due(&self, stream: Uuid) -> Option<DateTime<Utc>> {
+        sqlx::query_scalar("SELECT due_at FROM connectors.sync_due WHERE stream_id = $1")
+            .bind(stream)
+            .fetch_optional(&self.db)
+            .await
+            .unwrap()
+    }
+
+    /// The pages module stored a request of `items` for `page` (bound to
+    /// `connection` and `notion_page`) with `document` as the blocks to
+    /// write, and asks for it to be made. Returns the request.
+    pub async fn ask_notion_changes(
+        &self,
+        workspace: WorkspaceId,
+        connection: &serde_json::Value,
+        (page, notion_page): (Uuid, Uuid),
+        items: Vec<StoredPageItem>,
+        document: &serde_json::Value,
+        standing: bool,
+    ) -> Uuid {
+        let connection: ConnectionId = connection["id"].as_str().unwrap().parse().unwrap();
+        let request = Uuid::now_v7();
+        let body: BlobRef = self
+            .state
+            .blobs
+            .put(
+                &workspace.to_string(),
+                serde_json::to_vec(document).unwrap(),
+                CHANGE_TYPE,
+            )
+            .await
+            .unwrap();
+        if standing {
+            self.pages.release(
+                request,
+                StoredPageChanges {
+                    page,
+                    connection: *connection.as_uuid(),
+                    external_page: notion_page,
+                    items,
+                    body: body.clone(),
+                },
+            );
+        }
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        self.state
+            .events
+            .publish(
+                &mut tx,
+                &crate::events::NotionChangesRequested {
+                    workspace: workspace.to_string(),
+                    request,
+                    page,
+                    connection,
+                    notion_page,
+                    body,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        self.run_jobs().await;
+        request
+    }
+}
+
+/// An update of `block` (in Pages) that is `external` at Notion, whose
+/// last sync saw it edited at `base`.
+pub fn update_item(block: Uuid, external: Uuid, base: Option<DateTime<Utc>>) -> StoredPageItem {
+    StoredPageItem {
+        kind: PageItemKind::Update,
+        block,
+        external: Some(external),
+        parent: None,
+        parent_block: None,
+        after: None,
+        after_block: None,
+        base_edited_at: base,
+    }
+}
+
+/// An append of `block` after `after` (a block at Notion).
+pub fn append_item(block: Uuid, after: Option<Uuid>) -> StoredPageItem {
+    StoredPageItem {
+        kind: PageItemKind::Append,
+        block,
+        external: None,
+        parent: None,
+        parent_block: None,
+        after,
+        after_block: None,
+        base_edited_at: None,
+    }
+}
+
+/// A delete of `block` (in Pages) that is `external` at Notion.
+pub fn delete_item(block: Uuid, external: Uuid, base: Option<DateTime<Utc>>) -> StoredPageItem {
+    StoredPageItem {
+        kind: PageItemKind::Delete,
+        block,
+        external: Some(external),
+        parent: None,
+        parent_block: None,
+        after: None,
+        after_block: None,
+        base_edited_at: base,
+    }
+}
+
+/// A `notion-block-changes` document of paragraphs: `(seq, block id, text)`.
+pub fn paragraphs(items: &[(u32, Uuid, &str)]) -> serde_json::Value {
+    json!({
+        "version": 1,
+        "items": items.iter().map(|(seq, id, text)| json!({
+            "seq": seq,
+            "block": {"id": id, "kind": "paragraph", "runs": [{"text": text}]},
+        })).collect::<Vec<_>>(),
+    })
 }
