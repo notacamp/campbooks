@@ -398,3 +398,6 @@ async fn keep_title(
     }
     Ok(theirs)
 }
+
+#[cfg(test)]
+mod tests;

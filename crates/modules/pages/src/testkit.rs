@@ -87,6 +87,42 @@ static TASK_TYPES: [ResourceType; 1] = [ResourceType {
     ..ResourceType::new("tasks.task", "A test task.", Tenancy::Workspace)
 }];
 
+/// A connection to Notion, as the connectors module would declare it: its
+/// member's alone to disconnect (and so to import through).
+static CONNECTION_TYPES: [ResourceType; 1] = [ResourceType {
+    owner: Owner::Member,
+    owner_actions: &[
+        campbooks_kernel::authz::Action::Read,
+        campbooks_kernel::authz::Action::Disconnect,
+    ],
+    ..ResourceType::new("connectors.connection", "A test connection.", Tenancy::Workspace)
+}];
+
+#[derive(Debug, Default)]
+struct ConnectionFacts {
+    owners: Mutex<HashMap<String, UserId>>,
+}
+
+impl ResourceFacts for ConnectionFacts {
+    fn facts<'a>(
+        &'a self,
+        _conn: &'a mut PgConnection,
+        _access: &'a Access,
+        resource: &'a RecordRef,
+    ) -> FactsFuture<'a> {
+        let owner = self
+            .owners
+            .lock()
+            .ok()
+            .and_then(|owners| owners.get(&resource.id).copied());
+        let found = (resource.record_type == "connectors.connection")
+            .then_some(owner)
+            .flatten()
+            .map(|owner| Facts::owned_by(OwnerFact::User(owner)));
+        Box::pin(async move { Ok(found) })
+    }
+}
+
 #[derive(Debug, Default)]
 struct TaskFacts {
     owners: Mutex<HashMap<String, UserId>>,
@@ -122,6 +158,7 @@ pub struct Kit {
     idp: TestIdp,
     membership: Arc<TestMembership>,
     tasks: Arc<TaskFacts>,
+    connections: Arc<ConnectionFacts>,
 }
 
 impl Kit {
@@ -131,10 +168,12 @@ impl Kit {
         let pool = testing::app_role_pool(&db).await;
         let membership = Arc::new(TestMembership::default());
         let tasks = Arc::new(TaskFacts::default());
+        let connections = Arc::new(ConnectionFacts::default());
         let module = crate::module(crate::Deps::default());
         let catalogue = Catalogue::new([
             &module.resources,
             &Resources::new(&TASK_TYPES, tasks.clone()),
+            &Resources::new(&CONNECTION_TYPES, connections.clone()),
         ])
         .unwrap();
         let blobs = BlobStore::memory(&BlobsConfig::default(), pool.clone());
@@ -156,6 +195,7 @@ impl Kit {
             idp,
             membership,
             tasks,
+            connections,
         }
     }
 
@@ -230,6 +270,17 @@ impl Kit {
     pub fn task_of(&self, owner: UserId) -> String {
         let id = sqlx::types::Uuid::now_v7().to_string();
         self.tasks.owners.lock().unwrap().insert(id.clone(), owner);
+        id
+    }
+
+    /// A Notion connection that `owner` alone may import through.
+    pub fn connection_of(&self, owner: UserId) -> uuid::Uuid {
+        let id = uuid::Uuid::now_v7();
+        self.connections
+            .owners
+            .lock()
+            .unwrap()
+            .insert(id.to_string(), owner);
         id
     }
 

@@ -131,3 +131,6 @@ impl Job for PushToNotion {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

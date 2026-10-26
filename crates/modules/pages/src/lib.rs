@@ -118,6 +118,8 @@ mod access_tests;
 #[cfg(test)]
 mod testkit;
 #[cfg(test)]
+mod testkit_notion;
+#[cfg(test)]
 mod tracking_tests;
 
 #[cfg(test)]

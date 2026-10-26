@@ -42,3 +42,6 @@ impl EventHandler for StopNotionLink {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

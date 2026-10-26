@@ -42,3 +42,6 @@ impl EventHandler for StopNotionLinksOfConnection {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

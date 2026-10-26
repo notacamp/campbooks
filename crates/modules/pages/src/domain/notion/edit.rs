@@ -507,7 +507,14 @@ pub fn rewrite(
                 element.insert_attribute(txn, "size", Any::Number(size));
             }
         }
-        Kind::Divider | Kind::PageLink | Kind::External => {}
+        Kind::External => {
+            element.insert_attribute(
+                txn,
+                "kind",
+                string(block.label.as_deref().unwrap_or("unsupported")),
+            );
+        }
+        Kind::Divider | Kind::PageLink => {}
     }
     true
 }

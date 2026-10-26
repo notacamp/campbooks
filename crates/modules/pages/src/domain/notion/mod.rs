@@ -398,4 +398,4 @@ pub async fn schedule_push(
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

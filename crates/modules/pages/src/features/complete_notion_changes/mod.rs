@@ -193,3 +193,6 @@ async fn write_base(
         _ => Ok(false),
     }
 }
+
+#[cfg(test)]
+mod tests;
