@@ -257,23 +257,21 @@ export function notionDoc(): Y.Doc {
     const element = block(name, { bid }, ...inline);
     return element;
   };
-  doc
-    .getXmlFragment("default")
-    .push([
-      withId("heading", "0192f1a0-0000-7000-8000-0000000008a0", "Product roadmap"),
-      withId("paragraph", CONFLICT_BLOCK, "We launch on the 14th."),
-      wrap(
-        "conflict",
-        {
-          of: CONFLICT_BLOCK,
-          hash: "ab".repeat(32),
-          edited: "2026-10-25T09:00:00.000Z",
-          removed: false,
-        },
-        block("paragraph", {}, "We launch on the 21st."),
-      ),
-      block("external", { bid: "0192f1a0-0000-7000-8000-0000000008b2", kind: "column_list" }),
-      withId("paragraph", "0192f1a0-0000-7000-8000-0000000008b3", "Rui owns the launch checklist."),
-    ]);
+  doc.getXmlFragment("default").push([
+    withId("heading", "0192f1a0-0000-7000-8000-0000000008a0", "Product roadmap"),
+    withId("paragraph", CONFLICT_BLOCK, "We launch on the 14th."),
+    wrap(
+      "conflict",
+      {
+        of: CONFLICT_BLOCK,
+        hash: "ab".repeat(32),
+        edited: "2026-10-25T09:00:00.000Z",
+        removed: false,
+      },
+      block("paragraph", {}, "We launch on the 21st."),
+    ),
+    block("external", { bid: "0192f1a0-0000-7000-8000-0000000008b2", kind: "column_list" }),
+    withId("paragraph", "0192f1a0-0000-7000-8000-0000000008b3", "Rui owns the launch checklist."),
+  ]);
   return doc;
 }

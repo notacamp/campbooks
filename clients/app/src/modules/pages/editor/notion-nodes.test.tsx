@@ -43,9 +43,7 @@ function Editing({ editable = true }: { editable?: boolean }) {
     content,
   });
   return (
-    <EditorEnvironmentContext
-      value={{ workspaceId: DUARTE.id, pageId: PAGE, open: () => {} }}
-    >
+    <EditorEnvironmentContext value={{ workspaceId: DUARTE.id, pageId: PAGE, open: () => {} }}>
       <EditorContent editor={editor} />
     </EditorEnvironmentContext>
   );
