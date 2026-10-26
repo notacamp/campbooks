@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
-import { Button } from "../Button/Button";
-import { Visor } from "../Visor/Visor";
+import { Button, Visor } from "@notacamp/ui";
 
 import styles from "./ReplyDraft.module.css";
 

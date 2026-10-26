@@ -20,6 +20,15 @@ describe("HowDecided", () => {
     expect(screen.getByText("Footnote")).toBeVisible();
   });
 
+  it("leaves out the footnote when there is none", () => {
+    renderUi(
+      <HowDecided rows={[{ question: "Mentions a date", answer: "Yes.", source: "0.96" }]} />,
+    );
+    fireEvent.click(screen.getByText("How Campbooks decided"));
+    expect(screen.getByText("0.96")).toBeVisible();
+    expect(screen.queryByText("Footnote")).toBeNull();
+  });
+
   it("shows nothing without rows", () => {
     const { container } = renderUi(<HowDecided rows={[]} />);
     expect(container).toBeEmptyDOMElement();

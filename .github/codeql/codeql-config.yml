@@ -15,3 +15,4 @@ paths-ignore:
   - "**/*.test.tsx"
   - "**/*.stories.tsx"
   - "clients/app/test/**"
+  - "clients/ui/test/**"

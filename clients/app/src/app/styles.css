@@ -1,7 +1,10 @@
 /*
  * The app's one Tailwind entry. Utilities exist only for the design tokens
- * (src/lib/ui/tokens/tailwind-theme.css); the tokens themselves, the fonts and
- * the base styles come with `~/lib/ui`.
+ * (@notacamp/ui's tokens/tailwind-theme.css); the tokens themselves, the fonts
+ * and the base styles come with `~/lib/ui`.
  */
 @import "tailwindcss";
-@import "../lib/ui/tokens/tailwind-theme.css";
+@import "../../../ui/src/tokens/tailwind-theme.css";
+
+/* The design system's sources (its stories use layout utilities too). */
+@source "../../../ui/src";

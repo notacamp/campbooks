@@ -2,7 +2,7 @@
 // the desktop app's (`src-tauri/tauri.conf.json`) and the web app's
 // (`crates/server/src/web.rs`), read from where they are defined so this test
 // follows any change to them. The frame is the one the app renders
-// (`lib/ui/safe-html/frame.ts`), around the server's own output for the #160
+// (`clients/ui/src/safe-html/frame.ts`), around the server's own output for the #160
 // fixtures (`fixtures/*.html`, kept in step by a Rust test) and around hostile
 // markup no sanitiser would let through, to prove the policy and the sandbox
 // hold on their own.
@@ -24,7 +24,7 @@ import {
   framePolicy,
   REFERRER_POLICY,
   SANDBOX,
-} from "../../src/lib/ui/safe-html/frame.ts";
+} from "../../../ui/src/safe-html/frame.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (file: string) => readFileSync(path.join(here, file), "utf8");

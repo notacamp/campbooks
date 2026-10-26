@@ -5774,7 +5774,7 @@
             }
           },
           "409": {
-            "description": "It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), or a paid answer for a need that is not Pay (`not_a_payment`).",
+            "description": "It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), a paid answer for a need that is not Pay (`not_a_payment`), or a person to wait on who is not on the email (`not_a_party`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -24857,6 +24857,17 @@
             "$ref": "#/components/schemas/NeedTrust",
             "description": "`sure`, or `check` for a question to the member."
           },
+          "unsure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Unsure",
+                "description": "What the email's people allow answering a question about a reply or an\naction with (campbooks-cloud#372): present only for such a question\nwhen the email went to people besides the inbox, and facts of its\nheaders only."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "urgent": {
             "type": "boolean",
             "description": "Whether it is for today."
@@ -27555,6 +27566,14 @@
           "outcome": {
             "$ref": "#/components/schemas/Outcome",
             "description": "Done, Not needed, or for a Pay need Already paid or Still to pay."
+          },
+          "wait_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "With Not needed on a question about a reply or an action: the address\nof the person on the email who has the move. The conversation then\nwaits on them.",
+            "example": "ana@example.com"
           }
         },
         "additionalProperties": false
@@ -30468,6 +30487,70 @@
           "not_about_mail",
           "too_vague"
         ]
+      },
+      "Unsure": {
+        "type": "object",
+        "description": "The people of an email a question about a reply or an action is about,\nfrom its headers (campbooks-cloud#372). It lets the member say who has the\nmove, not only whether the email needs them.",
+        "required": [
+          "others",
+          "in_to",
+          "in_cc"
+        ],
+        "properties": {
+          "confidence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How sure the model was of its reading, in percent.",
+            "minimum": 0
+          },
+          "in_cc": {
+            "type": "boolean",
+            "description": "Whether the inbox is in `Cc`: copied. When it is in neither, it was not\nnamed (a blind copy, a list or an alias)."
+          },
+          "in_to": {
+            "type": "boolean",
+            "description": "Whether the inbox is in `To`; `false` when it is only copied, or not\nnamed at all."
+          },
+          "others": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Who else the email went to, `To` before `Cc`, as the headers gave\nthem: without the inbox, the sender, and no-reply or service\naddresses; at most six."
+          },
+          "party": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Address",
+                "description": "The one person it is natural to put the move on: the person the\nmodel's `awaited` answer named, else the only other person in `To`.\nNone when there is no obvious one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sure_bar": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The confidence from which Campbooks shows it as sure, in percent.",
+            "minimum": 0
+          },
+          "unanswered_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Whole days since the email was sent, when none of `others` wrote to\nthe inbox since; none when one did.",
+            "minimum": 0
+          }
+        }
       },
       "UpdateRule": {
         "type": "object",

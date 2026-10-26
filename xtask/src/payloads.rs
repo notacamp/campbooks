@@ -307,6 +307,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "newest",
         "the conversation a Worth a look run raises, and when its mail was sent (an id and a timestamp)",
     ),
+    (
+        "conversations.dispatch_needs_backfills",
+        "moves",
+        "a flag: whose move it is is switched on",
+    ),
     ("conversations.backfill_needs", "inbox", INBOX_ID),
     ("conversations.backfill_needs", "after", CONVERSATION_CURSOR),
     ("conversations.check_send", "draft", DRAFT_ID),

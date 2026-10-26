@@ -1,6 +1,8 @@
 # pnpm 11 reads its settings from this file (not .npmrc).
 packages:
   - app
+  # @notacamp/ui, the design system (published to GitHub Packages; see ui/README.md).
+  - ui
 
 # Supply-chain hardening ------------------------------------------------------
 # Refuse any version published less than 7 days ago (minutes). Most malicious

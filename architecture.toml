@@ -204,7 +204,7 @@ reason = "Notion's webhook (campbooks-cloud#376): the public hook finds the stre
 
 [[access.maintenance_scope]]
 path = "crates/modules/conversations/src/features/backfill_needs/mod.rs"
-reason = "The needs backfill's dispatcher starts pending backfills across workspaces (`conversations.needs_backfills` maintenance policies: ids and states, start only) and enqueues each inbox's page job in its workspace."
+reason = "The needs backfill's dispatcher starts pending backfills across workspaces, and, once whose move it is is switched on, the finished ones that did not ask it (`conversations.needs_backfills` maintenance policies: ids and states, start only), and enqueues each inbox's page job in its workspace."
 
 [[access.maintenance_scope]]
 path = "crates/modules/conversations/src/features/resign_rules/mod.rs"

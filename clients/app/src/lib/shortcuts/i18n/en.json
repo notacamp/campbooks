@@ -9,11 +9,6 @@
     "money": "Money",
     "settings": "Settings"
   },
-  "list": {
-    "next": "Next item",
-    "previous": "Previous item",
-    "open": "Open"
-  },
   "item": {
     "reply": "Reply",
     "done": "Done",
@@ -32,24 +27,7 @@
     "italic": "Italic",
     "ask": "Ask"
   },
-  "command": {
-    "open": "Search or ask"
-  },
-  "undo": "Undo",
   "workspace": {
     "switch": "Switch workspace"
-  },
-  "sheet": {
-    "open": "Keyboard shortcuts"
-  },
-  "overlay": {
-    "close": "Close"
-  },
-  "groups": {
-    "navigation": "Go to",
-    "general": "General",
-    "list": "Lists",
-    "item": "Selected item",
-    "compose": "Writing"
   }
 }

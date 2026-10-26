@@ -13,6 +13,17 @@
 //! The eval set is fictional: these operating points are a floor to start
 //! from until an eval of real mail, from members' corrections, replaces it
 //! (ADR 0018).
+//!
+//! Acting is not the same as being sure (campbooks-cloud#372). The operating
+//! point above is where an answer may act; a model's `needs_reply` or
+//! `asks_action` "yes" raises a *sure* need only from a higher bar
+//! ([`Policy::sure_bar`]), measured on the yes side of the same set by
+//! `crates/ai/evals/decide/mail-triage/reports/2026-10-25-confidence-bands-and-moves-cost.md`:
+//! between the check floor and the bar it is put to the member as a question.
+//! The bars are on the confidence the server stores and compares, which is
+//! the answer's own probability after the configured temperature
+//! (`CAMPBOOKS_AI__DECIDE__CALIBRATION__*`, 1.0 when unset), so they read on
+//! the report's raw scale while no temperature is configured.
 
 use campbooks_ai::decide::{Answer, signals::email::triage as questions};
 
@@ -47,6 +58,7 @@ impl Switch {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Policy {
     entries: Vec<(&'static str, Source, Switch)>,
+    sure_bars: Vec<(&'static str, f64)>,
     check_floor: f64,
 }
 
@@ -56,8 +68,8 @@ impl Policy {
     /// | Question | Target | `facts` (rules) | `jev` (model): point, precision on `test` | Model |
     /// | --- | --- | --- | --- | --- |
     /// | `stream` | 95% | never answers | 0.49, 98% | act ≥ 0.49 |
-    /// | `needs_reply` | 90% | "no" only: 0.99, 100%, act ≥ 0.99 | 0.51, 91% | act ≥ 0.51 |
-    /// | `asks_action` | 90% | never answers | 0.58, 94% | act ≥ 0.58 |
+    /// | `needs_reply` | 90% | "no" only: 0.99, 100%, act ≥ 0.99 | 0.51, 91% | act ≥ 0.51, sure ≥ 0.9 |
+    /// | `asks_action` | 90% | never answers | 0.58, 94% | act ≥ 0.58, sure ≥ 0.8 |
     /// | `has_deadline` | 90% | never answers | 0.51, 97% | act ≥ 0.51 |
     /// | `urgency` | 85% | never answers | 0.73, 81% (does not hold) | record |
     /// | `suspicious` | 98% | never answers | 0.54, 100% | act ≥ 0.54 |
@@ -66,6 +78,17 @@ impl Policy {
     /// | `awaited` | not set | never answers | not measured | record |
     /// | `has_dated_thing` | not set | never answers | not measured | record |
     /// | `dated_kind` | not set | never answers | not measured | record |
+    ///
+    /// The sure bars (campbooks-cloud#372, the 2026-10-25 report, yes side of
+    /// the model's answers on 320 items): a `needs_reply` "yes" below 0.9
+    /// was right 76% of the time at 0.8 to 0.9 and 25% to 50% under 0.8,
+    /// and 89% from 0.9 (97.6% of 42 once a `suspicious` "yes" vetoes it, so
+    /// the bar also needs the message not to be answered suspicious); an
+    /// `asks_action` "yes" was right 96.8% of the time from 0.8 (155 of 171
+    /// answers) and 0% to 40% from 0.5 to 0.8. Under its bar an answer is a
+    /// question, from [`CHECK_FLOOR`](Self::CHECK_FLOOR). Only these two
+    /// bars changed in that report's change; `stream`, `has_deadline` and
+    /// `suspicious` keep their operating points as measured.
     ///
     /// `has_dated_thing` and `dated_kind` (campbooks-cloud#42) only record
     /// until the owner's labelled dated mail gives them an operating point:
@@ -112,8 +135,31 @@ impl Policy {
                 ),
                 (questions::SUSPICIOUS, Source::Model, Switch::ActAbove(0.54)),
             ],
+            sure_bars: vec![
+                (questions::NEEDS_REPLY, Self::SURE_NEEDS_REPLY),
+                (questions::ASKS_ACTION, Self::SURE_ASKS_ACTION),
+            ],
             check_floor: Self::CHECK_FLOOR,
         }
+    }
+
+    /// The confidence from which a model's `needs_reply` "yes" raises a sure
+    /// Reply need, provided the message is not answered suspicious
+    /// (campbooks-cloud#372).
+    pub const SURE_NEEDS_REPLY: f64 = 0.9;
+
+    /// The confidence from which a model's `asks_action` "yes" raises a sure
+    /// Do need (campbooks-cloud#372).
+    pub const SURE_ASKS_ACTION: f64 = 0.8;
+
+    /// The confidence from which a model's "yes" to `question` is sure
+    /// enough to be shown as a need Campbooks stands behind; `None` for a
+    /// question with no bar of its own (it is sure where it acts).
+    pub fn sure_bar(&self, question: &str) -> Option<f64> {
+        self.sure_bars
+            .iter()
+            .find(|(q, _)| *q == question)
+            .map(|(_, bar)| *bar)
     }
 
     /// The confidence from which a model answer the policy does not accept
@@ -306,6 +352,33 @@ mod tests {
                     expected(question)
                 );
             }
+        }
+    }
+
+    #[test]
+    fn a_guess_is_only_sure_from_its_bar_and_the_bar_is_above_where_it_acts() {
+        let policy = Policy::baseline();
+        assert_eq!(policy.sure_bar(questions::NEEDS_REPLY), Some(0.9));
+        assert_eq!(policy.sure_bar(questions::ASKS_ACTION), Some(0.8));
+        // Only these two bars changed.
+        for question in [
+            questions::STREAM,
+            questions::HAS_DEADLINE,
+            questions::SUSPICIOUS,
+            questions::URGENCY,
+            questions::MONEY,
+        ] {
+            assert_eq!(policy.sure_bar(question), None, "{question}");
+        }
+        // A bar sits above the confidence the answer may act from, and the
+        // check floor is not above the bar: acting never shows as sure.
+        for question in [questions::NEEDS_REPLY, questions::ASKS_ACTION] {
+            let bar = policy.sure_bar(question).unwrap();
+            match policy.switch(question, Source::Model) {
+                Switch::ActAbove(act) => assert!(bar > act, "{question}"),
+                Switch::Record => panic!("{question} acts"),
+            }
+            assert!(policy.check_floor() <= bar, "{question}");
         }
     }
 

@@ -31,7 +31,7 @@
 //!   (`conversations.decide_backlog`, one job per message, ids only), which
 //!   sorts it and works out its need again.
 //!
-//! - With the action catalogue on (`CAMPBOOKS_CONVERSATIONS__ACTIONS__ENABLED`)
+//! - With whose move it is on (`CAMPBOOKS_CONVERSATIONS__MOVES__ENABLED`)
 //!   and the same model, each of those conversations with no open need whose
 //!   newest inbound message, sent within both windows, has no checked
 //!   `next_move` answer is queued too: the pass then asks only whose move it
@@ -46,6 +46,12 @@
 //!   asked again, but once for its dates, items and asks when its summary was
 //!   written before they were read (campbooks-cloud#275, #42). A need on a
 //!   message that is not flagged is queued for nothing.
+//!
+//! - Switching whose move it is on later runs this again once for every
+//!   inbox (`needs_backfills.moves_asked`): the dispatcher starts the finished
+//!   backfills that were made without it again, so the mail of the last days
+//!   is asked whose move it is. With it off nothing is reset and
+//!   nothing is asked.
 //!
 //! Each refresh also settles the need against the time now and writes when
 //! it next changes with time alone (`conversations.need_clocks`): an old
@@ -68,7 +74,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Transaction};
 
 use crate::{
-    config::ActionSettings,
+    config::MoveSettings,
     domain::{
         dated,
         needs::{self, NeedSettings},
@@ -126,7 +132,13 @@ const DISPATCH_BATCH: i64 = 500;
 /// inbox as failed) its job again. Enqueueing a page that is already
 /// queued or running is a no-op (one job per inbox and cursor).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DispatchNeedsBackfills;
+pub struct DispatchNeedsBackfills {
+    /// Whether whose move it is is switched on
+    /// (`CAMPBOOKS_CONVERSATIONS__MOVES__ENABLED`): then a backfill that
+    /// finished without asking it runs once more.
+    #[serde(default)]
+    pub moves: bool,
+}
 
 impl Job for DispatchNeedsBackfills {
     const NAME: &'static str = "conversations.dispatch_needs_backfills";
@@ -139,6 +151,24 @@ impl Job for DispatchNeedsBackfills {
         // `architecture.toml`. It reaches no kernel table: each page job is
         // enqueued in its inbox's workspace, set for that enqueue only.
         let tx = ctx.maintenance_tx().await?;
+        if self.moves {
+            // Whose move it is was switched on after these backfills ran:
+            // once more, which asks it of the recent mail. Started at once
+            // (`running`), as the maintenance policy only lets a row be
+            // started. A runtime query, so the column added since needs no
+            // entry in the `.sqlx` cache.
+            let again = sqlx::query(
+                "UPDATE conversations.needs_backfills
+                    SET state = 'running', after_id = NULL, refreshed = 0, finished_at = NULL
+                  WHERE state = 'done' AND NOT moves_asked",
+            )
+            .execute(&mut **tx)
+            .await?
+            .rows_affected();
+            if again > 0 {
+                tracing::info!(inboxes = again, "needs backfill again for whose move it is");
+            }
+        }
         sqlx::query!(
             r#"UPDATE conversations.needs_backfills b SET state = 'running'
                 WHERE b.inbox_id IN (
@@ -233,8 +263,8 @@ pub struct BackfillNeeds {
     needs: NeedSettings,
     model: Option<ModelPass>,
     decide_window: TimeDelta,
-    /// The action catalogue: on, recent mail is asked whose move it is.
-    actions: ActionSettings,
+    /// Whose move it is: on, recent mail is asked it.
+    moves: MoveSettings,
 }
 
 impl BackfillNeeds {
@@ -246,14 +276,14 @@ impl BackfillNeeds {
             needs,
             model,
             decide_window: TimeDelta::days(i64::from(decide_backfill_days)),
-            actions: ActionSettings::default(),
+            moves: MoveSettings::default(),
         }
     }
 
-    /// The same backfill, asking whose move it is as `actions` says.
+    /// The same backfill, asking whose move it is as `moves` says.
     #[must_use]
-    pub const fn with_actions(mut self, actions: ActionSettings) -> Self {
-        self.actions = actions;
+    pub const fn with_moves(mut self, moves: MoveSettings) -> Self {
+        self.moves = moves;
         self
     }
 }
@@ -348,6 +378,19 @@ impl BackfillNeeds {
             .execute(&mut **tx)
             .await?;
             return Ok(());
+        }
+
+        // Whether this run asks whose move it is, recorded with its first
+        // page: a run made without it is made again once it is switched on.
+        // A runtime query (the column was added since the `.sqlx` cache).
+        if page.after.is_none() {
+            sqlx::query(
+                "UPDATE conversations.needs_backfills SET moves_asked = $2 WHERE inbox_id = $1",
+            )
+            .bind(page.inbox)
+            .bind(self.moves.enabled)
+            .execute(&mut **tx)
+            .await?;
         }
 
         // Recent conversations, and any whose need is open (an old one may
@@ -488,7 +531,7 @@ impl BackfillNeeds {
         .await?;
         // Whose move it is, for mail that needs nothing yet: within the
         // needs window too, since only such mail can wait on someone.
-        let moves: Vec<MessageId> = if self.actions.enabled {
+        let moves: Vec<MessageId> = if self.moves.enabled {
             sqlx::query_scalar(MOVES_UNASKED)
                 .bind(conversations)
                 .bind(since.max(Utc::now() - self.needs.window))

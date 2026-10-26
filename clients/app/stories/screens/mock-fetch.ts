@@ -1,5 +1,5 @@
 import { writePref } from "~/lib/storage/prefs";
-import { DEFAULT_WORKSPACE } from "~/lib/ui/theme/theme";
+import { DEFAULT_WORKSPACE } from "~/lib/ui";
 
 /**
  * A mocked endpoint's answer: a fixed response, or one computed from the

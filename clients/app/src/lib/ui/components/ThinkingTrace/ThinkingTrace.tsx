@@ -1,6 +1,4 @@
-import { cx } from "../../internal/cx";
-import { Icon } from "../Icon/Icon";
-import { Visor } from "../Visor/Visor";
+import { cx, Icon, Visor } from "@notacamp/ui";
 
 import styles from "./ThinkingTrace.module.css";
 
