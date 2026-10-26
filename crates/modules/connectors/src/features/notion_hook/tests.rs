@@ -3,10 +3,7 @@
 //! the hook never calls Notion or reads a page.
 
 use axum::http::StatusCode;
-use campbooks_kernel::{
-    clock::Clock as _,
-    tenancy::{Role, WorkspaceId},
-};
+use campbooks_kernel::tenancy::{Role, WorkspaceId};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -33,10 +30,17 @@ async fn forced(kit: &Kit, stream: Uuid) -> bool {
     cursor["force"] == json!(true)
 }
 
+/// A run of the stream waits for a worker: the hook asked for one.
 async fn due(kit: &Kit, stream: Uuid) -> bool {
-    kit.notion_due(stream)
-        .await
-        .is_some_and(|at| at <= kit.clock.now())
+    sqlx::query_scalar(
+        "SELECT count(*) > 0 FROM kernel.jobs
+          WHERE kind = 'connectors.sync_stream' AND state = 'pending'
+            AND payload->>'stream' = $1",
+    )
+    .bind(stream.to_string())
+    .fetch_one(&kit.db)
+    .await
+    .unwrap()
 }
 
 /// A workspace with Marta's Notion connected and one page linked.
@@ -301,7 +305,6 @@ async fn only_page_events_for_a_known_page_wake_a_stream(db: PgPool) {
         event("comment.created", page),
         event("page.locked", page),
         event("database.schema_updated", page),
-        event("page.content_updated", Uuid::now_v7()),
         b"{}".to_vec(),
         serde_json::to_vec(
             &json!({"type": "page.content_updated", "entity": {"id": "not-a-uuid"}}),
@@ -320,6 +323,14 @@ async fn only_page_events_for_a_known_page_wake_a_stream(db: PgPool) {
     }
     assert!(!due(&kit, stream).await);
     assert!(!forced(&kit, stream).await);
+    // A page event for a Notion page nothing here reads is taken, and wakes
+    // nothing.
+    let unknown = event("page.content_updated", Uuid::now_v7());
+    let posted = kit
+        .notion_hook(&unknown, Some(&Kit::notion_signature(&unknown)))
+        .await;
+    assert_eq!(posted.status, StatusCode::ACCEPTED);
+    assert!(!due(&kit, stream).await);
     let junk = b"not json".to_vec();
     let posted = kit
         .notion_hook(&junk, Some(&Kit::notion_signature(&junk)))
@@ -338,14 +349,6 @@ async fn each_of_the_five_page_events_marks_the_stream_due(db: PgPool) {
         "page.deleted",
         "page.undeleted",
     ] {
-        sqlx::query("UPDATE connectors.sync_due SET due_at = now() + interval '1 day'")
-            .execute(&kit.db)
-            .await
-            .unwrap();
-        sqlx::query("UPDATE connectors.streams SET cursor = '{}'::jsonb")
-            .execute(&kit.db)
-            .await
-            .unwrap();
         assert!(!due(&kit, stream).await, "{kind}");
         let body = event(kind, page);
         let posted = kit
@@ -354,6 +357,8 @@ async fn each_of_the_five_page_events_marks_the_stream_due(db: PgPool) {
         assert_eq!(posted.status, StatusCode::ACCEPTED, "{kind}");
         assert!(due(&kit, stream).await, "{kind}");
         assert!(forced(&kit, stream).await, "{kind}");
+        // The worker takes the run, so the next kind starts from rest.
+        kit.run_jobs().await;
     }
 }
 

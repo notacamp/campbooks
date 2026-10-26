@@ -316,7 +316,7 @@ async fn a_row_edited_after_it_was_bound_is_never_made(db: PgPool) {
         .execute(&l.kit.db)
         .await
         .unwrap();
-    l.kit.tick(TimeDelta::minutes(10)).await;
+    l.kit.tick(TimeDelta::days(2)).await;
     assert!(l.kit.notion.patches().is_empty());
     assert_eq!(
         l.kit.notion.text(l.second).as_deref(),
@@ -362,7 +362,7 @@ async fn a_row_without_a_binding_is_never_made(db: PgPool) {
     .await
     .unwrap();
     tx.commit().await.unwrap();
-    l.kit.tick(TimeDelta::minutes(10)).await;
+    l.kit.tick(TimeDelta::days(2)).await;
     assert!(l.kit.notion.patches().is_empty());
     assert_eq!(
         states(&l).await,
@@ -396,7 +396,7 @@ async fn a_change_moved_to_another_pages_stream_is_refused(db: PgPool) {
         .execute(&l.kit.db)
         .await
         .unwrap();
-    l.kit.tick(TimeDelta::minutes(10)).await;
+    l.kit.tick(TimeDelta::days(2)).await;
     assert!(l.kit.notion.patches().is_empty());
     assert_eq!(
         l.kit.notion.text(victim).as_deref(),
@@ -441,7 +441,7 @@ async fn a_page_is_never_removed_even_when_the_request_says_so(db: PgPool) {
     let l = linked(db).await;
     let sub = l.kit.notion.add_page("A sub-page", Some(l.notion_page));
     // Read again so the sub-page is known, then ask to delete it.
-    l.kit.tick(TimeDelta::minutes(10)).await;
+    l.kit.tick(TimeDelta::days(2)).await;
     l.kit.notion.forget_calls();
     l.kit
         .ask_notion_changes(
@@ -528,7 +528,7 @@ async fn throttling_leaves_the_change_pending_for_the_next_run(db: PgPool) {
         Some("Plan the launch")
     );
     assert!(completed(&l).await.is_empty());
-    l.kit.tick(TimeDelta::minutes(10)).await;
+    l.kit.tick(TimeDelta::days(2)).await;
     assert_eq!(
         l.kit.notion.text(l.first).as_deref(),
         Some("After the wait")

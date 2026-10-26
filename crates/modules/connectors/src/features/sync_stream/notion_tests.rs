@@ -201,7 +201,7 @@ async fn throttling_backs_the_run_off_without_losing_the_page(db: PgPool) {
     assert_eq!(reads(&l).await.len(), 1, "nothing was read while throttled");
     assert!(l.kit.notion_stream_opt(l.notion_page).await.is_some());
     // Later, the page is read.
-    l.kit.tick(TimeDelta::minutes(10)).await;
+    l.kit.tick(TimeDelta::days(2)).await;
     assert_eq!(reads(&l).await.len(), 2);
     assert_eq!(health(&l).await, "ok");
 }
