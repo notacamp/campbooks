@@ -1,6 +1,6 @@
 import { useRef, type ComponentPropsWithRef, type KeyboardEvent, type ReactNode } from "react";
 
-import { cx, Icon, IconButton, type IconName } from "@notacamp/ui";
+import { cx, Icon, IconButton, KbdHint, type IconName } from "@notacamp/ui";
 
 import styles from "./Toolbar.module.css";
 
@@ -104,8 +104,8 @@ export interface ToolbarButtonProps extends Omit<ComponentPropsWithRef<"button">
   /** How many filters or sorts are on. */
   count?: number | undefined;
   primary?: boolean | undefined;
-  /** The key that does the same, shown after the name. */
-  keys?: string | undefined;
+  /** The shortcut that does the same: its keys are shown after the name. */
+  shortcut?: string | undefined;
 }
 
 /** A toolbar button: icon and name, the name only from the tablet width up. */
@@ -114,7 +114,7 @@ export function ToolbarButton({
   label,
   count,
   primary = false,
-  keys,
+  shortcut,
   className,
   type = "button",
   ...rest
@@ -131,10 +131,10 @@ export function ToolbarButton({
       <Icon name={icon} />
       <span className={styles["buttonLabel"]}>{label}</span>
       {count === undefined || count === 0 ? null : <span className={styles["count"]}>{count}</span>}
-      {keys === undefined ? null : (
-        <kbd className={styles["keys"]} aria-hidden="true">
-          {keys}
-        </kbd>
+      {shortcut === undefined ? null : (
+        <span className={styles["keys"]}>
+          <KbdHint shortcut={shortcut} />
+        </span>
       )}
     </button>
   );

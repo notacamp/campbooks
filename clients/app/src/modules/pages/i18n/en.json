@@ -582,7 +582,8 @@
       "crumb": "{{table}} · row",
       "title": "Row title",
       "openAsPage": "Open as page",
-      "close": "Close"
+      "close": "Close",
+      "trash": "Move to trash"
     },
     "toast": {
       "cell": "{{property}} changed",

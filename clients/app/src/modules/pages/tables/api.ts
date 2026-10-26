@@ -56,7 +56,7 @@ export function useTable(workspaceId: string, tableId: string) {
 }
 
 /** `pages.query_table` for a view, 100 rows at a time (the cursor is the server's). */
-export function useTableRows(workspaceId: string, tableId: string, viewId: string | undefined) {
+export function useTableRows(workspaceId: string, tableId: string, viewId?: string) {
   return useInfiniteQuery({
     queryKey: tableKeys.view(workspaceId, tableId, viewId ?? ""),
     enabled: viewId !== undefined,

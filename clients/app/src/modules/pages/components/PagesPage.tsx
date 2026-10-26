@@ -46,6 +46,9 @@ export interface PagesPageProps {
   creating?: boolean | undefined;
   /** `?import=notion`: open the import from Notion (Settings → Notion → Import pages). */
   importing?: boolean | undefined;
+  /** `?view=` and `?row=`: a table page's current view and the row opened beside it. */
+  view?: string | undefined;
+  row?: string | undefined;
   /** Notion, from the app shell; without it there is no import. */
   notion?: { useSource: UseNotionSource } | undefined;
 }
@@ -62,6 +65,8 @@ export function PagesPage({
   pageId,
   creating = false,
   importing = false,
+  view,
+  row,
   notion,
 }: PagesPageProps) {
   const { t } = useTranslation("pages");
@@ -379,6 +384,18 @@ export function PagesPage({
             pageId={pageId}
             pages={all}
             actions={actions}
+            view={view}
+            row={row}
+            onTable={(change) => {
+              void navigate({
+                to: `${base}/${pageId}`,
+                search: {
+                  ...(change.view === undefined ? {} : { view: change.view }),
+                  ...(change.row === undefined ? {} : { row: change.row }),
+                },
+                replace: true,
+              });
+            }}
             onBack={() => {
               go();
             }}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { Button, IconButton, useFocusTrap } from "@notacamp/ui";
 
@@ -10,15 +11,18 @@ export interface RowPeekProps {
   /** Where the row is ("Clients"), over its title. */
   crumb: ReactNode;
   /** The "Open as page" button's text. */
-  openAsPage: string;
-  onOpenAsPage: () => void;
+  openAsPage?: string | undefined;
+  onOpenAsPage?: (() => void) | undefined;
   closeLabel: string;
   onClose: () => void;
+  /** Move the row to the trash (not for a reader): the label names it. */
+  trashLabel?: string | undefined;
+  onTrash?: (() => void) | undefined;
   children: ReactNode;
 }
 
 /**
- * A row opened beside its table: its title, its properties and its page.
+ * A row opened beside its table (in the page's top layer, so nothing clips it): its title, its properties and its page.
  * From the large width it docks to the right edge over the table; on a phone
  * it fills the screen. Focus stays inside it; Escape (or Close) closes it and
  * puts focus back where it was.
@@ -30,6 +34,8 @@ export function RowPeek({
   onOpenAsPage,
   closeLabel,
   onClose,
+  trashLabel,
+  onTrash,
   children,
 }: RowPeekProps) {
   const panel = useRef<HTMLElement>(null);
@@ -53,7 +59,7 @@ export function RowPeek({
       element?.removeEventListener("keydown", onKeyDown);
     };
   }, []);
-  return (
+  return createPortal(
     <aside
       ref={panel}
       role="dialog"
@@ -64,13 +70,19 @@ export function RowPeek({
     >
       <div className={styles["bar"]}>
         <span className={styles["crumb"]}>{crumb}</span>
-        <Button variant="ghost" onClick={onOpenAsPage}>
-          {openAsPage}
-        </Button>
+        {openAsPage === undefined || onOpenAsPage === undefined ? null : (
+          <Button variant="ghost" onClick={onOpenAsPage}>
+            {openAsPage}
+          </Button>
+        )}
+        {onTrash === undefined || trashLabel === undefined ? null : (
+          <IconButton icon="trash" label={trashLabel} onClick={onTrash} />
+        )}
         <IconButton icon="close" label={closeLabel} onClick={onClose} />
       </div>
       <div className={styles["body"]}>{children}</div>
-    </aside>
+    </aside>,
+    document.body,
   );
 }
 

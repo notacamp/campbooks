@@ -19,3 +19,20 @@ rows for it.
 #### Scenario: An embedded table the reader cannot open
 - **WHEN** Rui opens a page that embeds Marta's private "Clients" table
 - **THEN** the block shows that something is there, and no row, title or value of the table reaches Rui
+
+### Requirement: Rows can be read by id
+`pages.query_table` SHALL take up to 100 row ids and answer only those of
+that table that are live and readable, so a relation cell's rows and a row
+opened as a page can be read without paging the whole table.
+
+#### Scenario: A row of another table is not the table's
+- **WHEN** Marta asks the Clients table for her Acme row and a row of Projects
+- **THEN** only the Acme row comes back
+
+### Requirement: The list says whether tables are on
+`pages.list` SHALL say whether tables are on, so a client offers "New table",
+`/table` and `/link to table` only when they work.
+
+#### Scenario: Tables are off
+- **WHEN** Marta lists her pages with tables off
+- **THEN** the answer says so, and the client shows no table entry points

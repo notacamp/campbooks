@@ -296,15 +296,17 @@ export function GridPane({
         onActiveRow(position?.rowId);
       }}
       empty={t("tables.rows.empty")}
-      onResize={(id, width) => {
-        if (canWrite) {
-          save({
-            properties: withColumns((candidate) =>
-              candidate.property.id === id ? { ...candidate, width } : candidate,
-            ),
-          });
-        }
-      }}
+      onResize={
+        canWrite
+          ? (id, width) => {
+              save({
+                properties: withColumns((candidate) =>
+                  candidate.property.id === id ? { ...candidate, width } : candidate,
+                ),
+              });
+            }
+          : undefined
+      }
       resizeLabel={(name) => t("tables.column.resize", { property: name })}
       headerEnd={
         canWrite ? <NewColumn tables={tables} here={here} onCreate={onNewColumn} /> : undefined

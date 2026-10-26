@@ -28,7 +28,7 @@ import {
 } from "../types";
 
 /** The types a member can make, in three groups: the menu of a new column and of a type change. */
-function TypeMenu({
+export function TypeMenu({
   label,
   current,
   onPick,

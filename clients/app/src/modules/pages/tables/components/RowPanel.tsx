@@ -218,6 +218,18 @@ export function RowPeekPanel({
       onOpenAsPage={onOpenAsPage}
       closeLabel={t("tables.peek.close")}
       onClose={onClose}
+      {...(readOnly
+        ? {}
+        : {
+            trashLabel: t("tables.peek.trash"),
+            onTrash: () => {
+              void actions.trashRow(row).then((done) => {
+                if (done) {
+                  onClose();
+                }
+              });
+            },
+          })}
     >
       <TitleField
         label={t("tables.peek.title")}

@@ -582,7 +582,8 @@
       "crumb": "{{table}} · linha",
       "title": "Título da linha",
       "openAsPage": "Abrir como página",
-      "close": "Fechar"
+      "close": "Fechar",
+      "trash": "Mover para a reciclagem"
     },
     "toast": {
       "cell": "{{property}} alterado",

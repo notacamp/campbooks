@@ -223,9 +223,7 @@ async fn rows_can_be_asked_for_by_id_and_only_the_tables_own(db: PgPool) {
         elsewhere["id"].as_str().unwrap().to_owned(),
     );
 
-    let asked = kit
-        .query(&marta, ws, &t, json!({"rows": [a, z]}))
-        .await;
+    let asked = kit.query(&marta, ws, &t, json!({"rows": [a, z]})).await;
     assert_eq!(asked.status, StatusCode::OK, "{:?}", asked.json);
     let titles: Vec<_> = asked.json["rows"]
         .as_array()
@@ -236,9 +234,7 @@ async fn rows_can_be_asked_for_by_id_and_only_the_tables_own(db: PgPool) {
     assert_eq!(titles, ["A"], "a row of another table is not the table's");
     let none = kit.query(&marta, ws, &t, json!({"rows": []})).await;
     assert_eq!(none.json["rows"], json!([]));
-    let many: Vec<String> = (0..101)
-        .map(|_| uuid::Uuid::now_v7().to_string())
-        .collect();
+    let many: Vec<String> = (0..101).map(|_| uuid::Uuid::now_v7().to_string()).collect();
     let too_many = kit.query(&marta, ws, &t, json!({"rows": many})).await;
     assert_eq!(too_many.status, StatusCode::BAD_REQUEST);
 }

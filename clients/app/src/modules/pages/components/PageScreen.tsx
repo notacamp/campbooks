@@ -45,10 +45,23 @@ export interface PageScreenProps {
   actions: ReturnType<typeof usePageActions>;
   /** Back to the tree (on phones). */
   onBack: () => void;
+  /** A table page's view and the row beside it, from the address; `onTable` changes them. */
+  view?: string | undefined;
+  row?: string | undefined;
+  onTable?: ((change: { view?: string | undefined; row?: string | undefined }) => void) | undefined;
 }
 
 /** The page open in the reader pane: loading, not found, or the page. */
-export function PageScreen({ workspaceId, pageId, pages, actions, onBack }: PageScreenProps) {
+export function PageScreen({
+  workspaceId,
+  pageId,
+  pages,
+  actions,
+  onBack,
+  view,
+  row,
+  onTable,
+}: PageScreenProps) {
   const { t } = useTranslation("pages");
   const page = usePage(workspaceId, pageId);
   if (page.isPending) {
@@ -78,6 +91,9 @@ export function PageScreen({ workspaceId, pageId, pages, actions, onBack }: Page
       pages={pages}
       actions={actions}
       onBack={onBack}
+      view={view}
+      row={row}
+      onTable={onTable}
     />
   );
 }
@@ -93,7 +109,16 @@ interface OpenPageProps extends Omit<PageScreenProps, "pageId"> {
   page: PageView;
 }
 
-function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) {
+function OpenPage({
+  workspaceId,
+  page,
+  pages,
+  actions,
+  onBack,
+  view,
+  row,
+  onTable,
+}: OpenPageProps) {
   const { t } = useTranslation("pages");
   const navigate = useNavigate();
   const trashed = page.trashed_at !== null && page.trashed_at !== undefined;
@@ -289,6 +314,18 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
               pages={pages}
               pageActions={actions}
               open={open}
+              {...(onTable === undefined
+                ? {}
+                : {
+                    view,
+                    row,
+                    onView: (next: string | undefined) => {
+                      onTable({ view: next });
+                    },
+                    onRow: (next: string | undefined) => {
+                      onTable({ view, row: next });
+                    },
+                  })}
             />
           ) : (
             <PageEditor

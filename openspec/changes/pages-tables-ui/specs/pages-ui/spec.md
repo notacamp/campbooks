@@ -31,3 +31,21 @@ locale.
 #### Scenario: A table on a phone
 - **WHEN** "Clients" is opened at 375 px
 - **THEN** the grid scrolls sideways inside its box, and the page does not
+
+### Requirement: The address holds the view and the row
+A table page's current view and the row opened beside it SHALL be in its
+address, so a link opens them and Escape or Close takes the row out again.
+
+#### Scenario: A link to a row
+- **WHEN** Rui opens the link to the Acme row of the Clients board
+- **THEN** the board opens with the Acme row beside it
+
+### Requirement: Every change can be undone
+Every change to a cell, a title, a row, a column, an option or a view SHALL
+show an Undo, and a failure SHALL roll the cell back and say so until Retry.
+A cell somebody else changed meanwhile SHALL be said in the toast, with the
+member's value kept.
+
+#### Scenario: A concurrent edit
+- **WHEN** Marta saves a Value that Rui changed a moment before
+- **THEN** the toast says someone else changed it too and that hers is kept, with Undo

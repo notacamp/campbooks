@@ -179,7 +179,7 @@ export interface FlatFilter {
   nested: boolean;
 }
 
-export function flatFilter(filter: FilterNode | undefined): FlatFilter {
+export function flatFilter(filter?: FilterNode): FlatFilter {
   if (filter === undefined) {
     return { mode: "and", conditions: [], nested: false };
   }
@@ -453,7 +453,7 @@ export function optionsOf(property: Pick<PropertyView, "config">): ChoiceOption[
   });
 }
 
-export function optionById(property: Pick<PropertyView, "config">, id: string | undefined) {
+export function optionById(property: Pick<PropertyView, "config">, id?: string) {
   return id === undefined ? undefined : optionsOf(property).find((option) => option.id === id);
 }
 
@@ -586,7 +586,7 @@ export function timeOf(value: string): string | undefined {
 }
 
 /** A day and a time of day (the viewer's) as the value the server keeps. */
-export function joinWhen(day: string, time: string | undefined): string {
+export function joinWhen(day: string, time?: string): string {
   if (time === undefined) {
     return day;
   }

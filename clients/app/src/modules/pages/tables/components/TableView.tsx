@@ -9,6 +9,7 @@ import {
   FilterChip,
   MentionChip,
   Popover,
+  RowPeek,
   SkeletonList,
   TableToolbar,
   ToolbarButton,
@@ -21,7 +22,7 @@ import { useMembers } from "~/modules/workspaces";
 import type { usePageActions } from "../../components/use-page-actions";
 import type { PageSummary } from "../../types";
 import { memberName, type CellContext } from "../cells/context";
-import { useTable, useTableRows } from "../api";
+import { useRowsById, useTable, useTableRows } from "../api";
 import {
   columnsOf,
   configJson,
@@ -59,6 +60,15 @@ export interface TableViewProps {
   open: (href: string) => void;
   /** The view an inline table shows first. */
   initialView?: string | undefined;
+  /**
+   * The view and the row opened beside the table, when the address holds them
+   * (a table page): `onView` and `onRow` change the address. Without them the
+   * table keeps its own (an inline table).
+   */
+  view?: string | undefined;
+  onView?: ((view: string | undefined) => void) | undefined;
+  row?: string | undefined;
+  onRow?: ((row: string | undefined) => void) | undefined;
   /** In a page's body: its shortcuts wait until the table has the focus. */
   inline?: boolean | undefined;
 }
@@ -112,6 +122,10 @@ function LoadedTable({
   pageActions,
   open,
   initialView,
+  view: viewInAddress,
+  onView,
+  row: rowInAddress,
+  onRow,
   inline = false,
   detail,
 }: TableViewProps & { detail: TableDetail }) {
@@ -120,14 +134,30 @@ function LoadedTable({
   const actions = useTableActions(workspaceId, tableId);
   const canWrite = detail.page.role !== "reader";
 
-  const [chosen, setChosen] = useState(initialView);
+  const [ownView, setOwnView] = useState(initialView);
+  const chosen = onView === undefined ? ownView : viewInAddress;
+  const setChosen = (id: string | undefined) => {
+    if (onView === undefined) {
+      setOwnView(id);
+    } else {
+      onView(id);
+    }
+  };
   const view = detail.views.find((candidate) => candidate.id === chosen) ?? detail.views[0];
   const [editing, setEditing] = useState<{ position: CellPos; seed?: string | undefined } | null>(
     null,
   );
   const [reveal, setReveal] = useState<CellPos | undefined>();
   const [activeRow, setActiveRow] = useState<string | undefined>();
-  const [peek, setPeek] = useState<string | undefined>();
+  const [ownPeek, setOwnPeek] = useState<string | undefined>();
+  const peek = onRow === undefined ? ownPeek : rowInAddress;
+  const setPeek = (id: string | undefined) => {
+    if (onRow === undefined) {
+      setOwnPeek(id);
+    } else {
+      onRow(id);
+    }
+  };
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterFocus, setFilterFocus] = useState<string | undefined>();
   const [focused, setFocused] = useState(false);
@@ -205,7 +235,20 @@ function LoadedTable({
   const config = viewConfig(view);
   const board = view.type === "board";
   const columns = columnsOf(detail.properties, config);
-  const peeked = peek === undefined ? undefined : rows.find((row) => row.id === peek);
+  // A row asked for by address that is not among the loaded ones is read by id; one that cannot
+  // be read is "Something you can't open", and nothing more.
+  const loaded = peek === undefined ? undefined : rows.find((row) => row.id === peek);
+  const fetched = useRowsById(
+    workspaceId,
+    tableId,
+    peek !== undefined && loaded === undefined && query.isSuccess ? [peek] : [],
+  );
+  const peeked = loaded ?? fetched.data?.rows.find((row) => row.id === peek);
+  const closed =
+    peek !== undefined &&
+    peeked === undefined &&
+    query.isSuccess &&
+    (fetched.isError || (fetched.isSuccess && fetched.data.rows.length === 0));
 
   const save = (change: Partial<typeof config>, label?: string) => {
     void actions.updateView(view, { config: configJson({ ...config, ...change }, board) }, label);
@@ -443,7 +486,7 @@ function LoadedTable({
               primary
               icon="plus"
               label={t("tables.rows.new")}
-              keys="N R"
+              shortcut="pages.table.new_row"
               onClick={() => {
                 void addRow();
               }}
@@ -553,6 +596,20 @@ function LoadedTable({
           />
         ) : null}
       </div>
+      {closed ? (
+        <RowPeek
+          label={t("tables.peek.label")}
+          crumb={t("tables.peek.crumb", {
+            table: detail.page.title === "" ? t("untitled") : detail.page.title,
+          })}
+          closeLabel={t("tables.peek.close")}
+          onClose={() => {
+            setPeek(undefined);
+          }}
+        >
+          <DocCard icon="document" title={t("mention.closed")} state="closed" />
+        </RowPeek>
+      ) : null}
       {peeked === undefined ? null : (
         <RowPeekPanel
           key={peeked.id}

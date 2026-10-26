@@ -273,7 +273,7 @@ export function useTableActions(workspaceId: string, tableId: string) {
     return made;
   };
 
-  const trashPage = async (row: RowView): Promise<boolean> => {
+  const trashRow = async (row: RowView): Promise<boolean> => {
     dropRow(client, workspaceId, tableId, row.id);
     const done = await attempt(
       t("tables.toast.trashFailed"),
@@ -597,7 +597,7 @@ export function useTableActions(workspaceId: string, tableId: string) {
     setCell,
     setTitle,
     addRow,
-    trashPage,
+    trashRow,
     addProperty,
     renameProperty,
     changeType,
