@@ -17,7 +17,7 @@ use crate::{
         model::{Phase, StreamId},
         schedule,
     },
-    events::NotionLinkRequested,
+    events::{NotionLinkRequested, NotionLinkStopped, NotionStop},
 };
 
 /// Makes the stream of a linked Notion page.
@@ -72,13 +72,28 @@ impl EventConsumer for LinkNotionPage {
         .bind(asked.connection)
         .fetch_optional(&mut **tx)
         .await?;
-        let Some((provider, needs_reauth)) = connection else {
+        let usable = connection
+            .as_ref()
+            .is_some_and(|(provider, _)| provider == "notion");
+        let Some((_, needs_reauth)) = connection.filter(|_| usable) else {
+            // No Notion connection to read through: pages ends the link
+            // instead of leaving it waiting.
+            tracing::warn!(%workspace, "a Notion link names no Notion connection");
+            state
+                .events
+                .publish(
+                    tx,
+                    &NotionLinkStopped {
+                        workspace: workspace.to_string(),
+                        connection: asked.connection,
+                        notion_page: asked.notion_page,
+                        page: asked.page,
+                        reason: NotionStop::NotionUnavailable,
+                    },
+                )
+                .await?;
             return Ok(());
         };
-        if provider != "notion" {
-            tracing::warn!(%workspace, "a Notion link names a connection that is not Notion's");
-            return Ok(());
-        }
         let existing: Option<StreamId> = sqlx::query_scalar(
             "SELECT stream_id FROM connectors.notion_links
               WHERE connection_id = $1 AND notion_page_id = $2",

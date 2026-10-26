@@ -362,7 +362,13 @@ pub fn parse(raw: &Value) -> Option<Parsed> {
                     .and_then(Value::as_str)
                     .unwrap_or_default(),
             ));
-            block.runs = runs();
+            // Code is plain text: marks inside it mean nothing here, and
+            // Campbooks stores none, so the hashes of both sides agree.
+            let text: String = runs().iter().map(|run| run.text.as_str()).collect();
+            block.runs = vec![Run {
+                text,
+                ..Run::default()
+            }];
         }
         "image" | "file" | "pdf" => {
             let hosted = body
