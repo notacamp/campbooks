@@ -229,12 +229,6 @@ function LoadedTable({
     { enabled: shortcutsOn && view?.type !== "board" },
   );
 
-  if (view === undefined) {
-    return null;
-  }
-  const config = viewConfig(view);
-  const board = view.type === "board";
-  const columns = columnsOf(detail.properties, config);
   // A row asked for by address that is not among the loaded ones is read by id; one that cannot
   // be read is "Something you can't open", and nothing more.
   const loaded = peek === undefined ? undefined : rows.find((row) => row.id === peek);
@@ -250,6 +244,12 @@ function LoadedTable({
     query.isSuccess &&
     (fetched.isError || (fetched.isSuccess && fetched.data.rows.length === 0));
 
+  if (view === undefined) {
+    return null;
+  }
+  const config = viewConfig(view);
+  const board = view.type === "board";
+  const columns = columnsOf(detail.properties, config);
   const save = (change: Partial<typeof config>, label?: string) => {
     void actions.updateView(view, { config: configJson({ ...config, ...change }, board) }, label);
   };

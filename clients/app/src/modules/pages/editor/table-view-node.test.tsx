@@ -20,8 +20,6 @@ import { EditorEnvironmentContext } from "./environment";
 import { TableViewBlock } from "./nodes";
 import { must } from "../../../../test/must";
 
-vi.mock("./PageEditor", () => ({ PageEditor: () => <p>the row’s page</p> }));
-
 const open = vi.fn();
 
 function Editing({ table, view }: { table: string; view: string }) {

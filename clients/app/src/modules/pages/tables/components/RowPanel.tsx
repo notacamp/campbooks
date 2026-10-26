@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { use, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -11,9 +11,6 @@ import {
   TypeGlyph,
 } from "~/lib/ui";
 
-import { PageEditor } from "../../editor/PageEditor";
-import { usePageDocument } from "../../editor/use-page-document";
-import { usePage } from "../../api/queries";
 import type { usePageActions } from "../../components/use-page-actions";
 import type { PageSummary, UploadedFile } from "../../types";
 import { CellDisplay } from "../cells/CellDisplay";
@@ -23,6 +20,8 @@ import { editable as typeEditable, isEmptyValue } from "../model";
 import type { TableActions } from "../use-table-actions";
 import { glyphOf } from "../type-info";
 import type { PropertyView, RowView } from "../types";
+
+import { RowBodyContext } from "./row-body";
 
 export interface RowPropertiesProps {
   ctx: CellContext;
@@ -123,63 +122,6 @@ export function RowProperties({
   );
 }
 
-interface RowBodyProps {
-  workspaceId: string;
-  rowId: string;
-  pages: readonly PageSummary[];
-  actions: ReturnType<typeof usePageActions>;
-  /** The row can be written (not a reader's). */
-  editable: boolean;
-  open: (href: string) => void;
-}
-
-/** A row's page: the notes, to-dos and mentions under its properties. */
-function RowBody({ workspaceId, rowId, pages, actions, editable, open }: RowBodyProps) {
-  const page = usePage(workspaceId, rowId);
-  if (!page.isSuccess) {
-    return null;
-  }
-  return (
-    <RowBodyEditor
-      key={page.data.id}
-      workspaceId={workspaceId}
-      page={page.data}
-      pages={pages}
-      actions={actions}
-      editable={editable && page.data.trashed_at === null}
-      open={open}
-    />
-  );
-}
-
-function RowBodyEditor({
-  workspaceId,
-  page,
-  pages,
-  actions,
-  editable,
-  open,
-}: Omit<RowBodyProps, "rowId"> & { page: NonNullable<ReturnType<typeof usePage>["data"]> }) {
-  const { doc } = usePageDocument({
-    pageId: page.id,
-    update: page.document.update,
-    stateVector: page.document.state_vector,
-    revision: page.revision,
-    calls: actions.calls,
-  });
-  return (
-    <PageEditor
-      environment={{ workspaceId, pageId: page.id, open }}
-      doc={doc}
-      editable={editable}
-      pages={pages}
-      subPages={false}
-      upload={(file) => actions.calls.upload(page.id, file)}
-      createSubPage={() => Promise.reject(new Error("rows have no sub-pages"))}
-    />
-  );
-}
-
 export interface RowPeekPanelProps {
   ctx: CellContext;
   tableTitle: string;
@@ -209,6 +151,7 @@ export function RowPeekPanel({
   onOpenAsPage,
 }: RowPeekPanelProps) {
   const { t } = useTranslation("pages");
+  const renderBody = use(RowBodyContext);
   const [title, setTitle] = useState(row.title);
   return (
     <RowPeek
@@ -255,14 +198,14 @@ export function RowPeekPanel({
         canEditOptions={canEditOptions}
         upload={(rowId, file) => pageActions.calls.upload(rowId, file)}
       />
-      <RowBody
-        workspaceId={ctx.workspaceId}
-        rowId={row.id}
-        pages={pages}
-        actions={pageActions}
-        editable={!readOnly}
-        open={ctx.open}
-      />
+      {renderBody?.({
+        workspaceId: ctx.workspaceId,
+        rowId: row.id,
+        pages,
+        actions: pageActions,
+        editable: !readOnly,
+        open: ctx.open,
+      })}
     </RowPeek>
   );
 }

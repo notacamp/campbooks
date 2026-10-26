@@ -24,12 +24,14 @@ import { useBacklinks, usePage, useTablesAvailable } from "../api/queries";
 import { PageEditor, type TableHelpers } from "../editor/PageEditor";
 import { useTableCalls } from "../tables/api";
 import { RowHeader } from "../tables/components/RowHeader";
+import { RowBodyContext } from "../tables/components/row-body";
 import { TableView } from "../tables/components/TableView";
 import type { SaveState } from "../editor/sync";
 import { usePageDocument } from "../editor/use-page-document";
 import type { PageSummary, PageView } from "../types";
 
 import { IconPicker } from "./IconPicker";
+import { renderRowBody } from "./RowBody";
 import { NotionSync } from "./NotionSync";
 import { ShareMenu } from "./ShareMenu";
 import { useNotionActions } from "./use-notion-actions";
@@ -198,7 +200,7 @@ function OpenPage({
   const isRow = page.kind === "row" && page.parent !== null && page.parent !== undefined;
 
   return (
-    <>
+    <RowBodyContext value={renderRowBody}>
       <div className="flex flex-wrap items-center gap-2 p-3">
         <IconButton icon="chevron-left" label={t("screen.back")} size="lg" onClick={onBack} />
         <nav
@@ -362,7 +364,7 @@ function OpenPage({
           <Spacer />
         </article>
       </ReaderBody>
-    </>
+    </RowBodyContext>
   );
 }
 

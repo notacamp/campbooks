@@ -318,3 +318,22 @@ fn attribute_helpers_read_only_what_has_the_right_shape() {
     let tree = read_doc(&doc, &resolver_for_test());
     assert_eq!(tree.nodes[0].block.level, Some(2));
 }
+
+#[test]
+fn a_table_shown_in_the_body_is_kept_in_campbooks_and_names_nothing_for_notion() {
+    let doc = docs::client(9);
+    docs::edit(&doc, |txn, fragment| {
+        let table = fragment.push_back(txn, XmlElementPrelim::empty("tableView"));
+        table.insert_attribute(
+            txn,
+            "table",
+            docs::s("0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9d01"),
+        );
+        table.insert_attribute(txn, "view", docs::s("0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9d02"));
+    });
+    let tree = read_doc(&doc, &resolver_for_test());
+    assert_eq!(tree.nodes.len(), 1);
+    let block = &tree.nodes[0].block;
+    assert_eq!(block.label.as_deref(), Some("campbooks_embed"));
+    assert!(block.runs.is_empty());
+}

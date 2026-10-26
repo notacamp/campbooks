@@ -18,10 +18,12 @@ import { cellAt, tablesApi } from "../../../../../test/tables";
 import { usePages } from "../../api/queries";
 import { usePageActions } from "../../components/use-page-actions";
 
+import { RowBodyContext } from "./row-body";
 import { TableView } from "./TableView";
 import { must } from "../../../../../test/must";
 
-vi.mock("../../editor/PageEditor", () => ({ PageEditor: () => <p>the row’s page</p> }));
+// The page editor needs a real browser; the page screen hands it down, and here a line stands in.
+const stubBody = () => <p>the row’s page</p>;
 
 function Harness({
   tableId = CLIENTS_ID,
@@ -35,15 +37,17 @@ function Harness({
   const pages = usePages(DUARTE.id).data ?? [];
   const pageActions = usePageActions(DUARTE.id);
   return (
-    <TableView
-      workspaceId={DUARTE.id}
-      tableId={tableId}
-      pages={pages}
-      pageActions={pageActions}
-      open={vi.fn()}
-      initialView={view}
-      {...(row === undefined ? {} : { row, onRow: vi.fn() })}
-    />
+    <RowBodyContext value={stubBody}>
+      <TableView
+        workspaceId={DUARTE.id}
+        tableId={tableId}
+        pages={pages}
+        pageActions={pageActions}
+        open={vi.fn()}
+        initialView={view}
+        {...(row === undefined ? {} : { row, onRow: vi.fn() })}
+      />
+    </RowBodyContext>
   );
 }
 
