@@ -17,7 +17,7 @@
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use yrs::Doc;
+use yrs::{Doc, Transact};
 
 use super::{
     edit::{self, Place},

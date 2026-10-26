@@ -27,7 +27,7 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use yrs::{Doc, TransactionMut, XmlElementRef, XmlFragmentRef};
+use yrs::{Doc, Transact, TransactionMut, XmlElementRef, XmlFragment, XmlFragmentRef};
 
 use super::{
     edit::{self, Built, Place},

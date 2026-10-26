@@ -331,7 +331,7 @@ pub async fn backlog(
 }
 
 /// What Notion answered when a change was applied.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Written {
     /// The block's id at Notion (the new one, for an added block).
     pub notion_block: Uuid,

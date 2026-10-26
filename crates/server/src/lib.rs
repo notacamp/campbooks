@@ -319,6 +319,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_admin(campbooks_admin::profiles(), campbooks_admin::audit())
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
+        .with_page_requests(campbooks_pages::page_requests())
         .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(Arc::new(campbooks_kernel::changes::Visibilities::new(
             vec![
