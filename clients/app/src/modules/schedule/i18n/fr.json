@@ -187,7 +187,15 @@
         "action": "Se reconnecter"
       },
       "unsupported": "Ce Campbooks ne peut pas donner l’accès à l’agenda pour ce compte.",
-      "rateLimited": "Trop d’essais. Attendez quelques minutes, puis réessayez."
+      "rateLimited": "Trop d’essais. Attendez quelques minutes, puis réessayez.",
+      "outcome": {
+        "added": "Accès au calendrier ajouté.",
+        "addedFor": "Accès au calendrier ajouté pour {{address}}.",
+        "mismatch": "{{provider}} a répondu avec un autre compte. Passez à {{address}} chez {{provider}}, puis réessayez.",
+        "mismatchAnother": "Ce n’était pas le compte de cette boîte. Changez de compte chez le fournisseur, puis réessayez.",
+        "cancelled": "Vous avez quitté la page avant la fin. L’accès au calendrier n’a pas été ajouté.",
+        "failed": "L’accès au calendrier n’a pas été ajouté. Réessayez."
+      }
     },
     "kinds": {
       "title": "Ce que Scout ajoute à partir de vos e-mails",

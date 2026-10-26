@@ -507,7 +507,11 @@ impl Upstream {
                     if request.offline {
                         query.append_pair("access_type", "offline");
                     }
-                    if request.consent {
+                    // A mailbox round trip (connect, reconnect) always shows
+                    // Zoho's screen: Zoho has no `select_account`, and without
+                    // a screen it answers as whichever account the browser is
+                    // already signed in to, ignoring `login_hint`.
+                    if request.consent || request.offline {
                         query.append_pair("prompt", "consent");
                     }
                 }
@@ -959,6 +963,24 @@ mod tests {
         let (_, q) = query(&zoho.authorize_url(&request(true, true)));
         assert_eq!(q["access_type"], "offline");
         assert_eq!(q["prompt"], "consent");
+    }
+
+    #[test]
+    fn a_zoho_mailbox_round_trip_always_shows_its_screen() {
+        let zoho = client(
+            Provider::Zoho,
+            Endpoints::zoho(ZOHO_DEFAULT_ACCOUNTS_SERVER).unwrap(),
+        );
+        // Offline access (connect, reconnect) is asked even when the caller
+        // did not ask for consent again, and the hint is still sent.
+        let mut reconnect = request(true, false);
+        reconnect.login_hint = Some("ana@example.com");
+        let (_, q) = query(&zoho.authorize_url(&reconnect));
+        assert_eq!(q["prompt"], "consent");
+        assert_eq!(q["login_hint"], "ana@example.com");
+        // A plain sign-in still shows nothing extra.
+        let (_, q) = query(&zoho.authorize_url(&request(false, false)));
+        assert!(!q.contains_key("prompt"));
     }
 
     #[test]

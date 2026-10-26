@@ -13,5 +13,6 @@ export type {
   WayInFate,
 } from "./consent";
 export { WorkspaceConnectionsAdmin } from "./components/WorkspaceConnectionsAdmin/WorkspaceConnectionsAdmin";
+export { mailboxResult, type MailboxResult } from "./model";
 export { buildConnectorsRoutes } from "./routes";
 export { CONNECTORS_SHORTCUTS } from "./shortcuts";

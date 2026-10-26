@@ -187,7 +187,15 @@
         "action": "Sign in again"
       },
       "unsupported": "This Campbooks can’t add calendar access to that account.",
-      "rateLimited": "Too many tries. Wait a few minutes, then try again."
+      "rateLimited": "Too many tries. Wait a few minutes, then try again.",
+      "outcome": {
+        "added": "Calendar access added.",
+        "addedFor": "Calendar access added for {{address}}.",
+        "mismatch": "{{provider}} answered as another account. Switch to {{address}} at {{provider}}, then try again.",
+        "mismatchAnother": "That wasn’t the mailbox’s own account. Switch accounts at the provider, then try again.",
+        "cancelled": "You left before finishing. Calendar access wasn’t added.",
+        "failed": "Calendar access wasn’t added. Try again."
+      }
     },
     "kinds": {
       "title": "What Scout adds from your mail",

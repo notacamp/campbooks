@@ -19,7 +19,12 @@ import {
   Text,
   TimePicker,
 } from "~/lib/ui";
-import { useConnections, type ConsentRefusal, type MailboxConsent } from "~/modules/connectors";
+import {
+  useConnections,
+  type ConsentRefusal,
+  type MailboxConsent,
+  type MailboxResult,
+} from "~/modules/connectors";
 
 import { useCalendars, useScheduleSettings, useSettingsMutations } from "../../api/queries";
 import {
@@ -54,10 +59,37 @@ function zoneOptions(current: string): { value: string; label: string }[] {
   return zones.map((zone) => ({ value: zone, label: zone.replaceAll("_", " ") }));
 }
 
+/** Where the mailbox Add calendar access was started for is remembered across the provider's screens. */
+const ATTEMPT_KEY = "campbooks.calendar-access";
+
+function rememberAttempt(connection: string): void {
+  try {
+    globalThis.sessionStorage.setItem(ATTEMPT_KEY, connection);
+  } catch {
+    // Without storage the page names the only mailbox that could have been meant.
+  }
+}
+
+function recalledAttempt(): string | undefined {
+  try {
+    return globalThis.sessionStorage.getItem(ATTEMPT_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const PROVIDER_NAMES: Record<string, string> = {
+  google: "Google",
+  zoho: "Zoho",
+  microsoft: "Microsoft",
+};
+
 export interface CalendarSettingsProps {
   workspaceId: string;
   /** The front door: starts the provider's consent for calendar access. */
   consent: MailboxConsent;
+  /** How the provider's screens came back here (`?connected=`, `?link_error=`), once. */
+  result?: MailboxResult | undefined;
 }
 
 /**
@@ -65,7 +97,7 @@ export interface CalendarSettingsProps {
  * Scout adds from mail and where else each kind goes, the time zone and the
  * working hours, and, for a mailbox without it, Add calendar access.
  */
-export function CalendarSettings({ workspaceId, consent }: CalendarSettingsProps) {
+export function CalendarSettings({ workspaceId, consent, result }: CalendarSettingsProps) {
   const { t } = useTranslation("schedule");
   const settings = useScheduleSettings(workspaceId);
   const calendars = useCalendars(workspaceId);
@@ -78,6 +110,7 @@ export function CalendarSettings({ workspaceId, consent }: CalendarSettingsProps
         calendars={calendars.data}
         connections={connections.data}
         consent={consent}
+        result={result}
         onShow={(calendar, syncing) => {
           saveCalendar.mutate({ calendarId: calendar.id, patch: { syncing } });
         }}
@@ -110,12 +143,14 @@ function CalendarsSection({
   calendars,
   connections,
   consent,
+  result,
   onShow,
   onColour,
 }: {
   calendars: readonly CalendarView[] | undefined;
-  connections: ReturnType<typeof useConnections>["data"];
+  connections: Connections | undefined;
   consent: MailboxConsent;
+  result: MailboxResult | undefined;
   onShow: (calendar: CalendarView, syncing: boolean) => void;
   onColour: (calendar: CalendarView, color: string) => void;
 }) {
@@ -125,11 +160,16 @@ function CalendarsSection({
     (connection) =>
       connection.offers.includes("calendar") && !connection.capabilities.includes("calendar"),
   );
+  // The mailbox this return was for: the one asked about, else the only one that could be.
+  const [attempt] = useState(recalledAttempt);
+  const asked = (connections ?? []).find((connection) => connection.id === attempt);
+  const only = withoutAccess.length === 1 ? withoutAccess[0] : undefined;
   return (
     <SettingsSection
       title={t("settings.calendars.title")}
       description={t("settings.calendars.description")}
     >
+      <Outcome result={result} connections={connections} mailbox={asked ?? only} />
       {calendars === undefined ? null : (
         <List label={t("settings.calendars.title")}>
           {calendars.map((calendar) => {
@@ -191,6 +231,7 @@ function CalendarsSection({
                   <Button
                     disabled={consent.starting}
                     onClick={() => {
+                      rememberAttempt(connection.id);
                       consent.start({
                         purpose: "reconnect",
                         connection: connection.id,
@@ -210,6 +251,63 @@ function CalendarsSection({
         <Refusal consent={consent} refusal={consent.refusal} />
       )}
     </SettingsSection>
+  );
+}
+
+type Connections = NonNullable<ReturnType<typeof useConnections>["data"]>;
+
+/** What the provider's screens came back with, said once above the calendars. */
+function Outcome({
+  result,
+  connections,
+  mailbox,
+}: {
+  result: MailboxResult | undefined;
+  connections: Connections | undefined;
+  mailbox: Connections[number] | undefined;
+}) {
+  const { t } = useTranslation("schedule");
+  if (result === undefined) {
+    return null;
+  }
+  if (result.kind === "connected") {
+    const address = connections?.find((connection) => connection.id === result.connection)?.address;
+    return (
+      <Banner
+        role="status"
+        icon="check"
+        title={
+          address === undefined
+            ? t("settings.calendars.outcome.added")
+            : t("settings.calendars.outcome.addedFor", { address })
+        }
+      />
+    );
+  }
+  if (result.error === "account_mismatch") {
+    const provider = mailbox === undefined ? undefined : PROVIDER_NAMES[mailbox.provider];
+    return (
+      <Banner
+        tone="danger"
+        role="alert"
+        title={
+          mailbox === undefined || provider === undefined
+            ? t("settings.calendars.outcome.mismatchAnother")
+            : t("settings.calendars.outcome.mismatch", { provider, address: mailbox.address })
+        }
+      />
+    );
+  }
+  return (
+    <Banner
+      tone="danger"
+      role="alert"
+      title={
+        result.error === "cancelled_at_provider"
+          ? t("settings.calendars.outcome.cancelled")
+          : t("settings.calendars.outcome.failed")
+      }
+    />
   );
 }
 
