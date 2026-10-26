@@ -1,9 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Avatar, type AvatarProps } from "../Avatar/Avatar";
-import { Icon, type IconName } from "../Icon/Icon";
-import { VisuallyHidden } from "../Typography/Typography";
+import { Avatar, type AvatarProps, Icon, type IconName, VisuallyHidden } from "@notacamp/ui";
 
 import styles from "./ConversationRow.module.css";
 

@@ -9,11 +9,6 @@
     "money": "Argent",
     "settings": "Paramètres"
   },
-  "list": {
-    "next": "Élément suivant",
-    "previous": "Élément précédent",
-    "open": "Ouvrir"
-  },
   "item": {
     "reply": "Répondre",
     "done": "Terminé",
@@ -32,24 +27,7 @@
     "italic": "Italique",
     "ask": "Demander"
   },
-  "command": {
-    "open": "Chercher, demander"
-  },
-  "undo": "Annuler",
   "workspace": {
     "switch": "Changer d’espace de travail"
-  },
-  "sheet": {
-    "open": "Raccourcis clavier"
-  },
-  "overlay": {
-    "close": "Fermer"
-  },
-  "groups": {
-    "navigation": "Aller à",
-    "general": "Général",
-    "list": "Listes",
-    "item": "Élément sélectionné",
-    "compose": "Rédaction"
   }
 }

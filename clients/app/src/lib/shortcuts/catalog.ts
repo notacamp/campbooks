@@ -1,7 +1,9 @@
-import type { ShortcutDefinition } from "./registry";
+import type { ShortcutDefinition } from "@notacamp/ui/shortcuts";
 
 /**
- * The default shortcuts, declared once. Screens bind handlers to these ids
+ * The default shortcuts, declared once (the engine is @notacamp/ui's; this is
+ * Campbooks' catalogue, which carries the design system's UI_SHORTCUTS as
+ * they are, checked by registry.test.ts). Screens bind handlers to these ids
  * with `useShortcut`; hints, the `?` sheet and the ⌘K menu read the keys from
  * here. These are client-only commands; screens that call a server
  * operation add shortcuts keyed by its OpenAPI operationId (ADR 0013) through

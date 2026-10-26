@@ -1,8 +1,8 @@
 // Applies the saved theme, accent and density to <html> before first paint,
 // so a reload never flashes the wrong theme. A classic (non-module) script
 // loaded from index.html: the web CSP allows `script-src 'self'` only, so this
-// cannot be inline. Keep in step with src/lib/ui/theme/theme.ts and
-// src/lib/storage/prefs.ts (theme-boot.test.ts checks both).
+// cannot be inline. Keep in step with clients/ui/src/theme/theme.ts and
+// src/lib/storage/prefs.ts (src/app/theme-boot.test.ts checks both).
 (function () {
   var prefix = "campbooks.pref.";
   var allowed = {

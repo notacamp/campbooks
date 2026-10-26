@@ -1,0 +1,24 @@
+{
+  "list": {
+    "next": "Elemento siguiente",
+    "previous": "Elemento anterior",
+    "open": "Abrir"
+  },
+  "command": {
+    "open": "Buscar o preguntar"
+  },
+  "undo": "Deshacer",
+  "sheet": {
+    "open": "Atajos de teclado"
+  },
+  "overlay": {
+    "close": "Cerrar"
+  },
+  "groups": {
+    "navigation": "Ir a",
+    "general": "General",
+    "list": "Listas",
+    "item": "Elemento seleccionado",
+    "compose": "Redacción"
+  }
+}

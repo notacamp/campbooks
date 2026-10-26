@@ -1,12 +1,14 @@
 // @ts-check
-// Token-only styling (AGENTS.md → UI). Outside src/lib/ui/tokens/ no CSS may
+// Token-only styling (AGENTS.md → UI). The tokens live in @notacamp/ui
+// (clients/ui/src/tokens/, linted there); here no CSS may
 // contain a colour, size, duration or easing literal: read a token instead
 // (`var(--surface-raised)`, `var(--space-3)`, `var(--duration-fast)`).
 // Unitless numbers (multipliers, flex factors, 0 and 1) and %, fr and deg
 // are allowed. Media queries may use the rem breakpoints from
 // tailwind-theme.css (40, 48, 64 and 80rem): custom properties can't be used there.
 
-const MESSAGE = "Use a design token from src/lib/ui/tokens/tokens.css instead of a literal.";
+const MESSAGE =
+  "Use a design token from @notacamp/ui (clients/ui/src/tokens/tokens.css) instead of a literal.";
 
 const ONLY_TOKENS = [String.raw`/^var\(/`, "inherit", "initial", "unset"];
 
@@ -53,17 +55,4 @@ export default {
     ],
     "custom-property-no-missing-var-function": true,
   },
-  overrides: [
-    {
-      // The one place literals live.
-      files: ["src/lib/ui/tokens/**/*.css"],
-      rules: {
-        "color-no-hex": null,
-        "color-named": null,
-        "function-disallowed-list": null,
-        "declaration-property-unit-allowed-list": null,
-        "declaration-property-value-allowed-list": null,
-      },
-    },
-  ],
 };

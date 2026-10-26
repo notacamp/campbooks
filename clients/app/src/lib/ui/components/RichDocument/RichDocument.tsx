@@ -1,6 +1,6 @@
 import type { MouseEventHandler, ReactNode } from "react";
 
-import { Icon, type IconName } from "../Icon/Icon";
+import { Icon, type IconName } from "@notacamp/ui";
 
 import styles from "./RichDocument.module.css";
 

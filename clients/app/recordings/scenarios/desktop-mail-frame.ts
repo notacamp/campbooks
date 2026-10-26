@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import type { Page } from "playwright";
 
-import { frameDocument, SANDBOX } from "../../src/lib/ui/safe-html/frame.ts";
+import { frameDocument, SANDBOX } from "../../../ui/src/safe-html/frame.ts";
 import { pause, type ScenarioContext } from "../context.ts";
 
 import { caption } from "./inbox.ts";
@@ -12,7 +12,7 @@ import { caption } from "./inbox.ts";
 // HTML mail under the desktop app's page policy (campbooks-cloud#199), in
 // WebKit, the desktop engine on macOS and Linux. The page is served with the
 // policy `src-tauri/tauri.conf.json` gives the app, around the frame the
-// reader renders (`lib/ui/safe-html/frame.ts`) and the server's own output
+// reader renders (`clients/ui/src/safe-html/frame.ts`) and the server's own output
 // for the #160 fixtures (`test/webkit/fixtures`). Nothing leaves the machine:
 // demo images are answered here. Start any dev server for the base URL, then:
 //

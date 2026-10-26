@@ -139,7 +139,8 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   of the same expression, holding something else, added in the same file);
   review job errors in diffs as well.)*
 - Untrusted HTML (email bodies) is rendered only in a sandboxed iframe with a
-  strict CSP; never `dangerouslySetInnerHTML` outside `lib/ui/safe-html`.
+  strict CSP; never `dangerouslySetInnerHTML` outside `@notacamp/ui`'s
+  `safe-html` (`clients/ui/src/safe-html`).
 
 ## Tracked events (enforced)
 
@@ -231,16 +232,23 @@ plurals). Every string a user can see exists in all four before it ships.
 
 ## UI (enforced)
 
-The design system is `clients/app/src/lib/ui` (tokens, themes, components)
-plus `lib/shortcuts` (the keyboard shortcut registry). How it works, how to
-add a token or theme a workspace: `docs/design-system.md`.
+The design system is the package `@notacamp/ui` (`clients/ui`: tokens,
+themes, generic components, the keyboard shortcut engine), shared with the
+other Not A Camp apps, plus, in the app, `clients/app/src/lib/ui` (its door,
+and the components that name a Campbooks concept) and `lib/shortcuts`
+(Campbooks' shortcut catalogue). How it works, how to add a token or theme a
+workspace: `docs/design-system.md`.
 
+- **The package knows no app.** Nothing in `clients/ui` imports Campbooks
+  code; a component that names a Campbooks concept stays in the app.
+  *(CI: the package's ESLint `no-restricted-imports`; dependency-cruiser
+  `design-system-knows-no-app`.)*
 - **Tokens only.** Colour, size, duration and easing values live in
-  `lib/ui/tokens/`. Component CSS (one CSS Module per component) reads tokens
-  with `var()`. *(CI: stylelint in `pnpm lint` rejects hex/named colours,
-  colour functions, `light-dark()`, `cubic-bezier()`, units other than
-  `%`/`fr`/`deg`, and literal z-index, font and opacity values outside
-  `lib/ui/tokens/`.)*
+  `clients/ui/src/tokens/`. Component CSS (one CSS Module per component) reads
+  tokens with `var()`. *(CI: stylelint in `pnpm lint` rejects hex/named
+  colours, colour functions, `light-dark()`, `cubic-bezier()`, units other
+  than `%`/`fr`/`deg`, and literal z-index, font and opacity values outside
+  the tokens.)*
 - **Tailwind is mapped to semantic tokens only**; its default palette and
   scales are wiped. *(CI: ESLint rejects arbitrary values like `p-[13px]`,
   palette classes like `bg-blue-500` and static `duration-*`/`z-*` classes in
@@ -251,7 +259,8 @@ add a token or theme a workspace: `docs/design-system.md`.
   a `lib/ui` component first. *(CI: ESLint layout-only and no-style rules;
   dependency-cruiser `modules-have-no-stylesheets`.)*
 - **One door.** Modules and the app shell import UI only from
-  `~/lib/ui` (its `index.ts`). *(CI: dependency-cruiser `ui-public-surface`.)*
+  `~/lib/ui` (its `index.ts`), never `@notacamp/ui` directly. *(CI:
+  dependency-cruiser `ui-public-surface`, `design-system-through-lib-ui`.)*
 - **Every component has a story and a test**, with every variant and state.
   Stories run as tests with axe, in light and in dark; a violation fails.
   *(CI: `pnpm test-storybook`.)*

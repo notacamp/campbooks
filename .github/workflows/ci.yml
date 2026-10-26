@@ -268,6 +268,17 @@ jobs:
       - name: Build
         if: always()
         run: pnpm build
+      # @notacamp/ui as it is published (publish-ui.yml): the bundles, the
+      # types and the stylesheets an app imports. Campbooks uses the source, so
+      # only this proves the package itself still builds.
+      - name: Design system package (the published build)
+        if: always()
+        run: |
+          pnpm --filter @notacamp/ui build
+          for file in index.js index.d.ts shortcuts.js shortcuts/index.d.ts ui.css \
+            tokens.css tailwind-theme.css base.css fonts.css i18n/en.json LICENSE; do
+            [ -s "ui/dist/$file" ] || { echo "::error::@notacamp/ui: dist/$file is missing"; exit 1; }
+          done
       - name: Audit (prod deps)
         if: always()
         run: pnpm audit --prod

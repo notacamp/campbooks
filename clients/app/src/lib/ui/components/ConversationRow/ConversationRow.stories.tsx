@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
-import { Highlight } from "../Highlight/Highlight";
-import { Pill } from "../Pill/Pill";
-import { Tag } from "../Tag/Tag";
+import { Highlight, Pill, Tag } from "@notacamp/ui";
 
 import { ConversationRow } from "./ConversationRow";
 
