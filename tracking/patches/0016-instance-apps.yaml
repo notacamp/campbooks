@@ -13,7 +13,7 @@ changelog:
   - date: "2026-10-26"
     plan_version: 16
     change: "Instance apps (campbooks-cloud#369): 3 instance-wide events for an instance app registered, its secret rotated and its removal (with the consents and refresh tokens it held) by the server's admin command, as system; the client kind instance; the instance apps' app_ ids in every client-id pattern; no Coverage rows (the CLI serves no operation and runs no job, schedule or handler)."
-    pr: "#681"
+    pr: "#683"
 
 events:
   - name: "identity.instance_app_registered"
