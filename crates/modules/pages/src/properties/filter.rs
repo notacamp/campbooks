@@ -272,7 +272,16 @@ fn operand_of(spec: &Spec, operator: Operator, raw: Option<&Value>) -> Result<Op
 /// A filter as JSON, checked against `specs` (the table's properties).
 pub fn parse(raw: &Value, specs: &HashMap<Uuid, Spec>) -> Result<Filter> {
     let mut conditions = 0;
-    walk(raw, specs, 1, &mut conditions)
+    walk(raw, specs, 1, &mut conditions, false)?.ok_or(PropertyError::FILTER)
+}
+
+/// A stored filter, read for a query: a condition on a property that was
+/// removed, or whose type changed so that it no longer fits, is left out
+/// instead of failing the query (restoring the property brings it back, the
+/// stored view is untouched).
+pub fn parse_lenient(raw: &Value, specs: &HashMap<Uuid, Spec>) -> Result<Option<Filter>> {
+    let mut conditions = 0;
+    walk(raw, specs, 1, &mut conditions, true)
 }
 
 fn walk(
@@ -280,7 +289,8 @@ fn walk(
     specs: &HashMap<Uuid, Spec>,
     depth: usize,
     conditions: &mut usize,
-) -> Result<Filter> {
+    lenient: bool,
+) -> Result<Option<Filter>> {
     let object = raw.as_object().ok_or(PropertyError::FILTER)?;
     for (key, any) in [("and", false), ("or", true)] {
         if let Some(items) = object.get(key) {
@@ -288,11 +298,13 @@ fn walk(
                 return Err(PropertyError::FILTER);
             }
             let items = items.as_array().ok_or(PropertyError::FILTER)?;
-            let items = items
-                .iter()
-                .map(|item| walk(item, specs, depth + 1, conditions))
-                .collect::<Result<Vec<_>>>()?;
-            return Ok(Filter::Group { any, items });
+            let mut kept = Vec::new();
+            for item in items {
+                if let Some(item) = walk(item, specs, depth + 1, conditions, lenient)? {
+                    kept.push(item);
+                }
+            }
+            return Ok(Some(Filter::Group { any, items: kept }));
         }
     }
     if object
@@ -305,26 +317,33 @@ fn walk(
     if *conditions > MAX_CONDITIONS {
         return Err(PropertyError::FILTER);
     }
-    let property: Uuid = object
-        .get("property")
-        .and_then(Value::as_str)
-        .and_then(|text| text.parse().ok())
-        .ok_or(PropertyError::FILTER)?;
-    let spec = specs.get(&property).ok_or(PropertyError::FILTER)?;
-    let operator: Operator = object
-        .get("operator")
-        .cloned()
-        .and_then(|operator| serde_json::from_value(operator).ok())
-        .ok_or(PropertyError::FILTER)?;
-    if !operators(spec).contains(&operator) {
-        return Err(PropertyError::FILTER);
+    let condition = || -> Result<Condition> {
+        let property: Uuid = object
+            .get("property")
+            .and_then(Value::as_str)
+            .and_then(|text| text.parse().ok())
+            .ok_or(PropertyError::FILTER)?;
+        let spec = specs.get(&property).ok_or(PropertyError::FILTER)?;
+        let operator: Operator = object
+            .get("operator")
+            .cloned()
+            .and_then(|operator| serde_json::from_value(operator).ok())
+            .ok_or(PropertyError::FILTER)?;
+        if !operators(spec).contains(&operator) {
+            return Err(PropertyError::FILTER);
+        }
+        let operand = operand_of(spec, operator, object.get("value"))?;
+        Ok(Condition {
+            property,
+            operator,
+            operand,
+        })
+    };
+    match condition() {
+        Ok(condition) => Ok(Some(Filter::Condition(condition))),
+        Err(_) if lenient => Ok(None),
+        Err(error) => Err(error),
     }
-    let operand = operand_of(spec, operator, object.get("value"))?;
-    Ok(Filter::Condition(Condition {
-        property,
-        operator,
-        operand,
-    }))
 }
 
 /// Which way a sort goes.

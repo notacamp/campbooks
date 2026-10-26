@@ -1,0 +1,150 @@
+# Tables in pages (campbooks-cloud#365, OpenSpec change pages-tables, part 1:
+# the model and the API): five events for a table made, a property added, a
+# view made, a table queried and cells edited, and Coverage for every
+# operation of the change. Never a table's or a property's name, an option, a
+# view's name, a filter or a value: ids, enums and counts in buckets only.
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0018-pages-tables.yaml`.
+changelog:
+  - date: "2026-10-26"
+    plan_version: 18
+    change: "Tables in pages (campbooks-cloud#365): 5 pages events for a table made, a property added (its type), a view made (its type), a table queried (rows answered, in buckets) and cells edited (how many, in buckets); Coverage for every operation of the change."
+    pr: "#681"
+
+events:
+  - name: "pages.table_created"
+    version: 1
+    module: "pages"
+    object: "table"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A table was made: a page whose rows are pages with typed properties. Never its title or its property names."
+    fires_when: "pages.create_table makes the table page, its title property and its first view, in the transaction that inserts them."
+    added_in: 18
+    openspec_change: "pages-tables"
+  - name: "pages.property_added"
+    version: 1
+    module: "pages"
+    object: "property"
+    action: "added"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A property (a column) of a table was added, and its type. Never its name or its options."
+    fires_when: "pages.add_property stores the property (and the property it pairs with on another table, when it is a paired relation, which is tracked as one more event), in that transaction."
+    added_in: 18
+    openspec_change: "pages-tables"
+  - name: "pages.view_created"
+    version: 1
+    module: "pages"
+    object: "view"
+    action: "created"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A view of a table was made, and its type. Never its name, filter or sorts."
+    fires_when: "pages.create_view stores the view, in that transaction; the first view made with the table is part of pages.table_created."
+    added_in: 18
+    openspec_change: "pages-tables"
+  - name: "pages.rows_queried"
+    version: 1
+    module: "pages"
+    object: "rows"
+    action: "queried"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A table was queried, for a view or ad hoc, and how many rows it answered, in a bucket. Never the filter, the sorts or any value."
+    fires_when: "pages.query_table has computed its answer, in the transaction that read it."
+    added_in: 18
+    openspec_change: "pages-tables"
+  - name: "pages.cells_edited"
+    version: 1
+    module: "pages"
+    object: "cells"
+    action: "edited"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "Cells of a row changed, and how many, in a bucket. Never which properties or any value; the same value again counts for nothing."
+    fires_when: "pages.add_row (with cells) or pages.set_cells stores at least one changed cell, in that transaction."
+    added_in: 18
+    openspec_change: "pages-tables"
+
+properties:
+  - { event: "pages.table_created", version: 1, property: "table", type: "record", of: "pages.page", required: true, classification: "operational", description: "The table page afterwards." }
+  - { event: "pages.property_added", version: 1, property: "table", type: "record", of: "pages.page", required: true, classification: "operational", description: "The table page." }
+  - { event: "pages.property_added", version: 1, property: "property_type", type: "enum", of: "pages.property_type", required: true, classification: "operational", description: "The type of the property." }
+  - { event: "pages.view_created", version: 1, property: "table", type: "record", of: "pages.page", required: true, classification: "operational", description: "The table page." }
+  - { event: "pages.view_created", version: 1, property: "view_type", type: "enum", of: "pages.view_type", required: true, classification: "operational", description: "The type of the view." }
+  - { event: "pages.rows_queried", version: 1, property: "table", type: "record", of: "pages.page", required: true, classification: "operational", description: "The table page." }
+  - { event: "pages.rows_queried", version: 1, property: "view_type", type: "enum", of: "pages.view_type", required: false, classification: "operational", description: "The type of the view asked for; absent for an ad hoc query." }
+  - { event: "pages.rows_queried", version: 1, property: "rows", type: "enum", of: "pages.count_bucket", required: true, classification: "operational", description: "How many rows the answer held." }
+  - { event: "pages.cells_edited", version: 1, property: "row", type: "record", of: "pages.page", required: true, classification: "operational", description: "The row page afterwards." }
+  - { event: "pages.cells_edited", version: 1, property: "cells", type: "enum", of: "pages.count_bucket", required: true, classification: "operational", description: "How many cells changed." }
+
+enums:
+  - { enum: "pages.property_type", value: "text", description: "Rich text." }
+  - { enum: "pages.property_type", value: "number", description: "A number, a percent or a currency amount." }
+  - { enum: "pages.property_type", value: "select", description: "One option." }
+  - { enum: "pages.property_type", value: "multi_select", description: "Several options." }
+  - { enum: "pages.property_type", value: "status", description: "One option in a to-do, doing or done group." }
+  - { enum: "pages.property_type", value: "date", description: "A date or a range, with or without a time." }
+  - { enum: "pages.property_type", value: "checkbox", description: "Yes or no." }
+  - { enum: "pages.property_type", value: "person", description: "Teammates." }
+  - { enum: "pages.property_type", value: "files", description: "Files." }
+  - { enum: "pages.property_type", value: "url", description: "A web address." }
+  - { enum: "pages.property_type", value: "email", description: "An email address." }
+  - { enum: "pages.property_type", value: "phone", description: "A phone number." }
+  - { enum: "pages.property_type", value: "relation", description: "Rows of a table." }
+  - { enum: "pages.property_type", value: "campbooks_link", description: "References to Campbooks records." }
+  - { enum: "pages.property_type", value: "created", description: "When or by whom the row was made." }
+  - { enum: "pages.property_type", value: "edited", description: "When or by whom the row was last edited." }
+  - { enum: "pages.property_type", value: "unique_id", description: "A number for each row, with a prefix." }
+  - { enum: "pages.view_type", value: "table", description: "A grid of rows and columns." }
+  - { enum: "pages.view_type", value: "board", description: "Cards in a column per option." }
+  - { enum: "pages.count_bucket", value: "none", description: "None." }
+  - { enum: "pages.count_bucket", value: "one", description: "One." }
+  - { enum: "pages.count_bucket", value: "few", description: "2 to 9." }
+  - { enum: "pages.count_bucket", value: "some", description: "10 to 99." }
+  - { enum: "pages.count_bucket", value: "many", description: "100 or more." }
+
+coverage:
+  - kind: "operation"
+    name: "pages.create_table"
+    events: [pages.table_created, pages.page_created]
+  - kind: "operation"
+    name: "pages.add_property"
+    events: [pages.property_added]
+  - kind: "operation"
+    name: "pages.update_property"
+    exemption: "renames a property or changes its config or type; the table's properties are tracked when they are added (pages.property_added), and a change of type keeps what the cells held for 30 days"
+  - kind: "operation"
+    name: "pages.remove_property"
+    exemption: "takes a property out of the table for 30 days, which restoring it undoes; the property is tracked when it is added (pages.property_added)"
+  - kind: "operation"
+    name: "pages.restore_property"
+    exemption: "undoes the removal or the last change of type of a property, putting back what was there; nothing new is made"
+  - kind: "operation"
+    name: "pages.set_options"
+    exemption: "renames, recolours, adds and reorders the options of a select; the option names are content, and what changes is the property, tracked when it is added (pages.property_added)"
+  - kind: "operation"
+    name: "pages.add_row"
+    events: [pages.page_created, pages.cells_edited]
+  - kind: "operation"
+    name: "pages.set_cells"
+    events: [pages.cells_edited]
+  - kind: "operation"
+    name: "pages.create_view"
+    events: [pages.view_created]
+  - kind: "operation"
+    name: "pages.update_view"
+    exemption: "changes a view's name, filter, sorts, summaries or columns, which are the member's own words and values; the view is tracked when it is made (pages.view_created)"
+  - kind: "operation"
+    name: "pages.remove_view"
+    exemption: "deletes a view of a table, which making one again undoes; the view is tracked when it is made (pages.view_created)"
+  - kind: "operation"
+    name: "pages.query_table"
+    events: [pages.rows_queried]

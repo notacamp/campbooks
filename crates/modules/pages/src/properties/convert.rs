@@ -41,7 +41,7 @@ pub fn plan<K: Clone>(
         Some(raw) => config::normalise(to, raw)?,
         None => default_config(to),
     };
-    if is_select(to) && options_of(&config).is_empty() {
+    if is_select(to) && from.ty != to && options_of(&config).is_empty() {
         config = options_from_values(from, to, &config, cells)?;
     }
     let values = cells

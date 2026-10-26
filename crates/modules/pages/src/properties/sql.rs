@@ -69,6 +69,12 @@ impl Binds {
         placeholder
     }
 
+    /// Take over the values of `other`, whose placeholders were numbered to
+    /// follow this one's.
+    pub fn extend(&mut self, other: &Self) {
+        self.items.extend(other.items.iter().cloned());
+    }
+
     /// The values, in placeholder order.
     pub fn items(&self) -> &[Bind] {
         &self.items
@@ -178,6 +184,15 @@ fn empty(spec: &Spec, alias: &str) -> String {
             "({alias}.value IS NULL OR {alias}.value = 'null'::jsonb \
              OR {alias}.value = '[]'::jsonb OR {alias}.value = '\"\"'::jsonb)"
         ),
+    }
+}
+
+/// The SQL for the option a select or status cell holds (`NULL` when empty):
+/// what a board groups by.
+pub fn option_key(spec: &Spec, alias: &str) -> Result<String> {
+    match scalar(spec, alias)? {
+        (sql, Kind::Id) => Ok(sql),
+        _ => Err(PropertyError::FILTER),
     }
 }
 

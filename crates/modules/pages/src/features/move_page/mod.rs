@@ -103,6 +103,13 @@ pub async fn handler(
         return Err(Error::Forbidden);
     };
     expect_live(&row)?;
+    // A row stays in its table; reorder it with its position only.
+    if row.kind()? == crate::domain::Kind::Row
+        && (request.parent != row.parent_id
+            || request.place.is_some_and(|asked| Some(asked) != row.place().ok()))
+    {
+        return Err(Error::Conflict(crate::MESSAGES.reason("table_row_fixed")));
+    }
     expect_meta_revision(&row, request.meta_revision)?;
     let before_place = row.place()?;
 
@@ -113,6 +120,9 @@ pub async fn handler(
                 access::require_page(&state, &mut tx, access, Action::Write, parent_id, false)
                     .await?;
             expect_live(&parent)?;
+            if parent.kind()? != crate::domain::Kind::Page && row.kind()? != crate::domain::Kind::Row {
+                return Err(Error::Conflict(crate::MESSAGES.reason("table_parent")));
+            }
             let place = parent.place()?;
             if request.place.is_some_and(|asked| asked != place) {
                 return Err(Error::BadRequest(crate::MESSAGES.reason("place_mismatch")));

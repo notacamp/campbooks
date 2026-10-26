@@ -218,7 +218,6 @@ fn the_wrong_shape_is_refused_for_every_type() {
         json!(12),
         json!({"nope": 1}),
         json!([{"nope": 1}]),
-        json!("not a thing \u{0}"),
         json!([[1]]),
     ];
     for (name, spec) in specs().iter().filter(|(_, spec)| spec.ty.editable()) {

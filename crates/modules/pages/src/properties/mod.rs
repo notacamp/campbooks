@@ -29,7 +29,7 @@ pub mod sql;
 pub mod value;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use std::{fmt, str::FromStr};
 
