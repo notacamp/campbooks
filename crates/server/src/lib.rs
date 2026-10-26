@@ -1246,11 +1246,16 @@ mod tests {
         // The tracked events outbox (ADR 0020): append only; nothing in the
         // application reads, changes or deletes a row back.
         let append_only = "kernel.tracked_events";
+        // Notion's webhook verification token (campbooks-cloud#376): the
+        // runtime role may replace it (delete and insert) and never read it;
+        // only the operator's CLI, on the migration login, does.
+        let write_only = "connectors.notion_webhook_token";
         let missing: Vec<String> = missing
             .into_iter()
             .filter(|t| {
                 t != read_only
                     && t != append_only
+                    && t != write_only
                     && t != functions_only
                     && t != snapshot
                     && !at_deploy.contains(&t.as_str())
@@ -1274,6 +1279,21 @@ mod tests {
             privileges,
             (true, false, false, false),
             "`{role}` only reads {read_only}"
+        );
+        let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
+            "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                    has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),
+                    has_any_column_privilege($1, $2, 'SELECT, UPDATE')",
+        )
+        .bind(role)
+        .bind(write_only)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            privileges,
+            (false, true, false, true, false),
+            "`{role}` only replaces {write_only}, never reads it"
         );
         let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
             "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),

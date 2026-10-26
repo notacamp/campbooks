@@ -7,11 +7,11 @@ import { ConflictBlock } from "./ConflictBlock";
 
 describe("ConflictBlock", () => {
   it("shows Notion’s version with the three choices", async () => {
-    let finish: (settled: boolean) => void = () => {};
+    const pending: ((settled: boolean) => void)[] = [];
     const onChoose = vi.fn(
       () =>
         new Promise<boolean>((resolve) => {
-          finish = resolve;
+          pending.push(resolve);
         }),
     );
     renderWithProviders(
@@ -30,7 +30,7 @@ describe("ConflictBlock", () => {
     });
     // The other choices wait while one is being applied.
     expect(screen.getByRole("button", { name: "Keep mine" })).toBeDisabled();
-    finish(true);
+    pending.at(-1)?.(true);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Keep mine" })).toBeEnabled();
     });

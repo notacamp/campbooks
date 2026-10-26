@@ -1094,7 +1094,6 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "connectors.start_connection" => {
             json!({"provider": "google", "capabilities": ["messages"]})
         }
-        "connectors.start_notion" => json!({}),
         "connectors.discover_imap" => json!({"address": "matrix@example.com"}),
         "connectors.connect_imap" => {
             json!({"address": "matrix@example.com", "password": "not-a-real-password"})
@@ -1148,7 +1147,8 @@ fn body(world: &World, id: &str) -> Option<Value> {
         | "conversations.restore_rule"
         | "conversations.suggest_replies"
         | "conversations.write_nudge"
-        | "assistant.start_chat" => json!({}),
+        | "assistant.start_chat"
+        | "connectors.start_notion" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),

@@ -109,6 +109,7 @@ async fn putting_the_page_in_the_trash_ends_the_link(db: PgPool) {
 async fn a_member_who_leaves_takes_their_links_but_not_their_pages(db: PgPool) {
     let rig = Rig::new(db).await;
     let (page, _) = linked(&rig).await;
+    rig.kit.remove_member("marta", rig.ws);
     let mut tx = rig.kit.begin(rig.ws).await;
     rig.kit
         .state
