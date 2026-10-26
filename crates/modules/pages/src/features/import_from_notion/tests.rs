@@ -39,7 +39,11 @@ async fn a_member_imports_pages_that_are_private_and_linked(db: PgPool) {
     assert_eq!(requested.len(), 2);
     assert_eq!(requested[0]["page"], page);
     assert_eq!(requested[0]["notion_page"], roadmap.to_string());
-    assert!(!requested.iter().any(|e| e.to_string().contains("Product roadmap")));
+    assert!(
+        !requested
+            .iter()
+            .any(|e| e.to_string().contains("Product roadmap"))
+    );
     // Another member does not see her page.
     let (rui, _) = rig.kit.member("rui", rig.ws);
     let hidden = rig
@@ -93,7 +97,12 @@ async fn a_connection_that_is_not_hers_is_a_connection_that_does_not_exist(db: P
         .await;
     assert_eq!(nowhere.status, StatusCode::NOT_FOUND);
     assert_eq!(rig.kit.page_count(rig.ws).await, 0);
-    assert!(rig.kit.events("pages.notion_link_requested").await.is_empty());
+    assert!(
+        rig.kit
+            .events("pages.notion_link_requested")
+            .await
+            .is_empty()
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -121,7 +130,11 @@ async fn the_request_is_checked_before_anything_is_made(db: PgPool) {
     let uri = format!("{}/notion/imports", Kit::pages(rig.ws));
     let none = rig
         .kit
-        .post(&rig.token, &uri, Some(json!({"connection": rig.connection, "pages": []})))
+        .post(
+            &rig.token,
+            &uri,
+            Some(json!({"connection": rig.connection, "pages": []})),
+        )
         .await;
     assert_eq!(none.status, StatusCode::BAD_REQUEST);
     assert_eq!(none.json["code"], "invalid_import");
@@ -130,7 +143,11 @@ async fn the_request_is_checked_before_anything_is_made(db: PgPool) {
         .collect();
     let too_many = rig
         .kit
-        .post(&rig.token, &uri, Some(json!({"connection": rig.connection, "pages": many})))
+        .post(
+            &rig.token,
+            &uri,
+            Some(json!({"connection": rig.connection, "pages": many})),
+        )
         .await;
     assert_eq!(too_many.json["code"], "invalid_import");
     let long = rig
@@ -178,7 +195,11 @@ async fn pages_go_under_a_parent_the_member_may_write(db: PgPool) {
     let rig = Rig::new(db).await;
     let parent = rig
         .kit
-        .add(&rig.token, rig.ws, json!({"title": "Wiki", "place": "private"}))
+        .add(
+            &rig.token,
+            rig.ws,
+            json!({"title": "Wiki", "place": "private"}),
+        )
         .await;
     let parent_id = parent["id"].as_str().unwrap();
     let uri = format!("{}/notion/imports", Kit::pages(rig.ws));
@@ -204,8 +225,10 @@ async fn pages_go_under_a_parent_the_member_may_write(db: PgPool) {
         .post(
             &rig.token,
             &uri,
-            Some(json!({"connection": rig.connection, "parent": Uuid::now_v7(),
-                "pages": [{"notion_page": Uuid::now_v7()}]})),
+            Some(
+                json!({"connection": rig.connection, "parent": Uuid::now_v7(),
+                "pages": [{"notion_page": Uuid::now_v7()}]}),
+            ),
         )
         .await;
     assert_eq!(hidden.status, StatusCode::NOT_FOUND);

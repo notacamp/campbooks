@@ -56,7 +56,8 @@ async fn a_linked_page_says_so(db: PgPool) {
     kit.join(&marta, ws, Role::Member);
     let connection = kit.connect_notion(&marta, ws).await;
     let roadmap = kit.notion.add_page("Product roadmap", None);
-    kit.link_notion(ws, &connection, Uuid::now_v7(), roadmap).await;
+    kit.link_notion(ws, &connection, Uuid::now_v7(), roadmap)
+        .await;
     let listed = kit.get(&marta, &uri(ws, &connection)).await;
     assert_eq!(listed.json["pages"][0]["linked"], true);
 }
@@ -142,7 +143,12 @@ async fn notion_trouble_reaches_the_member_as_a_short_code(db: PgPool) {
     let connection = kit.connect_notion(&marta, ws).await;
     kit.notion.throttle_next(42);
     let listed = kit.get(&marta, &uri(ws, &connection)).await;
-    assert_eq!(listed.status, StatusCode::TOO_MANY_REQUESTS, "{:?}", listed.json);
+    assert_eq!(
+        listed.status,
+        StatusCode::TOO_MANY_REQUESTS,
+        "{:?}",
+        listed.json
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

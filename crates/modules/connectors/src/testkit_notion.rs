@@ -233,7 +233,7 @@ impl FakeNotion {
     /// Add a block of `kind` with `body` at the end of `parent`'s children.
     pub fn add_block(&self, parent: Uuid, kind: &str, body: &Value) -> Uuid {
         let mut state = self.lock();
-        insert_block(&mut state, parent, kind, body.clone(), None)
+        insert_block(&mut state, parent, kind, body.clone(), (None, false))
     }
 
     /// Add a paragraph.
@@ -426,7 +426,7 @@ fn insert_block(
     parent: Uuid,
     kind: &str,
     body: Value,
-    after: Option<Uuid>,
+    (after, at_start): (Option<Uuid>, bool),
 ) -> Uuid {
     let id = Uuid::now_v7();
     let edited = FakeNotion::tick(state);
@@ -442,9 +442,13 @@ fn insert_block(
     );
     state.order.entry(id).or_default();
     let siblings = state.order.entry(parent).or_default();
-    let at = after
-        .and_then(|after| siblings.iter().position(|s| *s == after))
-        .map_or(siblings.len(), |at| at + 1);
+    let at = if at_start {
+        0
+    } else {
+        after
+            .and_then(|after| siblings.iter().position(|s| *s == after))
+            .map_or(siblings.len(), |at| at + 1)
+    };
     siblings.insert(at, id);
     touch_page(state, parent, edited);
     id
@@ -480,7 +484,6 @@ fn block_json(state: &State, id: Uuid) -> Value {
         "created_time": time(block.edited),
         "last_edited_time": time(block.edited),
         "has_children": !live_children(state, id).is_empty() && block.kind != "child_page",
-        "archived": block.archived,
         "in_trash": block.archived,
         "type": block.kind,
     });
@@ -501,7 +504,6 @@ fn page_json(state: &State, id: Uuid) -> Value {
         "id": id,
         "created_time": time(page.edited),
         "last_edited_time": time(page.edited),
-        "archived": page.archived,
         "in_trash": page.archived,
         "parent": parent,
         "properties": {"title": {"id": "title", "type": "title",
@@ -553,7 +555,7 @@ impl Respond for Responder {
             .headers
             .get("notion-version")
             .and_then(|v| v.to_str().ok())
-            != Some("2022-06-28")
+            != Some("2026-03-11")
         {
             return error(400, "invalid_request_url");
         }
@@ -746,7 +748,26 @@ fn append(state: &mut State, id: &str, body: &Value) -> ResponseTemplate {
     let Some(parent) = visible_block(state, id) else {
         return error(404, "object_not_found");
     };
-    let mut after = body["after"].as_str().and_then(|a| Uuid::parse_str(a).ok());
+    // API version 2026-03-11: `position`, not `after`.
+    if body.get("after").is_some() {
+        return error(400, "validation_error");
+    }
+    let mut after = match body.pointer("/position/type").and_then(Value::as_str) {
+        Some("after_block") => {
+            let Some(after) = body
+                .pointer("/position/after_block/id")
+                .and_then(Value::as_str)
+                .and_then(|a| Uuid::parse_str(a).ok())
+            else {
+                return error(400, "validation_error");
+            };
+            Some(after)
+        }
+        // Before every block, or after the last one.
+        Some("start" | "end") | None => None,
+        Some(_) => return error(400, "validation_error"),
+    };
+    let mut at_start = body.pointer("/position/type").and_then(Value::as_str) == Some("start");
     let Some(children) = body["children"].as_array() else {
         return error(400, "validation_error");
     };
@@ -756,7 +777,8 @@ fn append(state: &mut State, id: &str, body: &Value) -> ResponseTemplate {
         let Some(kind) = child["type"].as_str() else {
             return error(400, "validation_error");
         };
-        let made_id = insert_block(state, parent, kind, child[kind].clone(), after);
+        let made_id = insert_block(state, parent, kind, child[kind].clone(), (after, at_start));
+        at_start = false;
         after = Some(made_id);
         made.push(made_id);
     }
@@ -891,11 +913,13 @@ impl Kit {
 
     /// The stream that reads `notion_page`, if any.
     pub async fn notion_stream_opt(&self, notion_page: Uuid) -> Option<Uuid> {
-        sqlx::query_scalar("SELECT stream_id FROM connectors.notion_links WHERE notion_page_id = $1")
-            .bind(notion_page)
-            .fetch_optional(&self.db)
-            .await
-            .unwrap()
+        sqlx::query_scalar(
+            "SELECT stream_id FROM connectors.notion_links WHERE notion_page_id = $1",
+        )
+        .bind(notion_page)
+        .fetch_optional(&self.db)
+        .await
+        .unwrap()
     }
 
     /// When the stream next runs.

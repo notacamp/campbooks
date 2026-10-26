@@ -729,7 +729,9 @@ impl Kit {
             notion_webhook: (notion_client.is_some() && webhook_secret)
                 .then(|| ClientSecret::Inline(NOTION_HOOK_SECRET.into())),
             notion_cipher: notion_on.then(|| {
-                Arc::new(crate::domain::notion_webhook::cipher(&SecretKey::from_bytes([3; 32])))
+                Arc::new(crate::domain::notion_webhook::cipher(
+                    &SecretKey::from_bytes([3; 32]),
+                ))
             }),
             imap: Arc::new(crate::imap::Imap::new(imap_config)),
             cipher: Some(Arc::new(Cipher::new(

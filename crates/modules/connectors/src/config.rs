@@ -1064,13 +1064,25 @@ mod tests {
     #[test]
     fn notion_with_a_broken_value_is_refused_naming_it() {
         for (bad, name) in [
-            (serde_json::json!({"requests_per_second": 0}), "REQUESTS_PER_SECOND"),
-            (serde_json::json!({"requests_per_second": 5000}), "REQUESTS_PER_SECOND"),
-            (serde_json::json!({"requests_per_minute": "many"}), "REQUESTS_PER_MINUTE"),
+            (
+                serde_json::json!({"requests_per_second": 0}),
+                "REQUESTS_PER_SECOND",
+            ),
+            (
+                serde_json::json!({"requests_per_second": 5000}),
+                "REQUESTS_PER_SECOND",
+            ),
+            (
+                serde_json::json!({"requests_per_minute": "many"}),
+                "REQUESTS_PER_MINUTE",
+            ),
             (serde_json::json!({"max_blocks": 0}), "MAX_BLOCKS"),
             (serde_json::json!({"max_blocks": 100_000}), "MAX_BLOCKS"),
             (serde_json::json!({"max_depth": 99}), "MAX_DEPTH"),
-            (serde_json::json!({"patience_seconds": 0}), "PATIENCE_SECONDS"),
+            (
+                serde_json::json!({"patience_seconds": 0}),
+                "PATIENCE_SECONDS",
+            ),
         ] {
             let mut settings = bad.clone();
             settings["enabled"] = serde_json::json!(true);

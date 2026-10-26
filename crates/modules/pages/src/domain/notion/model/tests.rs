@@ -38,7 +38,15 @@ fn the_hash_sees_words_marks_kind_and_attributes() {
         todo.checked = Some(true);
         (before, h(&todo))
     };
-    let all = [h(&base), h(&words), h(&bold), h(&link), h(&kind), h2, h(&heading)];
+    let all = [
+        h(&base),
+        h(&words),
+        h(&bold),
+        h(&link),
+        h(&kind),
+        h2,
+        h(&heading),
+    ];
     for (n, one) in all.iter().enumerate() {
         for other in &all[n + 1..] {
             assert_ne!(one, other);
@@ -83,7 +91,10 @@ fn hashes_round_trip_as_hex() {
     let hash = h(&para(1, "Launch plan", 1));
     let hex = hash_hex(&hash);
     assert_eq!(hex.len(), 64);
-    assert!(hex.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
+    assert!(
+        hex.bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    );
     assert_eq!(hash_of_hex(&hex), Some(hash));
     let (g, short, wide) = ("g".repeat(64), "a".repeat(63), "é".repeat(32));
     for bad in ["", "abc", g.as_str(), short.as_str(), wide.as_str()] {
@@ -113,7 +124,11 @@ fn runs_are_normalised_to_one_shape() {
         page: Some(id(1)),
         ..Run::default()
     };
-    let kept = normalize(vec![Run::plain("see "), mention.clone(), Run::plain(" now")]);
+    let kept = normalize(vec![
+        Run::plain("see "),
+        mention.clone(),
+        Run::plain(" now"),
+    ]);
     assert_eq!(kept.len(), 3);
     assert_eq!(kept[1], mention);
 }
@@ -142,7 +157,13 @@ fn kinds_round_trip_by_name_and_say_what_the_member_can_edit() {
     }
     assert_eq!(Kind::parse("table"), None);
     // What is kept in Notion, linked or a file is never written from here.
-    for kind in [Kind::External, Kind::PageLink, Kind::Image, Kind::File, Kind::Divider] {
+    for kind in [
+        Kind::External,
+        Kind::PageLink,
+        Kind::Image,
+        Kind::File,
+        Kind::Divider,
+    ] {
         assert!(!kind.editable(), "{kind:?}");
     }
     assert!(Kind::Code.editable() && Kind::Paragraph.editable());
@@ -153,14 +174,11 @@ fn kinds_round_trip_by_name_and_say_what_the_member_can_edit() {
 #[test]
 fn a_snapshot_and_a_change_document_round_trip_and_match_the_contracts() {
     let snap = snapshot(
-        vec![
-            para(1, "Hello", 1),
-            {
-                let mut b = block(2, Kind::Toggle, "More", 1);
-                b.children = vec![para(3, "Inside", 1)];
-                b
-            },
-        ],
+        vec![para(1, "Hello", 1), {
+            let mut b = block(2, Kind::Toggle, "More", 1);
+            b.children = vec![para(3, "Inside", 1)];
+            b
+        }],
         5,
         true,
     );
@@ -178,7 +196,10 @@ fn a_snapshot_and_a_change_document_round_trip_and_match_the_contracts() {
                 seq: 0,
                 block: Some(para(7, "Edited here", 0)),
             },
-            ChangeItem { seq: 1, block: None },
+            ChangeItem {
+                seq: 1,
+                block: None,
+            },
         ],
     };
     let value = serde_json::to_value(&changes).unwrap();

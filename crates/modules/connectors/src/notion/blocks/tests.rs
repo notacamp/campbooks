@@ -13,7 +13,7 @@ fn raw(type_name: &str, body: &serde_json::Value) -> serde_json::Value {
         "type": type_name,
         "last_edited_time": TIME,
         "has_children": false,
-        "archived": false,
+        "in_trash": false,
     });
     block[type_name] = body.clone();
     block
@@ -234,9 +234,6 @@ fn a_sub_page_is_a_link_with_its_title() {
 
 #[test]
 fn a_block_in_the_trash_or_without_a_time_is_not_read() {
-    let mut gone = raw("paragraph", &json!({"rich_text": []}));
-    gone["archived"] = json!(true);
-    assert!(parse(&gone).is_none());
     let mut trashed = raw("paragraph", &json!({"rich_text": []}));
     trashed["in_trash"] = json!(true);
     assert!(parse(&trashed).is_none());
@@ -372,4 +369,16 @@ fn a_snapshot_round_trips_and_carries_no_hash() {
     let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(value["blocks"][0]["kind"], "paragraph");
     assert!(value["blocks"][0].get("hash").is_none());
+}
+
+#[test]
+fn meeting_notes_are_kept_in_notion_without_their_content() {
+    let parsed = parse(&raw(
+        "meeting_notes",
+        &json!({"title": [], "status": "notes_ready"}),
+    ))
+    .unwrap();
+    assert_eq!(parsed.block.kind, Kind::External);
+    assert_eq!(parsed.block.label.as_deref(), Some("meeting_notes"));
+    assert!(!parsed.recurse);
 }

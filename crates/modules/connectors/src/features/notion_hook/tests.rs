@@ -17,6 +17,7 @@ use crate::testkit::{Kit, NOTION_HOOK_SECRET};
 fn event(kind: &str, page: Uuid) -> Vec<u8> {
     serde_json::to_vec(&json!({
         "id": Uuid::now_v7().to_string(),
+        "api_version": "2026-03-11",
         "type": kind,
         "entity": {"id": page.to_string(), "type": "page"},
     }))
@@ -138,7 +139,10 @@ async fn with_the_secret_set_a_verification_post_is_none_of_ours(db: PgPool) {
     let (_, _, stream) = linked(&kit, "marta").await;
     let body = serde_json::to_vec(&json!({"verification_token": "secret_abc"})).unwrap();
     // Unsigned, and even signed: a token cannot be armed again.
-    assert_eq!(kit.notion_hook(&body, None).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        kit.notion_hook(&body, None).await.status,
+        StatusCode::NOT_FOUND
+    );
     let signed = Kit::notion_signature(&body);
     assert_eq!(
         kit.notion_hook(&body, Some(&signed)).await.status,
@@ -189,8 +193,13 @@ async fn before_the_secret_exists_the_verification_token_is_kept_sealed(db: PgPo
     .unwrap();
     assert_eq!(stored.token, "secret_first");
     assert!(!format!("{stored:?}").contains("secret_first"));
-    let credentials_cipher = campbooks_kernel::crypto::Cipher::new(&key, crate::CREDENTIALS_PURPOSE);
-    assert!(credentials_cipher.open(&sealed, b"connectors.notion_webhook_token").is_err());
+    let credentials_cipher =
+        campbooks_kernel::crypto::Cipher::new(&key, crate::CREDENTIALS_PURPOSE);
+    assert!(
+        credentials_cipher
+            .open(&sealed, b"connectors.notion_webhook_token")
+            .is_err()
+    );
     // The token appears in no event.
     let events: Vec<String> = sqlx::query_scalar("SELECT payload::text FROM kernel.events")
         .fetch_all(&kit.db)
@@ -203,11 +212,15 @@ async fn before_the_secret_exists_the_verification_token_is_kept_sealed(db: PgPo
 async fn a_second_verification_replaces_the_first(db: PgPool) {
     let kit = Kit::with_notion_unsigned(db).await;
     assert_eq!(
-        kit.notion_hook(&verification("secret_first"), None).await.status,
+        kit.notion_hook(&verification("secret_first"), None)
+            .await
+            .status,
         StatusCode::OK
     );
     assert_eq!(
-        kit.notion_hook(&verification("secret_second"), None).await.status,
+        kit.notion_hook(&verification("secret_second"), None)
+            .await
+            .status,
         StatusCode::OK
     );
     assert_eq!(stored_tokens(&kit).await, 1);
@@ -282,24 +295,66 @@ async fn the_runtime_role_can_replace_the_token_but_never_read_it(db: PgPool) {
 async fn only_page_events_for_a_known_page_wake_a_stream(db: PgPool) {
     let kit = Kit::with_notion(db).await;
     let (_, page, stream) = linked(&kit, "marta").await;
+    // Unknown event types and unusable bodies are answered 200 (so Notion
+    // does not retry them) and mark nothing due.
     for body in [
         event("comment.created", page),
+        event("page.locked", page),
+        event("database.schema_updated", page),
         event("page.content_updated", Uuid::now_v7()),
         b"{}".to_vec(),
-        serde_json::to_vec(&json!({"type": "page.content_updated", "entity": {"id": "not-a-uuid"}}))
-            .unwrap(),
+        serde_json::to_vec(
+            &json!({"type": "page.content_updated", "entity": {"id": "not-a-uuid"}}),
+        )
+        .unwrap(),
     ] {
         let posted = kit
             .notion_hook(&body, Some(&Kit::notion_signature(&body)))
             .await;
-        assert_eq!(posted.status, StatusCode::ACCEPTED);
+        assert_eq!(
+            posted.status,
+            StatusCode::OK,
+            "{}",
+            String::from_utf8_lossy(&body)
+        );
     }
     assert!(!due(&kit, stream).await);
+    assert!(!forced(&kit, stream).await);
     let junk = b"not json".to_vec();
     let posted = kit
         .notion_hook(&junk, Some(&Kit::notion_signature(&junk)))
         .await;
     assert_eq!(posted.status, StatusCode::BAD_REQUEST);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn each_of_the_five_page_events_marks_the_stream_due(db: PgPool) {
+    let kit = Kit::with_notion(db).await;
+    let (_, page, stream) = linked(&kit, "marta").await;
+    for kind in [
+        "page.content_updated",
+        "page.properties_updated",
+        "page.moved",
+        "page.deleted",
+        "page.undeleted",
+    ] {
+        sqlx::query("UPDATE connectors.sync_due SET due_at = now() + interval '1 day'")
+            .execute(&kit.db)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE connectors.streams SET cursor = '{}'::jsonb")
+            .execute(&kit.db)
+            .await
+            .unwrap();
+        assert!(!due(&kit, stream).await, "{kind}");
+        let body = event(kind, page);
+        let posted = kit
+            .notion_hook(&body, Some(&Kit::notion_signature(&body)))
+            .await;
+        assert_eq!(posted.status, StatusCode::ACCEPTED, "{kind}");
+        assert!(due(&kit, stream).await, "{kind}");
+        assert!(forced(&kit, stream).await, "{kind}");
+    }
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -348,4 +403,30 @@ async fn the_hook_is_absent_unless_notion_is_on(db: PgPool) {
         .notion_hook(&body, Some(&Kit::notion_signature(&body)))
         .await;
     assert_eq!(posted.status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_event_of_another_api_version_or_without_one_is_ignored(db: PgPool) {
+    let kit = Kit::with_notion(db).await;
+    let (_, page, stream) = linked(&kit, "marta").await;
+    for version in [Some("2022-06-28"), Some("2099-01-01"), None] {
+        let mut body = json!({"type": "page.content_updated",
+            "entity": {"id": page.to_string(), "type": "page"}});
+        if let Some(version) = version {
+            body["api_version"] = json!(version);
+        }
+        let body = serde_json::to_vec(&body).unwrap();
+        let posted = kit
+            .notion_hook(&body, Some(&Kit::notion_signature(&body)))
+            .await;
+        assert_eq!(posted.status, StatusCode::OK, "{version:?}");
+    }
+    assert!(!due(&kit, stream).await);
+    // The pinned version still works.
+    let body = event("page.content_updated", page);
+    let posted = kit
+        .notion_hook(&body, Some(&Kit::notion_signature(&body)))
+        .await;
+    assert_eq!(posted.status, StatusCode::ACCEPTED);
+    assert!(due(&kit, stream).await);
 }

@@ -294,7 +294,7 @@ pub fn parse(raw: &Value) -> Option<Parsed> {
         .and_then(Value::as_str)
         .and_then(|id| Uuid::parse_str(id).ok())?;
     let flag = |key: &str| raw.get(key).and_then(Value::as_bool).unwrap_or(false);
-    if flag("archived") || flag("in_trash") {
+    if flag("in_trash") {
         return None;
     }
     let edited = raw

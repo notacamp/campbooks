@@ -90,7 +90,12 @@ fn row(kind: &str) -> Recorded {
     }
 }
 
-async fn run(rig: &mut Rig, row: &Recorded, item: Option<&Block>, made: &mut HashMap<Uuid, Uuid>) -> Made {
+async fn run(
+    rig: &mut Rig,
+    row: &Recorded,
+    item: Option<&Block>,
+    made: &mut HashMap<Uuid, Uuid>,
+) -> Made {
     make(
         &rig.notion,
         &rig.token,
@@ -111,7 +116,13 @@ async fn an_update_is_written_when_notion_has_not_edited_the_block_since(db: PgP
     let mut change = row("update");
     change.notion_block_id = Some(block);
     change.base_edited_at = rig.fake.edited(block);
-    let outcome = run(&mut rig, &change, Some(&paragraph("New")), &mut HashMap::new()).await;
+    let outcome = run(
+        &mut rig,
+        &change,
+        Some(&paragraph("New")),
+        &mut HashMap::new(),
+    )
+    .await;
     assert!(matches!(outcome, Made::Applied(w) if w.notion_block == block));
     assert_eq!(rig.fake.text(block).as_deref(), Some("New"));
 }
@@ -125,7 +136,13 @@ async fn an_update_is_held_back_when_notion_changed_the_block_first(db: PgPool) 
     change.base_edited_at = rig.fake.edited(block);
     // Someone edits it in Notion after the last sync.
     rig.fake.set_text(block, "Theirs");
-    let outcome = run(&mut rig, &change, Some(&paragraph("Mine")), &mut HashMap::new()).await;
+    let outcome = run(
+        &mut rig,
+        &change,
+        Some(&paragraph("Mine")),
+        &mut HashMap::new(),
+    )
+    .await;
     assert_eq!(outcome, Made::Skipped(NotionReason::ChangedInNotion));
     assert_eq!(rig.fake.text(block).as_deref(), Some("Theirs"));
     assert!(rig.fake.patches().is_empty());
@@ -138,7 +155,13 @@ async fn a_block_without_a_base_time_is_not_written_over(db: PgPool) {
     let mut change = row("update");
     change.notion_block_id = Some(block);
     change.base_edited_at = None;
-    let outcome = run(&mut rig, &change, Some(&paragraph("New")), &mut HashMap::new()).await;
+    let outcome = run(
+        &mut rig,
+        &change,
+        Some(&paragraph("New")),
+        &mut HashMap::new(),
+    )
+    .await;
     assert_eq!(outcome, Made::Skipped(NotionReason::ChangedInNotion));
     assert!(rig.fake.patches().is_empty());
 }
@@ -151,10 +174,22 @@ async fn an_update_of_a_block_that_is_gone_is_skipped(db: PgPool) {
     change.notion_block_id = Some(block);
     change.base_edited_at = rig.fake.edited(block);
     rig.fake.remove_block(block);
-    let outcome = run(&mut rig, &change, Some(&paragraph("New")), &mut HashMap::new()).await;
+    let outcome = run(
+        &mut rig,
+        &change,
+        Some(&paragraph("New")),
+        &mut HashMap::new(),
+    )
+    .await;
     assert_eq!(outcome, Made::Skipped(NotionReason::NotFound));
     let unknown = row("update");
-    let outcome = run(&mut rig, &unknown, Some(&paragraph("New")), &mut HashMap::new()).await;
+    let outcome = run(
+        &mut rig,
+        &unknown,
+        Some(&paragraph("New")),
+        &mut HashMap::new(),
+    )
+    .await;
     assert_eq!(outcome, Made::Failed(NotionReason::Rejected));
 }
 
@@ -196,7 +231,13 @@ async fn an_append_after_a_block_that_was_never_made_is_skipped(db: PgPool) {
     let mut rig = rig(db).await;
     let mut change = row("append");
     change.after_block_id = Some(Uuid::now_v7());
-    let outcome = run(&mut rig, &change, Some(&paragraph("X")), &mut HashMap::new()).await;
+    let outcome = run(
+        &mut rig,
+        &change,
+        Some(&paragraph("X")),
+        &mut HashMap::new(),
+    )
+    .await;
     assert_eq!(outcome, Made::Skipped(NotionReason::NotFound));
     assert!(rig.fake.appends().is_empty());
 }

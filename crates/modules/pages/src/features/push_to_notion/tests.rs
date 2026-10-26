@@ -18,7 +18,11 @@ async fn synced(db: PgPool) -> (Rig, String, Uuid) {
     let rig = Rig::new(db).await;
     let notion_page = id(0xAA);
     let page = rig.import(notion_page, "Roadmap").await;
-    let mut snap = snapshot(vec![para(1, "Plan the launch", 1), para(2, "Write the notes", 1)], 5, true);
+    let mut snap = snapshot(
+        vec![para(1, "Plan the launch", 1), para(2, "Write the notes", 1)],
+        5,
+        true,
+    );
     snap.notion_page = notion_page;
     rig.read(&page, notion_page, &snap).await;
     (rig, page, notion_page)
@@ -50,7 +54,10 @@ async fn an_edit_becomes_one_bound_request_and_no_event_carries_a_word_of_it(db:
     // The words are in the document the request wrote, a blob.
     let document = rig.blob_json(&events[0]["body"]).await;
     assert_contract("notion-block-changes.v1.schema.json", &document);
-    assert_eq!(document["items"][0]["block"]["runs"][0]["text"], "Write the notes by Friday");
+    assert_eq!(
+        document["items"][0]["block"]["runs"][0]["text"],
+        "Write the notes by Friday"
+    );
 
     let stood = rig.stands(*request).await.expect("the request stands");
     assert_eq!(stood.external_page, notion_page);
@@ -88,7 +95,11 @@ async fn one_request_waits_at_a_time(db: PgPool) {
     rig.push_now().await;
     rig.type_into(&page, 1, " two").await;
     rig.push_now().await;
-    assert_eq!(rig.requests(&page).await.len(), 1, "the second waits for the first");
+    assert_eq!(
+        rig.requests(&page).await.len(),
+        1,
+        "the second waits for the first"
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -110,7 +121,9 @@ async fn a_new_paragraph_is_an_append_after_the_block_before_it(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_mention_of_anything_but_a_synced_page_goes_as_campbooks_link_with_no_subject(db: PgPool) {
+async fn a_mention_of_anything_but_a_synced_page_goes_as_campbooks_link_with_no_subject(
+    db: PgPool,
+) {
     let (rig, page, _) = synced(db).await;
     let task = rig.kit.task_of(rig.user);
     let person = "marta.example@example.com";
@@ -160,7 +173,10 @@ async fn a_request_the_connector_may_not_trust_does_not_stand(db: PgPool) {
     .execute(&rig.kit.db)
     .await
     .unwrap();
-    assert!(rig.stands(request).await.is_none(), "a tampered item is refused");
+    assert!(
+        rig.stands(request).await.is_none(),
+        "a tampered item is refused"
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -194,7 +210,10 @@ async fn a_request_does_not_stand_once_the_link_ended_or_in_another_workspace(db
         assert!(crossed.is_none());
     }
     let stop = format!("{}/{page}/notion/stop", crate::testkit::Kit::pages(rig.ws));
-    assert_eq!(rig.kit.post(&rig.token, &stop, None).await.status.as_u16(), 200);
+    assert_eq!(
+        rig.kit.post(&rig.token, &stop, None).await.status.as_u16(),
+        200
+    );
     assert!(rig.stands(request).await.is_none());
     // The stopped link ended its waiting request too.
     assert_eq!(rig.requests(&page).await[0].1, "done");

@@ -37,11 +37,21 @@ async fn the_links_of_the_pages_the_caller_may_open_say_how_they_are_going(db: P
     assert_eq!(theirs.json["links"].as_array().unwrap().len(), 0);
     // A stopped link says why.
     rig.kit
-        .post(&rig.token, &format!("{}/{second}/notion/stop", Kit::pages(rig.ws)), None)
+        .post(
+            &rig.token,
+            &format!("{}/{second}/notion/stop", Kit::pages(rig.ws)),
+            None,
+        )
         .await;
     let listed = rig.kit.get(&rig.token, &uri).await;
-    assert_eq!(listed.json["links"][1]["stopped_reason"], "stopped_by_member");
+    assert_eq!(
+        listed.json["links"][1]["stopped_reason"],
+        "stopped_by_member"
+    );
     // A client acting for nobody is refused.
     let client = rig.kit.client(rig.ws, "pages:read");
-    assert_eq!(rig.kit.get(&client, &uri).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        rig.kit.get(&client, &uri).await.status,
+        StatusCode::FORBIDDEN
+    );
 }

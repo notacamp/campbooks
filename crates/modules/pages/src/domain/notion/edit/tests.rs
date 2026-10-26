@@ -45,7 +45,11 @@ fn a_block_is_found_by_its_id_at_any_depth_and_inside_its_list() {
 #[test]
 fn rewriting_keeps_the_element_and_the_neighbours() {
     let mut s = Synced::new();
-    s.apply(&snapshot(vec![para(1, "A", 1), para(2, "B", 1), para(3, "C", 1)], 5, true));
+    s.apply(&snapshot(
+        vec![para(1, "A", 1), para(2, "B", 1), para(3, "C", 1)],
+        5,
+        true,
+    ));
     let (a, b) = (s.bid_of("A"), s.bid_of("B"));
     let mut next = Block::new(b, Kind::Paragraph);
     next.runs = vec![Run {
@@ -73,7 +77,11 @@ fn removing_a_block_takes_what_is_under_it_and_an_emptied_list() {
     let mut toggle = block(1, Kind::Toggle, "More", 1);
     toggle.children = vec![para(2, "Inside", 1)];
     s.apply(&snapshot(
-        vec![toggle, block(3, Kind::BulletedItem, "Only item", 1), para(4, "After", 1)],
+        vec![
+            toggle,
+            block(3, Kind::BulletedItem, "Only item", 1),
+            para(4, "After", 1),
+        ],
         5,
         true,
     ));
@@ -93,7 +101,11 @@ fn removing_a_block_takes_what_is_under_it_and_an_emptied_list() {
 #[test]
 fn a_new_first_block_goes_after_the_own_text_of_a_block_that_leads_with_it() {
     let mut s = Synced::new();
-    s.apply(&snapshot(vec![block(1, Kind::Toggle, "More", 1), para(2, "Body", 1)], 5, true));
+    s.apply(&snapshot(
+        vec![block(1, Kind::Toggle, "More", 1), para(2, "Body", 1)],
+        5,
+        true,
+    ));
     let more = s.bid_of("More");
     let txn = s.doc.transact();
     assert_eq!(first_index(&txn, &place(&s.doc)), 0);
@@ -128,7 +140,10 @@ fn blocks_lacking_an_id_are_given_one_but_not_their_own_text() {
     let mut toggle = block(1, Kind::Toggle, "More", 1);
     toggle.children = vec![para(2, "Inside", 1)];
     let merged = s.apply(&snapshot(vec![toggle], 5, true));
-    assert_eq!(merged.ids_given, 0, "blocks made from Notion are given theirs on the way");
+    assert_eq!(
+        merged.ids_given, 0,
+        "blocks made from Notion are given theirs on the way"
+    );
     assert_eq!(s.tree().all().len(), 2);
 }
 
@@ -208,7 +223,17 @@ fn a_sub_page_link_is_made_only_for_a_page_known_here() {
     link.page = Some(id(0x66));
     let r = root(&doc);
     let mut txn = doc.transact_mut();
-    assert!(build(&mut txn, &Place::Root(r.clone()), 0, &link, None, &resolver()).is_none());
+    assert!(
+        build(
+            &mut txn,
+            &Place::Root(r.clone()),
+            0,
+            &link,
+            None,
+            &resolver()
+        )
+        .is_none()
+    );
     let mut known = resolver();
     known.page_of.insert(id(0x66), Uuid::now_v7());
     assert!(build(&mut txn, &Place::Root(r), 0, &link, None, &known).is_some());

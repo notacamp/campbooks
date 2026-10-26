@@ -8,7 +8,10 @@ use crate::{events::ConnectionRemoved, testkit_notion::Rig};
 #[sqlx::test(migrations = "../../../migrations")]
 async fn disconnecting_stops_every_page_linked_through_it(db: PgPool) {
     let rig = Rig::new(db).await;
-    let (one, two) = (rig.import(Uuid::now_v7(), "One").await, rig.import(Uuid::now_v7(), "Two").await);
+    let (one, two) = (
+        rig.import(Uuid::now_v7(), "One").await,
+        rig.import(Uuid::now_v7(), "Two").await,
+    );
     let other = rig.kit.connection_of(rig.user);
     let uri = format!("{}/notion/imports", crate::testkit::Kit::pages(rig.ws));
     let third = rig

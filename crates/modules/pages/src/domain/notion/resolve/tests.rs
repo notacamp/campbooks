@@ -7,10 +7,18 @@ use crate::domain::notion::tests::{Synced, at, para, snapshot};
 /// "Theirs" (edited at minute 7).
 fn conflicted() -> (Synced, Uuid) {
     let mut s = Synced::new();
-    s.apply(&snapshot(vec![para(1, "Hello", 1), para(2, "Other", 1)], 5, true));
+    s.apply(&snapshot(
+        vec![para(1, "Hello", 1), para(2, "Other", 1)],
+        5,
+        true,
+    ));
     let bid = s.bid_of("Hello");
     s.edit_text(bid, "Mine");
-    s.apply(&snapshot(vec![para(1, "Theirs", 7), para(2, "Other", 1)], 8, true));
+    s.apply(&snapshot(
+        vec![para(1, "Theirs", 7), para(2, "Other", 1)],
+        8,
+        true,
+    ));
     assert_eq!(s.tree().conflicts.len(), 1);
     (s, bid)
 }
@@ -38,7 +46,10 @@ fn keep_mine_keeps_the_block_moves_the_base_and_so_sends_it() {
     // Ours now differs from the base: it reads as changed, and is sent.
     assert_ne!(hash(&s.tree().find(bid).unwrap().block), upsert.base_hash);
     assert_eq!(resolution.ours.text(), "Mine");
-    assert_eq!(resolution.theirs.as_ref().map(Block::text).as_deref(), Some("Theirs"));
+    assert_eq!(
+        resolution.theirs.as_ref().map(Block::text).as_deref(),
+        Some("Theirs")
+    );
     assert!(resolution.update.is_some());
 }
 
@@ -83,7 +94,11 @@ fn keep_both_adds_notions_version_after_ours_as_a_block_of_ours() {
 fn when_notion_removed_the_block_each_choice_means_what_it_says() {
     let removed = || {
         let mut s = Synced::new();
-        s.apply(&snapshot(vec![para(1, "Hello", 1), para(2, "Other", 1)], 5, true));
+        s.apply(&snapshot(
+            vec![para(1, "Hello", 1), para(2, "Other", 1)],
+            5,
+            true,
+        ));
         let bid = s.bid_of("Hello");
         s.edit_text(bid, "Mine");
         s.apply(&snapshot(vec![para(2, "Other", 1)], 6, true));
@@ -92,19 +107,40 @@ fn when_notion_removed_the_block_each_choice_means_what_it_says() {
     };
     // Keep mine: the block is ours alone now, no longer the same at Notion.
     let (s, bid) = removed();
-    let kept = resolve(&s.doc, &s.resolver, bid, Choice::Mine, Some(&mapping(&s, bid))).unwrap();
+    let kept = resolve(
+        &s.doc,
+        &s.resolver,
+        bid,
+        Choice::Mine,
+        Some(&mapping(&s, bid)),
+    )
+    .unwrap();
     assert_eq!(s.texts(), ["Mine", "Other"]);
     assert_eq!(kept.deletes, vec![bid]);
     assert!(kept.upsert.is_none());
     // Keep both is the same as keep mine: there is no version of theirs.
     let (s, bid) = removed();
-    let both = resolve(&s.doc, &s.resolver, bid, Choice::Both, Some(&mapping(&s, bid))).unwrap();
+    let both = resolve(
+        &s.doc,
+        &s.resolver,
+        bid,
+        Choice::Both,
+        Some(&mapping(&s, bid)),
+    )
+    .unwrap();
     assert_eq!(s.texts(), ["Mine", "Other"]);
     assert_eq!(both.deletes, vec![bid]);
     assert!(both.extra.is_none());
     // Use Notion's: ours goes too.
     let (s, bid) = removed();
-    let theirs = resolve(&s.doc, &s.resolver, bid, Choice::Notion, Some(&mapping(&s, bid))).unwrap();
+    let theirs = resolve(
+        &s.doc,
+        &s.resolver,
+        bid,
+        Choice::Notion,
+        Some(&mapping(&s, bid)),
+    )
+    .unwrap();
     assert_eq!(s.texts(), ["Other"]);
     assert_eq!(theirs.deletes, vec![bid]);
 }
@@ -130,7 +166,8 @@ fn undoing_puts_the_conflict_back_as_it_was() {
         let (s, bid) = conflicted();
         let before = s.texts();
         let conflict_before = s.tree().conflict_of(bid).cloned().unwrap();
-        let resolution = resolve(&s.doc, &s.resolver, bid, choice, Some(&mapping(&s, bid))).unwrap();
+        let resolution =
+            resolve(&s.doc, &s.resolver, bid, choice, Some(&mapping(&s, bid))).unwrap();
         let theirs = resolution.theirs.clone();
         let taken = Taken {
             bid,
@@ -156,7 +193,14 @@ fn undoing_puts_the_conflict_back_as_it_was() {
 #[test]
 fn undoing_twice_or_after_the_block_went_is_refused() {
     let (s, bid) = conflicted();
-    let resolution = resolve(&s.doc, &s.resolver, bid, Choice::Mine, Some(&mapping(&s, bid))).unwrap();
+    let resolution = resolve(
+        &s.doc,
+        &s.resolver,
+        bid,
+        Choice::Mine,
+        Some(&mapping(&s, bid)),
+    )
+    .unwrap();
     let taken = Taken {
         bid,
         choice: Choice::Mine,

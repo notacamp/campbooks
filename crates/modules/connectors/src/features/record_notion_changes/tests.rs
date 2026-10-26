@@ -85,7 +85,10 @@ async fn a_confirmed_update_is_written_and_reported_with_the_new_edit_time(db: P
     );
     let done = completed(&l).await;
     assert_eq!(done.len(), 1, "{done:?}");
-    assert_contract("connectors.notion_changes_completed.v1.schema.json", &done[0]);
+    assert_contract(
+        "connectors.notion_changes_completed.v1.schema.json",
+        &done[0],
+    );
     let result = &done[0]["results"][0];
     assert_eq!(result["outcome"], "applied");
     assert_eq!(result["block"], mine.to_string());
@@ -133,7 +136,10 @@ async fn a_request_the_pages_module_does_not_confirm_records_nothing(db: PgPool)
         )
         .await;
     assert!(states(&l).await.is_empty());
-    assert_eq!(l.kit.notion.text(l.first).as_deref(), Some("Plan the launch"));
+    assert_eq!(
+        l.kit.notion.text(l.first).as_deref(),
+        Some("Plan the launch")
+    );
     assert!(l.kit.notion.patches().is_empty());
 }
 
@@ -242,7 +248,13 @@ async fn a_delivery_twice_writes_once(db: PgPool) {
 
 /// Record `request`'s changes for `stream` directly, as the consumer does,
 /// to tamper with the rows before the stream runs.
-async fn record_for(l: &Linked, stream: StreamId, notion_page: Uuid, request: Uuid, kinds: Vec<(&str, Uuid, Option<Uuid>)>) {
+async fn record_for(
+    l: &Linked,
+    stream: StreamId,
+    notion_page: Uuid,
+    request: Uuid,
+    kinds: Vec<(&str, Uuid, Option<Uuid>)>,
+) {
     let id: ConnectionId = l.connection["id"].as_str().unwrap().parse().unwrap();
     let body = l
         .kit
@@ -306,7 +318,10 @@ async fn a_row_edited_after_it_was_bound_is_never_made(db: PgPool) {
         .unwrap();
     l.kit.tick(TimeDelta::minutes(10)).await;
     assert!(l.kit.notion.patches().is_empty());
-    assert_eq!(l.kit.notion.text(l.second).as_deref(), Some("Write the notes"));
+    assert_eq!(
+        l.kit.notion.text(l.second).as_deref(),
+        Some("Write the notes")
+    );
     assert_eq!(
         states(&l).await,
         vec![("skipped".to_owned(), Some("unverified".to_owned()))]
@@ -383,7 +398,10 @@ async fn a_change_moved_to_another_pages_stream_is_refused(db: PgPool) {
         .unwrap();
     l.kit.tick(TimeDelta::minutes(10)).await;
     assert!(l.kit.notion.patches().is_empty());
-    assert_eq!(l.kit.notion.text(victim).as_deref(), Some("Not for this request"));
+    assert_eq!(
+        l.kit.notion.text(victim).as_deref(),
+        Some("Not for this request")
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -405,7 +423,10 @@ async fn a_request_naming_another_workspaces_connection_writes_nothing(db: PgPoo
         )
         .await;
     assert!(l.kit.notion.patches().is_empty());
-    assert_eq!(l.kit.notion.text(l.first).as_deref(), Some("Plan the launch"));
+    assert_eq!(
+        l.kit.notion.text(l.first).as_deref(),
+        Some("Plan the launch")
+    );
     assert!(states(&l).await.is_empty());
     // B is told the request cannot be made.
     let done = l
@@ -434,7 +455,11 @@ async fn a_page_is_never_removed_even_when_the_request_says_so(db: PgPool) {
         .await;
     assert!(l.kit.notion.deleted().is_empty());
     assert!(
-        l.kit.notion.calls().iter().all(|c| !c.starts_with("DELETE")),
+        l.kit
+            .notion
+            .calls()
+            .iter()
+            .all(|c| !c.starts_with("DELETE")),
         "{:?}",
         l.kit.notion.calls()
     );
@@ -498,10 +523,16 @@ async fn throttling_leaves_the_change_pending_for_the_next_run(db: PgPool) {
             true,
         )
         .await;
-    assert_eq!(l.kit.notion.text(l.first).as_deref(), Some("Plan the launch"));
+    assert_eq!(
+        l.kit.notion.text(l.first).as_deref(),
+        Some("Plan the launch")
+    );
     assert!(completed(&l).await.is_empty());
     l.kit.tick(TimeDelta::minutes(10)).await;
-    assert_eq!(l.kit.notion.text(l.first).as_deref(), Some("After the wait"));
+    assert_eq!(
+        l.kit.notion.text(l.first).as_deref(),
+        Some("After the wait")
+    );
     assert_eq!(completed(&l).await.len(), 1);
 }
 

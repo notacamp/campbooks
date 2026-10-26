@@ -483,7 +483,10 @@ mod tests {
             notion.redirect_uri(),
             "https://campbooks.example.com/auth/callback/notion"
         );
-        assert!(deps.notion_webhook.is_none(), "no webhook without its secret");
+        assert!(
+            deps.notion_webhook.is_none(),
+            "no webhook without its secret"
+        );
         let hooked = notion_on(serde_json::json!({"webhook_secret": "w"}));
         assert!(
             Deps::from_figment(&hooked, &public, key())
@@ -494,7 +497,10 @@ mod tests {
         // A redirect path must be a path of this instance.
         for (path, expected) in [
             ("/cb/notion", "https://campbooks.example.com/cb/notion"),
-            ("//evil.example.com", "https://campbooks.example.com/auth/callback/notion"),
+            (
+                "//evil.example.com",
+                "https://campbooks.example.com/auth/callback/notion",
+            ),
             ("evil", "https://campbooks.example.com/auth/callback/notion"),
         ] {
             let figment = notion_on(serde_json::json!({"redirect_path": path}));
@@ -523,8 +529,8 @@ mod tests {
                 .notion
                 .is_none()
         );
-        let deps = Deps::from_figment(&notion_on(serde_json::json!({})), &kernel_config(), None)
-            .unwrap();
+        let deps =
+            Deps::from_figment(&notion_on(serde_json::json!({})), &kernel_config(), None).unwrap();
         assert!(deps.notion.is_none() && deps.notion_cipher.is_none());
     }
 

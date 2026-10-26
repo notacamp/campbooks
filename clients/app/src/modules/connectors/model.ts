@@ -4,7 +4,7 @@ import type { StatusTone } from "~/lib/ui";
 import type { Connection } from "./api/queries";
 
 /** The mail providers this client can name; anything else shows its raw name. */
-const PROVIDERS = ["google", "zoho", "microsoft", "imap"] as const;
+const PROVIDERS = ["google", "zoho", "microsoft", "imap", "notion"] as const;
 export type MailProvider = (typeof PROVIDERS)[number];
 
 export function knownMailProvider(name: string): name is MailProvider {

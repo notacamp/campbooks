@@ -174,7 +174,10 @@ async fn a_hosted_file_is_downloaded_once_and_a_refused_one_stays_in_notion(db: 
     .unwrap();
     assert!(again.snapshot.blocks[0].file.is_some());
     assert!(
-        rig.fake.calls().iter().all(|c| !c.starts_with("GET /files/a.png")),
+        rig.fake
+            .calls()
+            .iter()
+            .all(|c| !c.starts_with("GET /files/a.png")),
         "{:?}",
         rig.fake.calls()
     );

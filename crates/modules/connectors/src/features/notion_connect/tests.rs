@@ -12,14 +12,13 @@ use serde_json::json;
 use sqlx::PgPool;
 
 use super::safe_return_to;
-use crate::{
-    deps::CREDENTIALS_PURPOSE,
-    notion::CALLBACK_PATH,
-    testkit::Kit,
-};
+use crate::{deps::CREDENTIALS_PURPOSE, notion::CALLBACK_PATH, testkit::Kit};
 
 fn location(response: &campbooks_kernel::testing::TestResponse) -> String {
-    response.headers[header::LOCATION].to_str().unwrap().to_owned()
+    response.headers[header::LOCATION]
+        .to_str()
+        .unwrap()
+        .to_owned()
 }
 
 fn cipher() -> Cipher {
@@ -117,13 +116,24 @@ async fn a_ticket_works_once(db: PgPool) {
     let ana = kit.user("ana");
     kit.join(&ana, ws, Role::Member);
     let ticket = started(&kit, &ana, ws).await;
-    assert_eq!(kit.notion_get(&ticket, None).await.status, StatusCode::SEE_OTHER);
+    assert_eq!(
+        kit.notion_get(&ticket, None).await.status,
+        StatusCode::SEE_OTHER
+    );
     let again = kit.notion_get(&ticket, None).await;
     assert_eq!(again.status, StatusCode::SEE_OTHER);
-    assert!(location(&again).contains("link_error=link_expired"), "{}", location(&again));
-    assert!(again.headers.get_all(header::SET_COOKIE).iter().any(|c| {
-        c.to_str().unwrap().contains("Max-Age=0")
-    }));
+    assert!(
+        location(&again).contains("link_error=link_expired"),
+        "{}",
+        location(&again)
+    );
+    assert!(
+        again
+            .headers
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .any(|c| { c.to_str().unwrap().contains("Max-Age=0") })
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -149,7 +159,11 @@ async fn a_forged_or_swapped_ticket_or_state_is_refused(db: PgPool) {
             Some(&cookie),
         )
         .await;
-    assert!(location(&back).contains("link_error=link_expired"), "{}", location(&back));
+    assert!(
+        location(&back).contains("link_error=link_expired"),
+        "{}",
+        location(&back)
+    );
     assert_eq!(connections(&kit).await, 0);
 }
 
@@ -163,10 +177,22 @@ async fn a_replayed_state_is_refused(db: PgPool) {
     let sent = kit.notion_get(&ticket, None).await;
     let (state, cookie) = Kit::consent_of(&sent);
     let uri = |code: &str| format!("{CALLBACK_PATH}?code={code}&state={state}");
-    let first = kit.notion_get(&uri(&kit.notion.issue_code()), Some(&cookie)).await;
-    assert!(location(&first).contains("connected="), "{}", location(&first));
-    let replay = kit.notion_get(&uri(&kit.notion.issue_code()), Some(&cookie)).await;
-    assert!(location(&replay).contains("link_error=link_expired"), "{}", location(&replay));
+    let first = kit
+        .notion_get(&uri(&kit.notion.issue_code()), Some(&cookie))
+        .await;
+    assert!(
+        location(&first).contains("connected="),
+        "{}",
+        location(&first)
+    );
+    let replay = kit
+        .notion_get(&uri(&kit.notion.issue_code()), Some(&cookie))
+        .await;
+    assert!(
+        location(&replay).contains("link_error=link_expired"),
+        "{}",
+        location(&replay)
+    );
     assert_eq!(connections(&kit).await, 1);
     // The consent was spent by the first.
     let left: i64 = sqlx::query_scalar("SELECT count(*) FROM connectors.notion_authorizations")
@@ -184,7 +210,10 @@ async fn another_browser_cannot_finish_a_consent(db: PgPool) {
     kit.join(&ana, ws, Role::Member);
     let sent = kit.notion_get(&started(&kit, &ana, ws).await, None).await;
     let (state, cookie) = Kit::consent_of(&sent);
-    let uri = format!("{CALLBACK_PATH}?code={}&state={state}", kit.notion.issue_code());
+    let uri = format!(
+        "{CALLBACK_PATH}?code={}&state={state}",
+        kit.notion.issue_code()
+    );
     // No cookie at all, and the cookie of another browser's round trip.
     let bare = kit.notion_get(&uri, None).await;
     assert!(location(&bare).contains("link_error=link_expired"));
@@ -195,7 +224,11 @@ async fn another_browser_cannot_finish_a_consent(db: PgPool) {
     assert_eq!(connections(&kit).await, 0);
     // The consent was left as it was: the right browser can still finish.
     let right = kit.notion_get(&uri, Some(&cookie)).await;
-    assert!(location(&right).contains("connected="), "{}", location(&right));
+    assert!(
+        location(&right).contains("connected="),
+        "{}",
+        location(&right)
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -216,7 +249,10 @@ async fn an_expired_consent_is_refused(db: PgPool) {
     kit.clock.advance(TimeDelta::minutes(11));
     let back = kit
         .notion_get(
-            &format!("{CALLBACK_PATH}?code={}&state={state}", kit.notion.issue_code()),
+            &format!(
+                "{CALLBACK_PATH}?code={}&state={state}",
+                kit.notion.issue_code()
+            ),
             Some(&cookie),
         )
         .await;
@@ -286,16 +322,24 @@ async fn tokens_are_stored_sealed_and_bound_to_their_connection_and_column(db: P
     let access = access.unwrap();
     for sealed in [&refresh, &access] {
         let text = String::from_utf8_lossy(sealed).into_owned();
-        assert!(!text.contains("fake-notion"), "a token is stored in the clear");
+        assert!(
+            !text.contains("fake-notion"),
+            "a token is stored in the clear"
+        );
     }
     let cipher = cipher();
-    let context = |column: &str, id: uuid::Uuid| {
-        format!("connectors.credentials:{column}:{id}").into_bytes()
-    };
-    let opened = cipher.open(&refresh, &context("refresh_token", id)).unwrap();
+    let context =
+        |column: &str, id: uuid::Uuid| format!("connectors.credentials:{column}:{id}").into_bytes();
+    let opened = cipher
+        .open(&refresh, &context("refresh_token", id))
+        .unwrap();
     assert!(opened.starts_with("fake-notion-refresh"));
     // Not under another connection's context, nor the other column's.
-    assert!(cipher.open(&refresh, &context("refresh_token", uuid::Uuid::now_v7())).is_err());
+    assert!(
+        cipher
+            .open(&refresh, &context("refresh_token", uuid::Uuid::now_v7()))
+            .is_err()
+    );
     assert!(cipher.open(&refresh, &context("access_token", id)).is_err());
     assert!(cipher.open(&access, &context("refresh_token", id)).is_err());
     // The API never shows them.

@@ -55,9 +55,9 @@ fn edited(raw: &Value) -> Option<DateTime<Utc>> {
 
 /// Whether Notion has the block in the trash.
 fn trashed(raw: &Value) -> bool {
-    ["archived", "in_trash"]
-        .iter()
-        .any(|key| raw.get(key).and_then(Value::as_bool).unwrap_or(false))
+    raw.get("in_trash")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
 }
 
 /// What a failed call means for the change: a block that is not there is

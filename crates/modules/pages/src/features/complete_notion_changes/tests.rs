@@ -18,7 +18,13 @@ async fn completed(rig: &Rig, request: Uuid, page: &str, results: Vec<NotionItem
     completed_in(rig, rig.ws, request, page, results).await;
 }
 
-async fn completed_in(rig: &Rig, ws: WorkspaceId, request: Uuid, page: &str, results: Vec<NotionItemResult>) {
+async fn completed_in(
+    rig: &Rig,
+    ws: WorkspaceId,
+    request: Uuid,
+    page: &str,
+    results: Vec<NotionItemResult>,
+) {
     let mut tx = rig.kit.begin(ws).await;
     rig.kit
         .state
@@ -74,7 +80,6 @@ async fn an_applied_update_moves_the_base_to_what_was_written(db: PgPool) {
             outcome: NotionOutcome::Applied,
             notion_block: Some(id(2)),
             edited_at: Some(at(20)),
-            reason: None,
         }],
     )
     .await;
@@ -84,7 +89,11 @@ async fn an_applied_update_moves_the_base_to_what_was_written(db: PgPool) {
     assert_eq!(rig.requests(&page).await[0].1, "done");
     assert!(rig.link(&page).await["last_outbound_at"].is_string());
     // The next read finds Notion as we left it: nothing to do, no conflict.
-    let mut snap = snapshot(vec![para(1, "Plan", 1), para(2, "Notes more", 20)], 21, true);
+    let mut snap = snapshot(
+        vec![para(1, "Plan", 1), para(2, "Notes more", 20)],
+        21,
+        true,
+    );
     snap.notion_page = id(0xAA);
     rig.read(&page, id(0xAA), &snap).await;
     assert_eq!(rig.texts(&page).await, ["Plan", "Notes more"]);
@@ -104,14 +113,17 @@ async fn a_skipped_change_leaves_the_base_so_the_difference_comes_back_as_a_conf
             outcome: NotionOutcome::Skipped,
             notion_block: None,
             edited_at: None,
-            reason: Some(crate::events::NotionReason::ChangedInNotion),
         }],
     )
     .await;
     assert_eq!(base_of(&rig, id(2)).await, before, "the base did not move");
     assert_eq!(rig.requests(&page).await[0].1, "done");
     // Notion's own edit arrives: both sides changed the block.
-    let mut snap = snapshot(vec![para(1, "Plan", 1), para(2, "Notes, their way", 15)], 16, true);
+    let mut snap = snapshot(
+        vec![para(1, "Plan", 1), para(2, "Notes, their way", 15)],
+        16,
+        true,
+    );
     snap.notion_page = id(0xAA);
     rig.read(&page, id(0xAA), &snap).await;
     assert_eq!(rig.texts(&page).await, ["Plan", "Notes more"]);
@@ -145,13 +157,16 @@ async fn an_applied_append_makes_the_new_block_the_same_block_as_notions(db: PgP
             outcome: NotionOutcome::Applied,
             notion_block: Some(id(9)),
             edited_at: Some(at(12)),
-            reason: None,
         }],
     )
     .await;
     assert!(rig.bases(&page).await.contains(&(bid, id(9))));
     // The read that follows has Notion's block 9: the same block, no copy.
-    let mut snap = snapshot(vec![para(1, "Plan", 1), para(9, "Added here", 12)], 13, true);
+    let mut snap = snapshot(
+        vec![para(1, "Plan", 1), para(9, "Added here", 12)],
+        13,
+        true,
+    );
     snap.notion_page = notion_page;
     rig.read(&page, notion_page, &snap).await;
     assert_eq!(rig.texts(&page).await, ["Plan", "Added here"]);
@@ -166,7 +181,6 @@ async fn a_report_for_another_page_or_workspace_or_a_second_report_changes_nothi
         outcome: NotionOutcome::Applied,
         notion_block: Some(id(2)),
         edited_at: Some(at(20)),
-        reason: None,
     };
     // Naming another page than the request's.
     completed(&rig, request, &Uuid::now_v7().to_string(), vec![result()]).await;

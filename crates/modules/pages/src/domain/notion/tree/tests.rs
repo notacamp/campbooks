@@ -97,7 +97,10 @@ fn every_kind_reads_back_as_it_was_written() {
     assert_eq!(all[7].block.language.as_deref(), Some("rust"));
     assert_eq!(all[7].block.text(), "let x = 1;");
     assert_eq!(all[11].block.label.as_deref(), Some("column_list"));
-    assert!(all.iter().all(|node| node.bid.is_some()), "every block has an id");
+    assert!(
+        all.iter().all(|node| node.bid.is_some()),
+        "every block has an id"
+    );
 }
 
 #[test]
@@ -195,7 +198,11 @@ fn everything_else_is_exactly_campbooks_link_with_an_address_of_this_app() {
         let runs = runs_of(&mentioning(ref_type, ref_id), &resolver);
         assert_eq!(runs.len(), 2, "{ref_type}");
         assert_eq!(runs[1].text, CAMPBOOKS_LINK, "{ref_type}");
-        assert_eq!(runs[1].link.as_deref(), Some(address.as_str()), "{ref_type}");
+        assert_eq!(
+            runs[1].link.as_deref(),
+            Some(address.as_str()),
+            "{ref_type}"
+        );
         assert_eq!(runs[1].page, None);
     }
 }
@@ -271,7 +278,10 @@ fn a_conflict_is_kept_apart_with_notions_version() {
     assert_eq!(tree.nodes.len(), 1, "a conflict is not a block");
     let conflict = tree.conflict_of(bid).expect("a conflict about the block");
     assert!(!conflict.removed);
-    assert_eq!(conflict.theirs.as_ref().map(Block::text).as_deref(), Some("Theirs"));
+    assert_eq!(
+        conflict.theirs.as_ref().map(Block::text).as_deref(),
+        Some("Theirs")
+    );
     assert!(conflict.hash.is_some() && conflict.edited.is_some());
     assert_eq!(tree.find(bid).unwrap().block.text(), "Mine");
     assert!(tree.find(Uuid::now_v7()).is_none());
@@ -284,7 +294,11 @@ fn attribute_helpers_read_only_what_has_the_right_shape() {
         let node = fragment.push_back(txn, XmlElementPrelim::empty("heading"));
         node.insert_attribute(txn, "level", Any::Number(2.0));
         node.insert_attribute(txn, "bid", docs::s("not-a-uuid"));
-        node.insert_attribute(txn, "other", Any::Map(Arc::new(std::collections::HashMap::new())));
+        node.insert_attribute(
+            txn,
+            "other",
+            Any::Map(Arc::new(std::collections::HashMap::new())),
+        );
     });
     let root = doc.get_or_insert_xml_fragment(document::ROOT);
     let txn = doc.transact();

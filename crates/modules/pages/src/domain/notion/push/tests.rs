@@ -1,6 +1,8 @@
 //! What a member's edits ask of Notion: updates, appends in order, deletes,
 //! and the things that are never sent.
 
+use yrs::XmlFragment as _;
+
 use super::*;
 use crate::domain::notion::{
     edit::{self, Place},
@@ -66,7 +68,10 @@ fn a_block_waiting_on_a_conflict_is_not_sent() {
     s.edit_text(a, "Mine");
     s.apply(&snapshot(vec![para(1, "Theirs", 7)], 8, true));
     assert_eq!(s.tree().conflicts.len(), 1);
-    assert!(plan_of(&s).items.is_empty(), "neither is sent until the member chooses");
+    assert!(
+        plan_of(&s).items.is_empty(),
+        "neither is sent until the member chooses"
+    );
 }
 
 #[test]
@@ -157,7 +162,10 @@ fn a_deleted_block_is_a_delete_but_never_a_page_or_a_kept_block() {
     assert_eq!(plan.items[0].action, Do::Delete);
     assert_eq!(plan.items[0].bid, a);
     assert_eq!(plan.items[0].external, Some(id(1)));
-    assert_eq!(plan.items[0].base_edited, Some(crate::domain::notion::tests::at(1)));
+    assert_eq!(
+        plan.items[0].base_edited,
+        Some(crate::domain::notion::tests::at(1))
+    );
     assert!(plan.document.items[0].block.is_none());
     assert!(plan.items.iter().all(|i| i.kind != Kind::PageLink));
 }
@@ -185,7 +193,11 @@ fn kept_blocks_are_never_sent_and_files_go_as_a_link_to_the_page() {
         "a block kept in Notion is never sent"
     );
     let sent_image = plan.items.iter().find(|i| i.bid == image).unwrap();
-    assert_eq!(sent_image.kind, Kind::Paragraph, "a file goes as a paragraph");
+    assert_eq!(
+        sent_image.kind,
+        Kind::Paragraph,
+        "a file goes as a paragraph"
+    );
     let block = plan
         .document
         .items
@@ -199,7 +211,11 @@ fn kept_blocks_are_never_sent_and_files_go_as_a_link_to_the_page() {
         s.resolver.page_link().as_deref(),
         "it links to the page: the bytes stay here"
     );
-    assert!(plan.items.iter().any(|i| i.bid == rule && i.kind == Kind::Divider));
+    assert!(
+        plan.items
+            .iter()
+            .any(|i| i.bid == rule && i.kind == Kind::Divider)
+    );
 }
 
 #[test]

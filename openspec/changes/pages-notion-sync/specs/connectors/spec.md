@@ -29,7 +29,9 @@ Campbooks lacks as `external`. Notion files SHALL be stored as blobs within
 20 MiB and an allowed type. `POST /hooks/notion` SHALL exist whenever Notion
 is on, before any webhook secret is configured. With a webhook secret set,
 a post SHALL be accepted only with a valid `X-Notion-Signature` over its raw
-body, SHALL only mark the matching streams due, and SHALL never call Notion
+body, SHALL only mark the matching streams due (for `page.content_updated`,
+`page.properties_updated`, `page.moved`, `page.deleted` and `page.undeleted`;
+any other event type SHALL be answered 200 and mark nothing), and SHALL never call Notion
 itself; a verification-shaped body SHALL then be answered 404. With no
 webhook secret set, the only body taken SHALL be exactly
 `{"verification_token": <text of at most 200 characters>}`: it SHALL be kept
@@ -38,7 +40,7 @@ replaces it), answered 200 and logged without its value; every other post
 SHALL be answered 404. The token SHALL be readable only through the
 instance-admin CLI (`campbooks-server admin notion-webhook-token`, with
 `--clear` to forget it), never through an HTTP endpoint, an event or a log.
-Without a webhook secret, connections SHALL poll. Calls SHALL go only to `api.notion.com`, follow no
+Without a webhook secret, connections SHALL poll. Calls SHALL go only to `api.notion.com` with `Notion-Version: 2026-03-11`, follow no
 redirect, and stay within the connection's request budget.
 
 #### Scenario: A forged webhook post

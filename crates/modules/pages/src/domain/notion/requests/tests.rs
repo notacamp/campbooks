@@ -79,7 +79,11 @@ fn the_binding_covers_every_field_of_every_change() {
         ..body.clone()
     };
     assert_ne!(same, digest(&base, id(1), &other_body), "the document");
-    assert_ne!(same, digest(&[item("update"), item("delete")], id(1), &body), "one more change");
+    assert_ne!(
+        same,
+        digest(&[item("update"), item("delete")], id(1), &body),
+        "one more change"
+    );
     let edits: [fn(&mut StoredItem); 9] = [
         |i| i.action = "delete".to_owned(),
         |i| i.bid = id(99),

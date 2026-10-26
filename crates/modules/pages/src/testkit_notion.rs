@@ -4,10 +4,7 @@
 //! does, and the jobs run. No test talks to Notion.
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use campbooks_kernel::{
-    db::BeginFor as _,
-    tenancy::{UserId, WorkspaceId},
-};
+use campbooks_kernel::tenancy::{UserId, WorkspaceId};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -63,7 +60,10 @@ impl Rig {
     }
 
     /// Import Notion pages through Marta's connection.
-    pub async fn import_response(&self, pages: &[(Uuid, &str)]) -> campbooks_kernel::testing::TestResponse {
+    pub async fn import_response(
+        &self,
+        pages: &[(Uuid, &str)],
+    ) -> campbooks_kernel::testing::TestResponse {
         self.kit
             .post(
                 &self.token,
@@ -89,11 +89,18 @@ impl Rig {
     /// The connector read `notion_page` and hands `snapshot` over for
     /// `page`; the jobs run.
     pub async fn read(&self, page: &str, notion_page: Uuid, snapshot: &Snapshot) {
-        self.read_as(page, self.connection, notion_page, snapshot).await;
+        self.read_as(page, self.connection, notion_page, snapshot)
+            .await;
     }
 
     /// The same, claiming a given connection.
-    pub async fn read_as(&self, page: &str, connection: Uuid, notion_page: Uuid, snapshot: &Snapshot) {
+    pub async fn read_as(
+        &self,
+        page: &str,
+        connection: Uuid,
+        notion_page: Uuid,
+        snapshot: &Snapshot,
+    ) {
         let bytes = serde_json::to_vec(snapshot).unwrap();
         let blob = self
             .kit
@@ -131,7 +138,9 @@ impl Rig {
         let resolver = notion::resolver(&mut tx, &self.kit.state, self.ws, page)
             .await
             .unwrap();
-        let root = loaded.doc.get_or_insert_xml_fragment(crate::domain::document::ROOT);
+        let root = loaded
+            .doc
+            .get_or_insert_xml_fragment(crate::domain::document::ROOT);
         let txn = loaded.doc.transact();
         notion::tree::read(&txn, &root, &resolver)
     }
@@ -157,10 +166,15 @@ impl Rig {
             self.client
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         );
-        let fetched = self.kit.sync(&self.token, self.ws, page, &client, None).await;
+        let fetched = self
+            .kit
+            .sync(&self.token, self.ws, page, &client, None)
+            .await;
         docs::apply(
             &client,
-            &STANDARD.decode(fetched.json["update"].as_str().unwrap()).unwrap(),
+            &STANDARD
+                .decode(fetched.json["update"].as_str().unwrap())
+                .unwrap(),
         );
         let update = docs::edit(&client, change);
         let sent = self
@@ -203,13 +217,11 @@ impl Rig {
 
     /// A page's link row, as JSON.
     pub async fn link(&self, page: &str) -> Value {
-        sqlx::query_scalar(
-            "SELECT to_jsonb(l) FROM pages.external_links l WHERE page_id = $1",
-        )
-        .bind(page.parse::<Uuid>().unwrap())
-        .fetch_one(&self.kit.db)
-        .await
-        .unwrap()
+        sqlx::query_scalar("SELECT to_jsonb(l) FROM pages.external_links l WHERE page_id = $1")
+            .bind(page.parse::<Uuid>().unwrap())
+            .fetch_one(&self.kit.db)
+            .await
+            .unwrap()
     }
 
     /// The requests of a page, oldest first: `(state, items)`.
@@ -270,7 +282,10 @@ impl Rig {
 
     /// What the connectors module is told for `request`, as the port gives
     /// it: `None` when it does not stand.
-    pub async fn stands(&self, request: Uuid) -> Option<campbooks_kernel::outbound::StoredPageChanges> {
+    pub async fn stands(
+        &self,
+        request: Uuid,
+    ) -> Option<campbooks_kernel::outbound::StoredPageChanges> {
         use campbooks_kernel::outbound::PageRequests as _;
         let mut tx = self.kit.begin(self.ws).await;
         let stored = crate::domain::notion::requests::page_requests()

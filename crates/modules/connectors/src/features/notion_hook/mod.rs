@@ -287,6 +287,12 @@ async fn receive(
         tracing::info!("a Notion webhook post with a wrong or missing signature was refused");
         return StatusCode::UNAUTHORIZED.into_response();
     }
+    // The subscription is made for one API version, and an event of another
+    // shape is not read (answered 200: Notion would only post it again).
+    if posted.get("api_version").and_then(Value::as_str) != Some(crate::notion::VERSION) {
+        tracing::info!("a Notion webhook event of another API version was ignored");
+        return StatusCode::OK.into_response();
+    }
     let page = posted
         .get("type")
         .and_then(Value::as_str)
@@ -294,9 +300,12 @@ async fn receive(
         .and_then(|_| posted.pointer("/entity/id"))
         .and_then(Value::as_str)
         .and_then(|id| Uuid::parse_str(id).ok());
-    if let Some(page) = page
-        && let Err(err) = wake(&hook, page).await
-    {
+    // An event type this hook does not act on is answered 200 so Notion does
+    // not retry it, and marks nothing due.
+    let Some(page) = page else {
+        return StatusCode::OK.into_response();
+    };
+    if let Err(err) = wake(&hook, page).await {
         tracing::warn!(
             error = %campbooks_kernel::redact::error(&err),
             "could not take a Notion webhook event"

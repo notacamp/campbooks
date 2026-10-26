@@ -227,10 +227,12 @@ async fn notion_rows_are_isolated_and_only_the_links_are_read_across_workspaces(
     let mut tx = app.begin_for(b).await.unwrap();
     assert_eq!(counts(&mut tx).await, [0, 0, 0]);
     for table in ["notion_links", "notion_changes", "notion_authorizations"] {
-        let changed = sqlx::query(&format!("UPDATE connectors.{table} SET workspace_id = workspace_id"))
-            .execute(&mut *tx)
-            .await
-            .unwrap();
+        let changed = sqlx::query(&format!(
+            "UPDATE connectors.{table} SET workspace_id = workspace_id"
+        ))
+        .execute(&mut *tx)
+        .await
+        .unwrap();
         assert_eq!(changed.rows_affected(), 0, "{table}");
         let deleted = sqlx::query(&format!("DELETE FROM connectors.{table}"))
             .execute(&mut *tx)

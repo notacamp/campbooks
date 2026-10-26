@@ -95,7 +95,11 @@ static CONNECTION_TYPES: [ResourceType; 1] = [ResourceType {
         campbooks_kernel::authz::Action::Read,
         campbooks_kernel::authz::Action::Disconnect,
     ],
-    ..ResourceType::new("connectors.connection", "A test connection.", Tenancy::Workspace)
+    ..ResourceType::new(
+        "connectors.connection",
+        "A test connection.",
+        Tenancy::Workspace,
+    )
 }];
 
 #[derive(Debug, Default)]

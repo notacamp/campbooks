@@ -66,7 +66,19 @@ export function buildConnectorsRoutes<TParent extends AnyRoute>(
     const workspace = workspaces.data?.find((candidate) => candidate.id === workspaceId);
     // The workspace layout only renders its pages for a workspace in the list.
     return workspace === undefined ? null : (
-      <MailboxesPage workspace={workspace} consent={consent} result={result} adding={adding} />
+      <MailboxesPage
+        workspace={workspace}
+        consent={consent}
+        result={result}
+        adding={adding}
+        onImport={() => {
+          void navigate({
+            to: "/w/$workspaceId/pages",
+            params: { workspaceId: workspace.id },
+            search: { import: "notion" },
+          });
+        }}
+      />
     );
   }
 

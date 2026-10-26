@@ -36,7 +36,10 @@ fn notion_alone_changing_a_block_writes_it_in_place() {
     let mut s = Synced::new();
     s.apply(&snap(vec![para(1, "Hello", 1), para(2, "World", 1)], 5));
     let bid = s.bid_of("Hello");
-    let merged = s.apply(&snap(vec![para(1, "Hello there", 7), para(2, "World", 1)], 8));
+    let merged = s.apply(&snap(
+        vec![para(1, "Hello there", 7), para(2, "World", 1)],
+        8,
+    ));
     assert_eq!(s.texts(), ["Hello there", "World"]);
     assert_eq!(s.bid_of("Hello there"), bid, "the same block");
     assert_eq!(merged.outcome.touched, 1);
@@ -70,7 +73,10 @@ fn both_changing_different_words_is_a_conflict_that_keeps_ours_and_shows_theirs(
     assert_eq!(merged.conflicts, 1);
     assert_eq!(merged.outcome.raised, 1);
     let conflict = s.tree().conflict_of(bid).cloned().unwrap();
-    assert_eq!(conflict.theirs.as_ref().map(Block::text).as_deref(), Some("Theirs"));
+    assert_eq!(
+        conflict.theirs.as_ref().map(Block::text).as_deref(),
+        Some("Theirs")
+    );
     assert_eq!(conflict.hash, Some(hash(&para(1, "Theirs", 7))));
     // The base did not move: neither side is sent until the member chooses.
     let mapping = s.mappings.iter().find(|m| m.bid == bid).unwrap();
@@ -102,7 +108,10 @@ fn both_arriving_at_the_same_words_is_no_conflict_and_ends_a_shown_one() {
     let merged = s.apply(&snap(vec![para(1, "Same", 7)], 8));
     assert_eq!(merged.conflicts, 0);
     assert_eq!(merged.outcome.raised, 0);
-    assert_eq!(s.mappings.iter().find(|m| m.bid == bid).unwrap().base_hash, hash(&para(1, "Same", 7)));
+    assert_eq!(
+        s.mappings.iter().find(|m| m.bid == bid).unwrap().base_hash,
+        hash(&para(1, "Same", 7))
+    );
 
     // A conflict shown, then Notion goes back to the base: nothing to show.
     let mut s = Synced::new();
@@ -128,7 +137,10 @@ fn both_arriving_at_the_same_words_is_no_conflict_and_ends_a_shown_one() {
 #[test]
 fn notion_removing_an_unchanged_block_removes_it_and_a_changed_one_is_kept_with_a_conflict() {
     let mut s = Synced::new();
-    s.apply(&snap(vec![para(1, "Keep", 1), para(2, "Gone", 1), para(3, "Mine", 1)], 5));
+    s.apply(&snap(
+        vec![para(1, "Keep", 1), para(2, "Gone", 1), para(3, "Mine", 1)],
+        5,
+    ));
     s.edit_text(s.bid_of("Mine"), "Mine, edited");
     let gone = s.bid_of("Gone");
     let merged = s.apply(&snap(vec![para(1, "Keep", 1)], 6));
@@ -141,7 +153,10 @@ fn notion_removing_an_unchanged_block_removes_it_and_a_changed_one_is_kept_with_
     assert!(conflict.removed);
     assert!(conflict.theirs.is_none());
     // Said once.
-    assert_eq!(s.apply(&snap(vec![para(1, "Keep", 1)], 7)).outcome.raised, 0);
+    assert_eq!(
+        s.apply(&snap(vec![para(1, "Keep", 1)], 7)).outcome.raised,
+        0
+    );
 }
 
 #[test]
@@ -169,12 +184,20 @@ fn a_block_deleted_here_is_not_made_again_from_notion() {
 fn a_new_notion_block_lands_after_the_block_before_it() {
     let mut s = Synced::new();
     s.apply(&snap(vec![para(1, "A", 1), para(3, "C", 1)], 5));
-    let merged = s.apply(&snap(vec![para(1, "A", 1), para(2, "B", 6), para(3, "C", 1)], 7));
+    let merged = s.apply(&snap(
+        vec![para(1, "A", 1), para(2, "B", 6), para(3, "C", 1)],
+        7,
+    ));
     assert_eq!(s.texts(), ["A", "B", "C"]);
     assert_eq!(merged.outcome.upserts.len(), 1);
     // First in the page.
     let merged = s.apply(&snap(
-        vec![para(0, "Zero", 8), para(1, "A", 1), para(2, "B", 6), para(3, "C", 1)],
+        vec![
+            para(0, "Zero", 8),
+            para(1, "A", 1),
+            para(2, "B", 6),
+            para(3, "C", 1),
+        ],
         9,
     ));
     assert_eq!(s.texts(), ["Zero", "A", "B", "C"]);
@@ -203,7 +226,17 @@ fn consecutive_list_items_share_a_list_and_a_toggle_holds_its_blocks() {
     ));
     assert_eq!(
         s.texts(),
-        ["One", "Two", "Three", "Between", "Again", "More", "First", "Second", "Then a paragraph"]
+        [
+            "One",
+            "Two",
+            "Three",
+            "Between",
+            "Again",
+            "More",
+            "First",
+            "Second",
+            "Then a paragraph"
+        ]
     );
     let root = s.doc.get_or_insert_xml_fragment(document::ROOT);
     let txn = s.doc.transact();
@@ -212,7 +245,11 @@ fn consecutive_list_items_share_a_list_and_a_toggle_holds_its_blocks() {
     document::inspect(&s.doc).expect("a valid body");
     drop(txn);
     let tree = s.tree();
-    let toggle = tree.nodes.iter().find(|n| n.block.kind == Kind::Toggle).unwrap();
+    let toggle = tree
+        .nodes
+        .iter()
+        .find(|n| n.block.kind == Kind::Toggle)
+        .unwrap();
     assert_eq!(toggle.children.len(), 3);
 }
 
@@ -220,7 +257,10 @@ fn consecutive_list_items_share_a_list_and_a_toggle_holds_its_blocks() {
 fn a_new_item_joins_the_list_of_the_item_it_follows() {
     let mut s = Synced::new();
     s.apply(&snap(
-        vec![block(1, Kind::BulletedItem, "One", 1), block(3, Kind::BulletedItem, "Three", 1)],
+        vec![
+            block(1, Kind::BulletedItem, "One", 1),
+            block(3, Kind::BulletedItem, "Three", 1),
+        ],
         5,
     ));
     s.apply(&snap(
@@ -285,7 +325,10 @@ fn a_block_kept_in_notion_follows_notion_and_is_never_a_change_here() {
     other.edited = Some(crate::domain::notion::tests::at(6));
     let merged = s.apply(&snap(vec![other], 7));
     assert_eq!(merged.conflicts, 0);
-    assert_eq!(s.tree().nodes[0].block.label.as_deref(), Some("synced_block"));
+    assert_eq!(
+        s.tree().nodes[0].block.label.as_deref(),
+        Some("synced_block")
+    );
 }
 
 #[test]
@@ -314,7 +357,12 @@ fn page_mentions_become_mentions_of_synced_pages_and_notion_links_otherwise() {
     assert_eq!(runs.iter().filter(|r| r.page == Some(id(0x55))).count(), 1);
     assert_eq!(runs.iter().filter(|r| r.page == Some(id(0x56))).count(), 1);
     let inspected = document::inspect(&s.doc).unwrap();
-    assert!(inspected.links.iter().any(|l| l.ref_id == synced.to_string()));
+    assert!(
+        inspected
+            .links
+            .iter()
+            .any(|l| l.ref_id == synced.to_string())
+    );
 }
 
 #[test]
@@ -328,7 +376,12 @@ fn a_snapshot_the_body_would_not_hold_is_refused_and_nothing_is_kept() {
         deepest = parent;
     }
     let before = document::full_state(&doc);
-    let refused = merge_into(&doc, &snapshot(vec![deepest], 5, true), &Resolver::default(), Vec::new());
+    let refused = merge_into(
+        &doc,
+        &snapshot(vec![deepest], 5, true),
+        &Resolver::default(),
+        Vec::new(),
+    );
     assert!(refused.is_err());
     // The caller stores nothing on a refusal; the document it holds is only
     // a copy it throws away.

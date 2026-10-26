@@ -37,7 +37,9 @@ pub fn cipher(secret: &SecretKey) -> Cipher {
 /// Whether `token` is one worth keeping: 1 to [`MAX_TOKEN_CHARS`] printable
 /// ASCII characters, no spaces.
 pub fn acceptable(token: &str) -> bool {
-    !token.is_empty() && token.len() <= MAX_TOKEN_CHARS && token.bytes().all(|b| b.is_ascii_graphic())
+    !token.is_empty()
+        && token.len() <= MAX_TOKEN_CHARS
+        && token.bytes().all(|b| b.is_ascii_graphic())
 }
 
 /// Keep `token`, sealed, as the instance's one: any earlier one goes.

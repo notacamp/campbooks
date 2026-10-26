@@ -8,13 +8,15 @@ use campbooks_kernel::{
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::{
-    domain::model::ConnectionId,
-    events::NotionLinkRequested,
-    testkit::Kit,
-};
+use crate::{domain::model::ConnectionId, events::NotionLinkRequested, testkit::Kit};
 
-async fn request(kit: &Kit, ws: WorkspaceId, page: Uuid, connection: ConnectionId, notion_page: Uuid) {
+async fn request(
+    kit: &Kit,
+    ws: WorkspaceId,
+    page: Uuid,
+    connection: ConnectionId,
+    notion_page: Uuid,
+) {
     let mut tx = kit.state.db.begin_for(ws).await.unwrap();
     kit.state
         .events
@@ -68,7 +70,10 @@ async fn a_confirmed_link_makes_one_stream_that_runs_at_once(db: PgPool) {
     request(&kit, ws, page, id_of(&connection), notion_page).await;
     assert_eq!(streams(&kit).await, 1);
     // It has read the page already.
-    assert_eq!(kit.payloads(ws, "connectors.notion_page_read").await.len(), 1);
+    assert_eq!(
+        kit.payloads(ws, "connectors.notion_page_read").await.len(),
+        1
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -82,7 +87,11 @@ async fn a_link_the_pages_module_does_not_confirm_makes_nothing(db: PgPool) {
     // The event, with no link standing in the pages module.
     request(&kit, ws, Uuid::now_v7(), id_of(&connection), notion_page).await;
     assert_eq!(streams(&kit).await, 0);
-    assert!(kit.payloads(ws, "connectors.notion_page_read").await.is_empty());
+    assert!(
+        kit.payloads(ws, "connectors.notion_page_read")
+            .await
+            .is_empty()
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -104,7 +113,10 @@ async fn a_connection_that_is_not_notions_ends_the_link(db: PgPool) {
         .fetch_one(&kit.db)
         .await
         .unwrap();
-    assert_eq!(before, after, "no stream reads Notion through a Gmail grant");
+    assert_eq!(
+        before, after,
+        "no stream reads Notion through a Gmail grant"
+    );
     let stopped = kit.payloads(ws, "connectors.notion_link_stopped").await;
     assert_eq!(stopped.len(), 1);
     assert_eq!(stopped[0]["reason"], "notion_unavailable");
@@ -123,13 +135,18 @@ async fn another_workspaces_connection_is_not_one_to_read_through(db: PgPool) {
     let connection = kit.connect_notion(&marta, ws_a).await;
     let notion_page = kit.notion.add_page("Roadmap", None);
     let page = Uuid::now_v7();
-    kit.pages.link(page, *id_of(&connection).as_uuid(), notion_page);
+    kit.pages
+        .link(page, *id_of(&connection).as_uuid(), notion_page);
     request(&kit, ws_b, page, id_of(&connection), notion_page).await;
     assert_eq!(streams(&kit).await, 0);
     assert!(kit.notion_stream_opt(notion_page).await.is_none());
     let stopped = kit.payloads(ws_b, "connectors.notion_link_stopped").await;
     assert_eq!(stopped.len(), 1);
-    assert!(kit.payloads(ws_a, "connectors.notion_link_stopped").await.is_empty());
+    assert!(
+        kit.payloads(ws_a, "connectors.notion_link_stopped")
+            .await
+            .is_empty()
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -153,5 +170,9 @@ async fn a_member_who_must_connect_again_gets_a_paused_stream(db: PgPool) {
         .await
         .unwrap();
     assert!(paused);
-    assert!(kit.payloads(ws, "connectors.notion_page_read").await.is_empty());
+    assert!(
+        kit.payloads(ws, "connectors.notion_page_read")
+            .await
+            .is_empty()
+    );
 }

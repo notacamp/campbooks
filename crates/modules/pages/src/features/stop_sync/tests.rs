@@ -53,7 +53,11 @@ async fn stopping_ends_the_link_keeps_the_page_and_tells_the_connector(db: PgPoo
         .await;
     let never = rig
         .kit
-        .post(&rig.token, &stop_uri(&rig, plain["id"].as_str().unwrap()), None)
+        .post(
+            &rig.token,
+            &stop_uri(&rig, plain["id"].as_str().unwrap()),
+            None,
+        )
         .await;
     assert_eq!(never.status, StatusCode::CONFLICT);
     // Starting again is an import.
@@ -75,7 +79,10 @@ async fn only_someone_who_may_write_the_page_stops_it(db: PgPool) {
     assert_eq!(hidden.status, StatusCode::NOT_FOUND);
     let client = rig.kit.client(rig.ws, "pages:write");
     let denied = rig.kit.post(&client, &stop_uri(&rig, &page), None).await;
-    assert!(matches!(denied.status, StatusCode::FORBIDDEN | StatusCode::NOT_FOUND));
+    assert!(matches!(
+        denied.status,
+        StatusCode::FORBIDDEN | StatusCode::NOT_FOUND
+    ));
     assert_eq!(rig.link(&page).await["state"], "syncing");
 }
 
@@ -85,7 +92,11 @@ async fn putting_the_page_in_the_trash_ends_the_link(db: PgPool) {
     let (page, _) = linked(&rig).await;
     let trashed = rig
         .kit
-        .post(&rig.token, &format!("{}/{page}/trash", Kit::pages(rig.ws)), None)
+        .post(
+            &rig.token,
+            &format!("{}/{page}/trash", Kit::pages(rig.ws)),
+            None,
+        )
         .await;
     assert_eq!(trashed.status, StatusCode::OK, "{:?}", trashed.json);
     let link = rig.link(&page).await;

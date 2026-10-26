@@ -27,7 +27,10 @@ async fn a_member_starts_a_consent_and_gets_the_instances_own_start_address(db: 
     .await
     .unwrap();
     assert_eq!((armed, count), (false, 1));
-    assert!(!url.contains(&ws.to_string()), "the ticket names nothing: {url}");
+    assert!(
+        !url.contains(&ws.to_string()),
+        "the ticket names nothing: {url}"
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -65,7 +68,12 @@ async fn a_return_to_outside_the_app_is_refused(db: PgPool) {
         "/ok\r\nSet-Cookie: x=1",
     ] {
         let started = kit.notion_start(&ana, ws, json!({"return_to": bad})).await;
-        assert_eq!(started.status, StatusCode::BAD_REQUEST, "{bad}: {:?}", started.json);
+        assert_eq!(
+            started.status,
+            StatusCode::BAD_REQUEST,
+            "{bad}: {:?}",
+            started.json
+        );
         assert_eq!(started.json["code"], "invalid_return_to");
     }
     let ok = kit
@@ -84,9 +92,7 @@ async fn only_the_grantor_connects_their_notion_again(db: PgPool) {
     kit.join(&bea, ws, Role::Member);
     let connection = kit.connect_notion(&ana, ws).await;
     let id = connection["id"].clone();
-    let theirs = kit
-        .notion_start(&bea, ws, json!({"connection": id}))
-        .await;
+    let theirs = kit.notion_start(&bea, ws, json!({"connection": id})).await;
     assert_eq!(theirs.status, StatusCode::NOT_FOUND, "{:?}", theirs.json);
     let own = kit.notion_start(&ana, ws, json!({"connection": id})).await;
     assert_eq!(own.status, StatusCode::CREATED, "{:?}", own.json);

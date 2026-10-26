@@ -18,7 +18,10 @@ async fn only_the_link_the_event_names_is_ended(db: PgPool) {
     kit.join(&marta, ws, Role::Member);
     let connection = kit.connect_notion(&marta, ws).await;
     let id: ConnectionId = connection["id"].as_str().unwrap().parse().unwrap();
-    let (one, two) = (kit.notion.add_page("One", None), kit.notion.add_page("Two", None));
+    let (one, two) = (
+        kit.notion.add_page("One", None),
+        kit.notion.add_page("Two", None),
+    );
     let (page_one, page_two) = (Uuid::now_v7(), Uuid::now_v7());
     kit.link_notion(ws, &connection, page_one, one).await;
     kit.link_notion(ws, &connection, page_two, two).await;

@@ -72,7 +72,18 @@
   new access and refresh pair in one transaction (rotation). An
   `invalid_grant` marks the connection `needs_reconnect`.
 - **Client:** follows the Microsoft client.
-  - Fixed host `api.notion.com`, with `Notion-Version` pinned.
+  - Fixed host `api.notion.com`, with `Notion-Version` pinned to
+    **2026-03-11**, the version the owner's connection and webhook
+    subscription use. Its breaking changes are handled: blocks are added with
+    the `position` object (`after_block`, `start` or `end`), not `after`;
+    `archived` is gone and `in_trash` is the only trash flag (a page in the
+    trash stops the link with `trashed_in_notion`, a block in the trash
+    counts as deleted); the `transcription` block is `meeting_notes` and,
+    like any kind Pages lacks, is kept in Notion; webhook events carry
+    `api_version` and only `2026-03-11` is read (any other is answered 200
+    and ignored). Databases are data sources from this version
+    (`data_source.*` events, no `database.*`); v1 has no use for them, which
+    matters to cloud #377.
   - Ids are validated UUID path segments, and nothing in a response builds a
     URL.
   - No redirects, a 15 s call timeout, and answers capped at 1 MiB per page of
@@ -103,6 +114,13 @@
     pastes it into Notion, then sets `CAMPBOOKS_NOTION__WEBHOOK_SECRET[_FILE]`.
     No HTTP endpoint, event or log ever carries it, and the runtime database
     role can replace the row but not read it.
+  - Five page events make a linked page's stream read now and nothing else:
+    `page.content_updated`, `page.properties_updated` (a page's title is a
+    property), `page.moved`, `page.deleted` and `page.undeleted`. After
+    `page.deleted` the run finds the page trashed and stops the link with
+    `trashed_in_notion`; `page.undeleted` does not re-link (a stopped link
+    stays stopped; the member imports again). Any other event type is
+    answered 200 so Notion does not retry it, and marks nothing due.
   - **A webhook secret set**: a verification-shaped body is 404 (a token
     cannot be armed again). Every other post is checked in constant time
     against `X-Notion-Signature`, an HMAC-SHA256 of the raw body.
@@ -255,9 +273,9 @@ built. Each is listed here.
   (one call, its edit time) at least every five minutes, backing off as it
   stays quiet, instead of a search per connection. With a webhook the longest
   poll interval is the safety net.
-- **Order and moves.** Notion's API has no "insert first", so a new first
-  block under a parent lands at the end there, and a block moved inside a page
-  is not followed (it is the same block where it is).
+- **Order and moves.** With the `position` object a new first block under a
+  parent can be added first (`start`); a block moved inside a page is not
+  followed (it is the same block where it is).
 - **Files and images made here** go to Notion as a paragraph that names the
   file and links to the page; their bytes stay in Campbooks.
 - **Titles** sync inbound only; a title changed here is not sent.

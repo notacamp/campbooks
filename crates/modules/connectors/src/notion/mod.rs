@@ -45,7 +45,7 @@ use crate::provider::{
 pub const API_BASE: &str = "https://api.notion.com/v1/";
 
 /// The API version every call asks for.
-pub const VERSION: &str = "2022-06-28";
+pub const VERSION: &str = "2026-03-11";
 
 /// The longest one call to Notion may take.
 pub const CALL_TIMEOUT: Duration = Duration::from_secs(15);
@@ -508,7 +508,9 @@ impl Notion {
     }
 
     /// Add `children` under block (or page) `parent`, after block `after`
-    /// (first when none); the blocks Notion made, in order.
+    /// (first when none), by the `position` object of API version
+    /// 2026-03-11 (`after_block` or `start`); the blocks Notion made, in
+    /// order.
     pub async fn append(
         &self,
         token: &str,
@@ -518,9 +520,10 @@ impl Notion {
     ) -> Result<Vec<Value>, ProviderError> {
         let url = self.api_url(&["blocks", &parent.to_string(), "children"])?;
         let mut body = json!({"children": children});
-        if let Some(after) = after {
-            body["after"] = Value::String(after.to_string());
-        }
+        body["position"] = match after {
+            Some(after) => json!({"type": "after_block", "after_block": {"id": after}}),
+            None => json!({"type": "start"}),
+        };
         let answer = self
             .call(Method::PATCH, url, token, Some(&body), LIST_ANSWER_BYTES)
             .await?;
@@ -672,7 +675,7 @@ fn page_info(raw: &Value) -> Option<PageInfo> {
             .take(200)
             .collect(),
         edited,
-        trashed: flag("archived") || flag("in_trash"),
+        trashed: flag("in_trash"),
         parent,
     })
 }

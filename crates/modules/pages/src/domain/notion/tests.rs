@@ -86,13 +86,8 @@ impl Synced {
 
     /// Apply `snapshot` and keep the mappings it made.
     pub fn apply(&mut self, snapshot: &Snapshot) -> Merged {
-        let merged = merge::merge_into(
-            &self.doc,
-            snapshot,
-            &self.resolver,
-            self.mappings.clone(),
-        )
-        .expect("the body holds the result");
+        let merged = merge::merge_into(&self.doc, snapshot, &self.resolver, self.mappings.clone())
+            .expect("the body holds the result");
         for upsert in &merged.outcome.upserts {
             self.mappings
                 .retain(|m| m.bid != upsert.bid && m.notion_block != upsert.notion_block);

@@ -38,7 +38,10 @@ fn only_notions_hosts_are_file_hosts() {
     assert!(!endpoints.allows_file(&url(&format!("https://{}:8443/a.png", FILE_HOSTS[0]))));
     assert!(!endpoints.allows_file(&url(&format!("https://u:p@{}/a.png", FILE_HOSTS[0]))));
     // A look-alike of a listed host is not it.
-    assert!(!endpoints.allows_file(&url(&format!("https://{}.evil.example.com/a", FILE_HOSTS[0]))));
+    assert!(!endpoints.allows_file(&url(&format!(
+        "https://{}.evil.example.com/a",
+        FILE_HOSTS[0]
+    ))));
 }
 
 #[test]
@@ -79,7 +82,12 @@ async fn a_code_is_exchanged_once_for_tokens_and_the_bot() {
     let granted = notion.exchange(&code, "verifier").await.unwrap();
     assert_eq!(granted.bot_id, BOT_ID);
     assert_eq!(granted.workspace_name.as_deref(), Some(WORKSPACE_NAME));
-    assert!(granted.tokens.access_token.starts_with("fake-notion-access"));
+    assert!(
+        granted
+            .tokens
+            .access_token
+            .starts_with("fake-notion-access")
+    );
     assert!(granted.tokens.refresh_token.is_some());
     // A code is spent by its first use.
     assert!(matches!(
@@ -205,7 +213,8 @@ async fn children_are_listed_in_pages_and_blocks_are_written() {
     assert_eq!(second.blocks.len(), 1);
     assert!(second.next.is_none());
 
-    let body = serde_json::json!({"paragraph": {"rich_text": [crate::testkit_notion::rich("Uno")]}});
+    let body =
+        serde_json::json!({"paragraph": {"rich_text": [crate::testkit_notion::rich("Uno")]}});
     notion.update_block(&access, a, &body).await.unwrap();
     assert_eq!(fake.text(a).as_deref(), Some("Uno"));
 
@@ -279,6 +288,113 @@ async fn files_come_only_from_the_fake_host_and_of_an_allowed_type() {
     assert!(notion.download("not a url").await.unwrap().is_none());
     assert_eq!(fake.calls().len(), calls);
     // A file that has expired is not an error.
-    let missing = format!("{}/files/missing.png", fake.base().as_str().trim_end_matches('/'));
+    let missing = format!(
+        "{}/files/missing.png",
+        fake.base().as_str().trim_end_matches('/')
+    );
     assert!(notion.download(&missing).await.unwrap().is_none());
+}
+
+#[test]
+fn the_api_version_is_pinned() {
+    assert_eq!(VERSION, "2026-03-11");
+}
+
+#[tokio::test]
+async fn blocks_are_added_by_position_not_by_the_removed_after_parameter() {
+    let (fake, notion) = client().await;
+    let (access, _) = fake.grant();
+    let page = fake.add_page("Roadmap", None);
+    let first = fake.paragraph(page, "First");
+    let second = fake.paragraph(page, "Second");
+    let paragraph = |text: &str| {
+        serde_json::json!({"object": "block", "type": "paragraph",
+            "paragraph": {"rich_text": [crate::testkit_notion::rich(text)]}})
+    };
+    // After a block.
+    notion
+        .append(&access, page, &[paragraph("Between")], Some(first))
+        .await
+        .unwrap();
+    // First under the parent: the `start` position.
+    notion
+        .append(&access, page, &[paragraph("Zero")], None)
+        .await
+        .unwrap();
+    let order: Vec<String> = fake
+        .children_of(page)
+        .into_iter()
+        .map(|id| fake.text(id).unwrap())
+        .collect();
+    assert_eq!(order, ["Zero", "First", "Between", "Second"]);
+    assert!(fake.children_of(page).contains(&second));
+    let sent = fake.appends();
+    assert_eq!(sent[0].1["position"]["type"], "after_block");
+    assert_eq!(
+        sent[0].1["position"]["after_block"]["id"],
+        first.to_string()
+    );
+    assert_eq!(sent[1].1["position"]["type"], "start");
+    assert!(sent.iter().all(|(_, body)| body.get("after").is_none()));
+}
+
+#[tokio::test]
+async fn the_fake_refuses_the_removed_after_parameter_and_unknown_positions() {
+    let (fake, _) = client().await;
+    let (access, _) = fake.grant();
+    let page = fake.add_page("Roadmap", None);
+    let http = reqwest::Client::new();
+    let url = format!("{}v1/blocks/{page}/children", fake.base());
+    let call = |body: serde_json::Value| {
+        http.patch(&url)
+            .bearer_auth(&access)
+            .header("notion-version", VERSION)
+            .json(&body)
+            .send()
+    };
+    let children = serde_json::json!([{"object": "block", "type": "paragraph",
+        "paragraph": {"rich_text": [crate::testkit_notion::rich("x")]}}]);
+    let legacy = call(serde_json::json!({"children": children, "after": Uuid::now_v7()}))
+        .await
+        .unwrap();
+    assert_eq!(legacy.status().as_u16(), 400);
+    let odd = call(serde_json::json!({"children": children, "position": {"type": "middle"}}))
+        .await
+        .unwrap();
+    assert_eq!(odd.status().as_u16(), 400);
+    let end = call(serde_json::json!({"children": children, "position": {"type": "end"}}))
+        .await
+        .unwrap();
+    assert_eq!(end.status().as_u16(), 200);
+    // An older version is refused too.
+    let old = http
+        .get(format!("{}v1/pages/{page}", fake.base()))
+        .bearer_auth(&access)
+        .header("notion-version", "2022-06-28")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(old.status().as_u16(), 400);
+}
+
+#[tokio::test]
+async fn trash_is_in_trash_and_archived_is_gone() {
+    let (fake, notion) = client().await;
+    let (access, _) = fake.grant();
+    let page = fake.add_page("Roadmap", None);
+    let keep = fake.paragraph(page, "Keep");
+    let drop = fake.paragraph(page, "Drop");
+    fake.remove_block(drop);
+    let block = notion.block(&access, drop).await.unwrap();
+    assert_eq!(block["in_trash"], true);
+    assert!(block.get("archived").is_none(), "{block}");
+    let live = notion.block(&access, keep).await.unwrap();
+    assert_eq!(live["in_trash"], false);
+    // A block in the trash is not among the children.
+    let listed = notion.children(&access, page, None).await.unwrap();
+    assert_eq!(listed.blocks.len(), 1);
+    // A page in the trash says so the same way.
+    fake.trash_page(page);
+    let trashed = notion.page(&access, page).await.unwrap();
+    assert!(trashed.trashed);
 }

@@ -62,7 +62,14 @@ async fn an_event_naming_another_connection_or_notion_page_ends_nothing(db: PgPo
     let rig = Rig::new(db).await;
     let notion_page = id(0xAA);
     let page = rig.import(notion_page, "t").await;
-    stopped(&rig, &page, Uuid::now_v7(), notion_page, NotionStop::NotShared).await;
+    stopped(
+        &rig,
+        &page,
+        Uuid::now_v7(),
+        notion_page,
+        NotionStop::NotShared,
+    )
+    .await;
     stopped(&rig, &page, rig.connection, id(0xBB), NotionStop::NotShared).await;
     assert_eq!(rig.link(&page).await["state"], "syncing");
 }

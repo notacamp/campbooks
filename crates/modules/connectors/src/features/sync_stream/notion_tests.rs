@@ -46,9 +46,7 @@ async fn linked(db: PgPool) -> Linked {
 }
 
 async fn reads(l: &Linked) -> Vec<Value> {
-    l.kit
-        .payloads(l.ws, "connectors.notion_page_read")
-        .await
+    l.kit.payloads(l.ws, "connectors.notion_page_read").await
 }
 
 async fn health(l: &Linked) -> String {
@@ -83,13 +81,15 @@ async fn linking_a_page_reads_it_and_announces_the_snapshot_by_reference(db: PgP
     assert_eq!(snapshot["title"], "Product roadmap");
     assert_eq!(snapshot["complete"], true);
     assert_eq!(snapshot["blocks"][0]["runs"][0]["text"], SECRET_TEXT);
-    assert!(snapshot.get("hash").is_none(), "the snapshot carries no hash");
+    assert!(
+        snapshot.get("hash").is_none(),
+        "the snapshot carries no hash"
+    );
     // No event, anywhere, carries the page's words.
-    let everything: Vec<String> =
-        sqlx::query_scalar("SELECT payload::text FROM kernel.events")
-            .fetch_all(&l.kit.db)
-            .await
-            .unwrap();
+    let everything: Vec<String> = sqlx::query_scalar("SELECT payload::text FROM kernel.events")
+        .fetch_all(&l.kit.db)
+        .await
+        .unwrap();
     assert!(everything.iter().all(|p| !p.contains("launch")));
 }
 
@@ -123,13 +123,17 @@ async fn an_edit_in_notion_is_read_at_the_next_run(db: PgPool) {
     assert!(second > first, "a later read has a later time");
     let blob: BlobRef = serde_json::from_value(events[1]["snapshot"].clone()).unwrap();
     let snapshot: Value = serde_json::from_slice(&l.kit.blob(l.ws, &blob).await).unwrap();
-    assert_eq!(snapshot["blocks"][0]["runs"][0]["text"], "Moved to the 21st");
+    assert_eq!(
+        snapshot["blocks"][0]["runs"][0]["text"],
+        "Moved to the 21st"
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_webhook_event_makes_the_run_read_even_if_the_edit_time_did_not_move(db: PgPool) {
     let l = linked(db).await;
     let body = serde_json::to_vec(&json!({
+        "api_version": "2026-03-11",
         "type": "page.content_updated",
         "entity": {"id": l.notion_page.to_string(), "type": "page"},
     }))
@@ -189,7 +193,9 @@ async fn a_page_in_the_trash_ends_the_link_with_its_own_reason(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn throttling_backs_the_run_off_without_losing_the_page(db: PgPool) {
     let l = linked(db).await;
-    l.kit.notion.set_text(l.kit.notion.children_of(l.notion_page)[0], "Edited");
+    l.kit
+        .notion
+        .set_text(l.kit.notion.children_of(l.notion_page)[0], "Edited");
     l.kit.notion.throttle_next(120);
     run_again(&l).await;
     assert_eq!(reads(&l).await.len(), 1, "nothing was read while throttled");
@@ -220,12 +226,18 @@ async fn a_refresh_rotates_both_tokens_in_one_step(db: PgPool) {
     let before = sealed(&l.kit.db).await;
     // The access token has expired: the next run refreshes.
     l.kit.clock.advance(TimeDelta::hours(2));
-    l.kit.notion.set_text(l.kit.notion.children_of(l.notion_page)[0], "Edited");
+    l.kit
+        .notion
+        .set_text(l.kit.notion.children_of(l.notion_page)[0], "Edited");
     run_again(&l).await;
     let after = sealed(&l.kit.db).await;
     assert_ne!(before.0, after.0, "the refresh token was not rotated");
     assert_ne!(before.1, after.1, "the access token was not renewed");
-    assert_eq!(reads(&l).await.len(), 2, "the run went on with the new token");
+    assert_eq!(
+        reads(&l).await.len(),
+        2,
+        "the run went on with the new token"
+    );
     assert_eq!(health(&l).await, "ok");
 }
 
