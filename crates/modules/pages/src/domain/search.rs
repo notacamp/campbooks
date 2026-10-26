@@ -12,14 +12,22 @@ use campbooks_kernel::{
     },
 };
 use chrono::{DateTime, Utc};
+use serde_json::Value;
 
 use super::{PageId, document, resources::PAGE_RECORD, store};
 
 /// The record type of a page's body, the entry of its group.
 pub const BODY_RECORD: &str = "pages.body";
 
-/// A page as the index needs it: title, edited at, trashed at, revision.
-type Head = (String, DateTime<Utc>, Option<DateTime<Utc>>, i64);
+/// A page as the index needs it: title, edited at, trashed at, revision, and
+/// for a row its table.
+type Head = (
+    String,
+    DateTime<Utc>,
+    Option<DateTime<Utc>>,
+    i64,
+    Option<PageId>,
+);
 
 /// The source, for the server to register.
 pub fn source() -> Arc<dyn SearchSource> {
@@ -44,16 +52,19 @@ impl SearchSource for PageSource {
                 return Ok(None);
             };
             let row: Option<Head> = sqlx::query_as(
-                "SELECT title, edited_at, trashed_at, revision FROM pages.pages WHERE id = $1",
+                "SELECT title, edited_at, trashed_at, revision,
+                        CASE WHEN kind = 'row' THEN parent_id END
+                   FROM pages.pages WHERE id = $1",
             )
             .bind(page)
             .fetch_optional(cx.conn)
             .await?;
-            let Some((title, edited_at, None, revision)) = row else {
+            let Some((title, edited_at, None, revision, table)) = row else {
                 return Ok(None);
             };
             Ok(Some(Group {
-                container: RecordRef::new(PAGE_RECORD, &page),
+                // A row is found by whoever may read its table: its container.
+                container: RecordRef::new(PAGE_RECORD, &table.unwrap_or(page)),
                 occurred_at: edited_at,
                 title,
                 keywords: Vec::new(),
@@ -81,9 +92,24 @@ impl SearchSource for PageSource {
                     continue;
                 };
                 let loaded = store::load(&mut *conn, page).await?;
-                let text = document::inspect(&loaded.doc)
+                let mut text = document::inspect(&loaded.doc)
                     .map(|read| read.text)
                     .unwrap_or_default();
+                // A row's text values are searched with its title and body.
+                let values: Vec<Value> = sqlx::query_scalar(
+                    "SELECT v.value FROM pages.row_values v
+                       JOIN pages.table_properties p ON p.id = v.property_id
+                      WHERE v.row_id = $1 AND p.type = 'text' AND p.removed_at IS NULL
+                        AND jsonb_typeof(v.value) = 'array'
+                      ORDER BY p.position, p.id",
+                )
+                .bind(page)
+                .fetch_all(&mut *conn)
+                .await?;
+                for value in values {
+                    text.push('\n');
+                    text.push_str(&crate::properties::value::runs_text(&value));
+                }
                 texts.push(EntryText {
                     record: entry.clone(),
                     people: Vec::new(),

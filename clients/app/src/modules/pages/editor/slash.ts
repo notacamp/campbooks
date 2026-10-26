@@ -21,6 +21,8 @@ export const SLASH_IDS = [
   "subpage",
   "file",
   "image",
+  "table",
+  "tableLink",
 ] as const;
 
 export type SlashId = (typeof SLASH_IDS)[number];
@@ -33,7 +35,14 @@ export interface SlashHelpers {
   mention: (embed: boolean) => void;
   /** Make a sub-page under this page and put a link to it here. */
   subPage: () => void;
+  /** Make a table in this page, as an inline block. */
+  table: () => void;
+  /** Open the `@` menu for tables only; its pick becomes an inline block of that table. */
+  tableLink: () => void;
 }
+
+/** The blocks that need tables to be on. */
+export const TABLE_SLASH_IDS: readonly SlashId[] = ["table", "tableLink"];
 
 export interface SlashItem {
   id: SlashId;
@@ -62,6 +71,8 @@ export const SLASH_ITEMS: readonly SlashItem[] = [
   { id: "subpage", group: "campbooks", icon: "document" },
   { id: "file", group: "campbooks", icon: "attachment" },
   { id: "image", group: "campbooks", icon: "image" },
+  { id: "table", group: "campbooks", icon: "table" },
+  { id: "tableLink", group: "campbooks", icon: "link" },
 ];
 
 /** The blocks a block can be turned into, from its menu. */
@@ -154,6 +165,16 @@ export function runSlash(
     case "image": {
       chain().run();
       helpers.attach(id === "image");
+      return;
+    }
+    case "table": {
+      chain().run();
+      helpers.table();
+      return;
+    }
+    case "tableLink": {
+      chain().insertContent("@").run();
+      helpers.tableLink();
     }
   }
 }

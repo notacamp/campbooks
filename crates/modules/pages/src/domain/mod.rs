@@ -6,13 +6,18 @@ use std::str::FromStr;
 
 pub mod access;
 pub mod body;
+pub mod cells;
 pub mod document;
+pub mod notion;
 pub mod position;
 pub mod purge;
 pub mod resources;
 pub mod roles;
 pub mod search;
 pub mod store;
+pub mod table_query;
+pub mod table_views;
+pub mod tables;
 pub mod tracked;
 pub mod view;
 
@@ -31,6 +36,16 @@ use crate::events::{PageChangeKind, PageChanged};
 define_id!(
     /// A page.
     PageId
+);
+
+define_id!(
+    /// A property (a column) of a table.
+    PropertyId
+);
+
+define_id!(
+    /// A view of a table.
+    ViewId
 );
 
 /// The deepest a page may be nested: a top-level page is level 1.
@@ -105,6 +120,18 @@ words!(
 );
 
 words!(
+    /// What a page is: an ordinary page, a table, or one row of a table.
+    Kind as PageKind {
+        /// An ordinary page.
+        Page => "page",
+        /// A table: its rows are the pages under it.
+        Table => "table",
+        /// A row of a table: a page with typed values.
+        Row => "row",
+    }
+);
+
+words!(
     /// How a body points at a record.
     LinkKind as LinkKind {
         /// An inline mention.
@@ -120,7 +147,7 @@ words!(
 macro_rules! columns {
     () => {
         "id, parent_id, place, position, title, icon, created_by, created_at, edited_by, \
-         edited_at, trashed_at, trashed_by, trash_root, revision, meta_revision"
+         edited_at, trashed_at, trashed_by, trash_root, revision, meta_revision, kind"
     };
 }
 
@@ -154,9 +181,15 @@ pub struct PageRow {
     pub trash_root: Option<PageId>,
     pub revision: i64,
     pub meta_revision: i64,
+    pub kind: String,
 }
 
 impl PageRow {
+    /// What it is: a page, a table or a row.
+    pub fn kind(&self) -> Result<Kind> {
+        self.kind.parse()
+    }
+
     /// Whether it is in the trash.
     pub fn is_trashed(&self) -> bool {
         self.trashed_at.is_some()
@@ -195,6 +228,8 @@ pub struct PageSummary {
     pub trashed_at: Option<DateTime<Utc>>,
     /// Grows with a change of the title, icon or position.
     pub meta_revision: i64,
+    /// What it is: an ordinary page or a table (rows are never listed).
+    pub kind: Kind,
 }
 
 /// A member a page is shared with.
@@ -258,6 +293,8 @@ pub struct PageView {
     /// Grows with a change of the title, icon or position: send the one
     /// you saw with `pages.update` and `pages.move`.
     pub meta_revision: i64,
+    /// What it is: a page, a table, or one row of a table.
+    pub kind: Kind,
     /// The members it is shared with.
     pub grants: Vec<GrantView>,
     /// The pages above it that the caller may open, outermost first.
@@ -282,6 +319,7 @@ impl PageRow {
             edited_at: self.edited_at,
             trashed_at: self.trashed_at,
             meta_revision: self.meta_revision,
+            kind: self.kind()?,
         })
     }
 }
@@ -351,6 +389,7 @@ pub async fn announce(
         place: row.place()?,
         trashed: row.is_trashed(),
         kinds,
+        row: row.kind == "row",
     };
     state.events.publish(tx, &event).await?;
     Ok(())

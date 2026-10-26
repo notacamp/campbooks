@@ -1,0 +1,198 @@
+.tablist {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  outline: none;
+}
+
+.more,
+.rest {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+/* Tabs keep their own width; only the current one gives way, when even it cannot fit. */
+.tabWrap {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  border-bottom: var(--space-0-5) solid transparent;
+}
+
+.tabWrap[data-current] {
+  flex: 0 1 auto;
+  min-width: 0;
+  border-bottom-color: var(--text-primary);
+}
+
+.tab {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-1-5);
+  max-width: var(--popover-width);
+  min-height: var(--size-control-lg);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.tabWrap[data-current] .tab {
+  color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tabName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* One row, always: the tabs scroll, the chips give way, the actions stay. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+.chips {
+  display: none;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+@media (min-width: 48rem) {
+  .chips {
+    display: flex;
+  }
+}
+
+.button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  min-width: var(--size-hit);
+  height: var(--size-control-md);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.button[data-primary] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button[data-primary]:hover {
+  background: var(--accent-hover);
+}
+
+.button[aria-expanded="true"] {
+  background: var(--surface-selected);
+}
+
+.buttonLabel {
+  display: none;
+}
+
+@media (min-width: 48rem) {
+  .buttonLabel {
+    display: inline;
+  }
+
+  .button {
+    min-width: 0;
+  }
+}
+
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--space-4);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+}
+
+.keys {
+  display: none;
+  color: var(--kbd-fg);
+  font-size: var(--text-xs);
+}
+
+.button[data-primary] .keys {
+  color: var(--on-accent);
+  opacity: var(--kbd-on-accent-opacity);
+}
+
+@media (min-width: 80rem) {
+  .keys {
+    display: inline;
+  }
+}
+
+/* A chip is never cut short: when they do not all fit, the row of them scrolls. */
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+}
+
+.chipText {
+  padding: var(--space-0-5) var(--space-2);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+}
+
+button.chipText {
+  cursor: pointer;
+}

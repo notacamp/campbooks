@@ -13,6 +13,17 @@ export type UploadedFile = Schema<"UploadedFile">;
 export type NewPage = Schema<"NewPage">;
 export type PageMoveBody = Schema<"PageMove">;
 
+// The Notion shapes of the pages API, named once here so a rename in the
+// generated document is a one-line fix.
+export type NotionLink = Schema<"NotionLink">;
+export type NotionLinks = Schema<"NotionLinks">;
+export type NotionStopReason = Schema<"NotionStopReason">;
+export type ImportFromNotionBody = Schema<"ImportFromNotion">;
+export type Imported = Schema<"Imported">;
+export type NotionKeep = Schema<"NotionKeep">;
+export type Resolved = Schema<"Resolved">;
+export type Undone = Schema<"Undone">;
+
 /** The icons a page may have: the server's fixed set, by the design system's icon names. */
 export const PAGE_ICONS = [
   "document",
@@ -38,6 +49,18 @@ export type PageIcon = (typeof PAGE_ICONS)[number];
 /** The page's icon as the design system draws it. */
 export function iconOf(icon: string | null | undefined): PageIcon {
   return PAGE_ICONS.find((name) => name === icon) ?? "document";
+}
+
+/** A page's icon in the tree: its own, else the table's mark for a table. */
+export function treeIcon(page: {
+  icon?: string | null | undefined;
+  kind: string;
+}): PageIcon | "table" {
+  return page.icon === null || page.icon === undefined
+    ? page.kind === "table"
+      ? "table"
+      : "document"
+    : iconOf(page.icon);
 }
 
 /** The record types a page may mention (the server's list). */

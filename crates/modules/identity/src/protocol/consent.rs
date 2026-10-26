@@ -52,10 +52,11 @@ pub struct ConsentClient {
     pub id: String,
     /// Its name, as it registered it (only trustworthy when `verified`).
     pub name: String,
-    /// `first_party`, `workspace`, `dynamic` or `metadata_document`.
+    /// `first_party`, `workspace`, `dynamic`, `metadata_document` or
+    /// `instance` (registered by this instance's administrator).
     pub kind: String,
     /// Whether it is Campbooks' own app. Every other app's name is its
-    /// registrant's word.
+    /// registrant's word (an instance app's, the instance administrator's).
     pub verified: bool,
     /// For a workspace's own app, the workspace that registered it (its
     /// name, when the person belongs to it): what the screen says instead of

@@ -87,6 +87,46 @@ static TASK_TYPES: [ResourceType; 1] = [ResourceType {
     ..ResourceType::new("tasks.task", "A test task.", Tenancy::Workspace)
 }];
 
+/// A connection to Notion, as the connectors module would declare it: its
+/// member's alone to disconnect (and so to import through).
+static CONNECTION_TYPES: [ResourceType; 1] = [ResourceType {
+    owner: Owner::Member,
+    owner_actions: &[
+        campbooks_kernel::authz::Action::Read,
+        campbooks_kernel::authz::Action::Disconnect,
+    ],
+    ..ResourceType::new(
+        "connectors.connection",
+        "A test connection.",
+        Tenancy::Workspace,
+    )
+}];
+
+#[derive(Debug, Default)]
+struct ConnectionFacts {
+    owners: Mutex<HashMap<String, UserId>>,
+}
+
+impl ResourceFacts for ConnectionFacts {
+    fn facts<'a>(
+        &'a self,
+        _conn: &'a mut PgConnection,
+        _access: &'a Access,
+        resource: &'a RecordRef,
+    ) -> FactsFuture<'a> {
+        let owner = self
+            .owners
+            .lock()
+            .ok()
+            .and_then(|owners| owners.get(&resource.id).copied());
+        let found = (resource.record_type == "connectors.connection")
+            .then_some(owner)
+            .flatten()
+            .map(|owner| Facts::owned_by(OwnerFact::User(owner)));
+        Box::pin(async move { Ok(found) })
+    }
+}
+
 #[derive(Debug, Default)]
 struct TaskFacts {
     owners: Mutex<HashMap<String, UserId>>,
@@ -122,6 +162,7 @@ pub struct Kit {
     idp: TestIdp,
     membership: Arc<TestMembership>,
     tasks: Arc<TaskFacts>,
+    connections: Arc<ConnectionFacts>,
 }
 
 impl Kit {
@@ -131,10 +172,12 @@ impl Kit {
         let pool = testing::app_role_pool(&db).await;
         let membership = Arc::new(TestMembership::default());
         let tasks = Arc::new(TaskFacts::default());
+        let connections = Arc::new(ConnectionFacts::default());
         let module = crate::module(crate::Deps::default());
         let catalogue = Catalogue::new([
             &module.resources,
             &Resources::new(&TASK_TYPES, tasks.clone()),
+            &Resources::new(&CONNECTION_TYPES, connections.clone()),
         ])
         .unwrap();
         let blobs = BlobStore::memory(&BlobsConfig::default(), pool.clone());
@@ -156,6 +199,7 @@ impl Kit {
             idp,
             membership,
             tasks,
+            connections,
         }
     }
 
@@ -163,7 +207,23 @@ impl Kit {
     #[must_use]
     pub fn switched_off(mut self) -> Self {
         self.app = testing::app(
-            crate::module(crate::Deps { enabled: false }),
+            crate::module(crate::Deps {
+                enabled: false,
+                tables: false,
+            }),
+            self.state.clone(),
+        );
+        self
+    }
+
+    /// The same kit with tables switched on or off (pages stay on).
+    #[must_use]
+    pub fn with_tables(mut self, on: bool) -> Self {
+        self.app = testing::app(
+            crate::module(crate::Deps {
+                enabled: true,
+                tables: on,
+            }),
             self.state.clone(),
         );
         self
@@ -233,6 +293,17 @@ impl Kit {
         id
     }
 
+    /// A Notion connection that `owner` alone may import through.
+    pub fn connection_of(&self, owner: UserId) -> uuid::Uuid {
+        let id = uuid::Uuid::now_v7();
+        self.connections
+            .owners
+            .lock()
+            .unwrap()
+            .insert(id.to_string(), owner);
+        id
+    }
+
     /// Run every pending job until none is left.
     pub async fn run_jobs(&self) -> WorkerStats {
         let stats = Worker::new(self.state.clone()).run_until_idle().await;
@@ -286,6 +357,144 @@ impl Kit {
             made.json
         );
         made.json
+    }
+
+    /// How many cells are stored in the workspace.
+    pub async fn row_cell_count(&self, workspace: WorkspaceId) -> i64 {
+        sqlx::query_scalar("SELECT count(*) FROM pages.row_values WHERE workspace_id = $1")
+            .bind(workspace.as_uuid())
+            .fetch_one(&self.db)
+            .await
+            .unwrap()
+    }
+
+    /// The path of the module's tables.
+    pub fn tables(workspace: WorkspaceId) -> String {
+        format!("/api/v1/w/{workspace}/tables")
+    }
+
+    /// Make a table as `token` (private, titled "Clients") and return its
+    /// JSON.
+    pub async fn table(&self, token: &str, workspace: WorkspaceId) -> serde_json::Value {
+        let made = self
+            .post(
+                token,
+                &Self::tables(workspace),
+                Some(serde_json::json!({"title": "Clients", "place": "workspace"})),
+            )
+            .await;
+        assert_eq!(
+            made.status,
+            axum::http::StatusCode::CREATED,
+            "{:?}",
+            made.json
+        );
+        made.json
+    }
+
+    /// Add a property to a table and return its JSON (`property`, `paired`).
+    pub async fn property(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        table: &str,
+        body: serde_json::Value,
+    ) -> serde_json::Value {
+        let made = self
+            .post(
+                token,
+                &format!("{}/{table}/properties", Self::tables(workspace)),
+                Some(body),
+            )
+            .await;
+        assert_eq!(
+            made.status,
+            axum::http::StatusCode::CREATED,
+            "{:?}",
+            made.json
+        );
+        made.json
+    }
+
+    /// Add a row and return its JSON.
+    pub async fn row(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        table: &str,
+        body: serde_json::Value,
+    ) -> serde_json::Value {
+        let made = self
+            .post(
+                token,
+                &format!("{}/{table}/rows", Self::tables(workspace)),
+                Some(body),
+            )
+            .await;
+        assert_eq!(
+            made.status,
+            axum::http::StatusCode::CREATED,
+            "{:?}",
+            made.json
+        );
+        made.json
+    }
+
+    /// `PATCH …/rows/{row}/cells`.
+    pub async fn cells(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        table: &str,
+        row: &str,
+        cells: serde_json::Value,
+    ) -> TestResponse {
+        self.patch(
+            token,
+            &format!("{}/{table}/rows/{row}/cells", Self::tables(workspace)),
+            serde_json::json!({"cells": cells}),
+        )
+        .await
+    }
+
+    /// `POST …/query`.
+    pub async fn query(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        table: &str,
+        body: serde_json::Value,
+    ) -> TestResponse {
+        self.post(
+            token,
+            &format!("{}/{table}/query", Self::tables(workspace)),
+            Some(body),
+        )
+        .await
+    }
+
+    /// Share a page with `member` as `role`.
+    pub async fn share(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        page: &str,
+        member: UserId,
+        role: &str,
+    ) {
+        let shared = self
+            .put(
+                token,
+                &format!("{}/{page}/grants/{member}", Self::pages(workspace)),
+                serde_json::json!({"role": role}),
+            )
+            .await;
+        assert_eq!(
+            shared.status,
+            axum::http::StatusCode::OK,
+            "{:?}",
+            shared.json
+        );
     }
 
     /// `POST …/sync`: send `update` (if any) and what the client holds.

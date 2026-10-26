@@ -19,6 +19,7 @@ function page(id: string, overrides: Partial<PageSummary> = {}): PageSummary {
     edited_at: "2026-10-25T10:00:00Z",
     trashed_at: null,
     meta_revision: 1,
+    kind: "page",
     ...overrides,
   };
 }

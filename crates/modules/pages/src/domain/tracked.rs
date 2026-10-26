@@ -226,3 +226,342 @@ pub async fn unshared(
         .await?;
     Ok(())
 }
+
+/// Which way blocks crossed between a page and its Notion page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    /// From Notion into the page.
+    Inbound,
+    /// From the page to Notion.
+    Outbound,
+}
+
+/// What a member chose for a conflict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Choice {
+    /// Keep the block as it is here.
+    Mine,
+    /// Use Notion's version.
+    Notion,
+    /// Keep both.
+    Both,
+}
+
+const fn stop_reason_of(reason: super::notion::StopReason) -> tracking::SyncStopReason {
+    use super::notion::StopReason;
+    match reason {
+        StopReason::StoppedByMember => tracking::SyncStopReason::StoppedByMember,
+        StopReason::Disconnected => tracking::SyncStopReason::Disconnected,
+        StopReason::TrashedHere => tracking::SyncStopReason::TrashedHere,
+        StopReason::TrashedInNotion => tracking::SyncStopReason::TrashedInNotion,
+        StopReason::NotShared => tracking::SyncStopReason::NotShared,
+        StopReason::MemberLeft => tracking::SyncStopReason::MemberLeft,
+        StopReason::NotionUnavailable => tracking::SyncStopReason::NotionUnavailable,
+    }
+}
+
+/// `count` as the plan's whole number.
+fn counted(count: usize) -> i64 {
+    i64::try_from(count).unwrap_or(i64::MAX)
+}
+
+/// Pages were imported from Notion through `connection`.
+pub async fn notion_imported(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    connection: Uuid,
+    pages: usize,
+) -> Result<()> {
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionPagesImported {
+                workspace,
+                connection,
+                pages: counted(pages),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// `blocks` crossed between `page` and its Notion page.
+pub async fn notion_applied(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    direction: Direction,
+    blocks: usize,
+) -> Result<()> {
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    let direction = match direction {
+        Direction::Inbound => tracking::SyncDirection::Inbound,
+        Direction::Outbound => tracking::SyncDirection::Outbound,
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionSyncApplied {
+                workspace,
+                page,
+                direction,
+                blocks: counted(blocks),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// `blocks` of `page` are in conflict with Notion's version, newly.
+pub async fn notion_conflict_raised(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    blocks: usize,
+) -> Result<()> {
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionConflictRaised {
+                workspace,
+                page,
+                blocks: counted(blocks),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// A member settled a conflict of `page`.
+pub async fn notion_conflict_resolved(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    choice: Choice,
+) -> Result<()> {
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    let choice = match choice {
+        Choice::Mine => tracking::ConflictChoice::Mine,
+        Choice::Notion => tracking::ConflictChoice::Notion,
+        Choice::Both => tracking::ConflictChoice::Both,
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionConflictResolved {
+                workspace,
+                page,
+                choice,
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// `page` stopped being kept in step with its Notion page.
+pub async fn notion_stopped(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    reason: super::notion::StopReason,
+) -> Result<()> {
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionSyncStopped {
+                workspace,
+                page,
+                reason: stop_reason_of(reason),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// How many, in the buckets the plan counts in.
+pub const fn bucket(count: usize) -> tracking::CountBucket {
+    match count {
+        0 => tracking::CountBucket::None,
+        1 => tracking::CountBucket::One,
+        2..=9 => tracking::CountBucket::Few,
+        10..=99 => tracking::CountBucket::Some,
+        _ => tracking::CountBucket::Many,
+    }
+}
+
+const fn property_type_of(ty: crate::properties::PropertyType) -> Option<tracking::PropertyType> {
+    use crate::properties::PropertyType as T;
+    Some(match ty {
+        T::Text => tracking::PropertyType::Text,
+        T::Number => tracking::PropertyType::Number,
+        T::Select => tracking::PropertyType::Select,
+        T::MultiSelect => tracking::PropertyType::MultiSelect,
+        T::Status => tracking::PropertyType::Status,
+        T::Date => tracking::PropertyType::Date,
+        T::Checkbox => tracking::PropertyType::Checkbox,
+        T::Person => tracking::PropertyType::Person,
+        T::Files => tracking::PropertyType::Files,
+        T::Url => tracking::PropertyType::Url,
+        T::Email => tracking::PropertyType::Email,
+        T::Phone => tracking::PropertyType::Phone,
+        T::Relation => tracking::PropertyType::Relation,
+        T::CampbooksLink => tracking::PropertyType::CampbooksLink,
+        T::Created => tracking::PropertyType::Created,
+        T::Edited => tracking::PropertyType::Edited,
+        T::UniqueId => tracking::PropertyType::UniqueId,
+        _ => return None,
+    })
+}
+
+/// The plan's name for a view type, if it has one (only table and board are
+/// made).
+pub const fn view_type_of(ty: super::table_views::ViewType) -> Option<tracking::ViewType> {
+    match ty {
+        super::table_views::ViewType::Table => Some(tracking::ViewType::Table),
+        super::table_views::ViewType::Board => Some(tracking::ViewType::Board),
+        _ => None,
+    }
+}
+
+/// Track that table `table` was made.
+pub async fn table_created(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    table: PageId,
+) -> Result<()> {
+    if let Some(table) = snapshot(tx, table).await? {
+        state
+            .tracker
+            .track(tx, &tracking::TableCreated { workspace, table })
+            .await?;
+    }
+    Ok(())
+}
+
+/// Track that a property of type `ty` was added to `table`.
+pub async fn property_added(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    table: PageId,
+    ty: crate::properties::PropertyType,
+) -> Result<()> {
+    let (Some(property_type), Some(table)) = (property_type_of(ty), snapshot(tx, table).await?)
+    else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::PropertyAdded {
+                workspace,
+                property_type,
+                table,
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// Track that a view of type `view_type` was made on `table`.
+pub async fn view_created(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    table: PageId,
+    view_type: super::table_views::ViewType,
+) -> Result<()> {
+    let (Some(view_type), Some(table)) = (view_type_of(view_type), snapshot(tx, table).await?)
+    else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::ViewCreated {
+                workspace,
+                table,
+                view_type,
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// Track that `table` was queried and answered `rows` rows.
+pub async fn rows_queried(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    table: PageId,
+    view_type: Option<super::table_views::ViewType>,
+    rows: usize,
+) -> Result<()> {
+    let Some(table) = snapshot(tx, table).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::RowsQueried {
+                workspace,
+                rows: bucket(rows),
+                table,
+                view_type: view_type.and_then(view_type_of),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// Track that `cells` cells of `row` changed.
+pub async fn cells_edited(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    row: PageId,
+    cells: usize,
+) -> Result<()> {
+    if cells == 0 {
+        return Ok(());
+    }
+    let Some(row) = snapshot(tx, row).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::CellsEdited {
+                workspace,
+                cells: bucket(cells),
+                row,
+            },
+        )
+        .await?;
+    Ok(())
+}

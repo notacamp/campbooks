@@ -363,3 +363,319 @@ async fn search_reads_a_pages_title_and_text_and_a_trashed_page_leaves_the_index
             .is_some()
     );
 }
+
+// --- Tables: search, containers, retention ---
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn search_reads_a_rows_title_and_text_values_and_only_its_tables_readers_find_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let (_, rui_id) = kit.member("rui", workspace);
+    let table = kit
+        .post(
+            &ana,
+            &Kit::tables(workspace),
+            Some(json!({"title": "Clients"})),
+        )
+        .await
+        .json;
+    let t = table["page"]["id"].as_str().unwrap().to_owned();
+    let notes = kit
+        .property(
+            &ana,
+            workspace,
+            &t,
+            json!({"name": "Notes", "type": "text"}),
+        )
+        .await;
+    let number = kit
+        .property(
+            &ana,
+            workspace,
+            &t,
+            json!({"name": "Value", "type": "number"}),
+        )
+        .await;
+    let row = kit
+        .row(
+            &ana,
+            workspace,
+            &t,
+            json!({"title": "Northwind", "cells": [
+                {"property": notes["property"]["id"], "value": "prefers invoices on Fridays"},
+                {"property": number["property"]["id"], "value": "4242"}]}),
+        )
+        .await;
+    let id = row["id"].as_str().unwrap().to_owned();
+    let source = kit.state.search_sources.get(PAGE_RECORD).unwrap().clone();
+    let mut tx = kit.begin(workspace).await;
+    let group = source
+        .group(context(&kit, &mut tx, workspace), &id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(group.title, "Northwind");
+    // A row lives in its table's container, so a table of thousands of rows is
+    // one thing to the index and to the feed.
+    assert_eq!(group.container, RecordRef::new(PAGE_RECORD, &t));
+    let texts = source
+        .texts(
+            context(&kit, &mut tx, workspace),
+            std::slice::from_ref(&group.entries[0].record),
+        )
+        .await
+        .unwrap();
+    assert!(texts[0].text.contains("prefers invoices on Fridays"));
+    assert!(
+        !texts[0].text.contains("4242"),
+        "only text values are searched"
+    );
+    // A cell edit moves the entry's stamp, so the index reads it again.
+    let before = group.entries[0].stamp.clone();
+    tx.rollback().await.unwrap();
+    kit.cells(
+        &ana,
+        workspace,
+        &t,
+        &id,
+        json!([{"property": notes["property"]["id"], "value": "new"}]),
+    )
+    .await;
+    let mut tx = kit.begin(workspace).await;
+    let after = source
+        .group(context(&kit, &mut tx, workspace), &id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_ne!(after.entries[0].stamp, before);
+    tx.rollback().await.unwrap();
+
+    // The table is private: Rui cannot see its container, and the row is not
+    // among the containers listed for him; shared, he can.
+    let rui = access(workspace, Some(rui_id), Some(Role::Member));
+    let port = PageVisibility;
+    let container = RecordRef::new(PAGE_RECORD, &t);
+    assert!(
+        !port
+            .container_visible(&kit.state.db, &rui, &container)
+            .await
+            .unwrap()
+    );
+    let listed = port
+        .visible_containers(&kit.state.db, &rui, PAGE_RECORD)
+        .await
+        .unwrap();
+    assert!(listed.is_empty());
+    kit.share(&ana, workspace, &t, rui_id, "reader").await;
+    assert!(
+        port.container_visible(&kit.state.db, &rui, &container)
+            .await
+            .unwrap()
+    );
+    let listed = port
+        .visible_containers(&kit.state.db, &rui, PAGE_RECORD)
+        .await
+        .unwrap();
+    assert_eq!(listed, [container], "the table, not its 20,000 rows");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_rows_change_is_announced_in_its_tables_container(db: PgPool) {
+    use campbooks_kernel::DomainEvent as _;
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let t = kit.table(&ana, workspace).await["page"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let row = kit.row(&ana, workspace, &t, json!({"title": "A"})).await;
+    let events = kit.events("pages.page_changed").await;
+    let row_event: crate::events::PageChanged = events
+        .iter()
+        .map(|event| serde_json::from_value(event.clone()).unwrap())
+        .find(|event: &crate::events::PageChanged| {
+            event.page.to_string() == row["id"].as_str().unwrap()
+        })
+        .unwrap();
+    assert!(row_event.row);
+    let change = &row_event.changes()[0];
+    assert_eq!(change.container, Some(RecordRef::new(PAGE_RECORD, &t)));
+    assert_eq!(change.record.id, row_event.page.to_string());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn deleting_a_row_for_good_leaves_the_relation_cells_that_held_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let a = kit.table(&ana, workspace).await["page"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let b = kit.table(&ana, workspace).await["page"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let rel = kit
+        .property(
+            &ana,
+            workspace,
+            &a,
+            json!({"name": "Link", "type": "relation", "config": {"table": b}}),
+        )
+        .await["property"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let keep = kit.row(&ana, workspace, &b, json!({"title": "keep"})).await;
+    let gone = kit.row(&ana, workspace, &b, json!({"title": "gone"})).await;
+    let holder = kit
+        .row(
+            &ana,
+            workspace,
+            &a,
+            json!({"cells": [{"property": rel, "value": [keep["id"], gone["id"]]}]}),
+        )
+        .await;
+    let gone_id = gone["id"].as_str().unwrap();
+    let uri = format!("{}/{gone_id}", Kit::pages(workspace));
+    kit.post(&ana, &format!("{uri}/trash"), None).await;
+    // Trashed rows stay in the cell (restoring brings them back); purged ones go.
+    assert_eq!(
+        kit.delete(&ana, &uri).await.status,
+        axum::http::StatusCode::NO_CONTENT
+    );
+    let q = kit.query(&ana, workspace, &a, json!({})).await;
+    assert_eq!(
+        q.json["rows"][0]["cells"][&rel]["value"],
+        json!([keep["id"]])
+    );
+    assert_eq!(q.json["rows"][0]["id"], holder["id"]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn what_a_table_keeps_for_an_undo_goes_after_thirty_days(db: PgPool) {
+    use campbooks_kernel::{jobs, jobs::EnqueueOptions};
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let t = kit.table(&ana, workspace).await["page"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let removed = kit
+        .property(&ana, workspace, &t, json!({"name": "Old", "type": "text"}))
+        .await["property"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let converted = kit
+        .property(&ana, workspace, &t, json!({"name": "Conv", "type": "text"}))
+        .await["property"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    kit.row(&ana, workspace, &t, json!({"cells": [{"property": removed, "value": "x"}, {"property": converted, "value": "12"}]})).await;
+    let base = format!("{}/{t}/properties", Kit::tables(workspace));
+    kit.delete(&ana, &format!("{base}/{removed}")).await;
+    kit.patch(
+        &ana,
+        &format!("{base}/{converted}"),
+        json!({"type": "number"}),
+    )
+    .await;
+    sqlx::query("UPDATE pages.table_properties SET removed_at = now() - interval '31 days' WHERE removed_at IS NOT NULL")
+        .execute(&kit.db).await.unwrap();
+    sqlx::query("UPDATE pages.table_properties SET converted_at = now() - interval '31 days' WHERE converted_at IS NOT NULL")
+        .execute(&kit.db).await.unwrap();
+    // The daily dispatcher finds the workspace through the maintenance scope.
+    let mut tx = kit.state.db.begin().await.unwrap();
+    jobs::enqueue(
+        &mut tx,
+        &crate::features::purge_trash::DispatchPurgeTrash,
+        EnqueueOptions::default(),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+    let left: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM pages.table_properties WHERE id = $1::uuid")
+            .bind(&removed)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(left, 0, "the removed property and its cells are gone");
+    let cells: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM pages.row_values WHERE property_id = $1::uuid")
+            .bind(&removed)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(cells, 0);
+    let backup: i64 = sqlx::query_scalar("SELECT count(*) FROM pages.table_properties WHERE id = $1::uuid AND previous_type IS NOT NULL")
+        .bind(&converted).fetch_one(&kit.db).await.unwrap();
+    assert_eq!(backup, 0, "the old type is no longer kept");
+    let nothing = kit
+        .post(&ana, &format!("{base}/{converted}/restore"), None)
+        .await;
+    assert_eq!(nothing.json["code"], "nothing_to_restore");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_deleted_workspace_loses_its_tables_and_cells(db: PgPool) {
+    use crate::events::WorkspaceDeleting;
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let t = kit.table(&ana, workspace).await["page"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let p = kit
+        .property(&ana, workspace, &t, json!({"name": "N", "type": "number"}))
+        .await["property"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    kit.row(
+        &ana,
+        workspace,
+        &t,
+        json!({"cells": [{"property": p, "value": "1"}]}),
+    )
+    .await;
+    let mut tx = kit.begin(workspace).await;
+    kit.state
+        .events
+        .publish(
+            &mut tx,
+            &WorkspaceDeleting {
+                workspace: workspace.to_string(),
+                purge_after: chrono::Utc::now() - chrono::TimeDelta::hours(1),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+    for table in [
+        "pages",
+        "tables",
+        "table_properties",
+        "table_rows",
+        "row_values",
+        "table_views",
+    ] {
+        let rows: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT count(*) FROM pages.{table} WHERE workspace_id = $1"
+        )))
+        .bind(workspace.as_uuid())
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        assert_eq!(rows, 0, "{table}");
+    }
+}

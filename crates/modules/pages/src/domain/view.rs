@@ -89,6 +89,7 @@ pub async fn page_view(
         trashed_at: row.trashed_at,
         revision: row.revision,
         meta_revision: row.meta_revision,
+        kind: row.kind()?,
         grants: grants_view,
         ancestors,
         document: DocumentState {
@@ -110,7 +111,8 @@ pub async fn summary_of(
         .flatten()
         .ok_or(Error::NotFound)?;
     let has_children: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM pages.pages WHERE parent_id = $1 AND trashed_at IS NULL)",
+        "SELECT EXISTS (SELECT 1 FROM pages.pages
+          WHERE parent_id = $1 AND trashed_at IS NULL AND kind <> 'row')",
     )
     .bind(row.id)
     .fetch_one(conn)

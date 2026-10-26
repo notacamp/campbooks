@@ -7,7 +7,7 @@
     },
     {
       "description": "An app acting on its own behalf (client credentials).",
-      "id_is": "the OAuth client id when Campbooks minted it (campbooks-web, campbooks-native, cb_…, dcr_…); none for any other client (one known by its metadata document has a URL for an id)",
+      "id_is": "the OAuth client id when Campbooks minted it (campbooks-web, campbooks-native, cb_…, dcr_…, app_…); none for any other client (one known by its metadata document has a URL for an id)",
       "type": "client"
     },
     {
@@ -120,6 +120,24 @@
       "date": "2026-10-25",
       "plan_version": 14,
       "pr": "#676"
+    },
+    {
+      "change": "Instance apps (campbooks-cloud#369): 3 instance-wide events for an instance app registered, its secret rotated and its removal (with the consents and refresh tokens it held) by the server's admin command, as system; the client kind instance; the instance apps' app_ ids in every client-id pattern; no Coverage rows (the CLI serves no operation and runs no job, schedule or handler).",
+      "date": "2026-10-26",
+      "plan_version": 16,
+      "pr": "#683"
+    },
+    {
+      "change": "Sync with Notion (campbooks-cloud#376): provider notion and capability pages for connections; 5 pages events for pages imported from Notion (how many), a sync applied in either direction (how many blocks), a conflict raised, a conflict resolved (the choice) and a sync stopped (why); Coverage for every operation, job and handler of the change.",
+      "date": "2026-10-26",
+      "plan_version": 17,
+      "pr": "#680"
+    },
+    {
+      "change": "Tables in pages (campbooks-cloud#365): 5 pages events for a table made, a property added (its type), a view made (its type), a table queried (rows answered, in buckets) and cells edited (how many, in buckets); Coverage for every operation of the change.",
+      "date": "2026-10-26",
+      "plan_version": 18,
+      "pr": "#681"
     }
   ],
   "coverage": [
@@ -195,6 +213,12 @@
     },
     {
       "events": [],
+      "exemption": "a page's link to its Notion page, made when pages asked for it: the stream that reads it; the link is tracked by pages (pages.notion_pages_imported)",
+      "kind": "handler",
+      "name": "connectors.link_notion_page"
+    },
+    {
+      "events": [],
       "exemption": "records the send conversations asked for (tracked there); its outcome is connectors.send_succeeded or connectors.send_failed",
       "kind": "handler",
       "name": "connectors.queue_send"
@@ -206,6 +230,12 @@
       "exemption": "",
       "kind": "handler",
       "name": "connectors.record_calendar_change"
+    },
+    {
+      "events": [],
+      "exemption": "records the block changes pages asked for, once pages confirms them, for the stream's next run, which reports how each ended; tracked there as pages.notion_sync_applied",
+      "kind": "handler",
+      "name": "connectors.record_notion_changes"
     },
     {
       "events": [],
@@ -226,6 +256,12 @@
       "exemption": "consequence of workspaces.workspace_deleted (tracked by workspaces): the deleted workspace's connections go with it",
       "kind": "handler",
       "name": "connectors.revoke_workspace_grants"
+    },
+    {
+      "events": [],
+      "exemption": "the stream of a Notion page that pages stopped syncing is deleted; the stop is tracked by pages (pages.notion_sync_stopped)",
+      "kind": "handler",
+      "name": "connectors.unlink_notion_page"
     },
     {
       "events": [
@@ -326,6 +362,24 @@
       "name": "identity.revoke_departed_consents"
     },
     {
+      "events": [
+        "pages.notion_sync_applied",
+        "pages.notion_conflict_raised",
+        "pages.page_created"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.apply_notion_snapshot"
+    },
+    {
+      "events": [
+        "pages.notion_sync_applied"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.complete_notion_changes"
+    },
+    {
       "events": [],
       "exemption": "cleanup after a member left: their grants on pages are deleted; the departure is tracked by workspaces",
       "kind": "handler",
@@ -336,6 +390,22 @@
       "exemption": "projection of workspaces.workspace_deleted: it only schedules the purge",
       "kind": "handler",
       "name": "pages.schedule_workspace_purge"
+    },
+    {
+      "events": [
+        "pages.notion_sync_stopped"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.stop_notion_link"
+    },
+    {
+      "events": [
+        "pages.notion_sync_stopped"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.stop_notion_links_of_connection"
     },
     {
       "events": [
@@ -669,6 +739,12 @@
     },
     {
       "events": [],
+      "exemption": "records the blocks a member changed as a request for the connector to write to Notion; the writes are tracked when the connector reports them (pages.notion_sync_applied)",
+      "kind": "job",
+      "name": "pages.push_to_notion"
+    },
+    {
+      "events": [],
       "exemption": "maintenance, no action of anyone: invitations stored before announced once",
       "kind": "job",
       "name": "schedule.announce_invitations"
@@ -950,6 +1026,12 @@
       "exemption": "only starts a consent through the identity module's front door; nothing of connectors changes, and the connection it becomes is tracked as connectors.connection_added or connectors.connection_reconnected",
       "kind": "operation",
       "name": "connectors.start_connection"
+    },
+    {
+      "events": [],
+      "exemption": "only records a consent started and sends the browser to Notion; nothing of connectors changes until the member comes back, and the connection it becomes is tracked as connectors.connection_added or connectors.connection_reconnected",
+      "kind": "operation",
+      "name": "connectors.start_notion"
     },
     {
       "events": [
@@ -1493,11 +1575,54 @@
     },
     {
       "events": [
+        "pages.property_added"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.add_property"
+    },
+    {
+      "events": [
+        "pages.page_created",
+        "pages.cells_edited"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.add_row"
+    },
+    {
+      "events": [
         "pages.page_created"
       ],
       "exemption": "",
       "kind": "operation",
       "name": "pages.create"
+    },
+    {
+      "events": [
+        "pages.table_created",
+        "pages.page_created"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.create_table"
+    },
+    {
+      "events": [
+        "pages.view_created"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.create_view"
+    },
+    {
+      "events": [
+        "pages.notion_pages_imported",
+        "pages.page_created"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.import_from_notion"
     },
     {
       "events": [
@@ -1517,11 +1642,59 @@
     },
     {
       "events": [
+        "pages.rows_queried"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.query_table"
+    },
+    {
+      "events": [],
+      "exemption": "takes a property out of the table for 30 days, which restoring it undoes; the property is tracked when it is added (pages.property_added)",
+      "kind": "operation",
+      "name": "pages.remove_property"
+    },
+    {
+      "events": [],
+      "exemption": "deletes a view of a table, which making one again undoes; the view is tracked when it is made (pages.view_created)",
+      "kind": "operation",
+      "name": "pages.remove_view"
+    },
+    {
+      "events": [
+        "pages.notion_conflict_resolved"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.resolve_conflict"
+    },
+    {
+      "events": [
         "pages.page_restored"
       ],
       "exemption": "",
       "kind": "operation",
       "name": "pages.restore"
+    },
+    {
+      "events": [],
+      "exemption": "undoes the removal or the last change of type of a property, putting back what was there; nothing new is made",
+      "kind": "operation",
+      "name": "pages.restore_property"
+    },
+    {
+      "events": [
+        "pages.cells_edited"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.set_cells"
+    },
+    {
+      "events": [],
+      "exemption": "renames, recolours, adds and reorders the options of a select; the option names are content, and what changes is the property, tracked when it is added (pages.property_added)",
+      "kind": "operation",
+      "name": "pages.set_options"
     },
     {
       "events": [
@@ -1530,6 +1703,14 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.share"
+    },
+    {
+      "events": [
+        "pages.notion_sync_stopped"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.stop_sync"
     },
     {
       "events": [],
@@ -1547,6 +1728,14 @@
     },
     {
       "events": [
+        "pages.notion_conflict_raised"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.undo_resolve_conflict"
+    },
+    {
+      "events": [
         "pages.page_unshared"
       ],
       "exemption": "",
@@ -1560,6 +1749,18 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.update"
+    },
+    {
+      "events": [],
+      "exemption": "renames a property or changes its config or type; the table's properties are tracked when they are added (pages.property_added), and a change of type keeps what the cells held for 30 days",
+      "kind": "operation",
+      "name": "pages.update_property"
+    },
+    {
+      "events": [],
+      "exemption": "changes a view's name, filter, sorts, summaries or columns, which are the member's own words and values; the view is tracked when it is made (pages.view_created)",
+      "kind": "operation",
+      "name": "pages.update_view"
     },
     {
       "events": [],
@@ -2653,6 +2854,11 @@
       "value": "messages"
     },
     {
+      "description": "Pages kept in step both ways (Notion).",
+      "enum": "connectors.capability",
+      "value": "pages"
+    },
+    {
       "description": "Several runs in a row failed; syncing keeps retrying.",
       "enum": "connectors.health",
       "value": "failing"
@@ -2756,6 +2962,11 @@
       "description": "Microsoft: Outlook.com, Hotmail and Microsoft 365 mail.",
       "enum": "connectors.provider",
       "value": "microsoft"
+    },
+    {
+      "description": "Notion: pages kept in step with Pages.",
+      "enum": "connectors.provider",
+      "value": "notion"
     },
     {
       "description": "Zoho: Zoho Mail and Zoho Calendar.",
@@ -3448,6 +3659,11 @@
       "value": "first_party"
     },
     {
+      "description": "An instance app: registered by an instance administrator from the server's CLI (first-party sign-in for the instance's own other apps).",
+      "enum": "identity.client_kind",
+      "value": "instance"
+    },
+    {
       "description": "Known by its Client ID Metadata Document (its id is a URL, never kept).",
       "enum": "identity.client_kind",
       "value": "metadata_document"
@@ -3593,6 +3809,46 @@
       "value": "running"
     },
     {
+      "description": "Keep both as ordinary blocks.",
+      "enum": "pages.conflict_choice",
+      "value": "both"
+    },
+    {
+      "description": "Keep the block as it is in Campbooks.",
+      "enum": "pages.conflict_choice",
+      "value": "mine"
+    },
+    {
+      "description": "Use Notion's version.",
+      "enum": "pages.conflict_choice",
+      "value": "notion"
+    },
+    {
+      "description": "2 to 9.",
+      "enum": "pages.count_bucket",
+      "value": "few"
+    },
+    {
+      "description": "100 or more.",
+      "enum": "pages.count_bucket",
+      "value": "many"
+    },
+    {
+      "description": "None.",
+      "enum": "pages.count_bucket",
+      "value": "none"
+    },
+    {
+      "description": "One.",
+      "enum": "pages.count_bucket",
+      "value": "one"
+    },
+    {
+      "description": "10 to 99.",
+      "enum": "pages.count_bucket",
+      "value": "some"
+    },
+    {
       "description": "Its icon.",
       "enum": "pages.page_field",
       "value": "icon"
@@ -3626,6 +3882,146 @@
       "description": "Every member's.",
       "enum": "pages.place",
       "value": "workspace"
+    },
+    {
+      "description": "References to Campbooks records.",
+      "enum": "pages.property_type",
+      "value": "campbooks_link"
+    },
+    {
+      "description": "Yes or no.",
+      "enum": "pages.property_type",
+      "value": "checkbox"
+    },
+    {
+      "description": "When or by whom the row was made.",
+      "enum": "pages.property_type",
+      "value": "created"
+    },
+    {
+      "description": "A date or a range, with or without a time.",
+      "enum": "pages.property_type",
+      "value": "date"
+    },
+    {
+      "description": "When or by whom the row was last edited.",
+      "enum": "pages.property_type",
+      "value": "edited"
+    },
+    {
+      "description": "An email address.",
+      "enum": "pages.property_type",
+      "value": "email"
+    },
+    {
+      "description": "Files.",
+      "enum": "pages.property_type",
+      "value": "files"
+    },
+    {
+      "description": "Several options.",
+      "enum": "pages.property_type",
+      "value": "multi_select"
+    },
+    {
+      "description": "A number, a percent or a currency amount.",
+      "enum": "pages.property_type",
+      "value": "number"
+    },
+    {
+      "description": "Teammates.",
+      "enum": "pages.property_type",
+      "value": "person"
+    },
+    {
+      "description": "A phone number.",
+      "enum": "pages.property_type",
+      "value": "phone"
+    },
+    {
+      "description": "Rows of a table.",
+      "enum": "pages.property_type",
+      "value": "relation"
+    },
+    {
+      "description": "One option.",
+      "enum": "pages.property_type",
+      "value": "select"
+    },
+    {
+      "description": "One option in a to-do, doing or done group.",
+      "enum": "pages.property_type",
+      "value": "status"
+    },
+    {
+      "description": "Rich text.",
+      "enum": "pages.property_type",
+      "value": "text"
+    },
+    {
+      "description": "A number for each row, with a prefix.",
+      "enum": "pages.property_type",
+      "value": "unique_id"
+    },
+    {
+      "description": "A web address.",
+      "enum": "pages.property_type",
+      "value": "url"
+    },
+    {
+      "description": "From Notion into the page.",
+      "enum": "pages.sync_direction",
+      "value": "inbound"
+    },
+    {
+      "description": "From the page to Notion.",
+      "enum": "pages.sync_direction",
+      "value": "outbound"
+    },
+    {
+      "description": "The Notion connection was disconnected.",
+      "enum": "pages.sync_stop_reason",
+      "value": "disconnected"
+    },
+    {
+      "description": "The member whose Notion account it was left the workspace.",
+      "enum": "pages.sync_stop_reason",
+      "value": "member_left"
+    },
+    {
+      "description": "Notion no longer shares the page with Campbooks.",
+      "enum": "pages.sync_stop_reason",
+      "value": "not_shared"
+    },
+    {
+      "description": "Notion is not offered on this instance any more.",
+      "enum": "pages.sync_stop_reason",
+      "value": "notion_unavailable"
+    },
+    {
+      "description": "A member stopped syncing.",
+      "enum": "pages.sync_stop_reason",
+      "value": "stopped_by_member"
+    },
+    {
+      "description": "The page was put in the trash in Campbooks.",
+      "enum": "pages.sync_stop_reason",
+      "value": "trashed_here"
+    },
+    {
+      "description": "The page was trashed in Notion.",
+      "enum": "pages.sync_stop_reason",
+      "value": "trashed_in_notion"
+    },
+    {
+      "description": "Cards in a column per option.",
+      "enum": "pages.view_type",
+      "value": "board"
+    },
+    {
+      "description": "A grid of rows and columns.",
+      "enum": "pages.view_type",
+      "value": "table"
     },
     {
       "description": "Make the event at the provider.",
@@ -5873,7 +6269,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -5942,6 +6339,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6009,7 +6407,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6078,6 +6477,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6268,7 +6668,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6337,6 +6738,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6415,7 +6817,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6484,6 +6887,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6555,7 +6959,8 @@
                 "bank",
                 "calendar",
                 "files",
-                "messages"
+                "messages",
+                "pages"
               ],
               "type": "string"
             },
@@ -6578,7 +6983,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6647,6 +7053,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6732,7 +7139,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6801,6 +7209,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6882,7 +7291,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6951,6 +7361,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -7030,6 +7441,7 @@
               "google",
               "imap",
               "microsoft",
+              "notion",
               "zoho"
             ],
             "type": "string",
@@ -7134,6 +7546,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -7244,6 +7657,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -7346,6 +7760,7 @@
               "google",
               "imap",
               "microsoft",
+              "notion",
               "zoho"
             ],
             "type": "string",
@@ -7361,7 +7776,8 @@
                   "bank",
                   "calendar",
                   "files",
-                  "messages"
+                  "messages",
+                  "pages"
                 ],
                 "type": "string",
                 "x-classification": "operational"
@@ -12913,7 +13329,7 @@
             "properties": {
               "client_id": {
                 "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -12933,6 +13349,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13009,7 +13426,7 @@
           },
           "client_id": {
             "description": "The client's id.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -13056,7 +13473,7 @@
             "properties": {
               "client_id": {
                 "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -13076,6 +13493,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13208,7 +13626,7 @@
           },
           "client_id": {
             "description": "Its client id, when Campbooks minted it; absent for a metadata-document client.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -13217,6 +13635,7 @@
             "enum": [
               "dynamic",
               "first_party",
+              "instance",
               "metadata_document",
               "workspace"
             ],
@@ -13272,7 +13691,7 @@
               },
               "client_id": {
                 "description": "The client it lets in, when Campbooks minted its id; absent for a metadata-document client.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -13281,6 +13700,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13376,7 +13796,7 @@
               },
               "client_id": {
                 "description": "The client it lets in, when Campbooks minted its id; absent for a metadata-document client.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -13385,6 +13805,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13510,7 +13931,7 @@
             "properties": {
               "client_id": {
                 "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -13530,6 +13951,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13684,6 +14106,236 @@
           "provider"
         ],
         "title": "identity.held_grant_discarded",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "registered",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 16,
+      "description": "An instance administrator registered an instance app (a confidential sign-in client of the whole instance) with the server's `campbooks-server admin apps add`. The snapshot is the client, never its name, secret, scopes or redirect URIs.",
+      "fires_when": "admin apps add (campbooks_identity::domain::instance_apps::register) stores it, in the transaction that writes the client and its audit entry.",
+      "module": "identity",
+      "name": "identity.instance_app_registered",
+      "object": "instance_app",
+      "openspec_change": "instance-apps",
+      "rust_type": "InstanceAppRegistered",
+      "schema": {
+        "$id": "urn:campbooks:tracking:identity.instance_app_registered:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An instance administrator registered an instance app (a confidential sign-in client of the whole instance) with the server's `campbooks-server admin apps add`. The snapshot is the client, never its name, secret, scopes or redirect URIs.",
+        "properties": {
+          "client": {
+            "additionalProperties": false,
+            "description": "The new client.",
+            "properties": {
+              "client_id": {
+                "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "confidential": {
+                "description": "Whether it authenticates with a secret.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was registered.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "kind": {
+                "description": "What kind of client it is.",
+                "enum": [
+                  "dynamic",
+                  "first_party",
+                  "instance",
+                  "metadata_document",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "redirect_uri_count": {
+                "description": "How many redirect URIs it registered (never the URIs).",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "scope_count": {
+                "description": "How many scopes it may ask for.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "secret_rotated_at": {
+                "description": "When its secret was last rotated.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "confidential",
+              "created_at",
+              "kind",
+              "redirect_uri_count",
+              "scope_count"
+            ],
+            "title": "identity.client",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "client"
+        ],
+        "title": "identity.instance_app_registered",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "removed",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 16,
+      "description": "An instance app was removed by the server's `campbooks-server admin apps remove`, with every consent and refresh token it held.",
+      "fires_when": "admin apps remove (campbooks_identity::domain::instance_apps::remove) deletes it and revokes its consents and refresh tokens; an unknown client id tracks nothing.",
+      "module": "identity",
+      "name": "identity.instance_app_removed",
+      "object": "instance_app",
+      "openspec_change": "instance-apps",
+      "rust_type": "InstanceAppRemoved",
+      "schema": {
+        "$id": "urn:campbooks:tracking:identity.instance_app_removed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An instance app was removed by the server's `campbooks-server admin apps remove`, with every consent and refresh token it held.",
+        "properties": {
+          "client_id": {
+            "description": "The client's id.",
+            "pattern": "^app_[A-Za-z0-9_-]{22}$",
+            "type": "string",
+            "x-classification": "id"
+          },
+          "consents_revoked": {
+            "description": "How many live consents it held were revoked.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "refresh_tokens_revoked": {
+            "description": "How many live refresh-token families (sign-ins) it held were revoked.",
+            "type": "integer",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "client_id",
+          "consents_revoked",
+          "refresh_tokens_revoked"
+        ],
+        "title": "identity.instance_app_removed",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "rotated",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 16,
+      "description": "An instance app got a new secret from the server's `campbooks-server admin apps rotate-secret`; the old one stopped working.",
+      "fires_when": "admin apps rotate-secret (campbooks_identity::domain::instance_apps::rotate_secret) stores the new secret's hash; an unknown client id tracks nothing.",
+      "module": "identity",
+      "name": "identity.instance_app_secret_rotated",
+      "object": "instance_app_secret",
+      "openspec_change": "instance-apps",
+      "rust_type": "InstanceAppSecretRotated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:identity.instance_app_secret_rotated:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An instance app got a new secret from the server's `campbooks-server admin apps rotate-secret`; the old one stopped working.",
+        "properties": {
+          "client": {
+            "additionalProperties": false,
+            "description": "The client afterwards.",
+            "properties": {
+              "client_id": {
+                "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "confidential": {
+                "description": "Whether it authenticates with a secret.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was registered.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "kind": {
+                "description": "What kind of client it is.",
+                "enum": [
+                  "dynamic",
+                  "first_party",
+                  "instance",
+                  "metadata_document",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "redirect_uri_count": {
+                "description": "How many redirect URIs it registered (never the URIs).",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "scope_count": {
+                "description": "How many scopes it may ask for.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "secret_rotated_at": {
+                "description": "When its secret was last rotated.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "confidential",
+              "created_at",
+              "kind",
+              "redirect_uri_count",
+              "scope_count"
+            ],
+            "title": "identity.client",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "client"
+        ],
+        "title": "identity.instance_app_secret_rotated",
         "type": "object"
       },
       "scope": "instance",
@@ -14083,7 +14735,7 @@
           },
           "client_id": {
             "description": "Its client id, when Campbooks minted it; absent for a metadata-document client.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -14092,6 +14744,7 @@
             "enum": [
               "dynamic",
               "first_party",
+              "instance",
               "metadata_document",
               "workspace"
             ],
@@ -14137,7 +14790,7 @@
           },
           "client_id": {
             "description": "Its client id, when Campbooks minted it; absent for a metadata-document client.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -14146,6 +14799,7 @@
             "enum": [
               "dynamic",
               "first_party",
+              "instance",
               "metadata_document",
               "workspace"
             ],
@@ -14508,7 +15162,7 @@
           },
           "client_id": {
             "description": "Its client id, when Campbooks minted it; absent for a metadata-document client.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -14517,6 +15171,7 @@
             "enum": [
               "dynamic",
               "first_party",
+              "instance",
               "metadata_document",
               "workspace"
             ],
@@ -15073,6 +15728,497 @@
         "type": "object"
       },
       "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "edited",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 18,
+      "description": "Cells of a row changed, and how many, in a bucket. Never which properties or any value; the same value again counts for nothing.",
+      "fires_when": "pages.add_row (with cells) or pages.set_cells stores at least one changed cell, in that transaction.",
+      "module": "pages",
+      "name": "pages.cells_edited",
+      "object": "cells",
+      "openspec_change": "pages-tables",
+      "rust_type": "CellsEdited",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.cells_edited:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "Cells of a row changed, and how many, in a bucket. Never which properties or any value; the same value again counts for nothing.",
+        "properties": {
+          "cells": {
+            "description": "How many cells changed.",
+            "enum": [
+              "few",
+              "many",
+              "none",
+              "one",
+              "some"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "row": {
+            "additionalProperties": false,
+            "description": "The row page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "cells",
+          "row"
+        ],
+        "title": "pages.cells_edited",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "raised",
+      "actor_types": [
+        "user",
+        "system"
+      ],
+      "added_in": 17,
+      "description": "The same block changed in Campbooks and in Notion between two syncs: Campbooks kept its version and added Notion's beneath it as a conflict for the member to choose. How many blocks.",
+      "fires_when": "Applying a Notion snapshot, or undoing a resolution, adds conflict blocks to the page, in that transaction.",
+      "module": "pages",
+      "name": "pages.notion_conflict_raised",
+      "object": "notion_conflict",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionConflictRaised",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_conflict_raised:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The same block changed in Campbooks and in Notion between two syncs: Campbooks kept its version and added Notion's beneath it as a conflict for the member to choose. How many blocks.",
+        "properties": {
+          "blocks": {
+            "description": "How many blocks are in conflict now that were not before.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "blocks",
+          "page"
+        ],
+        "title": "pages.notion_conflict_raised",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "resolved",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 17,
+      "description": "A member chose what to do with a conflict between a block and Notion's version of it.",
+      "fires_when": "pages.resolve_conflict applies the choice, in the transaction that changes the page.",
+      "module": "pages",
+      "name": "pages.notion_conflict_resolved",
+      "object": "notion_conflict",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionConflictResolved",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_conflict_resolved:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member chose what to do with a conflict between a block and Notion's version of it.",
+        "properties": {
+          "choice": {
+            "description": "What the member chose.",
+            "enum": [
+              "both",
+              "mine",
+              "notion"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "choice",
+          "page"
+        ],
+        "title": "pages.notion_conflict_resolved",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "imported",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 17,
+      "description": "A member picked pages in their Notion account to bring into Pages: how many were made, linked to their Notion pages. Never their titles or ids at Notion.",
+      "fires_when": "pages.import_from_notion makes the pages and their links, in the transaction that stores them; pages already linked from this connection make none and track nothing.",
+      "module": "pages",
+      "name": "pages.notion_pages_imported",
+      "object": "notion_pages",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionPagesImported",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_pages_imported:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member picked pages in their Notion account to bring into Pages: how many were made, linked to their Notion pages. Never their titles or ids at Notion.",
+        "properties": {
+          "connection": {
+            "description": "The Notion connection they were imported through.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "id"
+          },
+          "pages": {
+            "description": "How many pages were made.",
+            "type": "integer",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "connection",
+          "pages"
+        ],
+        "title": "pages.notion_pages_imported",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "applied",
+      "actor_types": [
+        "user",
+        "system"
+      ],
+      "added_in": 17,
+      "description": "A change crossed between a page and its Notion page, in one direction: how many blocks it moved. Never their text.",
+      "fires_when": "A Notion snapshot is applied to the page (inbound), or the connector reports blocks written to Notion (outbound), in the transaction that stores the result; a run that moves no block tracks nothing.",
+      "module": "pages",
+      "name": "pages.notion_sync_applied",
+      "object": "notion_sync",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionSyncApplied",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_sync_applied:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A change crossed between a page and its Notion page, in one direction: how many blocks it moved. Never their text.",
+        "properties": {
+          "blocks": {
+            "description": "How many blocks moved.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "direction": {
+            "description": "Which way the blocks moved.",
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "blocks",
+          "direction",
+          "page"
+        ],
+        "title": "pages.notion_sync_applied",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "stopped",
+      "actor_types": [
+        "user",
+        "system"
+      ],
+      "added_in": 17,
+      "description": "A page stopped being kept in step with its Notion page, and why. Nothing is deleted on either side.",
+      "fires_when": "A member stops it, Notion is disconnected, either side trashes the page, Notion stops sharing it, or its member leaves, in the transaction that ends the link; a link already stopped tracks nothing.",
+      "module": "pages",
+      "name": "pages.notion_sync_stopped",
+      "object": "notion_sync",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionSyncStopped",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_sync_stopped:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page stopped being kept in step with its Notion page, and why. Nothing is deleted on either side.",
+        "properties": {
+          "page": {
+            "additionalProperties": false,
+            "description": "The page.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "reason": {
+            "description": "Why the link ended.",
+            "enum": [
+              "disconnected",
+              "member_left",
+              "not_shared",
+              "notion_unavailable",
+              "stopped_by_member",
+              "trashed_here",
+              "trashed_in_notion"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "page",
+          "reason"
+        ],
+        "title": "pages.notion_sync_stopped",
+        "type": "object"
+      },
+      "scope": "workspace",
       "status": "live",
       "version": 1
     },
@@ -15778,6 +16924,371 @@
           "page"
         ],
         "title": "pages.page_unshared",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "added",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 18,
+      "description": "A property (a column) of a table was added, and its type. Never its name or its options.",
+      "fires_when": "pages.add_property stores the property (and the property it pairs with on another table, when it is a paired relation, which is tracked as one more event), in that transaction.",
+      "module": "pages",
+      "name": "pages.property_added",
+      "object": "property",
+      "openspec_change": "pages-tables",
+      "rust_type": "PropertyAdded",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.property_added:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A property (a column) of a table was added, and its type. Never its name or its options.",
+        "properties": {
+          "property_type": {
+            "description": "The type of the property.",
+            "enum": [
+              "campbooks_link",
+              "checkbox",
+              "created",
+              "date",
+              "edited",
+              "email",
+              "files",
+              "multi_select",
+              "number",
+              "person",
+              "phone",
+              "relation",
+              "select",
+              "status",
+              "text",
+              "unique_id",
+              "url"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "table": {
+            "additionalProperties": false,
+            "description": "The table page.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "property_type",
+          "table"
+        ],
+        "title": "pages.property_added",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "queried",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 18,
+      "description": "A table was queried, for a view or ad hoc, and how many rows it answered, in a bucket. Never the filter, the sorts or any value.",
+      "fires_when": "pages.query_table has computed its answer, in the transaction that read it.",
+      "module": "pages",
+      "name": "pages.rows_queried",
+      "object": "rows",
+      "openspec_change": "pages-tables",
+      "rust_type": "RowsQueried",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.rows_queried:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A table was queried, for a view or ad hoc, and how many rows it answered, in a bucket. Never the filter, the sorts or any value.",
+        "properties": {
+          "rows": {
+            "description": "How many rows the answer held.",
+            "enum": [
+              "few",
+              "many",
+              "none",
+              "one",
+              "some"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "table": {
+            "additionalProperties": false,
+            "description": "The table page.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "view_type": {
+            "description": "The type of the view asked for; absent for an ad hoc query.",
+            "enum": [
+              "board",
+              "table"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "rows",
+          "table"
+        ],
+        "title": "pages.rows_queried",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "created",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 18,
+      "description": "A table was made: a page whose rows are pages with typed properties. Never its title or its property names.",
+      "fires_when": "pages.create_table makes the table page, its title property and its first view, in the transaction that inserts them.",
+      "module": "pages",
+      "name": "pages.table_created",
+      "object": "table",
+      "openspec_change": "pages-tables",
+      "rust_type": "TableCreated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.table_created:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A table was made: a page whose rows are pages with typed properties. Never its title or its property names.",
+        "properties": {
+          "table": {
+            "additionalProperties": false,
+            "description": "The table page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "table"
+        ],
+        "title": "pages.table_created",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "created",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 18,
+      "description": "A view of a table was made, and its type. Never its name, filter or sorts.",
+      "fires_when": "pages.create_view stores the view, in that transaction; the first view made with the table is part of pages.table_created.",
+      "module": "pages",
+      "name": "pages.view_created",
+      "object": "view",
+      "openspec_change": "pages-tables",
+      "rust_type": "ViewCreated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.view_created:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A view of a table was made, and its type. Never its name, filter or sorts.",
+        "properties": {
+          "table": {
+            "additionalProperties": false,
+            "description": "The table page.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "view_type": {
+            "description": "The type of the view.",
+            "enum": [
+              "board",
+              "table"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "table",
+          "view_type"
+        ],
+        "title": "pages.view_created",
         "type": "object"
       },
       "scope": "workspace",
@@ -22616,8 +24127,8 @@
     }
   ],
   "generated_by": "campbooks-tracking-plan",
-  "plan_date": "2026-10-25",
-  "plan_version": 14,
+  "plan_date": "2026-10-26",
+  "plan_version": 18,
   "properties": [
     {
       "classification": "operational",
@@ -24706,7 +26217,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": true,
       "type": "code",
@@ -24810,7 +26321,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": false,
       "type": "code",
@@ -24987,6 +26498,71 @@
     },
     {
       "classification": "operational",
+      "description": "The new client.",
+      "event": "identity.instance_app_registered",
+      "example": "",
+      "list": false,
+      "of": "identity.client",
+      "pattern": "",
+      "property": "client",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The client's id.",
+      "event": "identity.instance_app_removed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "^app_[A-Za-z0-9_-]{22}$",
+      "property": "client_id",
+      "required": true,
+      "type": "code",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many live consents it held were revoked.",
+      "event": "identity.instance_app_removed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "consents_revoked",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many live refresh-token families (sign-ins) it held were revoked.",
+      "event": "identity.instance_app_removed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "refresh_tokens_revoked",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The client afterwards.",
+      "event": "identity.instance_app_secret_rotated",
+      "example": "",
+      "list": false,
+      "of": "identity.client",
+      "pattern": "",
+      "property": "client",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "The passkey after the sign-in.",
       "event": "identity.passkey_counter_regressed",
       "example": "",
@@ -25070,7 +26646,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": false,
       "type": "code",
@@ -25109,7 +26685,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": false,
       "type": "code",
@@ -25278,7 +26854,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": false,
       "type": "code",
@@ -25520,6 +27096,175 @@
     },
     {
       "classification": "operational",
+      "description": "How many cells changed.",
+      "event": "pages.cells_edited",
+      "example": "",
+      "list": false,
+      "of": "pages.count_bucket",
+      "pattern": "",
+      "property": "cells",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The row page afterwards.",
+      "event": "pages.cells_edited",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "row",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many blocks are in conflict now that were not before.",
+      "event": "pages.notion_conflict_raised",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "blocks",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.notion_conflict_raised",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "What the member chose.",
+      "event": "pages.notion_conflict_resolved",
+      "example": "",
+      "list": false,
+      "of": "pages.conflict_choice",
+      "pattern": "",
+      "property": "choice",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.notion_conflict_resolved",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The Notion connection they were imported through.",
+      "event": "pages.notion_pages_imported",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "connection",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many pages were made.",
+      "event": "pages.notion_pages_imported",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "pages",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many blocks moved.",
+      "event": "pages.notion_sync_applied",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "blocks",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Which way the blocks moved.",
+      "event": "pages.notion_sync_applied",
+      "example": "",
+      "list": false,
+      "of": "pages.sync_direction",
+      "pattern": "",
+      "property": "direction",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.notion_sync_applied",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page.",
+      "event": "pages.notion_sync_stopped",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Why the link ended.",
+      "event": "pages.notion_sync_stopped",
+      "example": "",
+      "list": false,
+      "of": "pages.sync_stop_reason",
+      "pattern": "",
+      "property": "reason",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "The new page.",
       "event": "pages.page_created",
       "example": "",
@@ -25698,6 +27443,110 @@
       "property": "page",
       "required": true,
       "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The type of the property.",
+      "event": "pages.property_added",
+      "example": "",
+      "list": false,
+      "of": "pages.property_type",
+      "pattern": "",
+      "property": "property_type",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The table page.",
+      "event": "pages.property_added",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "table",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many rows the answer held.",
+      "event": "pages.rows_queried",
+      "example": "",
+      "list": false,
+      "of": "pages.count_bucket",
+      "pattern": "",
+      "property": "rows",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The table page.",
+      "event": "pages.rows_queried",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "table",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The type of the view asked for; absent for an ad hoc query.",
+      "event": "pages.rows_queried",
+      "example": "",
+      "list": false,
+      "of": "pages.view_type",
+      "pattern": "",
+      "property": "view_type",
+      "required": false,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The table page afterwards.",
+      "event": "pages.table_created",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "table",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The table page.",
+      "event": "pages.view_created",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "table",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The type of the view.",
+      "event": "pages.view_created",
+      "example": "",
+      "list": false,
+      "of": "pages.view_type",
+      "pattern": "",
+      "property": "view_type",
+      "required": true,
+      "type": "enum",
       "version": 1
     },
     {
@@ -28085,7 +29934,7 @@
       "enum": "",
       "field": "client_id",
       "list": false,
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "record": "identity.client",
       "required": false,
       "type": "code"
@@ -28184,7 +30033,7 @@
       "enum": "",
       "field": "client_id",
       "list": false,
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "record": "identity.consent",
       "required": false,
       "type": "code"

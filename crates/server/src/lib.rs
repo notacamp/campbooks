@@ -319,6 +319,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_admin(campbooks_admin::profiles(), campbooks_admin::audit())
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
+        .with_page_requests(campbooks_pages::page_requests())
         .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(Arc::new(campbooks_kernel::changes::Visibilities::new(
             vec![
@@ -696,6 +697,13 @@ pub fn router_with(
         state.clone(),
         composition.connectors.clone(),
     ));
+    // Notion (connectors, campbooks-cloud#376): the browser's round trip to
+    // Notion and back, and Notion's webhook. Public, outside the operation
+    // catalogue, and empty unless Notion is offered.
+    let identity = identity.merge(campbooks_connectors::notion_router(
+        state.clone(),
+        composition.connectors.clone(),
+    ));
 
     // RFC 9728: every Bearer challenge of the API names its metadata, so an
     // agent that knows only the API's URL finds the issuer.
@@ -1061,7 +1069,7 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these twelve, on module tables.
+        // The maintenance scope: these thirteen, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
             // The chats' expiry (assistant, campbooks-cloud#305): which
@@ -1086,6 +1094,13 @@ mod tests {
             (
                 "connectors.microsoft_subscriptions",
                 "maintenance_reads_microsoft_subscriptions",
+                "SELECT",
+            ),
+            // The Notion webhook (connectors, campbooks-cloud#376): finds the
+            // streams of a Notion page across workspaces, read only.
+            (
+                "connectors.notion_links",
+                "maintenance_reads_notion_links",
                 "SELECT",
             ),
             // The stream dispatcher (connectors): reads and leases.
@@ -1128,6 +1143,14 @@ mod tests {
             // The trash's 30 days (pages, campbooks-cloud#363): which
             // workspaces hold a trash root that old, read only.
             ("pages.pages", "maintenance_reads_trash", "SELECT"),
+            // The same sweep, for what a table keeps for an undo (pages,
+            // campbooks-cloud#365): which workspaces hold a property
+            // removed or retyped that long ago, read only.
+            (
+                "pages.table_properties",
+                "maintenance_reads_removed_properties",
+                "SELECT",
+            ),
             // Invitations stored before invitations were announced
             // (campbooks-cloud#360): which workspaces still have one to
             // announce, read only.
@@ -1231,11 +1254,16 @@ mod tests {
         // The tracked events outbox (ADR 0020): append only; nothing in the
         // application reads, changes or deletes a row back.
         let append_only = "kernel.tracked_events";
+        // Notion's webhook verification token (campbooks-cloud#376): the
+        // runtime role may replace it (delete and insert) and never read it;
+        // only the operator's CLI, on the migration login, does.
+        let write_only = "connectors.notion_webhook_token";
         let missing: Vec<String> = missing
             .into_iter()
             .filter(|t| {
                 t != read_only
                     && t != append_only
+                    && t != write_only
                     && t != functions_only
                     && t != snapshot
                     && !at_deploy.contains(&t.as_str())
@@ -1259,6 +1287,21 @@ mod tests {
             privileges,
             (true, false, false, false),
             "`{role}` only reads {read_only}"
+        );
+        let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
+            "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),
+                    has_table_privilege($1, $2, 'UPDATE'), has_table_privilege($1, $2, 'DELETE'),
+                    has_any_column_privilege($1, $2, 'SELECT, UPDATE')",
+        )
+        .bind(role)
+        .bind(write_only)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            privileges,
+            (false, true, false, true, false),
+            "`{role}` only replaces {write_only}, never reads it"
         );
         let privileges: (bool, bool, bool, bool, bool) = sqlx::query_as(
             "SELECT has_table_privilege($1, $2, 'SELECT'), has_table_privilege($1, $2, 'INSERT'),

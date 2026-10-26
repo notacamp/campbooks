@@ -189,6 +189,17 @@ pub fn microsoft_budget(connection: ConnectionId) -> String {
     format!("microsoft:{connection}")
 }
 
+/// The budget key of one Notion connection's requests, per minute.
+pub fn notion_budget(connection: ConnectionId) -> String {
+    format!("notion:{connection}")
+}
+
+/// The budget key of one Notion connection's requests, per second (Notion
+/// allows an average of three a second, and 429s a burst).
+pub fn notion_second_budget(connection: ConnectionId) -> String {
+    format!("notion-second:{connection}")
+}
+
 /// The budget key of one connection's calendar requests.
 pub fn calendar_budget(connection: ConnectionId) -> String {
     format!("calendar:{connection}")

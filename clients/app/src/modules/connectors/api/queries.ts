@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   api,
@@ -12,12 +12,13 @@ import {
 
 export type Connection = Schema<"ConnectionView">;
 
-/**
- * `connectors.list_connections`: the workspace's connections the caller can
- * see (their own; all of them for owners and admins), oldest first.
- */
-export function useConnections(workspaceId: string) {
-  return useQuery({
+/** Connections to Notion are pages, not mail: they have their own card and hook. */
+const isMailbox = (connection: Connection) => connection.provider !== "notion";
+const isNotion = (connection: Connection) => connection.provider === "notion";
+
+/** The list query, shared by the mailboxes and the Notion card (each selects its own rows). */
+function connectionsQuery(workspaceId: string) {
+  return queryOptions({
     queryKey: operationKey("connectors.list_connections", { workspace_id: workspaceId }),
     queryFn: async ({ signal }) =>
       unwrap(
@@ -31,6 +32,26 @@ export function useConnections(workspaceId: string) {
       query.state.data?.some((connection) => connection.address_check === "checking") === true
         ? 5000
         : false,
+  });
+}
+
+/**
+ * `connectors.list_connections`: the workspace's mailboxes the caller can
+ * see (their own; all of them for owners and admins), oldest first. A
+ * connection to Notion is not a mailbox: see {@link useNotionConnections}.
+ */
+export function useConnections(workspaceId: string) {
+  return useQuery({
+    ...connectionsQuery(workspaceId),
+    select: (connections) => connections.filter(isMailbox),
+  });
+}
+
+/** The same list, the connections to Notion only. */
+export function useNotionConnections(workspaceId: string) {
+  return useQuery({
+    ...connectionsQuery(workspaceId),
+    select: (connections) => connections.filter(isNotion),
   });
 }
 

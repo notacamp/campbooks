@@ -5,6 +5,7 @@ pub mod client_names;
 pub mod clients;
 pub mod consents;
 pub mod held_grants;
+pub mod instance_apps;
 pub mod keys;
 pub mod links;
 pub mod mailbox_links;

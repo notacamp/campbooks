@@ -8,14 +8,15 @@ import { normalizeBinding, parseBinding } from "./keys";
  * `settings` on a settings page that manages its own rows (mailboxes) and
  * moves through them with the list's keys, but never shows an item or a
  * composer; `calendar` on the Calendar place, whose keys (the views 1/2/3, T, N)
- * would otherwise meet the item keys of the same digits. Two
+ * would otherwise meet the item keys of the same digits; `table` on a table
+ * page, whose cell keys (Enter, ⌘↵, N R) would meet the item keys. Two
  * shortcuts conflict when they share keys, or one's keys start the other's
  * sequence, in scopes that can be live together: `global` overlaps every
  * scope, `list` and `item` overlap each other, and so do `settings` and
  * `list`.
  */
 export type ShortcutScope =
-  "global" | "list" | "item" | "compose" | "focus" | "settings" | "calendar";
+  "global" | "list" | "item" | "compose" | "focus" | "settings" | "calendar" | "table";
 
 /** Which heading the shortcut sheet and command menu list it under. */
 export type ShortcutGroup = "navigation" | "general" | "list" | "item" | "compose";

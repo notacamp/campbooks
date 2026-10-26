@@ -122,3 +122,164 @@ updates, snapshots, grants and links, and release its blob references.
 #### Scenario: A deleted workspace
 - **WHEN** the workspace purge runs for a workspace with pages
 - **THEN** no row of the `pages` schema remains for it
+
+### Requirement: Importing from Notion
+`pages.import_from_notion` SHALL take Notion pages that the caller's own
+Notion connection can see, and SHALL make each a private page of the caller
+under a parent they may write, with its sub-pages nested, each linked to its
+Notion page. One Notion page SHALL be linked to at most one page per
+connection.
+
+#### Scenario: Importing a roadmap
+- **WHEN** Marta imports "Product roadmap" with its 3 sub-pages
+- **THEN** four private pages of Marta's are made and linked, and filled from Notion on the first run
+
+#### Scenario: Someone else's connection
+- **WHEN** Rui asks to import through Marta's Notion connection
+- **THEN** the response is 404
+
+### Requirement: Applying Notion changes block by block
+Every block SHALL carry a stable block id. A Notion snapshot SHALL be
+applied by comparing, for each mapped block, our version, Notion's version
+and the base agreed at the last sync. Theirs changed alone: theirs is
+applied. Ours changed alone: ours is kept for sending. Both changed: ours is
+kept and a conflict block holding Notion's version is added after it. The
+result SHALL be one Yjs update checked like any `pages.sync`. Notion kinds
+without a mapping SHALL become `external` blocks that store only their kind
+and Notion id, and that Campbooks never edits, sends or deletes.
+
+#### Scenario: Different paragraphs on each side
+- **WHEN** Marta edits paragraph 1 in Campbooks while Rui edits paragraph 3 in Notion
+- **THEN** after the next syncs both pages hold both edits, and no conflict is raised
+
+#### Scenario: The same paragraph on both sides
+- **WHEN** Marta and Rui both change the launch date paragraph between two syncs
+- **THEN** Marta's version stays, Notion's version appears beneath it as a conflict, and neither is sent until she chooses
+
+### Requirement: Resolving a conflict
+`pages.resolve_conflict` SHALL keep our block, use Notion's, or keep both as
+ordinary blocks, SHALL move the base, SHALL let the block be sent again, and
+SHALL be undoable.
+
+#### Scenario: Use Notion's
+- **WHEN** Marta chooses "Use Notion's" on the launch date conflict
+- **THEN** her paragraph takes Notion's text, the conflict block goes away, and nothing is sent back for it
+
+### Requirement: Mentions sent to Notion
+A mention of a Campbooks record SHALL be sent to Notion as the text
+"Campbooks link" linking to it, never with the record's subject, name or
+text.
+
+#### Scenario: A thread mention
+- **WHEN** a synced page mentions the thread "Contract v2 — signed copy"
+- **THEN** Notion receives "Campbooks link", and not the subject
+
+### Requirement: Stopping a sync deletes nothing
+Stopping a sync, disconnecting Notion, trashing the page on either side,
+un-sharing it in Notion, or its connection's member leaving SHALL stop the
+link with a reason. The page SHALL stay as it is, and nothing SHALL be
+deleted in Notion.
+
+#### Scenario: Disconnecting
+- **WHEN** Marta disconnects Notion
+- **THEN** her imported pages stay in Campbooks unchanged, marked as no longer syncing
+
+### Requirement: A table and its rows
+With `CAMPBOOKS_PAGES__TABLES__ENABLED` on, a page MAY be a table. A
+table's rows SHALL be pages of kind `row` under it, so they follow the
+table's access, trash, search, mentions and backlinks, and can each hold a
+page body. A table SHALL have exactly one title property and at least one
+view, and SHALL hold at most 200 properties and 20,000 rows.
+
+#### Scenario: A new table
+- **WHEN** Marta creates the table "Clients"
+- **THEN** it has a title property, one table view, and no rows
+
+#### Scenario: A reader edits a cell
+- **WHEN** Rui, a reader of "Clients", sets a cell
+- **THEN** the response is 403 and the cell is unchanged
+
+### Requirement: Typed values
+Every property SHALL have one of the types in design.md, and every value
+SHALL be checked against its property's type and config before it is
+stored. Select, multi-select and status values SHALL be stored by option
+id. A paired relation SHALL be updated on both sides in the same
+transaction. A Campbooks link SHALL store only references, rendered through
+each record's own module with the viewer's access. The read-only types
+reserved for Notion SHALL NOT be created by members.
+
+#### Scenario: Renaming an option
+- **WHEN** Marta renames the Stage option "Kickoff" to "Onboarding"
+- **THEN** every row that had "Kickoff" shows "Onboarding", and no row value changes
+
+#### Scenario: A bad value
+- **WHEN** a client sets a number cell to "lots"
+- **THEN** the response is 400 and nothing is stored
+
+### Requirement: Cells never collide
+Each cell SHALL carry its own version. Writes to different cells of a row
+SHALL never conflict. A write to a cell that changed since the writer read
+it SHALL still be stored, and SHALL answer the value it replaced so the
+writer can undo.
+
+#### Scenario: Two people, two cells
+- **WHEN** Marta sets Stage and Rui sets Value on the same row at the same time
+- **THEN** both values are stored
+
+### Requirement: Querying a table
+`pages.query_table` SHALL answer the rows the caller may read for a view or
+an ad-hoc filter and sort: filters in AND/OR groups up to three levels, up
+to five sorts, 100 rows per page with a cursor, and the view's column
+summaries. It SHALL be computed in the database with casts by type.
+
+#### Scenario: Filter and sum
+- **WHEN** the "All clients" view filters Stage is not Paused and sums Value
+- **THEN** the answer lists only rows not Paused, and the sum of their values
+
+### Requirement: Views
+A table SHALL have table and board views with filters, sorts, visible
+properties, order, widths and summaries. A board SHALL group by a select or
+status property. Moving a card to another group SHALL set that row's value,
+with undo. View types `list`, `calendar` and `gallery` SHALL be reserved and
+refused in this version.
+
+#### Scenario: Dragging a card
+- **WHEN** Marta drags "Northwind Bakery" from "Proposal sent" to "Kickoff" on the board
+- **THEN** its Stage becomes Kickoff and an Undo toast is shown
+
+### Requirement: Pages say whether they are tables
+With tables enabled, every page in `pages.list` and `pages.get` SHALL carry
+its `kind`: `page` or `table`. Rows SHALL never be listed.
+
+#### Scenario: The tree knows a table
+- **WHEN** Marta lists her pages and "Clients" is a table
+- **THEN** "Clients" comes back with kind `table`, and none of its rows are listed
+
+### Requirement: An inline table block
+A page body MAY hold a `tableView` block naming a table and one of its views
+by id only. The server SHALL refuse a block naming a page that is not a table
+or a view not of that table, and SHALL never copy the table's content into
+the document. It SHALL record the block as an embed of the table, so the
+table's backlinks show it. A reader who may not read the table SHALL get no
+rows for it.
+
+#### Scenario: An embedded table the reader cannot open
+- **WHEN** Rui opens a page that embeds Marta's private "Clients" table
+- **THEN** the block shows that something is there, and no row, title or value of the table reaches Rui
+
+### Requirement: Rows can be read by id
+`pages.query_table` SHALL take up to 100 row ids and answer only those of
+that table that are live and readable, so a relation cell's rows and a row
+opened as a page can be read without paging the whole table.
+
+#### Scenario: A row of another table is not the table's
+- **WHEN** Marta asks the Clients table for her Acme row and a row of Projects
+- **THEN** only the Acme row comes back
+
+### Requirement: The list says whether tables are on
+`pages.list` SHALL say whether tables are on, so a client offers "New table",
+`/table` and `/link to table` only when they work.
+
+#### Scenario: Tables are off
+- **WHEN** Marta lists her pages with tables off
+- **THEN** the answer says so, and the client shows no table entry points

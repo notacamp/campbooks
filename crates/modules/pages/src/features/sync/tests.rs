@@ -456,3 +456,85 @@ async fn the_update_text_never_reaches_the_event_log_or_the_job_queue(db: PgPool
         assert!(!text.contains("Weekly"), "{text}");
     }
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_table_block_shows_a_table_the_writer_can_read_and_nothing_else(db: PgPool) {
+    let Fixture {
+        kit,
+        workspace,
+        ana,
+        rui,
+        page,
+    } = fixture(db).await;
+    let shared = kit.table(&ana, workspace).await;
+    let table = shared["page"]["id"].as_str().unwrap().to_owned();
+    let view = shared["views"][0]["id"].as_str().unwrap().to_owned();
+    // A private table of Ana's that Rui cannot see, and an ordinary page.
+    let secret = kit
+        .post(
+            &ana,
+            &Kit::tables(workspace),
+            Some(json!({"title": "Private", "place": "private"})),
+        )
+        .await
+        .json;
+    let secret_table = secret["page"]["id"].as_str().unwrap().to_owned();
+    let secret_view = secret["views"][0]["id"].as_str().unwrap().to_owned();
+
+    let block = |seed: u64, table: &str, view: &str| {
+        element(
+            &docs::client(seed),
+            "tableView",
+            &[("table", s(table)), ("view", s(view))],
+            None,
+        )
+    };
+    let shown = kit
+        .sync(
+            &rui,
+            workspace,
+            &page,
+            &docs::client(1),
+            Some(&block(31, &table, &view)),
+        )
+        .await;
+    assert_eq!(shown.status, StatusCode::OK, "{:?}", shown.json);
+    // The page records the table as embedded.
+    let embedded: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM pages.links WHERE page_id = $1 AND ref_id = $2 AND kind = 'embed'",
+    )
+    .bind(uuid(&page))
+    .bind(&table)
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(embedded, 1);
+
+    // Another table's view, an ordinary page and a table Rui cannot read all
+    // get the same answer.
+    let other_view = block(32, &table, &secret_view);
+    let not_a_table = block(33, &page, &view);
+    let hidden = block(34, &secret_table, &secret_view);
+    for (what, update) in [
+        ("a view of another table", other_view),
+        ("a page that is no table", not_a_table),
+        ("a table Rui cannot read", hidden),
+    ] {
+        let refused = kit
+            .sync(&rui, workspace, &page, &docs::client(40), Some(&update))
+            .await;
+        assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{what}");
+        assert_eq!(refused.json["code"], "bad_table_view", "{what}");
+    }
+    // A block with a malformed id is refused as a bad attribute.
+    let malformed = element(
+        &docs::client(35),
+        "tableView",
+        &[("table", s("nope")), ("view", s(&view))],
+        None,
+    );
+    let refused = kit
+        .sync(&rui, workspace, &page, &docs::client(41), Some(&malformed))
+        .await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+}

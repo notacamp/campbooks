@@ -133,8 +133,9 @@ impl Actor {
 pub const FIRST_PARTY_CLIENT_IDS: [&str; 2] = ["campbooks-web", "campbooks-native"];
 
 /// `id`, when it is a client id Campbooks minted and so may be recorded: one
-/// of its own apps ([`FIRST_PARTY_CLIENT_IDS`]), a workspace's app (`cb_`)
-/// or a registered one (`dcr_`), each followed by 16 random bytes in
+/// of its own apps ([`FIRST_PARTY_CLIENT_IDS`]), a workspace's app (`cb_`),
+/// a registered one (`dcr_`) or an instance app (`app_`, registered by an
+/// instance administrator from the server's CLI), each followed by 16 random bytes in
 /// unpadded base64url. `None` for any other: a client known by its metadata
 /// document has a URL for an id, and another identity provider's ids are
 /// its own, so neither goes into a tracked event.
@@ -147,7 +148,8 @@ pub fn minted_client_id(id: &str) -> Option<&str> {
                     .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
         })
     };
-    (FIRST_PARTY_CLIENT_IDS.contains(&id) || random("cb_") || random("dcr_")).then_some(id)
+    (FIRST_PARTY_CLIENT_IDS.contains(&id) || random("cb_") || random("dcr_") || random("app_"))
+        .then_some(id)
 }
 
 /// What caused a job's events: the job, or the event a delivery delivers.

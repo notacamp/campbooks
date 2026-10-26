@@ -7,6 +7,7 @@ import {
   Button,
   EmptyState,
   Heading,
+  IconButton,
   ListPane,
   PageTree,
   PageTreeGroup,
@@ -18,7 +19,7 @@ import {
 } from "~/lib/ui";
 import { useMembers } from "~/modules/workspaces";
 
-import { usePages } from "../api/queries";
+import { usePages, useTablesAvailable } from "../api/queries";
 import {
   buildSections,
   byPosition,
@@ -28,8 +29,11 @@ import {
   zoneOf,
   type TreeNode,
 } from "../model";
-import { iconOf, type PagePlace, type PageSummary } from "../types";
+import { treeIcon, type PagePlace, type PageSummary } from "../types";
 
+import type { UseNotionSource } from "../notion-source";
+
+import { ImportFromNotion } from "./ImportFromNotion";
 import { PageScreen } from "./PageScreen";
 import { TrashList } from "./TrashList";
 import { usePageActions } from "./use-page-actions";
@@ -40,6 +44,13 @@ export interface PagesPageProps {
   pageId?: string | undefined;
   /** `?new=1`: make a page and open it (`n g`). */
   creating?: boolean | undefined;
+  /** `?import=notion`: open the import from Notion (Settings → Notion → Import pages). */
+  importing?: boolean | undefined;
+  /** `?view=` and `?row=`: a table page's current view and the row opened beside it. */
+  view?: string | undefined;
+  row?: string | undefined;
+  /** Notion, from the app shell; without it there is no import. */
+  notion?: { useSource: UseNotionSource } | undefined;
 }
 
 type Zone = "before" | "inside" | "after";
@@ -49,15 +60,34 @@ type Zone = "before" | "inside" | "after";
  * open page beside it from `lg`, as its own screen below. Pages are dragged
  * to reorder and nest; every change has an Undo.
  */
-export function PagesPage({ workspaceId, pageId, creating = false }: PagesPageProps) {
+export function PagesPage({
+  workspaceId,
+  pageId,
+  creating = false,
+  importing = false,
+  view,
+  row,
+  notion,
+}: PagesPageProps) {
   const { t } = useTranslation("pages");
   const navigate = useNavigate();
   const pages = usePages(workspaceId);
   const members = useMembers(workspaceId).data ?? [];
   const me = members.find((member) => member.you)?.user_id;
   const actions = usePageActions(workspaceId);
+  const tablesOn = useTablesAvailable(workspaceId);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [showTrash, setShowTrash] = useState(false);
+  const [importOpen, setImportOpen] = useState(importing);
+  // The import opens when the address asks for it (state adjusted while
+  // rendering, guarded by the change).
+  const [wasImporting, setWasImporting] = useState(importing);
+  if (importing !== wasImporting) {
+    setWasImporting(importing);
+    if (importing) {
+      setImportOpen(true);
+    }
+  }
   const [dragging, setDragging] = useState<string | undefined>();
   const [over, setOver] = useState<{ id: string; zone: Zone } | undefined>();
 
@@ -75,6 +105,13 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
         setOpen((current) => new Set([...current, parent]));
       }
       go(made.id);
+    }
+  };
+
+  const makeTable = async (place: PagePlace = "private") => {
+    const made = await actions.createTable({ place });
+    if (made !== undefined) {
+      go(made.page.id);
     }
   };
 
@@ -148,7 +185,7 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
       <PageTreeRow
         key={page.id}
         label={page.title === "" ? t("untitled") : page.title}
-        icon={iconOf(page.icon)}
+        icon={treeIcon(page)}
         depth={depth}
         expanded={expanded}
         current={page.id === pageId}
@@ -162,7 +199,7 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
         onToggle={() => {
           toggle(page.id);
         }}
-        {...(page.role === "reader"
+        {...(page.role === "reader" || page.kind !== "page"
           ? {}
           : {
               onAdd: () => {
@@ -213,6 +250,15 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
           >
             {t("tree.trash")}
           </Button>
+          {tablesOn ? (
+            <IconButton
+              icon="table"
+              label={t("tables.newTable")}
+              onClick={() => {
+                void makeTable();
+              }}
+            />
+          ) : null}
           <Button
             icon="plus"
             shortcut="pages.create"
@@ -281,7 +327,23 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
             >
               {sections.workspace.length === 0 ? undefined : rows(sections.workspace)}
             </PageTreeGroup>
-            <PageTreeGroup name={t("tree.private")} empty={t("tree.privateEmpty")}>
+            <PageTreeGroup
+              name={t("tree.private")}
+              empty={t("tree.privateEmpty")}
+              action={
+                notion === undefined ? undefined : (
+                  <Button
+                    variant="ghost"
+                    icon="plus"
+                    onClick={() => {
+                      setImportOpen(true);
+                    }}
+                  >
+                    {t("notion.import.button")}
+                  </Button>
+                )
+              }
+            >
               {sections.private.length === 0 ? undefined : rows(sections.private)}
             </PageTreeGroup>
             {sections.shared.length === 0 ? null : (
@@ -290,6 +352,25 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
           </PageTree>
         ) : null}
       </ListPane>
+      {notion === undefined ? null : (
+        <ImportFromNotion
+          workspaceId={workspaceId}
+          open={importOpen}
+          useSource={notion.useSource}
+          settingsHref={`/w/${workspaceId}/settings/mailboxes`}
+          onClose={() => {
+            setImportOpen(false);
+            if (importing) {
+              void navigate({ to: base });
+            }
+          }}
+          onImported={(first) => {
+            if (first !== undefined) {
+              go(first);
+            }
+          }}
+        />
+      )}
       <ReaderPane label={t("screen.label")} narrow={pageId === undefined ? "hidden" : "shown"}>
         {pageId === undefined ? (
           <div className="flex flex-col items-center gap-2 p-6">
@@ -303,6 +384,18 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
             pageId={pageId}
             pages={all}
             actions={actions}
+            view={view}
+            row={row}
+            onTable={(change) => {
+              void navigate({
+                to: `${base}/${pageId}`,
+                search: {
+                  ...(change.view === undefined ? {} : { view: change.view }),
+                  ...(change.row === undefined ? {} : { row: change.row }),
+                },
+                replace: true,
+              });
+            }}
             onBack={() => {
               go();
             }}

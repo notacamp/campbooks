@@ -17,7 +17,13 @@ import {
   type MentionKind,
 } from "~/lib/ui";
 
+import { useNotionLink } from "../api/notion";
 import { useRecordLabel, type RecordLabel } from "../api/records";
+import { ConflictBlock } from "../components/ConflictBlock";
+import { InlineTable } from "../tables/components/InlineTable";
+import { KeptInNotion } from "../components/KeptInNotion";
+import { useNotionActions } from "../components/use-notion-actions";
+import { notionUrl } from "../notion";
 import { isMentionType, type MentionType } from "../types";
 
 import { useEditorEnvironment } from "./environment";
@@ -370,5 +376,139 @@ export const Toggle = BlockNode.create({
   },
   addNodeView() {
     return ReactNodeViewRenderer(ToggleView);
+  },
+});
+
+const booleanAttribute = (name: string, fallback: boolean): Attributes[string] => ({
+  default: fallback,
+  parseHTML: (element) => element.getAttribute(`data-${name}`) === "true",
+  renderHTML: (attributes) => ({ [`data-${name}`]: String(attributes[name] === true) }),
+});
+
+function ExternalView({ node }: NodeViewProps) {
+  const environment = useEditorEnvironment();
+  const link = useNotionLink(environment.workspaceId, environment.pageId);
+  return (
+    <NodeViewWrapper>
+      <KeptInNotion
+        kind={text(node.attrs["kind"])}
+        href={link === undefined ? undefined : notionUrl(link.notion_page)}
+      />
+    </NodeViewWrapper>
+  );
+}
+
+/**
+ * A block Pages doesn't have yet (synced blocks, columns, embeds,
+ * databases), kept as Notion has it: shown, never edited from here.
+ */
+export const External = BlockNode.create({
+  name: "external",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: false,
+  addAttributes() {
+    return { kind: stringAttribute("kind", "unsupported") };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="external"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "external" })];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ExternalView);
+  },
+});
+
+function ConflictView({ node, editor }: NodeViewProps) {
+  const environment = useEditorEnvironment();
+  const actions = useNotionActions(environment.workspaceId);
+  const of = text(node.attrs["of"]);
+  return (
+    <NodeViewWrapper data-type="conflict">
+      <ConflictBlock
+        removed={node.attrs["removed"] === true}
+        readOnly={!editor.isEditable}
+        onChoose={(keep) => actions.resolve(environment.pageId, of, keep)}
+      >
+        <NodeViewContent />
+      </ConflictBlock>
+    </NodeViewWrapper>
+  );
+}
+
+/**
+ * Notion's version of a block that changed on both sides, beneath ours (the
+ * server writes it; the member settles it: Keep mine, Use Notion's, Keep
+ * both). Its content is Notion's block, not editable here.
+ */
+export const Conflict = BlockNode.create({
+  name: "conflict",
+  group: "block",
+  content: "block*",
+  isolating: true,
+  selectable: true,
+  draggable: false,
+  addAttributes() {
+    return {
+      of: stringAttribute("of", null),
+      hash: stringAttribute("hash", null),
+      edited: stringAttribute("edited", null),
+      removed: booleanAttribute("removed", false),
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="conflict"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "conflict" }), 0];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ConflictView);
+  },
+});
+
+function TableViewBlockView({ node }: NodeViewProps) {
+  const environment = useEditorEnvironment();
+  return (
+    <NodeViewWrapper contentEditable={false}>
+      <InlineTable
+        workspaceId={environment.workspaceId}
+        tableId={text(node.attrs["table"])}
+        viewId={text(node.attrs["view"])}
+        open={environment.open}
+      />
+    </NodeViewWrapper>
+  );
+}
+
+/**
+ * A table shown in the page: the table and one of its views, by id. The
+ * table's rows are never copied into the page; the viewer reads them with
+ * their own access, and a table they cannot open is "Something you can't open".
+ */
+export const TableViewBlock = BlockNode.create({
+  name: "tableView",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: false,
+  addAttributes() {
+    return { table: stringAttribute("table", null), view: stringAttribute("view", null) };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="table-view"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "table-view" })];
+  },
+  addNodeView() {
+    // The table inside has its own keys: the editor leaves its events alone.
+    return ReactNodeViewRenderer(TableViewBlockView, {
+      stopEvent: () => true,
+      ignoreMutation: () => true,
+    });
   },
 });

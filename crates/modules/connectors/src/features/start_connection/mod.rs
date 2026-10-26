@@ -130,7 +130,8 @@ pub async fn execute(
                 MESSAGES.reason("imap_connects_with_a_password"),
             ));
         }
-        Provider::Imap => false,
+        // Notion has its own consent (`notion_connect`): it is not a way in.
+        Provider::Imap | Provider::Notion => false,
     };
     if !configured || deps.cipher.is_none() {
         return Err(Error::Conflict(MESSAGES.reason("provider_not_configured")));
@@ -159,7 +160,7 @@ pub async fn execute(
             Provider::Google => !google::capability_scopes(capability).is_empty(),
             Provider::Zoho => matches!(capability, Capability::Messages | Capability::Calendar),
             Provider::Microsoft => capability == Capability::Messages,
-            Provider::Imap => false,
+            Provider::Imap | Provider::Notion => false,
         };
         if !offered {
             return Err(Error::BadRequest(

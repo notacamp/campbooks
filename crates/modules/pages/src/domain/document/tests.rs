@@ -231,6 +231,44 @@ fn mentions_and_embeds_name_a_known_kind_of_record_by_a_well_formed_id() {
 }
 
 #[test]
+fn a_table_block_names_a_table_and_a_view_by_id_and_embeds_the_table() {
+    let server = Doc::new();
+    let update = element(
+        &docs::client(12),
+        "tableView",
+        &[("table", s(PAGE)), ("view", s(PAGE))],
+        None,
+    );
+    let seen = accept(&server, &update).unwrap();
+    assert_eq!(
+        seen.table_views.iter().collect::<Vec<_>>(),
+        [&(PAGE.to_owned(), PAGE.to_owned())]
+    );
+    let link = seen.links.iter().next().unwrap();
+    assert_eq!(
+        (link.ref_type.as_str(), link.ref_id.as_str(), link.kind),
+        ("pages.page", PAGE, LinkKind::Embed)
+    );
+    // Not by anything but ids, and with nothing inside.
+    for (key, value) in [("table", "../x"), ("view", "1"), ("rows", PAGE)] {
+        let update = element(
+            &docs::client(13),
+            "tableView",
+            &[("table", s(PAGE)), ("view", s(PAGE)), (key, s(value))],
+            None,
+        );
+        assert!(accept(&Doc::new(), &update).is_err(), "{key}");
+    }
+    let inside = element(
+        &docs::client(14),
+        "tableView",
+        &[("table", s(PAGE)), ("view", s(PAGE))],
+        Some("copied rows"),
+    );
+    assert!(accept(&Doc::new(), &inside).is_err());
+}
+
+#[test]
 fn blocks_only_stand_where_the_schema_lets_them() {
     // Text straight under the document, a list item outside a list, a block
     // inside a paragraph.

@@ -6,8 +6,10 @@ import type { AnyRoute } from "@tanstack/react-router";
 import type { ShortcutDefinition } from "~/lib/shortcuts";
 import { ASSISTANT_SHORTCUTS, buildAssistantRoutes } from "~/modules/assistant";
 import {
+  buildConnectNotionRoute,
   buildConnectorsRoutes,
   CONNECTORS_SHORTCUTS,
+  useNotionSource,
   WorkspaceConnectionsAdmin,
 } from "~/modules/connectors";
 import {
@@ -90,7 +92,13 @@ export function buildModuleRoutes<
     // Signed in or not: signing in, creating an account.
     public: [...identity.public],
     // Pages outside any workspace: status, first run, invitation links.
-    root: [...buildSystemRoutes(root), ...workspaces.root, ...assistant.root],
+    // `/connect/notion` is where Notion's listing sends people (the connectors module's).
+    root: [
+      ...buildSystemRoutes(root),
+      ...workspaces.root,
+      ...assistant.root,
+      ...buildConnectNotionRoute(root),
+    ],
     // A domain module's pages live inside a workspace (`/w/$workspaceId/...`).
     workspace: [
       ...workspaces.workspace,
@@ -110,7 +118,8 @@ export function buildModuleRoutes<
         useConsent: useMailboxConsent,
         useSources: useConversationSources,
       }),
-      ...buildPagesRoutes(workspace),
+      // The import from Notion lists what the connectors module's connection can see.
+      ...buildPagesRoutes(workspace, { useNotionSource }),
       // `cargo xtask new-module` inserts above this line.
     ],
   } as const;

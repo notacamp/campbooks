@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/notion-block-changes.v1.schema.json",
+  "title": "notion-block-changes v1 (blob)",
+  "description": "What the pages module asks the connectors module to write to a Notion page (`application/vnd.campbooks.notion-block-changes+json; version=1`): one item per change, in the order the request lists them (`seq`); an update or an append carries the block to write (its `id` is the block's id in the page), a delete none. The connector writes this document only after the pages module confirmed the request through the kernel's page-requests port.",
+  "type": "object",
+  "required": [
+    "version",
+    "items"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "seq"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "block": {
+            "$ref": "#/$defs/block"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "bold": {
+          "const": true
+        },
+        "italic": {
+          "const": true
+        },
+        "strike": {
+          "const": true
+        },
+        "code": {
+          "const": true
+        },
+        "link": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^(?i:(https?:|mailto:))"
+        },
+        "page": {
+          "$ref": "#/$defs/uuid"
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid",
+          "description": "The block's id at Notion (in a change document: its id in the page)."
+        },
+        "kind": {
+          "enum": [
+            "paragraph",
+            "heading",
+            "bulleted_item",
+            "numbered_item",
+            "todo",
+            "toggle",
+            "quote",
+            "callout",
+            "divider",
+            "code",
+            "image",
+            "file",
+            "page_link",
+            "external"
+          ]
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run"
+          }
+        },
+        "file": {
+          "type": "object",
+          "required": [
+            "blob",
+            "size",
+            "content_type",
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "blob": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "content_type": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        },
+        "page": {
+          "$ref": "#/$defs/uuid",
+          "description": "A sub-page's Notion page."
+        },
+        "label": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]{1,32}$",
+          "description": "An external block's Notion type; nothing of its content."
+        },
+        "edited": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/block"
+          }
+        }
+      }
+    }
+  }
+}

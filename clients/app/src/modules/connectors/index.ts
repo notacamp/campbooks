@@ -14,5 +14,6 @@ export type {
 } from "./consent";
 export { WorkspaceConnectionsAdmin } from "./components/WorkspaceConnectionsAdmin/WorkspaceConnectionsAdmin";
 export { mailboxResult, type MailboxResult } from "./model";
-export { buildConnectorsRoutes } from "./routes";
+export { useNotionSource } from "./notion-source";
+export { buildConnectNotionRoute, buildConnectorsRoutes } from "./routes";
 export { CONNECTORS_SHORTCUTS } from "./shortcuts";

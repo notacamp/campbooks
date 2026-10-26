@@ -28,6 +28,9 @@ pub struct ConnectorsConfig {
     /// Microsoft mail (`CAMPBOOKS_CONNECTORS__MICROSOFT__*`), off by
     /// default.
     pub microsoft: MicrosoftMailConfig,
+    /// Notion pages kept in step with Pages
+    /// (`CAMPBOOKS_CONNECTORS__NOTION__*`), off by default.
+    pub notion: NotionConfig,
     /// Whether Zoho Calendar is offered (`CAMPBOOKS_CONNECTORS__ZOHO_CALENDAR`,
     /// default off): its adapter is unverified against a live Zoho grant.
     pub zoho_calendar: bool,
@@ -239,6 +242,208 @@ impl MicrosoftMailConfig {
     }
 }
 
+/// `CAMPBOOKS_CONNECTORS__NOTION__*`: pages imported from Notion and kept in
+/// step both ways (campbooks-cloud#376). Nothing here is checked while it is
+/// off: a server that does not offer Notion starts whatever these say (an
+/// unknown key or a value of any shape included).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct NotionConfig {
+    /// Offer Notion (default false: `true`, `1`, `yes` or `on` turn it on).
+    /// Also needs the Notion integration (`CAMPBOOKS_NOTION__CLIENT_ID` and a
+    /// secret) and the instance secret key; without them it is not offered,
+    /// with a warning.
+    #[serde(deserialize_with = "any_text")]
+    pub enabled: Option<String>,
+    /// Requests per second each Notion connection may make, shared by every
+    /// process (default 3, Notion's average limit).
+    #[serde(deserialize_with = "any_text")]
+    pub requests_per_second: Option<String>,
+    /// Requests per minute each Notion connection may make, shared by every
+    /// process (default 120).
+    #[serde(deserialize_with = "any_text")]
+    pub requests_per_minute: Option<String>,
+    /// Most blocks read from one page (default 2000).
+    #[serde(deserialize_with = "any_text")]
+    pub max_blocks: Option<String>,
+    /// Deepest blocks nest when a page is read (default 12).
+    #[serde(deserialize_with = "any_text")]
+    pub max_depth: Option<String>,
+    /// How long one run waits for its connection's request budget before it
+    /// gives the page up until later, in seconds (default 300).
+    #[serde(deserialize_with = "any_text")]
+    pub patience_seconds: Option<String>,
+}
+
+/// The Notion adapter's settings, read (defaults for what is unset).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NotionAdapter {
+    pub requests_per_second: u32,
+    pub requests_per_minute: u32,
+    pub max_blocks: u32,
+    pub max_depth: u32,
+    pub patience_seconds: u32,
+}
+
+impl Default for NotionAdapter {
+    fn default() -> Self {
+        Self {
+            requests_per_second: 3,
+            requests_per_minute: 120,
+            max_blocks: 2000,
+            max_depth: 12,
+            patience_seconds: 300,
+        }
+    }
+}
+
+impl NotionConfig {
+    /// Whether Notion is asked for: `true`, `1`, `yes` or `on`, in any case.
+    /// Anything else, a value of any shape included, is off.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.as_deref().is_some_and(|text| {
+            matches!(
+                text.trim().to_ascii_lowercase().as_str(),
+                "true" | "1" | "yes" | "on"
+            )
+        })
+    }
+
+    /// The adapter's settings, each checked: the first one that is not
+    /// usable is an error naming it. Only called while Notion is on
+    /// ([`ConnectorsConfig::check`]); [`adapter`](Self::adapter) reads them
+    /// where they are used.
+    pub fn read_adapter(&self) -> Result<NotionAdapter, String> {
+        let defaults = NotionAdapter::default();
+        let number = |value: Option<&str>, name: &str, low: u32, high: u32, default: u32| {
+            let Some(text) = value.map(str::trim) else {
+                return Ok(default);
+            };
+            text.parse::<u32>()
+                .ok()
+                .filter(|n| (low..=high).contains(n))
+                .ok_or_else(|| {
+                    format!("CAMPBOOKS_CONNECTORS__NOTION__{name} must be {low} to {high}")
+                })
+        };
+        Ok(NotionAdapter {
+            requests_per_second: number(
+                self.requests_per_second.as_deref(),
+                "REQUESTS_PER_SECOND",
+                1,
+                1000,
+                defaults.requests_per_second,
+            )?,
+            requests_per_minute: number(
+                self.requests_per_minute.as_deref(),
+                "REQUESTS_PER_MINUTE",
+                1,
+                100_000,
+                defaults.requests_per_minute,
+            )?,
+            max_blocks: number(
+                self.max_blocks.as_deref(),
+                "MAX_BLOCKS",
+                1,
+                20_000,
+                defaults.max_blocks,
+            )?,
+            max_depth: number(
+                self.max_depth.as_deref(),
+                "MAX_DEPTH",
+                1,
+                32,
+                defaults.max_depth,
+            )?,
+            patience_seconds: number(
+                self.patience_seconds.as_deref(),
+                "PATIENCE_SECONDS",
+                1,
+                3600,
+                defaults.patience_seconds,
+            )?,
+        })
+    }
+
+    /// The adapter's settings as used: what [`read_adapter`](Self::read_adapter)
+    /// reads, or the defaults where a value is unusable (never the case
+    /// while Notion is on: the server would not have started).
+    pub fn adapter(&self) -> NotionAdapter {
+        self.read_adapter().unwrap_or_default()
+    }
+}
+
+/// `CAMPBOOKS_NOTION__*`: the Notion integration this instance is registered
+/// as. Read only while Notion is offered, and tolerantly: every value is
+/// text, whatever its shape.
+#[derive(Debug, Clone, Default)]
+pub struct NotionClientConfig {
+    /// `…__CLIENT_ID`.
+    pub client_id: Option<String>,
+    /// `…__CLIENT_SECRET`, inline; for development.
+    pub client_secret: Option<SecretString>,
+    /// `…__CLIENT_SECRET_FILE`.
+    pub client_secret_file: Option<PathBuf>,
+    /// `…__BASE_URL`: serve every endpoint from this base instead (a local
+    /// fake). Development only.
+    pub base_url: Option<String>,
+    /// `…__REDIRECT_PATH`: where Notion sends members back, registered with
+    /// the integration (default `/auth/callback/notion`).
+    pub redirect_path: Option<String>,
+    /// `…__WEBHOOK_SECRET`, inline; for development: the verification token
+    /// of the Notion webhook subscription.
+    pub webhook_secret: Option<SecretString>,
+    /// `…__WEBHOOK_SECRET_FILE`.
+    pub webhook_secret_file: Option<PathBuf>,
+}
+
+/// The raw shape of [`NotionClientConfig`]: every value as text.
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct RawNotionClient {
+    #[serde(deserialize_with = "any_text")]
+    client_id: Option<String>,
+    #[serde(deserialize_with = "any_text")]
+    client_secret: Option<String>,
+    #[serde(deserialize_with = "any_text")]
+    client_secret_file: Option<String>,
+    #[serde(deserialize_with = "any_text")]
+    base_url: Option<String>,
+    #[serde(deserialize_with = "any_text")]
+    redirect_path: Option<String>,
+    #[serde(deserialize_with = "any_text")]
+    webhook_secret: Option<String>,
+    #[serde(deserialize_with = "any_text")]
+    webhook_secret_file: Option<String>,
+}
+
+impl NotionClientConfig {
+    /// Load the `notion` section of `figment`: an empty setting is no
+    /// setting.
+    pub fn from_figment(figment: &Figment) -> Result<Self, String> {
+        if !figment.contains("notion") {
+            return Ok(Self::default());
+        }
+        let raw: RawNotionClient = figment
+            .extract_inner("notion")
+            .map_err(|e| format!("CAMPBOOKS_NOTION__*: {e}"))?;
+        let text = |value: Option<String>| {
+            value
+                .map(|value| value.trim().to_owned())
+                .filter(|value| !value.is_empty())
+        };
+        Ok(Self {
+            client_id: text(raw.client_id),
+            client_secret: text(raw.client_secret).map(SecretString::from),
+            client_secret_file: text(raw.client_secret_file).map(PathBuf::from),
+            base_url: text(raw.base_url),
+            redirect_path: text(raw.redirect_path),
+            webhook_secret: text(raw.webhook_secret).map(SecretString::from),
+            webhook_secret_file: text(raw.webhook_secret_file).map(PathBuf::from),
+        })
+    }
+}
+
 /// Any value as text, so its shape never stops a server that does not use
 /// it: a scalar as written, anything else as nothing (checked where used).
 fn any_text<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
@@ -395,6 +600,7 @@ impl Default for ConnectorsConfig {
             imap: ImapConfig::default(),
             calendar: CalendarConfig::default(),
             microsoft: MicrosoftMailConfig::default(),
+            notion: NotionConfig::default(),
             zoho_calendar: false,
             failing_after: 5,
             batch_retention_days: 7,
@@ -499,6 +705,10 @@ impl ConnectorsConfig {
         Ok(config)
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one check of every setting, top to bottom"
+    )]
     fn check(&self) -> Result<(), String> {
         if self.gmail.backfill_days == 0 || self.gmail.backfill_days > 3650 {
             return Err("CAMPBOOKS_CONNECTORS__GMAIL__BACKFILL_DAYS must be 1 to 3650".to_owned());
@@ -595,6 +805,7 @@ impl ConnectorsConfig {
             self.check_send()?;
         }
         self.check_microsoft()?;
+        self.check_notion()?;
         if self.failing_after == 0 {
             return Err("CAMPBOOKS_CONNECTORS__FAILING_AFTER must be positive".to_owned());
         }
@@ -623,6 +834,18 @@ impl ConnectorsConfig {
             self.microsoft.read_adapter().map_err(|e| {
                 format!("{e} (or turn CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED off)")
             })?;
+        }
+        Ok(())
+    }
+
+    /// The Notion settings: checked only while Notion is on, so a stray value
+    /// never stops an instance that does not offer it.
+    fn check_notion(&self) -> Result<(), String> {
+        if self.notion.is_enabled() {
+            // Tied to no poll bound: the poll bounds never stop it.
+            self.notion
+                .read_adapter()
+                .map_err(|e| format!("{e} (or turn CAMPBOOKS_CONNECTORS__NOTION__ENABLED off)"))?;
         }
         Ok(())
     }
@@ -785,6 +1008,116 @@ mod tests {
 
     fn figment(value: serde_json::Value) -> Figment {
         Figment::from(Serialized::defaults(value))
+    }
+
+    #[test]
+    fn notion_is_off_by_default_and_never_stops_a_server_that_does_not_offer_it() {
+        let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
+        assert!(!config.notion.is_enabled());
+        assert_eq!(config.notion.adapter(), NotionAdapter::default());
+        // Production's settings: its poll bounds and no Notion variable.
+        let production = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}}
+        })))
+        .unwrap();
+        assert!(!production.notion.is_enabled());
+        // Off: any shape of any setting starts.
+        for stray in [
+            serde_json::json!({"requests_per_second": "lots", "max_blocks": -1}),
+            serde_json::json!({"enabled": false, "max_depth": 0, "patience_seconds": [1]}),
+            serde_json::json!({"enabled": "nope", "unknown_key": {"a": 1}}),
+            serde_json::json!({"enabled": 0, "requests_per_minute": {"a": 1}}),
+        ] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}, "notion": stray}
+            })))
+            .unwrap();
+            assert!(!config.notion.is_enabled());
+        }
+    }
+
+    #[test]
+    fn notion_is_on_for_the_usual_spellings_and_its_settings_are_read() {
+        for spelling in ["true", "TRUE", " 1 ", "yes", "On"] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"notion": {"enabled": spelling}}
+            })))
+            .unwrap();
+            assert!(config.notion.is_enabled(), "{spelling}");
+        }
+        let on = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {
+                "poll": {"min_seconds": 60, "max_seconds": 120},
+                "notion": {"enabled": true, "requests_per_second": "2", "requests_per_minute": 90,
+                           "max_blocks": 500, "max_depth": 6, "patience_seconds": 60}
+            }
+        })))
+        .unwrap();
+        assert_eq!(
+            on.notion.adapter(),
+            NotionAdapter {
+                requests_per_second: 2,
+                requests_per_minute: 90,
+                max_blocks: 500,
+                max_depth: 6,
+                patience_seconds: 60,
+            }
+        );
+    }
+
+    #[test]
+    fn notion_with_a_broken_value_is_refused_naming_it() {
+        for (bad, name) in [
+            (
+                serde_json::json!({"requests_per_second": 0}),
+                "REQUESTS_PER_SECOND",
+            ),
+            (
+                serde_json::json!({"requests_per_second": 5000}),
+                "REQUESTS_PER_SECOND",
+            ),
+            (
+                serde_json::json!({"requests_per_minute": "many"}),
+                "REQUESTS_PER_MINUTE",
+            ),
+            (serde_json::json!({"max_blocks": 0}), "MAX_BLOCKS"),
+            (serde_json::json!({"max_blocks": 100_000}), "MAX_BLOCKS"),
+            (serde_json::json!({"max_depth": 99}), "MAX_DEPTH"),
+            (
+                serde_json::json!({"patience_seconds": 0}),
+                "PATIENCE_SECONDS",
+            ),
+        ] {
+            let mut settings = bad.clone();
+            settings["enabled"] = serde_json::json!(true);
+            let refused = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"notion": settings}
+            })))
+            .unwrap_err();
+            assert!(refused.contains(name), "{bad}: {refused}");
+            assert!(refused.contains("NOTION__ENABLED"), "{refused}");
+        }
+    }
+
+    #[test]
+    fn the_notion_integration_is_read_as_text_whatever_its_shape() {
+        let none = NotionClientConfig::from_figment(&Figment::new()).unwrap();
+        assert!(none.client_id.is_none() && none.client_secret.is_none());
+        let client = NotionClientConfig::from_figment(&figment(serde_json::json!({
+            "notion": {
+                "client_id": "  notion-client  ", "client_secret": "s3cret",
+                "redirect_path": "/auth/callback/notion", "webhook_secret": "w",
+                "client_secret_file": "", "base_url": 7
+            }
+        })))
+        .unwrap();
+        assert_eq!(client.client_id.as_deref(), Some("notion-client"));
+        assert!(client.client_secret.is_some() && client.webhook_secret.is_some());
+        // An empty setting is no setting.
+        assert!(client.client_secret_file.is_none());
+        assert_eq!(client.base_url.as_deref(), Some("7"));
+        // The secret never shows in a debug print.
+        assert!(!format!("{client:?}").contains("s3cret"));
     }
 
     #[test]

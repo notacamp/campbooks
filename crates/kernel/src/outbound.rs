@@ -234,3 +234,127 @@ impl CalendarRequests for NoCalendarRequests {
 
 /// Shared handle to the registered [`CalendarRequests`] port.
 pub type CalendarPort = Arc<dyn CalendarRequests>;
+
+/// What a block change asked for in a page that is kept in step with an
+/// outside page does to the block there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageItemKind {
+    /// Rewrite a block that is there.
+    Update,
+    /// Add a block.
+    Append,
+    /// Remove a block the member deleted here.
+    Delete,
+}
+
+/// One block change of a [`StoredPageChanges`], as the pages module stored it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredPageItem {
+    /// What to do.
+    pub kind: PageItemKind,
+    /// The block's id in the pages module.
+    pub block: Uuid,
+    /// The block's id at the outside page (update, delete).
+    pub external: Option<Uuid>,
+    /// The block or page at the outside account it goes under (append);
+    /// none when it goes under the block of this request `parent_block`
+    /// names, or under the page itself.
+    pub parent: Option<Uuid>,
+    /// The block of this request it goes under, when that one is new too
+    /// (append).
+    pub parent_block: Option<Uuid>,
+    /// The block at the outside page it goes after (append); none: first.
+    pub after: Option<Uuid>,
+    /// The block of this request it goes after, when that one is new too
+    /// (append): its id at the outside page is known once it is made.
+    pub after_block: Option<Uuid>,
+    /// When the block was last edited at the outside page as of the last
+    /// sync: a block edited since is not written (update, delete).
+    pub base_edited_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// A page's block changes as the pages module stored them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredPageChanges {
+    /// The page (an id of the pages module).
+    pub page: Uuid,
+    /// The connection whose grant makes the changes.
+    pub connection: Uuid,
+    /// The page at the outside account.
+    pub external_page: Uuid,
+    /// The changes, in the order they are made.
+    pub items: Vec<StoredPageItem>,
+    /// The document holding what to write, as the pages module wrote it.
+    /// The connector writes this, never a document an event names.
+    pub body: BlobRef,
+}
+
+/// A future returned by [`PageRequests::stored_changes`].
+pub type StoredPageChangesFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Option<StoredPageChanges>, Error>> + Send + 'a>>;
+
+/// A future returned by [`PageRequests::link_standing`].
+pub type LinkStandingFuture<'a> = Pin<Box<dyn Future<Output = Result<bool, Error>> + Send + 'a>>;
+
+/// Answers whether a change to a page kept in step with an outside page, or
+/// the link itself, was really asked for, before the connector acts on it:
+/// the pages module's side of the outbound-requests port. Any transaction
+/// working in a workspace can append that workspace's events, so
+/// `pages.notion_changes_requested` alone proves nothing.
+pub trait PageRequests: std::fmt::Debug + Send + Sync + 'static {
+    /// The changes of request `request` in `workspace`, read in `conn` (a
+    /// transaction working in that workspace): `Some` only while they wait
+    /// for the connector, their stored binding verifies
+    /// ([`state.binding`](crate::binding)), and the page's link to the
+    /// outside page is syncing. `None` otherwise, or when there is no such
+    /// request.
+    fn stored_changes<'a>(
+        &'a self,
+        state: &'a AppState,
+        conn: &'a mut PgConnection,
+        workspace: WorkspaceId,
+        request: Uuid,
+    ) -> StoredPageChangesFuture<'a>;
+
+    /// Whether `page` of `workspace` is linked to `external_page` through
+    /// `connection` and the link is syncing, read in `conn`.
+    fn link_standing<'a>(
+        &'a self,
+        conn: &'a mut PgConnection,
+        workspace: WorkspaceId,
+        page: Uuid,
+        connection: Uuid,
+        external_page: Uuid,
+    ) -> LinkStandingFuture<'a>;
+}
+
+/// The port before a module provides one: no page change was asked for and
+/// no link stands.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoPageRequests;
+
+impl PageRequests for NoPageRequests {
+    fn stored_changes<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _conn: &'a mut PgConnection,
+        _workspace: WorkspaceId,
+        _request: Uuid,
+    ) -> StoredPageChangesFuture<'a> {
+        Box::pin(async { Ok(None) })
+    }
+
+    fn link_standing<'a>(
+        &'a self,
+        _conn: &'a mut PgConnection,
+        _workspace: WorkspaceId,
+        _page: Uuid,
+        _connection: Uuid,
+        _external_page: Uuid,
+    ) -> LinkStandingFuture<'a> {
+        Box::pin(async { Ok(false) })
+    }
+}
+
+/// Shared handle to the registered [`PageRequests`] port.
+pub type PageRequestsPort = Arc<dyn PageRequests>;

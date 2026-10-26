@@ -254,6 +254,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "the page's id (a UUID), never its title or text",
     ),
     (
+        "pages.push_to_notion",
+        "page",
+        "the page's id (a UUID), never its title or text",
+    ),
+    (
         "search.backfill",
         "group_type",
         "a record type's name (`<module>.<record>`), from the code",

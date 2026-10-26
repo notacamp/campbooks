@@ -7,11 +7,20 @@ import {
   RouterProvider,
   useParams,
 } from "@tanstack/react-router";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { W } from "../../../../test/demo/conversations";
-import { HANDBOOK, HOLIDAYS, IDEAS, PAGES, plainDoc, viewOfDoc } from "../../../../test/demo/pages";
+import {
+  HANDBOOK,
+  HOLIDAYS,
+  IDEAS,
+  NOTION_ROADMAP,
+  notionLink,
+  PAGES,
+  plainDoc,
+  viewOfDoc,
+} from "../../../../test/demo/pages";
 import { TEAM } from "../../../../test/demo/tasks";
 import { ANA, DUARTE } from "../../../../test/demo/workspaces";
 import { mockApi, renderWithProviders, type MockHandler } from "../../../../test/render";
@@ -22,7 +31,10 @@ import { PagesPage } from "./PagesPage";
 // The editor needs a real browser; the page around it is what is tested here.
 vi.mock("../editor/PageEditor", () => ({
   PageEditor: ({ editable }: { editable: boolean }) => (
-    <p>{editable ? "editor (editable)" : "editor (read-only)"}</p>
+    <>
+      <p>{editable ? "editor (editable)" : "editor (read-only)"}</p>
+      <div data-type="conflict" />
+    </>
   ),
 }));
 
@@ -166,5 +178,75 @@ describe("a page open beside the tree", () => {
     });
     renderOpen(HANDBOOK.id);
     expect(await screen.findByText("This page isn’t here")).toBeTruthy();
+  });
+});
+
+describe("a page kept in step with Notion", () => {
+  const linked = (over: Parameters<typeof notionLink>[2] = {}) => ({
+    [`GET ${P}/notion/links`]: {
+      body: { links: [notionLink(HANDBOOK.id, NOTION_ROADMAP, over)] },
+    },
+  });
+
+  it("says it is synced, with Open in Notion and Stop syncing", async () => {
+    api(view(), linked());
+    renderOpen(HANDBOOK.id);
+    expect(await screen.findByText(/^Synced with Notion · /u)).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open in Notion" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Stop syncing" })).toBeVisible();
+    expect(screen.queryByText(/changes? to look at/u)).toBeNull();
+  });
+
+  it("says nothing of Notion for a page that is not linked", async () => {
+    api(view());
+    renderOpen(HANDBOOK.id);
+    await screen.findByRole("textbox", { name: "Page title" });
+    expect(screen.queryByText(/Notion/u)).toBeNull();
+  });
+
+  it("jumps to the first change that waits for a choice", async () => {
+    api(view(), linked({ conflicts: 1 }));
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    renderOpen(HANDBOOK.id);
+    fireEvent.click(await screen.findByRole("button", { name: "1 change to look at" }));
+    expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+  });
+
+  it("stops syncing after asking, and says so", async () => {
+    const mocked = api(view(), {
+      ...linked(),
+      [`POST ${P}/${HANDBOOK.id}/notion/stop`]: {
+        body: notionLink(HANDBOOK.id, NOTION_ROADMAP, {
+          state: "stopped",
+          stopped_reason: "stopped_by_member",
+        }),
+      },
+    });
+    renderOpen(HANDBOOK.id);
+    fireEvent.click(await screen.findByRole("button", { name: "Stop syncing" }));
+    const group = await screen.findByRole("group", { name: /Stop keeping this page/u });
+    fireEvent.click(within(group).getByRole("button", { name: "Stop syncing" }));
+    await waitFor(() => {
+      expect(
+        mocked.calls.some((call) => call.route === `POST ${P}/${HANDBOOK.id}/notion/stop`),
+      ).toBe(true);
+    });
+    expect(await screen.findByText("Stopped syncing with Notion")).toBeVisible();
+  });
+
+  it("says when stopping did not work", async () => {
+    api(view(), {
+      ...linked(),
+      [`POST ${P}/${HANDBOOK.id}/notion/stop`]: {
+        status: 409,
+        body: { status: 409, code: "not_syncing", title: "x" },
+      },
+    });
+    renderOpen(HANDBOOK.id);
+    fireEvent.click(await screen.findByRole("button", { name: "Stop syncing" }));
+    const group = await screen.findByRole("group", { name: /Stop keeping this page/u });
+    fireEvent.click(within(group).getByRole("button", { name: "Stop syncing" }));
+    expect(await screen.findByText("Couldn’t stop syncing. Nothing was changed.")).toBeVisible();
   });
 });

@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 
 import { useWorkspaces } from "~/modules/workspaces";
 
+import { ConnectNotion } from "./components/ConnectNotion/ConnectNotion";
 import { MailboxesPage } from "./components/MailboxesPage/MailboxesPage";
 import type { UseMailboxConsent } from "./consent";
 import { mailboxResult } from "./model";
@@ -66,7 +67,19 @@ export function buildConnectorsRoutes<TParent extends AnyRoute>(
     const workspace = workspaces.data?.find((candidate) => candidate.id === workspaceId);
     // The workspace layout only renders its pages for a workspace in the list.
     return workspace === undefined ? null : (
-      <MailboxesPage workspace={workspace} consent={consent} result={result} adding={adding} />
+      <MailboxesPage
+        workspace={workspace}
+        consent={consent}
+        result={result}
+        adding={adding}
+        onImport={() => {
+          void navigate({
+            to: "/w/$workspaceId/pages",
+            params: { workspaceId: workspace.id },
+            search: { import: "notion" },
+          });
+        }}
+      />
     );
   }
 
@@ -77,4 +90,29 @@ export function buildConnectorsRoutes<TParent extends AnyRoute>(
     component: MailboxesRoute,
   });
   return [mailboxes] as const;
+}
+
+/**
+ * `/connect/notion`, outside any workspace (the listing's installation
+ * address): the session gate signs a signed-out browser in and brings it back
+ * here; the page then starts the connect flow.
+ */
+export function buildConnectNotionRoute<TParent extends AnyRoute>(parent: TParent) {
+  function ConnectNotionRoute() {
+    const navigate = useNavigate();
+    return (
+      <ConnectNotion
+        onBack={() => {
+          void navigate({ to: "/" });
+        }}
+      />
+    );
+  }
+  return [
+    createRoute({
+      getParentRoute: () => parent,
+      path: "/connect/notion",
+      component: ConnectNotionRoute,
+    }),
+  ] as const;
 }

@@ -205,6 +205,43 @@ export const TEAM_APP_CONSENT: Schema<"ConsentRequest"> = {
   remembered: true,
 };
 
+/**
+ * An instance app (registered by this server's administrator from its CLI):
+ * Applicamp, signing Ana in on an https callback.
+ */
+export const INSTANCE_APP_CONSENT: Schema<"ConsentRequest"> = {
+  client: {
+    id: "app_Z3k8rT1qLm0vXc5bN2yW4a",
+    name: "Applicamp",
+    kind: "instance",
+    verified: false,
+    workspace_name: null,
+    logo_uri: null,
+    redirect_host: "applicamp.example.com",
+    document_host: null,
+    device: false,
+  },
+  scopes: [
+    { name: "openid", description: "Know who you are on Campbooks." },
+    { name: "profile", description: "See your name." },
+    { name: "email", description: "See your email address." },
+    {
+      name: "offline_access",
+      description: "Keep access when you are not using it, until you revoke it.",
+    },
+    { name: "conversations:read", description: "Read your conversations." },
+    { name: "schedule:read", description: "See your calendars." },
+  ],
+  binds_workspace: true,
+  workspaces: [
+    { id: "0192f1a0-0000-7000-8000-000000000001", name: "Duarte & Pessoa", role: "owner" },
+    { id: "0192f1a0-0000-7000-8000-000000000002", name: "Household", role: "member" },
+  ],
+  account_name: "Ana Duarte",
+  account_email: "ana@example.com",
+  remembered: true,
+};
+
 /** Ana's connected apps: an agent in Duarte & Pessoa, and the desktop app. */
 export const CONNECTED_APPS: Schema<"ConnectedApp">[] = [
   {
@@ -275,4 +312,16 @@ export const SIGN_UP_PASSKEY: Schema<"PasskeyView"> = {
   created_at: "2026-10-12T10:00:00Z",
   last_used_at: "2026-10-13T08:30:00Z",
   signed_up_with: true,
+};
+
+/** Ana's Notion, connected for Acme's pages (Notion gives no address; the connection is named for its workspace). */
+export const NOTION_CONNECTION: Schema<"ConnectionView"> = {
+  ...CONNECTION,
+  id: "0192f1a0-0000-7000-8000-0000000000c9",
+  provider: "notion",
+  address: "",
+  address_verified: false,
+  display_name: "Acme",
+  capabilities: ["pages"],
+  offers: [],
 };

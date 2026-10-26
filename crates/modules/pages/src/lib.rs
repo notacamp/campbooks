@@ -28,13 +28,16 @@ pub mod config;
 pub mod domain;
 pub mod events;
 mod features;
+pub mod properties;
 pub mod scopes;
 /// The module's tracked events, generated from the tracking plan (ADR 0020).
 #[path = "tracking.gen.rs"]
 pub mod tracking;
 
 pub use config::Deps;
-pub use domain::{resources::visibility, search::source as search_source};
+pub use domain::{
+    notion::requests::page_requests, resources::visibility, search::source as search_source,
+};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "pages";
@@ -48,8 +51,17 @@ pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 pub fn module(deps: Deps) -> Module {
     let mut background = Background::new()
         .publishes::<events::PageChanged>()
+        .publishes::<events::TableChanged>()
+        .publishes::<events::NotionLinkRequested>()
+        .publishes::<events::NotionLinkEnded>()
+        .publishes::<events::NotionChangesRequested>()
         .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
         .on_event::<features::forget_member::ForgetMember>()
+        .on_event::<features::apply_notion_snapshot::ApplyNotionSnapshot>()
+        .on_event::<features::complete_notion_changes::CompleteNotionChanges>()
+        .on_event::<features::stop_notion_link::StopNotionLink>()
+        .on_event::<features::stop_notion_links_of_connection::StopNotionLinksOfConnection>()
+        .job::<features::push_to_notion::PushToNotion>()
         .job::<features::purge_workspace::PurgeWorkspace>()
         .job::<features::compact::Compact>()
         .job::<features::purge_trash::PurgeTrash>();
@@ -60,9 +72,12 @@ pub fn module(deps: Deps) -> Module {
     Module {
         name: NAME,
         scopes: scopes::ALL,
-        router: router().layer(middleware::from_fn(
-            move |request: Request, next: Next| async move {
+        router: router(deps).layer(middleware::from_fn(
+            move |mut request: Request, next: Next| async move {
                 if deps.enabled {
+                    request
+                        .extensions_mut()
+                        .insert(config::TablesOn(deps.tables));
                     next.run(request).await
                 } else {
                     Error::NotFound.into_response()
@@ -76,17 +91,48 @@ pub fn module(deps: Deps) -> Module {
 }
 
 /// Every route of the module, one per feature.
-fn router() -> OpenApiRouter<AppState> {
+fn router(deps: Deps) -> OpenApiRouter<AppState> {
     use features::{
-        backlinks, create, file, get, list, move_page, share, sync, trash, update, upload,
+        add_property, add_row, backlinks, create, create_table, create_view, file, get, get_table,
+        import_from_notion, list, list_notion_links, move_page, query_table, remove_property,
+        remove_view, resolve_conflict, restore_property, set_cells, set_options, share, stop_sync,
+        sync, trash, undo_resolve_conflict, update, update_property, update_view, upload,
     };
     // A file is up to 20 MiB; everything else is small.
     let uploads = OpenApiRouter::new()
         .routes(routes!(upload::handler))
         .layer(DefaultBodyLimit::max(upload::MAX_FILE_BYTES));
+    // Tables are a switch of their own: off, these routes are not there.
+    let tables = OpenApiRouter::new()
+        .routes(routes!(create_table::handler))
+        .routes(routes!(get_table::handler))
+        .routes(routes!(add_property::handler))
+        .routes(routes!(update_property::handler, remove_property::handler))
+        .routes(routes!(restore_property::handler))
+        .routes(routes!(set_options::handler))
+        .routes(routes!(add_row::handler))
+        .routes(routes!(set_cells::handler))
+        .routes(routes!(query_table::handler))
+        .routes(routes!(create_view::handler))
+        .routes(routes!(update_view::handler, remove_view::handler))
+        .layer(middleware::from_fn(
+            move |request: Request, next: Next| async move {
+                if deps.tables {
+                    next.run(request).await
+                } else {
+                    Error::NotFound.into_response()
+                }
+            },
+        ));
     OpenApiRouter::new()
+        .merge(tables)
         .routes(routes!(list::handler, create::handler))
         .routes(routes!(backlinks::handler))
+        .routes(routes!(import_from_notion::handler))
+        .routes(routes!(list_notion_links::handler))
+        .routes(routes!(resolve_conflict::handler))
+        .routes(routes!(undo_resolve_conflict::handler))
+        .routes(routes!(stop_sync::handler))
         .routes(routes!(get::handler, update::handler, trash::purge))
         .routes(routes!(move_page::handler))
         .routes(routes!(sync::handler))
@@ -101,6 +147,8 @@ fn router() -> OpenApiRouter<AppState> {
 mod access_tests;
 #[cfg(test)]
 mod testkit;
+#[cfg(test)]
+mod testkit_notion;
 #[cfg(test)]
 mod tracking_tests;
 
@@ -141,7 +189,10 @@ mod tests {
 
     #[test]
     fn off_it_schedules_nothing() {
-        let off = Deps { enabled: false };
+        let off = Deps {
+            enabled: false,
+            tables: false,
+        };
         let registry = campbooks_kernel::jobs::Registry::build(&[module(off)]).unwrap();
         assert!(
             !registry

@@ -2526,7 +2526,8 @@
           "messages",
           "calendar",
           "files",
-          "bank"
+          "bank",
+          "pages"
         ]
       },
       "CodeState": {
@@ -3044,7 +3045,8 @@
           "google",
           "zoho",
           "imap",
-          "microsoft"
+          "microsoft",
+          "notion"
         ]
       },
       "QueueSummary": {

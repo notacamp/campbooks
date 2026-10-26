@@ -31,6 +31,7 @@
 //! shortest interval.
 
 mod calendar;
+mod notion;
 
 use campbooks_kernel::{
     JobContext, JobError,
@@ -145,12 +146,17 @@ impl JobHandler for SyncStream {
         if is_calendar(ctx, workspace, target.stream).await? {
             return self.run_calendar(ctx, workspace, &target, now).await;
         }
+        if target.provider == Provider::Notion {
+            return self.run_notion(ctx, workspace, &target, now).await;
+        }
         let configured = match target.provider {
             Provider::Google => self.deps.google.is_some(),
             Provider::Zoho => self.deps.zoho.is_some(),
             Provider::Imap if self.deps.imap.config.enabled && self.deps.cipher.is_some() => true,
             Provider::Imap => return self.idle_imap(ctx, workspace, &target, now).await,
             Provider::Microsoft => self.deps.microsoft.is_some(),
+            // Run above, before this.
+            Provider::Notion => false,
         };
         let (true, Some(inbox)) = (configured, target.inbox) else {
             // The provider is no longer configured (or the stream has no
@@ -235,7 +241,7 @@ impl JobHandler for SyncStream {
                 self.run_microsoft(ctx, workspace, &target, &token, &backlog, now)
                     .await
             }
-            Provider::Imap => Ok(None),
+            Provider::Imap | Provider::Notion => Ok(None),
         }
         .inspect_err(|_| metrics::sync_finished(target.provider, SyncOutcome::Failed))?;
         // Without a page the run waits or has recorded its trouble, and
@@ -336,7 +342,7 @@ impl SyncStream {
                 ),
                 // IMAP and Microsoft have no label cache (their stream
                 // folders are in the cursor), and create no mark.
-                Provider::Imap | Provider::Microsoft => continue,
+                Provider::Imap | Provider::Microsoft | Provider::Notion => continue,
             };
             insert
                 .bind(workspace)
@@ -1980,7 +1986,7 @@ async fn label_rows(
               WHERE stream_id = $1 AND kind = 'user'"
         }
         Provider::Zoho => "SELECT label_id, name FROM connectors.zoho_labels WHERE stream_id = $1",
-        Provider::Imap | Provider::Microsoft => return Ok(Vec::new()),
+        Provider::Imap | Provider::Microsoft | Provider::Notion => return Ok(Vec::new()),
     };
     let mut tx = ctx.pool().begin_for(workspace).await?;
     let rows: Vec<(String, String)> = sqlx::query_as(query)
@@ -2292,5 +2298,7 @@ mod imap_write_tests;
 mod microsoft_tests;
 #[cfg(test)]
 mod microsoft_write_tests;
+#[cfg(test)]
+mod notion_tests;
 #[cfg(test)]
 mod tests;

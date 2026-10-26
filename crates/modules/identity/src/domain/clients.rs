@@ -7,13 +7,16 @@
 //!   `campbooks-native` the desktop and mobile apps (a public client that
 //!   always shows the consent screen, RFC 8252 §8.6).
 //! - **Stored** clients (`identity.clients`, slice S4): a workspace's own
-//!   integrations, clients registered dynamically (RFC 7591) and clients
-//!   known by their metadata document. The table is under forced row-level
-//!   security; the authorization server reads it in a transaction that says
-//!   so ([`begin_as_server`]).
+//!   integrations, clients registered dynamically (RFC 7591), clients
+//!   known by their metadata document, and instance apps an instance
+//!   administrator registered from the server's CLI
+//!   ([`instance_apps`](super::instance_apps), campbooks-cloud#369). The
+//!   table is under forced row-level security; the authorization server
+//!   reads it in a transaction that says so ([`begin_as_server`]).
 //!
 //! Redirect URIs match exactly, except that a loopback redirect
-//! (`127.0.0.1`, `[::1]`, `localhost`) matches on any port (RFC 8252 §7.3).
+//! (`127.0.0.1`, `[::1]`, `localhost`) matches on any port (RFC 8252 §7.3)
+//! for every client but an instance app, whose match is always exact.
 
 use aws_lc_rs::constant_time;
 use campbooks_kernel::{
@@ -60,6 +63,9 @@ pub enum Kind {
     Dynamic,
     /// Known by its Client ID Metadata Document.
     MetadataDocument,
+    /// Registered by an instance administrator from the server's CLI: a
+    /// confidential sign-in client of the whole instance.
+    Instance,
 }
 
 impl Kind {
@@ -70,6 +76,7 @@ impl Kind {
             Self::Workspace => "workspace",
             Self::Dynamic => "dynamic",
             Self::MetadataDocument => "metadata_document",
+            Self::Instance => "instance",
         }
     }
 
@@ -78,6 +85,7 @@ impl Kind {
             "workspace" => Some(Self::Workspace),
             "dynamic" => Some(Self::Dynamic),
             "metadata_document" => Some(Self::MetadataDocument),
+            "instance" => Some(Self::Instance),
             _ => None,
         }
     }
@@ -88,7 +96,8 @@ pub enum Authentication {
     /// `client_secret_basic` or `client_secret_post`, a secret we can read
     /// (the web client's, derived from the instance secret).
     Secret(SecretString),
-    /// The same, against the SHA-256 we keep (a workspace client).
+    /// The same, against the SHA-256 we keep (a workspace client, an
+    /// instance app).
     Hashed(Vec<u8>),
     /// A public client: PKCE only.
     None,
@@ -113,7 +122,8 @@ pub struct Client {
     /// Grant types it may use.
     pub grant_types: Vec<String>,
     /// The API scopes it may ask for; `None` for first-party clients (every
-    /// scope of the catalogue).
+    /// scope of the catalogue). An instance app's is its whole ceiling, the
+    /// OIDC scopes included.
     pub allowed_scopes: Option<Vec<String>>,
     /// Where it may send the browser after logout.
     pub post_logout_redirect_uris: Vec<String>,
@@ -138,6 +148,9 @@ impl Client {
     pub fn accepts_redirect(&self, uri: &str) -> bool {
         if self.redirect_uris.iter().any(|allowed| allowed == uri) {
             return true;
+        }
+        if self.kind == Kind::Instance {
+            return false;
         }
         let Some(asked) = Loopback::parse(uri) else {
             return false;
@@ -195,8 +208,18 @@ impl Client {
 
     /// Whether it may ask for `scope`: the OIDC scopes; for Campbooks' own,
     /// every scope of `catalogue`; for anyone else, the ones it registered,
-    /// never an `identity:*` scope.
+    /// never an `identity:*` scope. An instance app may ask only for its
+    /// ceiling, the OIDC scopes included.
     pub fn may_ask_for(&self, scope: &str, catalogue: &[ScopeInfo]) -> bool {
+        if self.kind == Kind::Instance {
+            let in_ceiling = self
+                .allowed_scopes
+                .as_ref()
+                .is_some_and(|ceiling| ceiling.iter().any(|s| s == scope));
+            return in_ceiling
+                && (OIDC_SCOPES.contains(&scope)
+                    || (catalogue.iter().any(|s| s.name == scope) && third_party_may_hold(scope)));
+        }
         if OIDC_SCOPES.contains(&scope) {
             return true;
         }
@@ -278,6 +301,12 @@ impl Loopback {
             query: url.query().map(ToOwned::to_owned),
         })
     }
+}
+
+/// Whether `uri` is a loopback `http` redirect (`127.0.0.1`, `[::1]`,
+/// `localhost`), with no fragment or userinfo.
+pub fn is_loopback_redirect(uri: &str) -> bool {
+    Loopback::parse(uri).is_some()
 }
 
 /// Whether `uri` is a loopback redirect (`http://127.0.0.1…`, `[::1]`,
@@ -386,7 +415,7 @@ impl Clients {
         self.documents
     }
 
-    /// The first-party client `id` (RP-initiated logout serves only these).
+    /// The first-party client `id`.
     pub fn first_party_client(&self, id: &str) -> Option<&Client> {
         self.first_party.iter().find(|client| client.id == id)
     }
@@ -406,7 +435,7 @@ impl Clients {
         Ok(client.filter(|c| match c.kind {
             Kind::Dynamic => self.dynamic,
             Kind::MetadataDocument => self.documents,
-            Kind::FirstParty | Kind::Workspace => true,
+            Kind::FirstParty | Kind::Workspace | Kind::Instance => true,
         }))
     }
 }
@@ -457,7 +486,7 @@ pub async fn as_server(conn: &mut PgConnection) -> Result<()> {
 pub struct Row {
     /// `client_id`.
     pub client_id: String,
-    /// `workspace`, `dynamic` or `metadata_document`.
+    /// `workspace`, `dynamic`, `metadata_document` or `instance`.
     pub kind: String,
     /// A workspace client's workspace.
     pub workspace_id: Option<Uuid>,
@@ -481,12 +510,14 @@ pub struct Row {
     pub last_used_at: Option<DateTime<Utc>>,
     /// A metadata document's cache expiry.
     pub metadata_expires_at: Option<DateTime<Utc>>,
+    /// Where an instance app may send the browser after logout.
+    pub post_logout_redirect_uris: Vec<String>,
 }
 
 /// The columns of [`Row`].
 pub const COLUMNS: &str = "client_id, kind, workspace_id, name, logo_uri, redirect_uris, \
      grant_types, secret_hash, allowed_scopes, created_at, secret_rotated_at, last_used_at, \
-     metadata_expires_at";
+     metadata_expires_at, post_logout_redirect_uris";
 
 impl Row {
     /// The client this row describes; `None` for a kind this build does not
@@ -506,7 +537,11 @@ impl Row {
             redirect_uris: self.redirect_uris,
             grant_types: self.grant_types,
             allowed_scopes: Some(self.allowed_scopes),
-            post_logout_redirect_uris: Vec::new(),
+            post_logout_redirect_uris: if kind == Kind::Instance {
+                self.post_logout_redirect_uris
+            } else {
+                Vec::new()
+            },
             refresh_idle: THIRD_PARTY_REFRESH.0,
             refresh_absolute: THIRD_PARTY_REFRESH.1,
         })
@@ -704,6 +739,59 @@ mod tests {
         let mut agent = public(&[]);
         agent.allowed_scopes = Some(vec!["admin:access".to_owned()]);
         assert!(!agent.may_ask_for("admin:access", &catalogue));
+    }
+
+    #[test]
+    fn an_instance_app_matches_exactly_and_asks_within_its_ceiling() {
+        let catalogue = [
+            ScopeInfo {
+                name: "conversations:read",
+                description: "",
+            },
+            ScopeInfo {
+                name: "system:read",
+                description: "",
+            },
+            ScopeInfo {
+                name: "identity:read",
+                description: "",
+            },
+        ];
+        let mut app = public(&[
+            "https://applicamp.example.com/auth/callback",
+            "http://127.0.0.1:4000/auth/callback",
+        ]);
+        app.kind = Kind::Instance;
+        app.authentication = Authentication::Hashed(hash("a-secret"));
+        app.allowed_scopes = Some(vec![
+            "openid".to_owned(),
+            "email".to_owned(),
+            "conversations:read".to_owned(),
+            "identity:read".to_owned(),
+        ]);
+        assert!(app.accepts_redirect("https://applicamp.example.com/auth/callback"));
+        assert!(app.accepts_redirect("http://127.0.0.1:4000/auth/callback"));
+        assert!(
+            !app.accepts_redirect("http://127.0.0.1:5000/auth/callback"),
+            "no loopback port leeway for an instance app"
+        );
+        assert!(app.may_ask_for("openid", &catalogue));
+        assert!(app.may_ask_for("conversations:read", &catalogue));
+        assert!(
+            !app.may_ask_for("profile", &catalogue),
+            "not in its ceiling"
+        );
+        assert!(
+            !app.may_ask_for("system:read", &catalogue),
+            "not in its ceiling"
+        );
+        assert!(
+            !app.may_ask_for("identity:read", &catalogue),
+            "never a third party's, ceiling or not"
+        );
+        assert!(app.is_confidential() && app.needs_consent() && app.binds_workspace());
+        assert!(app.authenticates(Some("a-secret")));
+        assert!(!app.authenticates(None));
     }
 
     #[test]

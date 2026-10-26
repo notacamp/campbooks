@@ -146,15 +146,18 @@ pub async fn standing(
     Ok(Some(role_in_chain(&nodes, &grants, caller)))
 }
 
-/// The role `access` holds on every page of the workspace it may see.
+/// The role `access` holds on every page of the workspace it may see. The
+/// rows of tables are left out: they follow their table, can hold no
+/// sub-pages, and there can be 20,000 to a table.
 pub async fn readable(conn: &mut PgConnection, access: &Access) -> Result<HashMap<PageId, Role>> {
     let Some(caller) = Caller::of(access) else {
         return Ok(HashMap::new());
     };
-    let rows: Vec<NodeRow> =
-        sqlx::query_as("SELECT id, parent_id, place, created_by FROM pages.pages")
-            .fetch_all(&mut *conn)
-            .await?;
+    let rows: Vec<NodeRow> = sqlx::query_as(
+        "SELECT id, parent_id, place, created_by FROM pages.pages WHERE kind <> 'row'",
+    )
+    .fetch_all(&mut *conn)
+    .await?;
     let nodes: Vec<Node> = rows.into_iter().map(node_of).collect::<Result<_>>()?;
     let rows: Vec<(PageId, String)> =
         sqlx::query_as("SELECT page_id, role FROM pages.grants WHERE member_id = $1")

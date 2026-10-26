@@ -2,7 +2,12 @@
   "title": "Pages",
   "untitled": "Untitled",
   "shortcuts": {
-    "create": "New page"
+    "create": "New page",
+    "tableNewRow": "New row",
+    "tableOpenRow": "Open the row",
+    "tableEdit": "Edit the cell",
+    "tableMove": "Move between cells",
+    "tableClear": "Clear the cell"
   },
   "tree": {
     "label": "Pages",
@@ -74,7 +79,9 @@
       "reader": "Can read",
       "writer": "Can edit",
       "manager": "Can manage"
-    }
+    },
+    "syncedNote": "Edits here go to Notion through {{name}}’s connection.",
+    "syncedMentions": "Mentions are sent to Notion as a plain “Campbooks link”, never with their subject."
   },
   "trash": {
     "label": "Pages in the trash",
@@ -174,7 +181,9 @@
     "embed": "Embed a record",
     "subpage": "Sub-page",
     "file": "File",
-    "image": "Image"
+    "image": "Image",
+    "table": "Table",
+    "tableLink": "Link to table"
   },
   "upload": {
     "failed": "Couldn’t upload {{name}}."
@@ -199,5 +208,414 @@
     "dining": "Dining",
     "parcel": "Parcel",
     "ticket": "Ticket"
+  },
+  "notion": {
+    "import": {
+      "title": "Import from Notion",
+      "button": "Import from Notion",
+      "connectedAs": "Connected as {{who}}",
+      "lead": "These are the pages you shared with Campbooks in Notion. Sub-pages come along.",
+      "account": "Notion account",
+      "listLabel": "Pages from Notion",
+      "subPages_one": "{{count}} sub-page",
+      "subPages_other": "{{count}} sub-pages",
+      "linked": "Already synced",
+      "info": "Blocks Campbooks doesn’t have yet (synced blocks, columns, embeds, databases) come across as a “Kept in Notion” box: you see them, they stay intact in Notion, and editing them happens there.",
+      "cancel": "Cancel",
+      "submit_one": "Import {{count}} page",
+      "submit_other": "Import {{count}} pages",
+      "submitNone": "Import pages",
+      "truncated": "Notion lists more pages than are shown here. Share fewer pages in Notion to see the rest.",
+      "empty": {
+        "title": "No pages shared yet",
+        "lead": "In Notion, choose “Select pages” for Campbooks, then come back."
+      },
+      "noConnection": {
+        "title": "Connect Notion first",
+        "lead": "Campbooks needs your Notion connection to list your pages.",
+        "settings": "Open Settings"
+      },
+      "errors": {
+        "needs_reauth": {
+          "title": "Notion needs you to connect again",
+          "lead": "Reconnect Notion in Settings, then come back to import."
+        },
+        "rate_limited": {
+          "title": "Notion asked us to slow down",
+          "lead": "Wait a minute, then try again."
+        },
+        "not_connected": {
+          "title": "This Notion connection isn’t yours",
+          "lead": "Only the member who connected Notion can import its pages."
+        },
+        "unavailable": {
+          "title": "Notion couldn’t be reached",
+          "lead": "Nothing was changed. Try again in a moment."
+        }
+      },
+      "retry": "Try again",
+      "tooMany": "Pick at most {{max}} pages at a time.",
+      "failed": "Couldn’t import. Nothing was changed.",
+      "done_one": "Imported {{count}} page from Notion",
+      "done_other": "Imported {{count}} pages from Notion"
+    },
+    "sync": {
+      "label": "Sync with Notion",
+      "badge": "Synced with Notion · {{ago}}",
+      "waiting": "Linked to Notion, waiting for the first sync",
+      "paused": "Sync with Notion is paused",
+      "reason": {
+        "stopped_by_member": "Stopped syncing with Notion",
+        "disconnected": "Not synced: Notion was disconnected",
+        "trashed_here": "Not synced: the page was moved to the trash",
+        "trashed_in_notion": "Not synced: the page is in the trash in Notion",
+        "not_shared": "Not synced: the page isn’t shared with Campbooks in Notion any more",
+        "member_left": "Not synced: the member who connected Notion left",
+        "notion_unavailable": "Not synced: Notion isn’t available on this instance",
+        "other": "Not synced with Notion any more"
+      },
+      "open": "Open in Notion",
+      "stop": "Stop syncing",
+      "stopConfirm": "Stop syncing",
+      "stopCancel": "Keep syncing",
+      "stopQuestion": "Stop keeping this page in step with Notion? The page stays here and the Notion page is left alone. Starting again is an import.",
+      "stopped": "Stopped syncing with Notion",
+      "stopFailed": "Couldn’t stop syncing. Nothing was changed.",
+      "conflicts_one": "{{count}} change to look at",
+      "conflicts_other": "{{count}} changes to look at",
+      "conflictsHint": "Jump to the first one"
+    },
+    "conflict": {
+      "label": "A change from Notion",
+      "changed": "Changed in Notion, while you were editing it here",
+      "removed": "Removed in Notion, while you were editing it here",
+      "removedBody": "Notion no longer has this block. Keep it here, or remove it too.",
+      "theirs": "Notion’s version",
+      "choices": "Choose a version",
+      "mine": "Keep mine",
+      "notion": "Use Notion’s",
+      "both": "Keep both",
+      "footer": "Changes to different paragraphs merge on their own; only the same one needs a choice.",
+      "resolved": {
+        "mine": "Kept your version",
+        "notion": "Using Notion’s version",
+        "both": "Kept both, one under the other"
+      },
+      "done": "{{what}} — it goes to Notion on the next sync.",
+      "failed": "Couldn’t apply that choice. Nothing was changed.",
+      "undoFailed": "Couldn’t undo that choice. Nothing was changed."
+    },
+    "kept": {
+      "title": "Kept in Notion · {{what}}",
+      "body": "Campbooks shows it but doesn’t edit it yet; it stays exactly as it is in Notion.",
+      "edit": "Edit in Notion",
+      "kind": {
+        "column_list": "Columns",
+        "synced_block": "Synced block",
+        "table": "Table",
+        "child_database": "Database",
+        "bookmark": "Bookmark",
+        "embed": "Embed",
+        "link_preview": "Link preview",
+        "equation": "Equation",
+        "video": "Video",
+        "audio": "Audio",
+        "pdf": "PDF",
+        "table_of_contents": "Table of contents",
+        "breadcrumb": "Breadcrumb",
+        "template": "Template button",
+        "unsupported": "Block"
+      }
+    }
+  },
+  "tables": {
+    "newTable": "New table",
+    "error": {
+      "title": "Couldn’t load this table",
+      "rows": "Couldn’t load the rows"
+    },
+    "type": {
+      "title": "Name",
+      "text": "Text",
+      "number": "Number",
+      "select": "Select",
+      "multi_select": "Multi-select",
+      "status": "Status",
+      "date": "Date",
+      "checkbox": "Checkbox",
+      "person": "Person",
+      "files": "Files",
+      "url": "URL",
+      "email": "Email",
+      "phone": "Phone",
+      "relation": "Relation",
+      "campbooks_link": "Campbooks link",
+      "created": "Created",
+      "edited": "Edited",
+      "unique_id": "ID",
+      "notion_formula": "Formula (Notion)",
+      "notion_rollup": "Rollup (Notion)",
+      "notion_people": "People (Notion)",
+      "external": "Kept in Notion"
+    },
+    "typeHint": {
+      "text": "plain words",
+      "number": "plain, %, currency",
+      "select": "one option",
+      "multi_select": "tags",
+      "status": "to do · doing · done",
+      "date": "or a range",
+      "checkbox": "yes or no",
+      "person": "a teammate",
+      "files": "any file",
+      "url": "a web address",
+      "email": "an address",
+      "phone": "a number",
+      "relation": "rows of another table",
+      "campbooks_link": "threads, tasks, events, people",
+      "created": "time or who",
+      "edited": "time or who",
+      "unique_id": "CL-12"
+    },
+    "typeGroup": {
+      "basic": "Basic",
+      "links": "Links",
+      "filled": "Filled in for you"
+    },
+    "column": {
+      "add": "Add a column",
+      "name": "Column name",
+      "namePlaceholder": "Name (optional)",
+      "type": "Column type",
+      "menu": "Options for column {{property}}",
+      "rename": "Rename",
+      "changeType": "Change type",
+      "format": "Format",
+      "includeTime": "Include time",
+      "showsWho": "Show who, not when",
+      "filter": "Filter by this column",
+      "hide": "Hide column",
+      "delete": "Delete column",
+      "resize": "Resize {{property}}",
+      "relatedTable": "Related table",
+      "searchTables": "Search tables",
+      "noTables": "No other table you can open.",
+      "paired": "Show it on the other table too"
+    },
+    "numberFormat": {
+      "number": "Number",
+      "percent": "Percent",
+      "EUR": "Euro (€)",
+      "USD": "US dollar ($)",
+      "GBP": "Pound (£)"
+    },
+    "cell": {
+      "someone": "Someone",
+      "keptInNotion": "Kept in Notion",
+      "empty": "Empty",
+      "edit": "Edit {{property}}"
+    },
+    "rows": {
+      "new": "New row",
+      "empty": "No rows yet. Add one with New row.",
+      "count_one": "{{count}} row",
+      "count_other": "{{count}} rows",
+      "loadMore": "Load more rows ({{shown}} of {{total}})",
+      "loadedOf": "Showing {{shown}} of {{total}} rows"
+    },
+    "row": {
+      "open": "Open {{title}}"
+    },
+    "view": {
+      "label": "Views",
+      "add": "Add a view",
+      "name": "View name",
+      "type": "View type",
+      "table": "Table",
+      "board": "Board",
+      "groupBy": "Group by",
+      "needGroup": "Add a select or status column first.",
+      "create": "Create view",
+      "options": "Options for {{view}}",
+      "rename": "Rename view",
+      "columns": "Columns",
+      "remove": "Delete view",
+      "default": {
+        "table": "Table",
+        "board": "Board"
+      },
+      "more": "More views"
+    },
+    "filter": {
+      "label": "Filter",
+      "mode": "Match",
+      "all": "All",
+      "any": "Any",
+      "add": "Add condition",
+      "apply": "Apply",
+      "clear": "Clear filter",
+      "property": "Property",
+      "operator": "Condition",
+      "value": "Value",
+      "checked": "Checked",
+      "unchecked": "Unchecked",
+      "chooseMember": "Choose a person",
+      "none": "No conditions yet.",
+      "nested": "This filter has groups of conditions. You can clear it here.",
+      "nestedChip": "Filter with groups",
+      "condition": "Condition {{number}}",
+      "remove": "Remove condition {{number}}",
+      "removeChip": "Remove the filter on {{property}}"
+    },
+    "operator": {
+      "is": "is",
+      "is_not": "is not",
+      "is_any_of": "is any of",
+      "contains": "contains",
+      "does_not_contain": "does not contain",
+      "starts_with": "starts with",
+      "ends_with": "ends with",
+      "gt": "is greater than",
+      "gte": "is at least",
+      "lt": "is less than",
+      "lte": "is at most",
+      "before": "is before",
+      "after": "is after",
+      "on_or_before": "is on or before",
+      "on_or_after": "is on or after",
+      "is_empty": "is empty",
+      "is_not_empty": "is not empty"
+    },
+    "sort": {
+      "label": "Sort",
+      "none": "Not sorted.",
+      "add": "Add sort",
+      "direction": "Direction",
+      "asc": "Ascending",
+      "desc": "Descending",
+      "level": "Sort {{number}}",
+      "remove": "Remove sort {{number}}"
+    },
+    "summary": {
+      "menu": "Summary of {{property}}",
+      "none": "None",
+      "count": "Count",
+      "sum": "Sum",
+      "average": "Average",
+      "min": "Min",
+      "max": "Max",
+      "percentChecked": "Checked"
+    },
+    "status": {
+      "todo": "To do",
+      "doing": "In progress",
+      "done": "Done",
+      "default": {
+        "todo": "To do",
+        "doing": "In progress",
+        "done": "Done"
+      }
+    },
+    "colors": {
+      "default": "Default",
+      "gray": "Gray",
+      "brown": "Brown",
+      "orange": "Orange",
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "purple": "Purple",
+      "pink": "Pink",
+      "red": "Red"
+    },
+    "picker": {
+      "searchOptions": "Search options",
+      "noOptions": "No options yet. Type a name to make one.",
+      "createOption": "Create “{{name}}”",
+      "editOption": "Edit option {{name}}",
+      "optionName": "Option name",
+      "optionColor": "Colour",
+      "saveOption": "Save",
+      "deleteOption": "Delete option",
+      "back": "Back",
+      "clear": "Clear",
+      "done": "Done",
+      "people": "People",
+      "searchPeople": "Search people",
+      "noPeople": "No one by that name.",
+      "rows": "Rows",
+      "searchRows": "Search rows",
+      "noRows": "No rows found.",
+      "chosenRow": "A row",
+      "links": "Records",
+      "searchLinks": "Search conversations, tasks, events, people and pages",
+      "noLinks": "Nothing found.",
+      "loading": "Searching…"
+    },
+    "date": {
+      "start": "Date",
+      "startTime": "Time",
+      "end": "End date",
+      "endTime": "End time",
+      "range": "Add an end date"
+    },
+    "files": {
+      "list": "Files",
+      "add": "Add a file",
+      "choose": "Choose a file",
+      "uploading": "Uploading…",
+      "failed": "Couldn’t upload that file.",
+      "remove": "Remove {{name}}",
+      "removeShort": "Remove"
+    },
+    "board": {
+      "noGroupTitle": "Choose what the board groups by",
+      "noGroupBody": "A board needs a select or status column. Add one first.",
+      "pickGroupBody": "Pick the column whose options become the board’s columns.",
+      "pickGroup": "Choose a column",
+      "none": "No {{property}}",
+      "moveTo": "Move to",
+      "moveCard": "Move {{title}} to",
+      "addCard": "Add a row to {{group}}"
+    },
+    "peek": {
+      "label": "Row",
+      "crumb": "{{table}} · row",
+      "title": "Row title",
+      "openAsPage": "Open as page",
+      "close": "Close",
+      "trash": "Move to trash"
+    },
+    "toast": {
+      "cell": "{{property}} changed",
+      "cellStale": "Someone else changed {{property}} too: yours is kept",
+      "cellFailed": "Couldn’t change {{property}}. Nothing was changed.",
+      "title": "Title changed",
+      "titleFailed": "Couldn’t change the title. Nothing was changed.",
+      "row": "Row added",
+      "rowFailed": "Couldn’t add the row. Nothing was saved.",
+      "rowUndoFailed": "Couldn’t take that back. Nothing was changed.",
+      "trashed": "Row moved to the trash",
+      "trashFailed": "Couldn’t move that to the trash. Nothing was changed.",
+      "restoreFailed": "Couldn’t restore that. Nothing was changed.",
+      "column": "Column {{property}} added",
+      "columnFailed": "Couldn’t change the column. Nothing was changed.",
+      "columnUndoFailed": "Couldn’t take that back. Nothing was changed.",
+      "columnRenamed": "Column renamed to {{property}}",
+      "columnType": "Type of {{property}} changed",
+      "columnChanged": "{{property}} changed",
+      "columnRemoved": "Column {{property}} deleted",
+      "options": "Options of {{property}} changed",
+      "optionsFailed": "Couldn’t change the options. Nothing was changed.",
+      "view": "{{view}} changed",
+      "viewAdded": "View {{view}} added",
+      "viewRemoved": "View {{view}} deleted",
+      "viewFailed": "Couldn’t change the view. Nothing was changed.",
+      "tableCreated": "Table created",
+      "tableFailed": "Couldn’t create the table. Nothing was saved.",
+      "createFailed": "Couldn’t create the table. Nothing was saved.",
+      "inlineCreated": "Table added to the page",
+      "linkFailed": "Couldn’t link that table. Nothing was changed."
+    }
   }
 }

@@ -374,6 +374,133 @@
       }
     },
     {
+      "name": "connectors.notion_changes_completed",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A request of block changes ended\n(`contracts/connectors.notion_changes_completed.v1.schema.json`): every\nitem of the pages module's request has an end.",
+        "required": [
+          "workspace",
+          "request",
+          "page",
+          "results"
+        ],
+        "properties": {
+          "page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The page (an id of the pages module)."
+          },
+          "request": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The request (an id of the pages module)."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotionItemResult"
+            },
+            "description": "How each item ended, in the request's order."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "connectors.notion_link_stopped",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A Notion page is no longer read\n(`contracts/connectors.notion_link_stopped.v1.schema.json`): its stream\nis gone and the pages module ends the link. Nothing is deleted at Notion.",
+        "required": [
+          "workspace",
+          "connection",
+          "notion_page",
+          "page",
+          "reason"
+        ],
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The Notion connection."
+          },
+          "notion_page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion page."
+          },
+          "page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The pages module's page it was linked to."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NotionStop",
+            "description": "Why."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "connectors.notion_page_read",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A Notion page's blocks were read\n(`contracts/connectors.notion_page_read.v1.schema.json`): the snapshot\nthe pages module applies to the page linked to it. Published in the\ntransaction that advances the stream's cursor.",
+        "required": [
+          "workspace",
+          "connection",
+          "notion_page",
+          "page",
+          "snapshot",
+          "read_at"
+        ],
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The Notion connection."
+          },
+          "notion_page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion page."
+          },
+          "page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The pages module's page it is linked to."
+          },
+          "read_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was read: a later read of the page has a later time."
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/BlobRef",
+            "description": "The `notion-page-snapshot` v1 document, a blob of the workspace."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "connectors.send_completed",
       "module": "connectors",
       "version": 1,
@@ -1371,6 +1498,125 @@
       }
     },
     {
+      "name": "pages.notion_changes_requested",
+      "module": "pages",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "`pages.notion_changes_requested` v1\n(`contracts/pages.notion_changes_requested.v1.schema.json`): block\nchanges a member's edits asked for, to be made at Notion. Ids and a blob\nreference only: what to write is in the blob, which this module stored\nand which the connectors module reads through the page-requests port,\nnever from the event.",
+        "required": [
+          "workspace",
+          "request",
+          "page",
+          "connection",
+          "notion_page",
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "$ref": "#/components/schemas/BlobRef",
+            "description": "The `notion-block-changes` v1 document, a blob of the workspace."
+          },
+          "connection": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion connection whose grant makes the changes."
+          },
+          "notion_page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion page."
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The page."
+          },
+          "request": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The request."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "pages.notion_link_ended",
+      "module": "pages",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "`pages.notion_link_ended` v1\n(`contracts/pages.notion_link_ended.v1.schema.json`): a page stopped\nbeing kept in step with its Notion page, so nothing reads it any more.\nNothing is deleted at Notion.",
+        "required": [
+          "workspace",
+          "page",
+          "connection",
+          "notion_page"
+        ],
+        "properties": {
+          "connection": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion connection it was read through."
+          },
+          "notion_page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion page."
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The page."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "pages.notion_link_requested",
+      "module": "pages",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "`pages.notion_link_requested` v1\n(`contracts/pages.notion_link_requested.v1.schema.json`): a page was\nlinked to a page in a member's Notion account, which now needs reading.\nThe connectors module asks this module, through the kernel's\npage-requests port, whether the link stands before it makes the stream.",
+        "required": [
+          "workspace",
+          "page",
+          "connection",
+          "notion_page"
+        ],
+        "properties": {
+          "connection": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion connection it is read through (a connectors id)."
+          },
+          "notion_page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion page."
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The page."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "pages.page_changed",
       "module": "pages",
       "version": 1,
@@ -1418,9 +1664,51 @@
             "format": "int64",
             "description": "Grows with every change of this page."
           },
+          "row": {
+            "type": "boolean",
+            "description": "Whether the page is a row of a table (its parent): a row is followed\nthrough its table."
+          },
           "trashed": {
             "type": "boolean",
             "description": "Whether it is in the trash."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "pages.table_changed",
+      "module": "pages",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "`pages.table_changed` v1 (`contracts/pages.table_changed.v1.schema.json`):\na table's schema, views or set of rows changed, so a view that is open\nasks for the table again. A snapshot: `revision` grows with every change\nof the table, and a consumer applies only newer ones. Ids and enums only:\nnever a property's name, an option, a view's name or any value. (A cell\nedit is announced as `pages.page_changed` of its row, kind `values`.)",
+        "required": [
+          "workspace",
+          "table",
+          "revision",
+          "kinds"
+        ],
+        "properties": {
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableChangeKind"
+            },
+            "description": "What changed."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change of the table."
+          },
+          "table": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The table (a page)."
           },
           "workspace": {
             "type": "string",
@@ -2319,7 +2607,8 @@
           "messages",
           "calendar",
           "files",
-          "bank"
+          "bank",
+          "pages"
         ]
       },
       "Change": {
@@ -2671,6 +2960,85 @@
           "check"
         ]
       },
+      "NotionItemResult": {
+        "type": "object",
+        "description": "How one block change of a request ended.",
+        "required": [
+          "block",
+          "outcome"
+        ],
+        "properties": {
+          "block": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The block (an id of the pages module)."
+          },
+          "edited_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When Notion last edited the block after the write (applied)."
+          },
+          "notion_block": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The block's id at Notion (applied; for an added block, the new one)."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/NotionOutcome",
+            "description": "How it ended."
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NotionReason",
+                "description": "Why it did not apply."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "NotionOutcome": {
+        "type": "string",
+        "description": "How a block change asked for by `pages.notion_changes_requested` ended.",
+        "enum": [
+          "applied",
+          "skipped",
+          "failed"
+        ]
+      },
+      "NotionReason": {
+        "type": "string",
+        "description": "Why a block change did not apply: a closed set, never Notion's words.",
+        "enum": [
+          "changed_in_notion",
+          "unverified",
+          "not_connected",
+          "needs_reauth",
+          "rejected",
+          "not_found",
+          "unavailable",
+          "too_many_attempts",
+          "unsupported"
+        ]
+      },
+      "NotionStop": {
+        "type": "string",
+        "description": "Why a Notion page is no longer read.",
+        "enum": [
+          "not_shared",
+          "trashed_in_notion",
+          "notion_unavailable"
+        ]
+      },
       "Origin": {
         "type": "string",
         "description": "Where a change came from.",
@@ -2688,7 +3056,10 @@
           "share",
           "move",
           "trash",
-          "purge"
+          "purge",
+          "schema",
+          "values",
+          "views"
         ]
       },
       "PageId": {
@@ -2711,7 +3082,8 @@
           "google",
           "zoho",
           "imap",
-          "microsoft"
+          "microsoft",
+          "notion"
         ]
       },
       "ReadAskFacts": {
@@ -3208,6 +3580,15 @@
           "updates",
           "receipts",
           "newsletters"
+        ]
+      },
+      "TableChangeKind": {
+        "type": "string",
+        "description": "What changed in a table.",
+        "enum": [
+          "schema",
+          "views",
+          "rows"
         ]
       },
       "TaskChange": {
