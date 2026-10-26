@@ -70,7 +70,9 @@ async function filterRows(page: Page) {
   await settle();
   const condition = page.getByRole("group", { name: "Condition 2" });
   await condition.getByLabel("Property", { exact: true }).selectOption({ label: "Value" });
-  await condition.getByLabel("Condition", { exact: true }).selectOption({ label: "is greater than" });
+  await condition
+    .getByLabel("Condition", { exact: true })
+    .selectOption({ label: "is greater than" });
   await condition.getByLabel("Value", { exact: true }).fill("3000");
   await caption(page, "Filter by any column: the operators come from its type", 2400);
   await page.getByRole("button", { name: "Apply" }).click();
