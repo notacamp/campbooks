@@ -38,7 +38,7 @@ export function RowPeek({
   onTrash,
   children,
 }: RowPeekProps) {
-  const panel = useRef<HTMLElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   useFocusTrap(panel, true);
   const close = useRef(onClose);
   useEffect(() => {
@@ -60,7 +60,7 @@ export function RowPeek({
     };
   }, []);
   return createPortal(
-    <aside
+    <div
       ref={panel}
       role="dialog"
       aria-modal="true"
@@ -81,7 +81,7 @@ export function RowPeek({
         <IconButton icon="close" label={closeLabel} onClick={onClose} />
       </div>
       <div className={styles["body"]}>{children}</div>
-    </aside>,
+    </div>,
     document.body,
   );
 }

@@ -284,6 +284,10 @@ describe("a table", () => {
     await waitFor(() => {
       expect(server.rowOf(ROW.acme)?.cells[P.value]?.value).toBe("11000");
     });
+    // A value with links in it has its Edit button beside it, not around it.
+    const threads = within(peek).getByRole("group", { name: "Threads" });
+    expect(within(threads).getByRole("button", { name: "Edit Threads" })).toBeTruthy();
+    expect(within(threads).getAllByRole("link").length).toBeGreaterThan(0);
     fireEvent.click(within(peek).getByRole("checkbox", { name: "Signed" }));
     await waitFor(() => {
       expect(server.rowOf(ROW.acme)?.cells[P.signed]?.value).toBe(false);

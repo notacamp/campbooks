@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   CellButton,
   CellEmpty,
+  IconButton,
   PropertyLine,
   PropertyList,
   RowPeek,
@@ -19,9 +20,19 @@ import type { CellContext } from "../cells/context";
 import { editable as typeEditable, isEmptyValue } from "../model";
 import type { TableActions } from "../use-table-actions";
 import { glyphOf } from "../type-info";
-import type { PropertyView, RowView } from "../types";
+import type { PropertyType, PropertyView, RowView } from "../types";
 
 import { RowBodyContext } from "./row-body";
+
+/** The types whose values can hold links (or chips that open): they are shown beside their Edit button. */
+const HOLDS_LINKS = new Set<PropertyType>([
+  "text",
+  "url",
+  "email",
+  "files",
+  "relation",
+  "campbooks_link",
+]);
 
 export interface RowPropertiesProps {
   ctx: CellContext;
@@ -91,18 +102,24 @@ export function RowProperties({
             />
           );
         } else if (writable) {
-          content = (
-            <CellButton
-              aria-label={t("tables.cell.edit", { property: property.name })}
-              onClick={() => {
-                setEditing(property.id);
-              }}
-            >
-              {isEmptyValue(value) ? (
-                <CellEmpty>{t("tables.cell.empty")}</CellEmpty>
-              ) : (
-                <CellDisplay ctx={ctx} property={property} row={row} value={value} />
-              )}
+          const edit = () => {
+            setEditing(property.id);
+          };
+          const label = t("tables.cell.edit", { property: property.name });
+          const shown = isEmptyValue(value) ? (
+            <CellEmpty>{t("tables.cell.empty")}</CellEmpty>
+          ) : (
+            <CellDisplay ctx={ctx} property={property} row={row} value={value} />
+          );
+          // A value with links in it cannot sit inside a button: its Edit button stands beside it.
+          content = HOLDS_LINKS.has(property.type) ? (
+            <>
+              {shown}
+              <IconButton icon="edit" label={label} onClick={edit} />
+            </>
+          ) : (
+            <CellButton aria-label={label} onClick={edit}>
+              {shown}
             </CellButton>
           );
         } else {
