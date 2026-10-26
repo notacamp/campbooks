@@ -10,15 +10,13 @@ export interface TableTab {
   icon: IconName;
   current: boolean;
   onSelect: () => void;
-  /** Beside the current tab (its menu). */
-  after?: ReactNode | undefined;
 }
 
 export interface TableTabsProps {
   /** Names the tabs ("Views"). */
   label: string;
   tabs: readonly TableTab[];
-  /** After the last tab (the "+" that adds a view). */
+  /** After the last tab, outside the tab list: the current view's options and the "+" that adds one. */
   trailing?: ReactNode | undefined;
   /** The id of the panel the current tab shows. */
   panelId?: string | undefined;
@@ -55,7 +53,12 @@ export function TableTabs({ label, tabs, trailing, panelId }: TableTabsProps) {
         onKeyDown={onKeyDown}
       >
         {tabs.map((tab) => (
-          <span key={tab.id} className={styles["tabWrap"]} data-current={tab.current || undefined}>
+          <span
+            key={tab.id}
+            role="presentation"
+            className={styles["tabWrap"]}
+            data-current={tab.current || undefined}
+          >
             <button
               type="button"
               role="tab"
@@ -68,7 +71,6 @@ export function TableTabs({ label, tabs, trailing, panelId }: TableTabsProps) {
               <Icon name={tab.icon} />
               <span className={styles["tabName"]}>{tab.label}</span>
             </button>
-            {tab.current ? tab.after : null}
           </span>
         ))}
       </div>

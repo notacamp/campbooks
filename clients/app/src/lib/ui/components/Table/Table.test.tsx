@@ -245,7 +245,6 @@ describe("the toolbar", () => {
             onSelect: () => {
               onSelect("a");
             },
-            after: <span>after</span>,
           },
           {
             id: "b",
@@ -267,7 +266,6 @@ describe("the toolbar", () => {
     renderUi(<Tabs onSelect={onSelect} />);
     const all = screen.getByRole("tab", { name: "All" });
     expect(all).toHaveAttribute("aria-controls", "panel");
-    expect(screen.getByText("after")).toBeTruthy();
     all.focus();
     fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" });
     expect(onSelect).toHaveBeenLastCalledWith("b");
@@ -538,7 +536,7 @@ describe("the grid", () => {
     renderUi(<Grid />);
     const grid = screen.getByRole("grid", { name: "Clients" });
     expect(grid).toHaveAttribute("aria-rowcount", "4");
-    expect(grid).toHaveAttribute("aria-colcount", "2");
+    expect(grid).toHaveAttribute("aria-colcount", "3");
     const cells = within(grid)
       .getAllByRole("gridcell")
       .filter((cell) => Object.hasOwn(cell.dataset, "row"));

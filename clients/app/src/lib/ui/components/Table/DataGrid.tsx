@@ -56,8 +56,9 @@ export interface DataGridProps {
   onActiveChange?: ((position: CellPos | null) => void) | undefined;
   /** The footer's cell for a column (its summary). */
   renderFooter?: ((column: GridColumn) => ReactNode) | undefined;
-  /** The cell at the end of the header (adds a column). */
+  /** The cell at the end of the header (adds a column), and its name. */
   headerEnd?: ReactNode | undefined;
+  headerEndLabel?: string | undefined;
   /** The footer's first cell (adds a row). */
   footerStart?: ReactNode | undefined;
   /** More rows can be loaded. */
@@ -112,6 +113,7 @@ export function DataGrid({
   onActiveChange,
   renderFooter,
   headerEnd,
+  headerEndLabel,
   footerStart,
   hasMore = false,
   loadingMore = false,
@@ -353,7 +355,7 @@ export function DataGrid({
           role="grid"
           aria-label={label}
           aria-rowcount={rowCount + 1}
-          aria-colcount={columnCount}
+          aria-colcount={columnCount + (headerEnd === undefined ? 0 : 1)}
           className={styles["grid"]}
         >
           <div role="row" aria-rowindex={1} className={styles["row"]} data-head="true">
@@ -382,7 +384,16 @@ export function DataGrid({
                 )}
               </div>
             ))}
-            {headerEnd === undefined ? null : <div className={styles["headEnd"]}>{headerEnd}</div>}
+            {headerEnd === undefined ? null : (
+              <div
+                role="columnheader"
+                aria-colindex={columnCount + 1}
+                aria-label={headerEndLabel}
+                className={styles["headEnd"]}
+              >
+                {headerEnd}
+              </div>
+            )}
           </div>
           {before > 0 ? <div aria-hidden="true" style={{ height: before }} /> : null}
           {visible.map((row, offset) => {

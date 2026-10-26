@@ -366,16 +366,18 @@ function LoadedTable({
               setChosen(candidate.id);
               setEditing(null);
             },
-            after: (
+          }))}
+          trailing={
+            <>
               <ViewOptions
-                view={candidate}
+                view={view}
                 columns={columns}
                 properties={detail.properties}
                 groupBy={config.groupBy}
                 canWrite={canWrite}
                 canRemove={detail.views.length > 1}
                 onRename={(name) => {
-                  void actions.updateView(candidate, { name });
+                  void actions.updateView(view, { name });
                 }}
                 onToggle={(property, visible) => {
                   save({
@@ -390,35 +392,33 @@ function LoadedTable({
                   save({ groupBy: property });
                 }}
                 onRemove={() => {
-                  void actions.removeView(candidate).then((removed) => {
+                  void actions.removeView(view).then((removed) => {
                     if (removed) {
                       setChosen(undefined);
                     }
                   });
                 }}
               />
-            ),
-          }))}
-          trailing={
-            canWrite ? (
-              <NewView
-                properties={detail.properties}
-                onCreate={(name, type: TableViewType, groupBy) => {
-                  void actions
-                    .createView({
-                      name,
-                      type,
-                      config:
-                        type === "board" && groupBy !== undefined ? { group_by: groupBy } : {},
-                    })
-                    .then((made) => {
-                      if (made !== undefined) {
-                        setChosen(made.id);
-                      }
-                    });
-                }}
-              />
-            ) : undefined
+              {canWrite ? (
+                <NewView
+                  properties={detail.properties}
+                  onCreate={(name, type: TableViewType, groupBy) => {
+                    void actions
+                      .createView({
+                        name,
+                        type,
+                        config:
+                          type === "board" && groupBy !== undefined ? { group_by: groupBy } : {},
+                      })
+                      .then((made) => {
+                        if (made !== undefined) {
+                          setChosen(made.id);
+                        }
+                      });
+                  }}
+                />
+              ) : null}
+            </>
           }
         />
       }
@@ -517,7 +517,7 @@ function LoadedTable({
         />
       ) : null}
       {toolbar}
-      <div id={panelId} role="tabpanel" className="min-w-0">
+      <div id={panelId} role="tabpanel" aria-label={view.name} className="min-w-0">
         {query.isPending ? <SkeletonList rows={4} /> : null}
         {query.isError ? (
           <EmptyState

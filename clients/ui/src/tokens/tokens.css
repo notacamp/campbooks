@@ -409,14 +409,14 @@
   --table-peek-width: 28rem;
   --table-board-column: 15rem;
   /* The colours of a select option: a tint of the colour behind its name. */
-  --option-brown: light-dark(oklch(0.5 0.07 55), oklch(0.74 0.07 55));
-  --option-orange: light-dark(oklch(0.55 0.15 50), oklch(0.76 0.14 55));
-  --option-yellow: light-dark(oklch(0.5 0.11 90), oklch(0.82 0.13 95));
-  --option-green: light-dark(oklch(0.5 0.12 150), oklch(0.76 0.13 150));
-  --option-blue: light-dark(oklch(0.52 0.13 250), oklch(0.76 0.11 250));
-  --option-purple: light-dark(oklch(0.52 0.15 300), oklch(0.76 0.12 300));
-  --option-pink: light-dark(oklch(0.54 0.16 350), oklch(0.78 0.12 350));
-  --option-red: light-dark(oklch(0.54 0.18 25), oklch(0.75 0.15 25));
+  --option-brown: light-dark(oklch(0.44 0.07 55), oklch(0.82 0.07 55));
+  --option-orange: light-dark(oklch(0.46 0.13 50), oklch(0.82 0.13 55));
+  --option-yellow: light-dark(oklch(0.43 0.1 90), oklch(0.86 0.12 95));
+  --option-green: light-dark(oklch(0.42 0.11 150), oklch(0.82 0.12 150));
+  --option-blue: light-dark(oklch(0.45 0.13 250), oklch(0.82 0.1 250));
+  --option-purple: light-dark(oklch(0.45 0.14 300), oklch(0.82 0.11 300));
+  --option-pink: light-dark(oklch(0.46 0.15 350), oklch(0.83 0.11 350));
+  --option-red: light-dark(oklch(0.46 0.17 25), oklch(0.8 0.14 25));
   /* A thread's own messages sit this far in from the left (more from 48rem). */
   --message-yours-indent: var(--space-5);
   /* The reader's pinned reply area grows up to this, then scrolls. */

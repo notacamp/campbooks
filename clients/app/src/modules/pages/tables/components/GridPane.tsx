@@ -308,6 +308,7 @@ export function GridPane({
           : undefined
       }
       resizeLabel={(name) => t("tables.column.resize", { property: name })}
+      headerEndLabel={t("tables.column.add")}
       headerEnd={
         canWrite ? <NewColumn tables={tables} here={here} onCreate={onNewColumn} /> : undefined
       }
