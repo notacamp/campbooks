@@ -8,7 +8,7 @@ export interface NotionSourcePage {
   notion_page: string;
   title: string;
   edited_at: string;
-  parent: string | null;
+  parent?: string | null;
   sub_pages: number;
   linked: boolean;
 }

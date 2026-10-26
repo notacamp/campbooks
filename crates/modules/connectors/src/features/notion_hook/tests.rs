@@ -189,7 +189,7 @@ async fn before_the_secret_exists_the_verification_token_is_kept_sealed(db: PgPo
     // It opens with the instance key and the token's own purpose only.
     let key = campbooks_kernel::crypto::SecretKey::from_bytes([3; 32]);
     let stored = crate::notion_webhook_token::read(
-        &mut *kit.db.acquire().await.unwrap(),
+        &mut kit.db.acquire().await.unwrap(),
         &crate::notion_webhook_token::cipher(&key),
     )
     .await
@@ -230,7 +230,7 @@ async fn a_second_verification_replaces_the_first(db: PgPool) {
     assert_eq!(stored_tokens(&kit).await, 1);
     let key = campbooks_kernel::crypto::SecretKey::from_bytes([3; 32]);
     let stored = crate::notion_webhook_token::read(
-        &mut *kit.db.acquire().await.unwrap(),
+        &mut kit.db.acquire().await.unwrap(),
         &crate::notion_webhook_token::cipher(&key),
     )
     .await

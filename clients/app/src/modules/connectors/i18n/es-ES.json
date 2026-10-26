@@ -182,13 +182,15 @@
       "google": "Google",
       "zoho": "Zoho",
       "imap": "IMAP",
-      "microsoft": "Microsoft"
+      "microsoft": "Microsoft",
+      "notion": "Notion"
     },
     "capability": {
       "messages": "Correo",
       "calendar": "Calendario",
       "files": "Archivos",
-      "bank": "Banco"
+      "bank": "Banco",
+      "pages": "Páginas"
     },
     "lastSynced": "Última sincronización el {{date}}",
     "neverSynced": "Aún sin sincronizar",

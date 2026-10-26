@@ -73,7 +73,7 @@ export function idFixes(doc: ProseNode, fresh: () => string): IdFix[] {
 const attribute = {
   bid: {
     default: null,
-    parseHTML: (element: HTMLElement) => element.dataset.bid,
+    parseHTML: (element: HTMLElement) => element.dataset["bid"],
     renderHTML: (attributes: Record<string, unknown>) => {
       const bid = attributes["bid"];
       return typeof bid === "string" ? { "data-bid": bid } : {};

@@ -99,7 +99,15 @@ async fn an_unchanged_page_costs_one_call_and_announces_nothing(db: PgPool) {
     l.kit.notion.forget_calls();
     run_again(&l).await;
     assert_eq!(reads(&l).await.len(), 1);
-    let calls = l.kit.notion.calls();
+    // The wait outlasted the access token, so it was renewed: that call is
+    // not about the page.
+    let calls: Vec<String> = l
+        .kit
+        .notion
+        .calls()
+        .into_iter()
+        .filter(|c| !c.contains("/oauth/token"))
+        .collect();
     assert!(
         calls.iter().all(|c| !c.contains("/children")),
         "the blocks were read again: {calls:?}"
@@ -172,7 +180,11 @@ async fn a_page_that_is_not_shared_any_more_ends_the_link_and_deletes_nothing(db
     assert_eq!(streams, 0);
     // Notion was only ever read from.
     assert!(
-        l.kit.notion.calls().iter().all(|c| c.starts_with("GET")),
+        l.kit
+            .notion
+            .calls()
+            .iter()
+            .all(|c| c.starts_with("GET") || c.contains("/oauth/token")),
         "{:?}",
         l.kit.notion.calls()
     );

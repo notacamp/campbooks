@@ -148,7 +148,7 @@ async fn a_mention_of_anything_but_a_synced_page_goes_as_campbooks_link_with_no_
     let shown = document.to_string();
     // The task's address is this app's; the person is never named.
     assert!(!shown.contains("marta.example"), "{shown}");
-    assert!(!shown.contains("@"), "{shown}");
+    assert!(!shown.contains('@'), "{shown}");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

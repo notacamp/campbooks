@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, Icon, Pill } from "~/lib/ui";
+import { Button, Icon, Panel, Pill, Text } from "~/lib/ui";
 
 import type { NotionKeep } from "../types";
 
@@ -40,10 +40,7 @@ export function ConflictBlock({
     });
   };
   return (
-    <section
-      className="flex flex-col gap-2 rounded-md border border-strong bg-surface-sunken p-3"
-      aria-label={t("notion.conflict.label")}
-    >
+    <Panel label={t("notion.conflict.label")}>
       <div className="flex flex-wrap items-center gap-2">
         <Icon name="warning" />
         <Pill signal="look">
@@ -51,10 +48,14 @@ export function ConflictBlock({
         </Pill>
       </div>
       {removed ? (
-        <p className="text-sm text-secondary">{t("notion.conflict.removedBody")}</p>
+        <Text tone="secondary" size="sm">
+          {t("notion.conflict.removedBody")}
+        </Text>
       ) : (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-secondary">{t("notion.conflict.theirs")}</span>
+          <Text as="span" tone="secondary" size="sm">
+            {t("notion.conflict.theirs")}
+          </Text>
           <div contentEditable={false} suppressContentEditableWarning>
             {children}
           </div>
@@ -80,7 +81,9 @@ export function ConflictBlock({
           ))}
         </div>
       )}
-      <p className="text-xs text-tertiary">{t("notion.conflict.footer")}</p>
-    </section>
+      <Text tone="tertiary" size="xs">
+        {t("notion.conflict.footer")}
+      </Text>
+    </Panel>
   );
 }

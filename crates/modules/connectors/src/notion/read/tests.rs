@@ -42,7 +42,7 @@ async fn rig(db: PgPool) -> Rig {
 }
 
 async fn read(rig: &Rig, page: uuid::Uuid, limits: Limits) -> Result<Read, Stop> {
-    let mut pace = Pace::new(
+    let mut budget = Pace::new(
         rig.kit.state.db.clone(),
         ConnectionId::new(),
         &NotionAdapter {
@@ -55,7 +55,7 @@ async fn read(rig: &Rig, page: uuid::Uuid, limits: Limits) -> Result<Read, Stop>
     read_page(
         &rig.notion,
         &rig.token,
-        &mut pace,
+        &mut budget,
         &rig.kit.state.blobs,
         "workspace-1",
         &info,
@@ -153,7 +153,7 @@ async fn a_hosted_file_is_downloaded_once_and_a_refused_one_stays_in_notion(db: 
     assert!(first.snapshot.blocks[1].file.is_none());
     assert!(first.files.known.contains_key(&good.to_string()));
     // Remembered: the unchanged file is not fetched again.
-    let mut pace = Pace::new(
+    let mut budget = Pace::new(
         rig.kit.state.db.clone(),
         ConnectionId::new(),
         &NotionAdapter::default(),
@@ -163,7 +163,7 @@ async fn a_hosted_file_is_downloaded_once_and_a_refused_one_stays_in_notion(db: 
     let again = read_page(
         &rig.notion,
         &rig.token,
-        &mut pace,
+        &mut budget,
         &rig.kit.state.blobs,
         "workspace-1",
         &info,
@@ -244,7 +244,7 @@ async fn a_page_that_is_not_shared_any_more_reads_as_not_found(db: PgPool) {
     rig.fake.paragraph(page, "x");
     let info = rig.notion.page(&rig.token, page).await.unwrap();
     rig.fake.unshare(page);
-    let mut pace = Pace::new(
+    let mut budget = Pace::new(
         rig.kit.state.db.clone(),
         ConnectionId::new(),
         &NotionAdapter::default(),
@@ -252,7 +252,7 @@ async fn a_page_that_is_not_shared_any_more_reads_as_not_found(db: PgPool) {
     let outcome = read_page(
         &rig.notion,
         &rig.token,
-        &mut pace,
+        &mut budget,
         &rig.kit.state.blobs,
         "workspace-1",
         &info,

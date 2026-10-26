@@ -133,7 +133,7 @@ describe("the Bid extension", () => {
   it("leaves a read-only page alone", () => {
     const editor = make(false);
     editor.view.dispatch(
-      editor.state.tr.insert(editor.state.doc.content.size, schema.nodeFromJSON(p("x"))),
+      editor.state.tr.insert(editor.state.doc.content.size, editor.schema.nodeFromJSON(p("x"))),
     );
     expect(bids(editor)).toEqual(["one", null]);
     editor.destroy();
@@ -143,7 +143,7 @@ describe("the Bid extension", () => {
     const editor = make();
     editor.view.dispatch(
       editor.state.tr
-        .insert(editor.state.doc.content.size, schema.nodeFromJSON(p("remote")))
+        .insert(editor.state.doc.content.size, editor.schema.nodeFromJSON(p("remote")))
         .setMeta(ySyncPluginKey, { isChangeOrigin: true }),
     );
     expect(bids(editor)).toEqual(["one", null]);

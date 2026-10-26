@@ -178,6 +178,19 @@ async fn subscriptions(conn: &mut sqlx::PgConnection) -> i64 {
         .unwrap()
 }
 
+/// The Notion rows `conn` sees: links, recorded changes and open consents.
+async fn counts(conn: &mut sqlx::PgConnection) -> [i64; 3] {
+    let row: (i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM connectors.notion_links),
+                (SELECT count(*) FROM connectors.notion_changes),
+                (SELECT count(*) FROM connectors.notion_authorizations)",
+    )
+    .fetch_one(conn)
+    .await
+    .unwrap();
+    [row.0, row.1, row.2]
+}
+
 /// Notion's links, recorded changes and consents (campbooks-cloud#376): a
 /// workspace sees its own; the maintenance scope (the webhook's) reads the
 /// links across workspaces, ids only, and nothing else; nothing set, none.
@@ -206,18 +219,6 @@ async fn notion_rows_are_isolated_and_only_the_links_are_read_across_workspaces(
     let ticket = kit.notion_start(&marta, a, serde_json::json!({})).await;
     assert_eq!(ticket.status.as_u16(), 201);
     let b = WorkspaceId::new();
-
-    async fn counts(conn: &mut sqlx::PgConnection) -> [i64; 3] {
-        let row: (i64, i64, i64) = sqlx::query_as(
-            "SELECT (SELECT count(*) FROM connectors.notion_links),
-                    (SELECT count(*) FROM connectors.notion_changes),
-                    (SELECT count(*) FROM connectors.notion_authorizations)",
-        )
-        .fetch_one(conn)
-        .await
-        .unwrap();
-        [row.0, row.1, row.2]
-    }
 
     let app = testing::app_role_pool(&kit.db).await;
     let mut tx = app.begin_for(a).await.unwrap();

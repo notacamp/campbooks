@@ -132,7 +132,7 @@ function renderWithProvidersFor(link: ReturnType<typeof notionLink>) {
       link={link}
       canStop
       onStop={() => Promise.resolve(true)}
-      onShowConflict={() => {}}
+      onShowConflict={vi.fn()}
       now={NOW}
     />,
   );

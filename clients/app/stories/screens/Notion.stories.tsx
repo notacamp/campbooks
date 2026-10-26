@@ -77,7 +77,7 @@ interface Choice {
 }
 
 const textOf = (element: Y.XmlElement | undefined): string =>
-  element?.firstChild instanceof Y.XmlText ? element.firstChild.toString() : "";
+  element?.firstChild instanceof Y.XmlText ? String(element.firstChild) : "";
 
 const paragraph = (text: string, bid?: string): Y.XmlElement => {
   const element = new Y.XmlElement("paragraph");

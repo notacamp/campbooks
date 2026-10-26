@@ -9,7 +9,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { W } from "../../../../test/demo/conversations";
 import { NOTION_PAGES, PAGES } from "../../../../test/demo/pages";
@@ -28,7 +28,7 @@ const useSource: UseNotionSource = () => ({
     pages: NOTION_PAGES,
     truncated: false,
     error: undefined,
-    retry: () => {},
+    retry: vi.fn(),
   },
 });
 

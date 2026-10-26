@@ -43,6 +43,7 @@ export {
 } from "./components/Attachments/Attachments";
 export { Avatar, avatarHue, initialsOf, type AvatarProps } from "./components/Avatar/Avatar";
 export { Banner, type BannerProps } from "./components/Banner/Banner";
+export { Panel, type PanelProps } from "./components/Panel/Panel";
 export {
   Button,
   ButtonLink,

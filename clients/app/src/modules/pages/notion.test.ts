@@ -83,7 +83,11 @@ describe("importTree", () => {
     expect(ids(tree)).toEqual([ROADMAP, NOTES, HIRING]);
     expect(ids(tree[0]?.children ?? [])).toEqual([OKRS, RETRO]);
     expect(allNodes(tree).map((n) => n.depth)).toEqual([0, 1, 1, 0, 0]);
-    expect(ids(flatten(tree[0]!))).toEqual([ROADMAP, OKRS, RETRO]);
+    const [roadmap] = tree;
+    if (roadmap === undefined) {
+      throw new Error("the listing has no roadmap");
+    }
+    expect(ids(flatten(roadmap))).toEqual([ROADMAP, OKRS, RETRO]);
   });
 
   it("makes a root of a page whose parent is not listed, and survives a cycle", () => {

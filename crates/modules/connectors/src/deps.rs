@@ -436,7 +436,7 @@ mod tests {
         campbooks_kernel::testing::config("postgres://test@localhost/test")
     }
 
-    fn notion_on(extra: serde_json::Value) -> Figment {
+    fn notion_on(extra: &serde_json::Value) -> Figment {
         let mut settings = serde_json::json!({
             "notion": {"client_id": "n", "client_secret": "s"},
             "connectors": {"notion": {"enabled": true}}
@@ -476,7 +476,7 @@ mod tests {
         let key = || Some(SecretKey::from_bytes([1; 32]));
         let mut public = kernel_config();
         public.public_url = "https://campbooks.example.com/".to_owned();
-        let deps = Deps::from_figment(&notion_on(serde_json::json!({})), &public, key()).unwrap();
+        let deps = Deps::from_figment(&notion_on(&serde_json::json!({})), &public, key()).unwrap();
         assert!(deps.notion_cipher.is_some());
         let notion = deps.notion.unwrap();
         assert_eq!(
@@ -487,7 +487,7 @@ mod tests {
             deps.notion_webhook.is_none(),
             "no webhook without its secret"
         );
-        let hooked = notion_on(serde_json::json!({"webhook_secret": "w"}));
+        let hooked = notion_on(&serde_json::json!({"webhook_secret": "w"}));
         assert!(
             Deps::from_figment(&hooked, &public, key())
                 .unwrap()
@@ -503,7 +503,7 @@ mod tests {
             ),
             ("evil", "https://campbooks.example.com/auth/callback/notion"),
         ] {
-            let figment = notion_on(serde_json::json!({"redirect_path": path}));
+            let figment = notion_on(&serde_json::json!({"redirect_path": path}));
             let deps = Deps::from_figment(&figment, &public, key()).unwrap();
             assert_eq!(deps.notion.unwrap().redirect_uri(), expected, "{path}");
         }
@@ -530,14 +530,14 @@ mod tests {
                 .is_none()
         );
         let deps =
-            Deps::from_figment(&notion_on(serde_json::json!({})), &kernel_config(), None).unwrap();
+            Deps::from_figment(&notion_on(&serde_json::json!({})), &kernel_config(), None).unwrap();
         assert!(deps.notion.is_none() && deps.notion_cipher.is_none());
     }
 
     #[test]
     fn a_notion_fake_outside_development_stops_the_server_but_not_in_development() {
         let key = || Some(SecretKey::from_bytes([1; 32]));
-        let fake = notion_on(serde_json::json!({"base_url": "http://127.0.0.1:9051"}));
+        let fake = notion_on(&serde_json::json!({"base_url": "http://127.0.0.1:9051"}));
         let err = Deps::from_figment(&fake, &kernel_config(), key()).unwrap_err();
         assert!(err.contains("development only"), "{err}");
         let mut dev = kernel_config();

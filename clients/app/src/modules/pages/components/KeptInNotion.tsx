@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { Icon } from "~/lib/ui";
+import { ButtonLink, Icon, Panel, Text } from "~/lib/ui";
 
 import { humanKind, KEPT_KINDS, type KeptKind } from "../notion-kinds";
 
@@ -21,17 +21,21 @@ export function KeptInNotion({ kind, href }: KeptInNotionProps) {
   const what =
     known === undefined ? humanKind(kind) : t(`notion.kept.kind.${known satisfies KeptKind}`);
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-strong bg-surface-sunken p-3">
+    <Panel variant="dashed" row label={t("notion.kept.title", { what })}>
       <Icon name="document" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <strong className="break-words">{t("notion.kept.title", { what })}</strong>
-        <span className="text-sm text-secondary">{t("notion.kept.body")}</span>
+        <Text as="span" weight="semibold">
+          {t("notion.kept.title", { what })}
+        </Text>
+        <Text as="span" tone="secondary" size="sm">
+          {t("notion.kept.body")}
+        </Text>
       </div>
       {href === undefined ? null : (
-        <a className="text-sm underline" href={href} target="_blank" rel="noopener noreferrer">
+        <ButtonLink variant="secondary" href={href} target="_blank" rel="noopener noreferrer">
           {t("notion.kept.edit")}
-        </a>
+        </ButtonLink>
       )}
-    </div>
+    </Panel>
   );
 }

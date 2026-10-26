@@ -12,7 +12,7 @@ const START = `POST ${W}/connections/notion/authorizations`;
 const IMPORT = `/w/${DUARTE.id}/pages?import=notion`;
 
 function renderCard(
-  connections: Parameters<typeof NotionCard>[0]["connections"],
+  connections?: Parameters<typeof NotionCard>[0]["connections"],
   over: Partial<Parameters<typeof NotionCard>[0]> = {},
 ) {
   const leave = vi.fn();
@@ -64,7 +64,7 @@ describe("NotionCard", () => {
     mockApi({ [START]: problem(409, "provider_not_configured") });
     renderCard([]);
     fireEvent.click(screen.getByRole("button", { name: "Connect Notion" }));
-    expect(await screen.findByText("Notion isn’t available on this instance")).toBeVisible();
+    expect(await screen.findByText("Notion isn’t available on this instance.")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Connect Notion" })).toBeNull();
   });
 

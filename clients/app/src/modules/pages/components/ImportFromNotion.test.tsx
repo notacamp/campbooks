@@ -10,7 +10,7 @@ import {
 } from "../../../../test/demo/pages";
 import { TEAM } from "../../../../test/demo/tasks";
 import { DUARTE } from "../../../../test/demo/workspaces";
-import { mockApi, renderWithProviders } from "../../../../test/render";
+import { type MockHandler, mockApi, renderWithProviders } from "../../../../test/render";
 import type { NotionSource, UseNotionSource } from "../notion-source";
 
 import { ImportFromNotion, MAX_IMPORT } from "./ImportFromNotion";
@@ -34,7 +34,7 @@ function source(
   });
 }
 
-function renderImport(useSource: UseNotionSource, extra: Record<string, unknown> = {}) {
+function renderImport(useSource: UseNotionSource, extra: Record<string, MockHandler> = {}) {
   const mocked = mockApi({
     [`GET ${W}/members`]: { body: { members: TEAM } },
     [`GET ${W}/pages`]: { body: { pages: [] } },
@@ -47,7 +47,7 @@ function renderImport(useSource: UseNotionSource, extra: Record<string, unknown>
   });
   const onClose = vi.fn();
   const onImported = vi.fn();
-  renderWithProviders(
+  const view = renderWithProviders(
     <ImportFromNotion
       workspaceId={DUARTE.id}
       open
@@ -57,7 +57,7 @@ function renderImport(useSource: UseNotionSource, extra: Record<string, unknown>
       onImported={onImported}
     />,
   );
-  return { mocked, onClose, onImported };
+  return { mocked, onClose, onImported, unmount: view.unmount };
 }
 
 describe("ImportFromNotion", () => {

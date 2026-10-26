@@ -46,7 +46,7 @@ const REASONS = [
 
 export type KnownReason = (typeof REASONS)[number];
 
-export function knownReason(reason: string | null | undefined): KnownReason | undefined {
+export function knownReason(reason?: string | null): KnownReason | undefined {
   return REASONS.find((known) => known === reason);
 }
 
@@ -54,7 +54,7 @@ export function knownReason(reason: string | null | undefined): KnownReason | un
 export interface ImportPage {
   notion_page: string;
   title: string;
-  parent: string | null;
+  parent?: string | null;
   sub_pages: number;
   linked: boolean;
 }
@@ -72,8 +72,9 @@ export function importTree(pages: readonly ImportPage[]): ImportNode[] {
   const children = new Map<string, ImportPage[]>();
   const roots: ImportPage[] = [];
   for (const page of pages) {
-    if (page.parent !== null && known.has(page.parent) && page.parent !== page.notion_page) {
-      children.set(page.parent, [...(children.get(page.parent) ?? []), page]);
+    const parent = page.parent;
+    if (typeof parent === "string" && known.has(parent) && parent !== page.notion_page) {
+      children.set(parent, [...(children.get(parent) ?? []), page]);
     } else {
       roots.push(page);
     }

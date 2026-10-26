@@ -39,7 +39,7 @@ async fn rig(db: PgPool) -> Rig {
     .unwrap();
     let (token, _) = fake.grant();
     let page = fake.add_page("Roadmap", None);
-    let pace = Pace::new(
+    let budget = Pace::new(
         kit.state.db.clone(),
         ConnectionId::new(),
         &NotionAdapter {
@@ -49,7 +49,7 @@ async fn rig(db: PgPool) -> Rig {
         },
     );
     Rig {
-        pace,
+        pace: budget,
         fake,
         notion,
         token,

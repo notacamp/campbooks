@@ -72,11 +72,15 @@ export function PagesPage({
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [showTrash, setShowTrash] = useState(false);
   const [importOpen, setImportOpen] = useState(importing);
-  useEffect(() => {
+  // The import opens when the address asks for it (state adjusted while
+  // rendering, guarded by the change).
+  const [wasImporting, setWasImporting] = useState(importing);
+  if (importing !== wasImporting) {
+    setWasImporting(importing);
     if (importing) {
       setImportOpen(true);
     }
-  }, [importing]);
+  }
   const [dragging, setDragging] = useState<string | undefined>();
   const [over, setOver] = useState<{ id: string; zone: Zone } | undefined>();
 

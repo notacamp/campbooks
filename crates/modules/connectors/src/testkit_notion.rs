@@ -680,7 +680,7 @@ fn start_of(cursor: Option<&str>) -> usize {
     cursor.and_then(|c| c.parse().ok()).unwrap_or(0)
 }
 
-fn listing(state: &State, results: Vec<Value>, start: usize, size: usize) -> Value {
+fn listing(state: &State, results: &[Value], start: usize, size: usize) -> Value {
     let size = state.page_size.unwrap_or(size).max(1);
     let end = (start + size).min(results.len());
     let more = end < results.len();
@@ -708,7 +708,7 @@ fn search(state: &State, body: &Value) -> ResponseTemplate {
         200,
         &listing(
             state,
-            results,
+            &results,
             start_of(body["start_cursor"].as_str()),
             size,
         ),
@@ -737,7 +737,7 @@ fn children(state: &State, id: &str, query: &HashMap<String, String>) -> Respons
         200,
         &listing(
             state,
-            results,
+            &results,
             start_of(query.get("start_cursor").map(String::as_str)),
             size,
         ),

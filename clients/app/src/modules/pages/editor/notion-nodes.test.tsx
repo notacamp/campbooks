@@ -1,7 +1,7 @@
 import { StarterKit } from "@tiptap/starter-kit";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { W } from "../../../../test/demo/conversations";
 import { NOTION_ROADMAP, notionLink } from "../../../../test/demo/pages";
@@ -43,7 +43,7 @@ function Editing({ editable = true }: { editable?: boolean }) {
     content,
   });
   return (
-    <EditorEnvironmentContext value={{ workspaceId: DUARTE.id, pageId: PAGE, open: () => {} }}>
+    <EditorEnvironmentContext value={{ workspaceId: DUARTE.id, pageId: PAGE, open: vi.fn() }}>
       <EditorContent editor={editor} />
     </EditorEnvironmentContext>
   );

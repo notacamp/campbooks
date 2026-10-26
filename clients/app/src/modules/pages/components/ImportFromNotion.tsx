@@ -1,7 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Banner, Button, ButtonLink, Checkbox, Dialog, Select, SkeletonList, Text } from "~/lib/ui";
+import {
+  Banner,
+  Button,
+  ButtonLink,
+  Checkbox,
+  Dialog,
+  Panel,
+  Select,
+  SkeletonList,
+  Text,
+} from "~/lib/ui";
 import { useMembers } from "~/modules/workspaces";
 
 import { choiceOf, importRequest, importTree, toggle, allNodes, type ImportNode } from "../notion";
@@ -49,12 +59,13 @@ export function ImportFromNotion({
   const source = useSource(workspaceId, open ? chosen : undefined);
 
   const connections = source.connections;
-  // The first connection that works, once they are known.
-  useEffect(() => {
-    if (open && chosen === undefined && connections !== undefined) {
-      setChosen((connections.find((c) => !c.needsReauth) ?? connections[0])?.id);
-    }
-  }, [open, chosen, connections]);
+  // The first connection that works, once they are known (state adjusted
+  // while rendering, which React allows when it is guarded like this).
+  const firstWorking =
+    connections === undefined ? undefined : (connections.find((c) => !c.needsReauth) ?? connections[0]);
+  if (open && chosen === undefined && firstWorking !== undefined) {
+    setChosen(firstWorking.id);
+  }
 
   const tree = importTree(source.list.pages);
   const choice = choiceOf(tree, ticked);
@@ -145,9 +156,11 @@ export function ImportFromNotion({
           />
         ) : null}
         {failed ? <Banner tone="danger" role="alert" title={t("notion.import.failed")} /> : null}
-        <p className="rounded-md bg-surface-sunken p-3 text-sm text-secondary">
-          {t("notion.import.info")}
-        </p>
+        <Panel>
+          <Text tone="secondary" size="sm">
+            {t("notion.import.info")}
+          </Text>
+        </Panel>
       </div>
     </Dialog>
   );

@@ -7,7 +7,13 @@ import { ConflictBlock } from "./ConflictBlock";
 
 describe("ConflictBlock", () => {
   it("shows Notion’s version with the three choices", async () => {
-    const onChoose = vi.fn(() => Promise.resolve(true));
+    let finish: (settled: boolean) => void = () => undefined;
+    const onChoose = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        }),
+    );
     renderWithProviders(
       <ConflictBlock removed={false} onChoose={onChoose}>
         <p>We launch on the 21st.</p>
@@ -24,6 +30,7 @@ describe("ConflictBlock", () => {
     });
     // The other choices wait while one is being applied.
     expect(screen.getByRole("button", { name: "Keep mine" })).toBeDisabled();
+    finish(true);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Keep mine" })).toBeEnabled();
     });

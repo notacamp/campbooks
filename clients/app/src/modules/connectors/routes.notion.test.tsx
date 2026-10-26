@@ -24,7 +24,7 @@ describe("buildConnectNotionRoute", () => {
     });
     const root = createRootRoute({ component: Outlet });
     const routes = buildConnectNotionRoute(root);
-    expect(routes[0].path).toBe("/connect/notion");
+    expect(routes).toHaveLength(1);
     const router = createRouter({
       routeTree: root.addChildren([...routes]),
       history: createMemoryHistory({ initialEntries: ["/connect/notion"] }),

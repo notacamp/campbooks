@@ -77,6 +77,7 @@ impl Keep {
 /// The choice.
 #[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = ResolveNotionConflict)]
 pub struct Resolve {
     /// What to keep.
     pub keep: Keep,
