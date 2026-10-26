@@ -157,6 +157,18 @@ export const WithExcerpt: Story = {
   },
 };
 
+/** Scout isn't sure: its own second line under the sentence, plain and wrapping, never quoted. */
+export const WithNote: Story = {
+  args: {
+    who: "Ana Costa",
+    what: "Ana Costa wrote to Águas do Ribatejo. You’re in Cc.",
+    note: "They haven’t answered in 9 days. Scout can’t tell whose move this is. What’s next for you?",
+    avatar: { name: "Ana Costa" },
+    due: undefined,
+    tags: [],
+  },
+};
+
 /** Opened with Scout's summary above the email (here a stand-in for it). */
 export const SummaryOpen: Story = {
   args: {

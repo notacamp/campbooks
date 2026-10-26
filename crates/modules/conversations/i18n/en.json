@@ -24,6 +24,7 @@
     "invalid_view": "Ask for archived conversations with view=archive alone: archived=true can’t be combined with another view.",
     "no_open_need": "Nothing here needs you any more.",
     "not_a_payment": "This isn't a payment to make.",
+    "not_a_party": "That person isn’t one of the people on this email, so Scout can’t wait on them.",
     "not_waiting": "You’re not waiting on anyone here any more, so there is no one to nudge.",
     "nothing_to_reopen": "There is nothing to bring back here.",
     "need_changed": "This changed while you were looking at it. Have another look.",

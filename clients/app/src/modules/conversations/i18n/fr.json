@@ -355,7 +355,8 @@
       "expired": "Expiré",
       "worth_a_look": "À voir",
       "waiting": "En attente de {{name}}",
-      "nudge": "À relancer"
+      "nudge": "À relancer",
+      "unsure": "Scout n’est pas sûr"
     },
     "due": {
       "today": "Pour aujourd’hui",
@@ -401,7 +402,10 @@
       "report": "Signaler et supprimer",
       "seen": "Vu",
       "heardBack": "Nouvelles reçues",
-      "notWaiting": "Je n’attends plus"
+      "notWaiting": "Je n’attends plus",
+      "nudgeParty": "Relancer {{name}}…",
+      "replyTo": "Répondre à {{name}}…",
+      "nothingForMe": "Rien pour moi"
     },
     "toast": {
       "done": "Fait · {{name}}",
@@ -419,7 +423,8 @@
       "allPaidFailed_other": "Impossible de marquer {{count}} factures comme payées. Réessayez.",
       "reported": "Signalé · {{name}}. Il est dans les spams",
       "heardBack": "Nouvelles de {{name}} · Scout n’attend plus",
-      "notWaiting": "Vous n’attendez plus {{name}}"
+      "notWaiting": "Vous n’attendez plus {{name}}",
+      "waiting": "En attente de {{name}}"
     },
     "summary": {
       "heading": "Résumé de Scout"
@@ -428,6 +433,21 @@
       "more": "Afficher tout l’e-mail",
       "less": "Afficher moins",
       "linksOff": "Les liens sont désactivés dans les e-mails qui pourraient être du hameçonnage."
+    },
+    "unsure": {
+      "lineTo": "{{name}} a écrit à {{others}} et à vous.",
+      "lineCc": "{{name}} a écrit à {{others}}. Vous êtes en Cc.",
+      "lineNamed": "{{name}} a écrit à {{others}}. Vous n’êtes ni en À ni en Cc.",
+      "more_one": "{{names}} et {{count}} autre personne",
+      "more_other": "{{names}} et {{count}} autres personnes",
+      "unanswered_one": "Ils n’ont pas répondu depuis {{count}} jour.",
+      "unanswered_other": "Ils n’ont pas répondu depuis {{count}} jours.",
+      "ask": "Scout ne sait pas à qui revient la suite. Que voulez-vous faire ?",
+      "howQuestion": "Le degré de certitude de Scout",
+      "howReply": "Sûr à {{confidence}}% qu’une réponse est nécessaire. Compte comme sûr à partir de {{bar}}%.",
+      "howAction": "Sûr à {{confidence}}% qu’on vous a demandé de faire quelque chose. Compte comme sûr à partir de {{bar}}%.",
+      "howCc": "Vous êtes en Cc, pas en À.",
+      "howNotTo": "Vous n’êtes ni en À ni en Cc."
     }
   },
   "rules": {

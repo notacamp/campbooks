@@ -35,6 +35,12 @@ export interface ItemProps {
   what: string;
   /** The sender's own words, on one line under it while closed (quoted, plain text). */
   excerpt?: string | undefined;
+  /**
+   * Scout's own second line under the sentence, in plain words and over as many lines as it
+   * needs ("They haven't answered in 9 days. Scout can't tell whose move this is."). Not
+   * quoted: it is never the sender's.
+   */
+  note?: string | undefined;
   /** Who it is from, as an avatar; the row's `who` when omitted. */
   avatar?: Pick<AvatarProps, "name" | "kind" | "initials"> | undefined;
   /**
@@ -91,6 +97,7 @@ export function Item({
   who,
   what,
   excerpt,
+  note,
   avatar,
   kind,
   due,
@@ -147,6 +154,7 @@ export function Item({
         )}
       </span>{" "}
       <span className={styles["what"]}>{what}</span>
+      {note === undefined ? null : <span className={styles["note"]}>{note}</span>}
       {excerpt === undefined || expanded ? null : <q className={styles["excerpt"]}>{excerpt}</q>}
       {tags.length + pills.length > 0 ? (
         <span className={styles["meta"]}>

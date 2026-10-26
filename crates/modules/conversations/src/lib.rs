@@ -68,7 +68,7 @@ mod tracking_tests;
 
 pub use config::{
     ActionSettings, ConversationsConfig, DEFAULT_DATED_FLAG, DEFAULT_DECIDE_BACKFILL_DAYS,
-    DEFAULT_NEEDS_WINDOW_DAYS, DatedSettings, NoticeSettings, WaitSettings,
+    DEFAULT_NEEDS_WINDOW_DAYS, DatedSettings, MoveSettings, NoticeSettings, WaitSettings,
 };
 pub use domain::{
     decide::STATE_VERSION,
@@ -200,7 +200,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
     let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy)
         .with_summaries(summaries.is_some())
         .with_wait_days(deps.config.wait.working_days)
-        .with_waits(deps.config.actions.enabled)
+        .with_waits(deps.config.moves.enabled)
         .with_dated(deps.config.dated);
     Module {
         name: NAME,
@@ -261,9 +261,12 @@ pub fn module(deps: ConversationsDeps) -> Module {
                     model.clone(),
                     deps.config.decide_backfill_days,
                 )
-                .with_actions(deps.config.actions),
+                .with_moves(deps.config.moves),
             )
-            .schedule::<features::backfill_needs::DispatchNeedsBackfills>(
+            .schedule_with(
+                features::backfill_needs::DispatchNeedsBackfills {
+                    moves: deps.config.moves.enabled,
+                },
                 features::backfill_needs::EVERY,
             )
             .schedule::<features::resign_rules::DispatchRuleResigns>(features::resign_rules::EVERY)
@@ -276,7 +279,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
                     deps.policy.clone(),
                     needs.clone(),
                 )
-                .with_actions(deps.config.actions),
+                .with_actions(deps.config.actions)
+                .with_moves(deps.config.moves),
             )
             .handler(
                 features::decide_message::DecideBacklog::new(
@@ -285,7 +289,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
                     deps.policy,
                     needs,
                 )
-                .with_actions(deps.config.actions),
+                .with_actions(deps.config.actions)
+                .with_moves(deps.config.moves),
             )
             .on_event::<features::ingest_messages::IngestMessages>()
             .on_event::<features::create_inbox::CreateInbox>()

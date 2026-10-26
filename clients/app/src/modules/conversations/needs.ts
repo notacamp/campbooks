@@ -2,7 +2,7 @@
 // and "How Campbooks decided". Pure helpers over the API's records, shared by
 // the inbox and Home. Mail text (names, the quote) is only ever interpolated
 // into fixed sentences and shown as plain text: never an instruction.
-import type { ConversationSummary, DecisionView, NeedView } from "./api/queries";
+import type { ConversationSummary, DecisionView, NeedView, Unsure } from "./api/queries";
 import { displayName, reasonText, type Translate } from "./model";
 
 const DAY_MS = 86_400_000;
@@ -17,6 +17,82 @@ export function billKind(need: NeedView): "ask" | "toPay" | undefined {
     return undefined;
   }
   return need.trust === "check" ? "ask" : "toPay";
+}
+
+/**
+ * What a question about a reply or an action on mail that went to other
+ * people knows about them (campbooks-cloud#372): the card then asks whose move
+ * it is, not only whether the email needs a reply. Undefined for any other
+ * need, and for a question about mail the member got alone.
+ */
+export function unsureOf(need: NeedView): Unsure | undefined {
+  if (
+    need.trust !== "check" ||
+    (need.question !== "needs_reply" && need.question !== "asks_action")
+  ) {
+    return undefined;
+  }
+  return need.unsure ?? undefined;
+}
+
+/** The people an unsure card names: one or two by name, then how many more. */
+function othersLabel(t: Translate, others: Unsure["others"], locale: string): string {
+  const names = others.slice(0, 2).map((person) => displayName(person));
+  const more = others.length - names.length;
+  if (more > 0) {
+    return t("needs.unsure.more", { names: names.join(", "), count: more });
+  }
+  return new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(names);
+}
+
+/**
+ * The first line of an unsure card, in the user's language: who wrote to
+ * whom, and where the member stands in it ("Ana Costa wrote to Rui Matos.
+ * You're in Cc.").
+ */
+function unsureLine(t: Translate, name: string, unsure: Unsure, locale: string): string {
+  const others = othersLabel(t, unsure.others, locale);
+  if (unsure.in_to) {
+    return t("needs.unsure.lineTo", { name, others });
+  }
+  return t(unsure.in_cc ? "needs.unsure.lineCc" : "needs.unsure.lineNamed", { name, others });
+}
+
+/**
+ * The second line: that they haven't answered, when the headers say so, then
+ * that Scout can't tell whose move it is.
+ */
+export function unsureNote(t: Translate, unsure: Unsure): string {
+  const days = unsure.unanswered_days ?? 0;
+  const ask = t("needs.unsure.ask");
+  return days > 0 ? `${t("needs.unsure.unanswered", { count: days })} ${ask}` : ask;
+}
+
+/**
+ * "How Scout decided" for an unsure card: how sure the model was, the bar for
+ * calling it sure, and, when it applied, that the member was not in To.
+ */
+function unsureHow(
+  t: Translate,
+  unsure: Unsure,
+  question: NeedView["question"],
+): { question: string; answer: string; source: string } | undefined {
+  const { confidence, sure_bar: bar } = unsure;
+  if (confidence === null || confidence === undefined || bar === null || bar === undefined) {
+    return undefined;
+  }
+  const answer = [
+    t(question === "asks_action" ? "needs.unsure.howAction" : "needs.unsure.howReply", {
+      confidence,
+      bar,
+    }),
+    ...(unsure.in_to ? [] : [t(unsure.in_cc ? "needs.unsure.howCc" : "needs.unsure.howNotTo")]),
+  ];
+  return {
+    question: t("needs.unsure.howQuestion"),
+    answer: answer.join(" "),
+    source: t("needs.how.source.model"),
+  };
 }
 
 /**
@@ -121,6 +197,10 @@ export function needSentence(
   if (need.question === "worth_a_look") {
     return t("needs.line.worthALook", { name });
   }
+  const unsure = unsureOf(need);
+  if (unsure !== undefined && when !== undefined) {
+    return unsureLine(t, name, unsure, when.locale);
+  }
   if (need.trust === "check") {
     if (billKind(need) === "ask") {
       // Campbooks can't see the bank: a bill is a question until answered
@@ -174,6 +254,9 @@ export function needChip(t: Translate, need: NeedView): string {
   }
   if (isWait(need)) {
     return t(`needs.chip.${need.reason}`, { name: displayName(need.waiting_on) });
+  }
+  if (unsureOf(need) !== undefined) {
+    return t("needs.chip.unsure");
   }
   if (need.trust === "check" && billKind(need) === undefined) {
     return t("needs.chip.check");
@@ -309,8 +392,10 @@ export function howRows(
   t: Translate,
   exists: (key: string) => boolean,
   decisions: readonly DecisionView[],
+  unsure?: { unsure: Unsure; question: NeedView["question"] },
 ): { question: string; answer: string; source: string }[] {
-  return QUESTIONS.flatMap(({ question, label }) => {
+  const sure = unsure === undefined ? undefined : unsureHow(t, unsure.unsure, unsure.question);
+  const rows = QUESTIONS.flatMap(({ question, label }) => {
     const decision = decisions.find((d) => d.question === question);
     if (decision === undefined) {
       return [];
@@ -333,4 +418,5 @@ export function howRows(
       },
     ];
   });
+  return sure === undefined ? rows : [...rows, sure];
 }

@@ -436,6 +436,23 @@ impl Facts {
     }
 }
 
+/// Whether one of the inbox's addresses is in `To` (addresses compared
+/// without regard to case): `Some(false)` for mail the inbox only got a copy
+/// of (`Cc`) or without being named at all (`Bcc`, a list, an alias), `None`
+/// when the inbox is unknown. A fact about the headers, for lowering trust
+/// only: a message the inbox was not addressed in is never a sure ask of its
+/// owner on the model's word alone (campbooks-cloud#372).
+pub fn addressed_to_inbox(envelope: &Envelope) -> Option<bool> {
+    let recipient = envelope.recipient.as_ref()?;
+    let mine = |party: &super::email::Party| {
+        recipient
+            .addresses
+            .iter()
+            .any(|a| a.trim().eq_ignore_ascii_case(party.address.trim()))
+    };
+    Some(envelope.to.iter().any(mine))
+}
+
 /// Whether one of the inbox's addresses is in `Cc` and none is in `To`
 /// (addresses compared without regard to case). `false` when the inbox is
 /// unknown.
@@ -723,6 +740,27 @@ mod tests {
             shared: false,
         });
         env
+    }
+
+    #[test]
+    fn addressed_to_the_inbox_means_in_to() {
+        let to = with_recipient(
+            &["ana@example.com", "sam@example.com"],
+            &[],
+            &["Sam@Example.com"],
+        );
+        assert_eq!(addressed_to_inbox(&to), Some(true));
+        let cc = with_recipient(
+            &["ana@example.com"],
+            &["sam@example.com"],
+            &["sam@example.com"],
+        );
+        assert_eq!(addressed_to_inbox(&cc), Some(false));
+        let bcc = with_recipient(&["ana@example.com"], &[], &["sam@example.com"]);
+        assert_eq!(addressed_to_inbox(&bcc), Some(false));
+        let mut unknown = to;
+        unknown.recipient = None;
+        assert_eq!(addressed_to_inbox(&unknown), None);
     }
 
     #[test]

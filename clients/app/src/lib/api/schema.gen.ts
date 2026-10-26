@@ -5119,6 +5119,7 @@ export interface components {
             sent_at?: string | null;
             /** @description `sure`, or `check` for a question to the member. */
             trust: components["schemas"]["NeedTrust"];
+            unsure?: components["schemas"]["Unsure"] | null;
             /** @description Whether it is for today. */
             urgent: boolean;
             waiting_on?: components["schemas"]["Address"] | null;
@@ -6200,6 +6201,13 @@ export interface components {
             message_id: components["schemas"]["MessageId"];
             /** @description Done, Not needed, or for a Pay need Already paid or Still to pay. */
             outcome: components["schemas"]["Outcome"];
+            /**
+             * @description With Not needed on a question about a reply or an action: the address
+             *     of the person on the email who has the move. The conversation then
+             *     waits on them.
+             * @example ana@example.com
+             */
+            wait_on?: string | null;
         };
         /**
          * @description The member's answer to an invitation.
@@ -7421,6 +7429,46 @@ export interface components {
          * @enum {string}
          */
         UnsupportedReason: "sends_mail" | "deletes_mail" | "not_about_mail" | "too_vague";
+        /**
+         * @description The people of an email a question about a reply or an action is about,
+         *     from its headers (campbooks-cloud#372). It lets the member say who has the
+         *     move, not only whether the email needs them.
+         */
+        Unsure: {
+            /**
+             * Format: int32
+             * @description How sure the model was of its reading, in percent.
+             */
+            confidence?: number | null;
+            /**
+             * @description Whether the inbox is in `Cc`: copied. When it is in neither, it was not
+             *     named (a blind copy, a list or an alias).
+             */
+            in_cc: boolean;
+            /**
+             * @description Whether the inbox is in `To`; `false` when it is only copied, or not
+             *     named at all.
+             */
+            in_to: boolean;
+            /**
+             * @description Who else the email went to, `To` before `Cc`, as the headers gave
+             *     them: without the inbox, the sender, and no-reply or service
+             *     addresses; at most six.
+             */
+            others: components["schemas"]["Address"][];
+            party?: components["schemas"]["Address"] | null;
+            /**
+             * Format: int32
+             * @description The confidence from which Campbooks shows it as sure, in percent.
+             */
+            sure_bar?: number | null;
+            /**
+             * Format: int32
+             * @description Whole days since the email was sent, when none of `others` wrote to
+             *     the inbox since; none when one did.
+             */
+            unanswered_days?: number | null;
+        };
         /** @description What to change about a rule. */
         UpdateRule: {
             /** @description New actions. */
@@ -11132,7 +11180,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), or a paid answer for a need that is not Pay (`not_a_payment`). */
+            /** @description It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), a paid answer for a need that is not Pay (`not_a_payment`), or a person to wait on who is not on the email (`not_a_party`). */
             409: {
                 headers: {
                     [name: string]: unknown;

@@ -18,6 +18,7 @@ const TOASTS: Record<Exclude<NeedVerdict, "reopen">, string> = {
   confirm: "needs.toast.confirmed",
   already_paid: "needs.toast.paid",
   still_to_pay: "needs.toast.toPay",
+  wait_on: "needs.toast.waiting",
 };
 
 export interface NeedActionOptions {
@@ -29,6 +30,11 @@ export interface NeedActionOptions {
   onRedo?: (conversation: ConversationSummary) => void;
   /** When the server refused or failed: Home shows the item again. */
   onFailed?: (conversation: ConversationSummary) => void;
+  /**
+   * "Someone else has the move" was filed and the server agreed (campbooks-cloud#372): the
+   * conversation now waits on that person, in this summary. Where the nudge to them is offered.
+   */
+  onWaiting?: (conversation: ConversationSummary) => void;
   /**
    * A bill was marked paid and the server agreed: where the paid rule for
    * that sender is offered ("Mark their invoices paid from now on",
@@ -58,7 +64,7 @@ function personOf(
  */
 export function useNeedActions(
   workspaceId: string,
-  { onChanged, onUndo, onRedo, onFailed, onPaid, onReported }: NeedActionOptions = {},
+  { onChanged, onUndo, onRedo, onFailed, onPaid, onReported, onWaiting }: NeedActionOptions = {},
 ) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
@@ -76,11 +82,21 @@ export function useNeedActions(
     verdict: NeedVerdict,
     entry?: number,
     undone?: { current: boolean },
+    waitingOn?: { address: string; name: string },
   ) => {
     void mutation
-      .mutateAsync({ conversation, action: { need: verdict } })
+      .mutateAsync({
+        conversation,
+        action:
+          waitingOn === undefined
+            ? { need: verdict }
+            : { need: verdict, address: waitingOn.address },
+      })
       .then(
-        () => {
+        (summary) => {
+          if (verdict === "wait_on" && undone?.current !== true) {
+            onWaiting?.(summary);
+          }
           // Not needed on a need (not a warning) can teach: "these never need me".
           // Not on "Still needed?": the mail did need something, time passed.
           const need = conversation.need;
@@ -128,7 +144,7 @@ export function useNeedActions(
                   if (verdict !== "confirm" && verdict !== "still_to_pay") {
                     onRedo?.(conversation);
                   }
-                  judge(conversation, verdict);
+                  judge(conversation, verdict, waitingOn);
                 }
               },
             });
@@ -140,12 +156,17 @@ export function useNeedActions(
       });
   };
 
-  const judge = (conversation: ConversationSummary, verdict: Exclude<NeedVerdict, "reopen">) => {
+  const judge = (
+    conversation: ConversationSummary,
+    verdict: Exclude<NeedVerdict, "reopen">,
+    waitingOn?: { address: string; name: string },
+  ) => {
     const need = conversation.need;
     if (need === null || need === undefined) {
       return;
     }
-    const name = personOf(need, conversation);
+    // Said of the person waited on, not of the one who wrote.
+    const name = waitingOn?.name ?? personOf(need, conversation);
     const safe = verdict === "not_needed" && need.question === "suspicious";
     // "Still needed?" answered No: nothing is learned from it, so say only that.
     const stale = verdict === "not_needed" && isStillNeeded(need);
@@ -172,10 +193,10 @@ export function useNeedActions(
         if (verdict !== "confirm" && verdict !== "still_to_pay") {
           onRedo?.(conversation);
         }
-        run(conversation, verdict, undefined, undone);
+        run(conversation, verdict, undefined, undone, waitingOn);
       },
     });
-    run(conversation, verdict, entry, undone);
+    run(conversation, verdict, entry, undone, waitingOn);
   };
 
   /** One Undo for several bills marked paid at once: those the server took. */
@@ -315,6 +336,13 @@ export function useNeedActions(
     },
     confirm: (conversation: ConversationSummary) => {
       judge(conversation, "confirm");
+    },
+    /**
+     * Someone else on the email has the move (campbooks-cloud#372): the conversation waits on
+     * `person`, with Undo. `onWaiting` hears of the wait once the server agreed.
+     */
+    waitOn: (conversation: ConversationSummary, person: { address: string; name: string }) => {
+      judge(conversation, "wait_on", person);
     },
     /** A bill is paid already: it leaves the list. */
     alreadyPaid: (conversation: ConversationSummary) => {

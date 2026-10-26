@@ -30,12 +30,22 @@ type MessageBody = Schema<"MessageBody">;
 export type DecisionView = Schema<"DecisionView">;
 export type ReasonView = Schema<"ReasonView">;
 export type NeedView = Schema<"NeedView">;
+/** The people behind a question about a reply or an action (campbooks-cloud#372). */
+export type Unsure = Schema<"Unsure">;
 export type Sender = Schema<"SenderView">;
 export type Correspondent = Schema<"CorrespondentView">;
 
 /** A member's verdict on what a conversation needs (`conversations.resolve_need`, …). */
 export type NeedVerdict =
-  "done" | "not_needed" | "confirm" | "reopen" | "already_paid" | "still_to_pay";
+  | "done"
+  | "not_needed"
+  | "confirm"
+  | "reopen"
+  | "already_paid"
+  | "still_to_pay"
+  // Not needed, because someone else on the email has the move (campbooks-cloud#372):
+  // the conversation waits on them. Goes with the address of that person.
+  | "wait_on";
 
 /** The built-in streams, in display order. */
 export const STREAMS: readonly Stream[] = ["primary", "updates", "receipts", "newsletters"];
@@ -350,7 +360,7 @@ export type ConversationAction =
   | "trash"
   | "untrash"
   | { stream: Stream }
-  | { need: NeedVerdict };
+  | { need: NeedVerdict; address?: string };
 
 const PATHS = {
   archive: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/archive",
@@ -375,6 +385,7 @@ export function applied(
       switch (action.need) {
         case "done":
         case "not_needed":
+        case "wait_on":
         case "already_paid": {
           return { ...summary, need: null };
         }
@@ -441,8 +452,17 @@ async function needRequest(
   params: { path: { workspace_id: string; conversation_id: string } },
   verdict: NeedVerdict,
   seen: string,
+  address?: string,
 ): Promise<ConversationSummary> {
   switch (verdict) {
+    case "wait_on": {
+      return unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve", {
+          params,
+          body: { outcome: "not_needed", message_id: seen, wait_on: address ?? "" },
+        }),
+      );
+    }
     case "done":
     case "not_needed":
     case "already_paid":
@@ -584,7 +604,12 @@ export function useConversationAction(workspaceId: string) {
     }) => {
       const params = { path: { workspace_id: workspaceId, conversation_id: conversation.id } };
       if (typeof action === "object" && "need" in action) {
-        return needRequest(params, action.need, conversation.need?.message_id ?? "");
+        return needRequest(
+          params,
+          action.need,
+          conversation.need?.message_id ?? "",
+          action.address,
+        );
       }
       if (typeof action === "object") {
         return unwrap(
