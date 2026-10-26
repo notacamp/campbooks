@@ -2,7 +2,10 @@
 //! session an ID token was issued in, and the refresh tokens of that sign-in.
 //!
 //! A valid `id_token_hint` is required: only the client the person signed in
-//! to holds it, so another site cannot sign anyone out. An expired hint is
+//! to holds it, so another site cannot sign anyone out. Campbooks' own apps
+//! and instance apps (campbooks-cloud#369) may end a session this way, and
+//! return the browser to one of their registered
+//! `post_logout_redirect_uris`, matched exactly. An expired hint is
 //! fine (OIDC RP-Initiated Logout §2), but its signature, issuer and client
 //! are checked. The web BFF calls it server-side, in-process, with the ID
 //! token it keeps; browsers never see one.
@@ -29,7 +32,10 @@ use super::Ctx;
 use crate::{
     MESSAGES,
     deps::Issuer,
-    domain::{sessions, tracked},
+    domain::{
+        clients::{Client, Kind},
+        sessions, tracked,
+    },
     tracking,
     web::{self, SESSION_COOKIE, SameSite, see_other, with_cookie},
 };
@@ -143,11 +149,12 @@ async fn end(ctx: &Ctx, ip: ClientIp, request: EndSession) -> Result<Response> {
         }
         tx.commit().await?;
     }
-    let client = issuer.clients.first_party_client(&hint.client);
-    let target = request
-        .post_logout_redirect_uri
-        .as_deref()
-        .filter(|uri| client.is_some_and(|c| c.post_logout_redirect_uris.iter().any(|u| u == uri)));
+    let client = logout_client(ctx, issuer, &hint.client).await?;
+    let target = request.post_logout_redirect_uri.as_deref().filter(|uri| {
+        client
+            .as_ref()
+            .is_some_and(|c| c.post_logout_redirect_uris.iter().any(|u| u == uri))
+    });
     let response = match target {
         Some(uri) => {
             let mut url = url::Url::parse(uri).map_err(Error::internal)?;
@@ -162,6 +169,16 @@ async fn end(ctx: &Ctx, ip: ClientIp, request: EndSession) -> Result<Response> {
         response,
         issuer.cookies.clear(SESSION_COOKIE, SameSite::Lax),
     ))
+}
+
+/// Client `id` when it may end a session here: one of Campbooks' own, or
+/// an instance app.
+async fn logout_client(ctx: &Ctx, issuer: &Issuer, id: &str) -> Result<Option<Client>> {
+    Ok(issuer
+        .clients
+        .find(&ctx.state.db, id)
+        .await?
+        .filter(|client| matches!(client.kind, Kind::FirstParty | Kind::Instance)))
 }
 
 /// What a valid hint says.
@@ -211,7 +228,7 @@ async fn verify_hint(ctx: &Ctx, issuer: &Issuer, token: &str) -> Result<Option<H
     let Ok(account) = claims.sub.parse() else {
         return Ok(None);
     };
-    if issuer.clients.first_party_client(&claims.aud).is_none() {
+    if logout_client(ctx, issuer, &claims.aud).await?.is_none() {
         return Ok(None);
     }
     Ok(Some(Hint {

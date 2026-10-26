@@ -1,0 +1,79 @@
+# Instance apps (campbooks-cloud#369, OpenSpec change instance-apps): OAuth
+# clients an instance administrator registers from the server's CLI only
+# (`campbooks-server admin apps add|rotate-secret|remove`), for first-party
+# single sign-on such as Applicamp. Three instance-wide events, tracked as
+# `system` with the command's name, in the transaction of the change; the
+# client kind `instance`; and the `app_…` client ids they mint join every
+# client-id pattern (an additive widening: every value valid before stays
+# valid). No Coverage rows: the CLI serves no operation and runs no job,
+# schedule or handler (like the admin module's grant and revoke).
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0016-instance-apps.yaml`.
+changelog:
+  - date: "2026-10-26"
+    plan_version: 16
+    change: "Instance apps (campbooks-cloud#369): 3 instance-wide events for an instance app registered, its secret rotated and its removal (with the consents and refresh tokens it held) by the server's admin command, as system; the client kind instance; the instance apps' app_ ids in every client-id pattern; no Coverage rows (the CLI serves no operation and runs no job, schedule or handler)."
+    pr: "#681"
+
+events:
+  - name: "identity.instance_app_registered"
+    version: 1
+    module: "identity"
+    object: "instance_app"
+    action: "registered"
+    scope: "instance"
+    status: "live"
+    actor_types: [system]
+    description: "An instance administrator registered an instance app (a confidential sign-in client of the whole instance) with the server's `campbooks-server admin apps add`. The snapshot is the client, never its name, secret, scopes or redirect URIs."
+    fires_when: "admin apps add (campbooks_identity::domain::instance_apps::register) stores it, in the transaction that writes the client and its audit entry."
+    added_in: 16
+    openspec_change: "instance-apps"
+  - name: "identity.instance_app_secret_rotated"
+    version: 1
+    module: "identity"
+    object: "instance_app_secret"
+    action: "rotated"
+    scope: "instance"
+    status: "live"
+    actor_types: [system]
+    description: "An instance app got a new secret from the server's `campbooks-server admin apps rotate-secret`; the old one stopped working."
+    fires_when: "admin apps rotate-secret (campbooks_identity::domain::instance_apps::rotate_secret) stores the new secret's hash; an unknown client id tracks nothing."
+    added_in: 16
+    openspec_change: "instance-apps"
+  - name: "identity.instance_app_removed"
+    version: 1
+    module: "identity"
+    object: "instance_app"
+    action: "removed"
+    scope: "instance"
+    status: "live"
+    actor_types: [system]
+    description: "An instance app was removed by the server's `campbooks-server admin apps remove`, with every consent and refresh token it held."
+    fires_when: "admin apps remove (campbooks_identity::domain::instance_apps::remove) deletes it and revokes its consents and refresh tokens; an unknown client id tracks nothing."
+    added_in: 16
+    openspec_change: "instance-apps"
+
+properties:
+  - { event: "identity.instance_app_registered", version: 1, property: "client", type: "record", of: "identity.client", required: true, classification: "operational", description: "The new client." }
+  - { event: "identity.instance_app_secret_rotated", version: 1, property: "client", type: "record", of: "identity.client", required: true, classification: "operational", description: "The client afterwards." }
+  - { event: "identity.instance_app_removed", version: 1, property: "client_id", type: "code", required: true, classification: "id", pattern: "^app_[A-Za-z0-9_-]{22}$", description: "The client's id." }
+  - { event: "identity.instance_app_removed", version: 1, property: "consents_revoked", type: "int", required: true, classification: "operational", description: "How many live consents it held were revoked." }
+  - { event: "identity.instance_app_removed", version: 1, property: "refresh_tokens_revoked", type: "int", required: true, classification: "operational", description: "How many live refresh-token families (sign-ins) it held were revoked." }
+  # The client-id patterns, widened to the instance apps' `app_…` ids.
+  - { event: "identity.client_removed", version: 1, property: "client_id", type: "code", required: true, classification: "id", pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$", description: "The client's id." }
+  - { event: "identity.consent_denied", version: 1, property: "client_id", type: "code", required: false, classification: "id", pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$", description: "Its client id, when Campbooks minted it; absent for a metadata-document client." }
+  - { event: "identity.refresh_reuse_detected", version: 1, property: "client_id", type: "code", required: false, classification: "id", pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$", description: "Its client id, when Campbooks minted it; absent for a metadata-document client." }
+  - { event: "identity.refresh_token_revoked", version: 1, property: "client_id", type: "code", required: false, classification: "id", pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$", description: "Its client id, when Campbooks minted it; absent for a metadata-document client." }
+  - { event: "identity.tokens_issued", version: 1, property: "client_id", type: "code", required: false, classification: "id", pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$", description: "Its client id, when Campbooks minted it; absent for a metadata-document client." }
+
+records:
+  - { record: "identity.client", field: "client_id", type: "code", required: false, classification: "id", pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$", description: "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL." }
+  - { record: "identity.consent", field: "client_id", type: "code", required: false, classification: "id", pattern: "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$", description: "The client it lets in, when Campbooks minted its id; absent for a metadata-document client." }
+
+enums:
+  - { enum: "identity.client_kind", value: "instance", description: "An instance app: registered by an instance administrator from the server's CLI (first-party sign-in for the instance's own other apps)." }
+
+actors:
+  - type: "client"
+    id_is: "the OAuth client id when Campbooks minted it (campbooks-web, campbooks-native, cb_…, dcr_…, app_…); none for any other client (one known by its metadata document has a URL for an id)"
+    description: "An app acting on its own behalf (client credentials)."

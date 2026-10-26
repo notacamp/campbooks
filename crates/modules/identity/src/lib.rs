@@ -147,6 +147,8 @@ mod allow_list_tests;
 #[cfg(test)]
 mod clients_tests;
 #[cfg(test)]
+mod instance_apps_tests;
+#[cfg(test)]
 mod passkey_tests;
 #[cfg(test)]
 mod revocation_tests;

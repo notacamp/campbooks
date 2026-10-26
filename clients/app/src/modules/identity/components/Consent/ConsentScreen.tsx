@@ -174,12 +174,20 @@ function Ask({
     return <Simple visor="unsure" title={t("consent.gone.title")} lead={t("consent.gone.lead")} />;
   }
 
-  const kind = client.kind as "first_party" | "workspace" | "dynamic" | "metadata_document";
+  const kind = client.kind as
+    | "first_party"
+    | "workspace"
+    | "dynamic"
+    | "metadata_document"
+    | "instance";
   const host = client.document_host ?? client.redirect_host ?? "";
+  // Campbooks' own apps, and the apps this server's administrator added,
+  // are vouched for; anyone can register any other app with any name.
+  const vouched = client.verified || kind === "instance";
   return (
     <FocusPage
       top={<Brand name={tShell("appName")} />}
-      leading={<Visor size="xl" state={client.verified ? "happy" : "alert"} />}
+      leading={<Visor size="xl" state={vouched ? "happy" : "alert"} />}
       eyebrow={t("consent.eyebrow")}
       title={t("consent.title", { app: client.name })}
       lead={
@@ -234,7 +242,7 @@ function Ask({
         <Banner icon="warning" title={t("consent.device.title")}>
           {t("consent.device.lead")}
         </Banner>
-      ) : client.verified ? null : (
+      ) : vouched ? null : (
         <Banner icon="warning" title={t("consent.unverifiedNote.title")}>
           {t("consent.unverifiedNote.lead")}
         </Banner>
@@ -311,13 +319,17 @@ function Ask({
 }
 
 /**
- * Who vouches for an app: Campbooks for its own, the workspace for one a
- * workspace registered, nobody for the rest.
+ * Who vouches for an app: Campbooks for its own, this server's
+ * administrator for an instance app, the workspace for one a workspace
+ * registered, nobody for the rest.
  */
 function AppTag({ client }: { client: ConsentRequest["client"] }) {
   const { t } = useTranslation("identity");
   if (client.verified) {
     return <Tag icon="check">{t("consent.campbooks")}</Tag>;
+  }
+  if (client.kind === "instance") {
+    return <Tag icon="lock">{t("consent.instanceApp")}</Tag>;
   }
   if (client.kind === "workspace") {
     return (
