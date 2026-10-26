@@ -4,9 +4,15 @@
 //! login** (`CAMPBOOKS_DATABASE_MIGRATION_URL`, else the database URL): the
 //! runtime role every request runs as cannot write a profile.
 //!
-//! A change of a profile is tracked (ADR 0020) with the tracker
-//! `CAMPBOOKS_TRACKING__*` configures, as `system` `admin` (the command's
-//! name, outside any request or job) with the role `cli`.
+//! `campbooks-server admin apps add|list|rotate-secret|remove`
+//! (campbooks-cloud#369) does the same for **instance apps**: confidential
+//! sign-in clients of the whole instance, for the operator's own other apps
+//! (first-party single sign-on). No HTTP endpoint registers, rotates or
+//! removes one, and the runtime role cannot change one.
+//!
+//! A change of a profile or an instance app is tracked (ADR 0020) with the
+//! tracker `CAMPBOOKS_TRACKING__*` configures, as `system` `admin` (the
+//! command's name, outside any request or job) with the role `cli`.
 
 use std::{
     io::{BufRead as _, Write as _},
@@ -14,7 +20,8 @@ use std::{
 };
 
 use campbooks_admin::cli::{self, Profile, Revoked};
-use campbooks_kernel::{Config, admin::Permission, db, tracking::Tracker};
+use campbooks_identity::domain::instance_apps::{self, InstanceApp, NewInstanceApp};
+use campbooks_kernel::{Config, admin::Permission, config::Environment, db, tracking::Tracker};
 use clap::{Args, Subcommand};
 use sqlx::{Connection as _, PgConnection};
 use uuid::Uuid;
@@ -58,6 +65,60 @@ pub enum AdminCommand {
         /// How many entries.
         #[arg(long, default_value_t = 20)]
         limit: i64,
+    },
+    /// Manage instance apps: the operator's own other apps that sign people
+    /// in with Campbooks (`OpenID Connect`, a confidential client). The only
+    /// way to register, rotate or remove one.
+    Apps {
+        #[command(subcommand)]
+        command: AppsCommand,
+    },
+}
+
+/// What `campbooks-server admin apps` does.
+#[derive(Debug, Subcommand)]
+pub enum AppsCommand {
+    /// Register an instance app; prints its client id and its secret, the
+    /// only time the secret is shown.
+    Add {
+        /// The name people see on the consent screen.
+        #[arg(long)]
+        name: String,
+        /// Where codes may go (repeatable): https, matched exactly (loopback
+        /// http only when `CAMPBOOKS_ENV=development`).
+        #[arg(long = "redirect-uri", required = true)]
+        redirect_uris: Vec<String>,
+        /// Where the browser may return after signing out (repeatable).
+        #[arg(long = "post-logout-redirect-uri")]
+        post_logout_redirect_uris: Vec<String>,
+        /// The scope ceiling: every scope it may ever be granted. Any of
+        /// `openid profile email offline_access` and the API scopes a
+        /// third party may hold (`campbooks-server scopes` lists them).
+        #[arg(long = "scopes", required = true, num_args = 1..)]
+        scopes: Vec<String>,
+        /// Do not ask for confirmation.
+        #[arg(long)]
+        yes: bool,
+    },
+    /// List the instance apps.
+    List,
+    /// Give an instance app a new secret, shown once; the old one stops
+    /// working at once.
+    RotateSecret {
+        /// Its client id (`app_…`).
+        client_id: String,
+        /// Do not ask for confirmation.
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Remove an instance app: every consent people gave it and every
+    /// refresh token it holds end at once.
+    Remove {
+        /// Its client id (`app_…`).
+        client_id: String,
+        /// Do not ask for confirmation.
+        #[arg(long)]
+        yes: bool,
     },
 }
 
@@ -128,6 +189,7 @@ async fn execute(config: &Config, command: AdminCommand) -> Result<(), String> {
         } => revoke(&mut conn, &tracker, &who, &permissions, yes).await,
         AdminCommand::List => list(&mut conn).await,
         AdminCommand::Log { limit } => log(&mut conn, limit).await,
+        AdminCommand::Apps { command } => apps(config, &mut conn, &tracker, command).await,
     };
     let _ = conn.close().await;
     result
@@ -244,6 +306,168 @@ async fn log(conn: &mut PgConnection, limit: i64) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+async fn apps(
+    config: &Config,
+    conn: &mut PgConnection,
+    tracker: &Tracker,
+    command: AppsCommand,
+) -> Result<(), String> {
+    match command {
+        AppsCommand::Add {
+            name,
+            redirect_uris,
+            post_logout_redirect_uris,
+            scopes,
+            yes,
+        } => {
+            let asked = NewInstanceApp {
+                name,
+                redirect_uris,
+                post_logout_redirect_uris,
+                scopes: split_scopes(&scopes),
+            };
+            add_app(config, conn, tracker, &asked, yes).await
+        }
+        AppsCommand::List => list_apps(conn).await,
+        AppsCommand::RotateSecret { client_id, yes } => {
+            rotate_app(conn, tracker, client_id.trim(), yes).await
+        }
+        AppsCommand::Remove { client_id, yes } => {
+            remove_app(conn, tracker, client_id.trim(), yes).await
+        }
+    }
+}
+
+async fn add_app(
+    config: &Config,
+    conn: &mut PgConnection,
+    tracker: &Tracker,
+    asked: &NewInstanceApp,
+    yes: bool,
+) -> Result<(), String> {
+    let app = instance_apps::validate(
+        asked,
+        &campbooks_server::scope_catalogue(),
+        config.env == Environment::Development,
+    )
+    .map_err(|refusal| format!("refused: {refusal}"))?;
+    confirm(
+        yes,
+        &format!(
+            "Register the instance app {:?} with the scopes {} and the redirect URIs {}?",
+            app.name,
+            app.scopes.join(" "),
+            app.redirect_uris.join(" ")
+        ),
+    )?;
+    let (stored, secret) = instance_apps::register(conn, tracker, &app, chrono::Utc::now())
+        .await
+        .map_err(|e| format!("could not register: {e}"))?;
+    say(&format!("registered: {}", stored.name));
+    say(&format!(
+        "issuer: {}",
+        config.public_url.trim_end_matches('/')
+    ));
+    say(&format!("client_id: {}", stored.client_id));
+    say(&format!("client_secret: {secret}"));
+    warn("the secret is shown this once: store it now (rotate-secret makes a new one)");
+    Ok(())
+}
+
+async fn list_apps(conn: &mut PgConnection) -> Result<(), String> {
+    let apps = instance_apps::list(conn)
+        .await
+        .map_err(|e| format!("could not list: {e}"))?;
+    if apps.is_empty() {
+        say("no instance apps yet: register one with `campbooks-server admin apps add`");
+    }
+    for app in &apps {
+        say(&describe_app(app));
+    }
+    Ok(())
+}
+
+async fn rotate_app(
+    conn: &mut PgConnection,
+    tracker: &Tracker,
+    client_id: &str,
+    yes: bool,
+) -> Result<(), String> {
+    confirm(
+        yes,
+        &format!("Give {client_id} a new secret? The current one stops working at once."),
+    )?;
+    let Some((app, secret)) =
+        instance_apps::rotate_secret(conn, tracker, client_id, chrono::Utc::now())
+            .await
+            .map_err(|e| format!("could not rotate: {e}"))?
+    else {
+        return Err(format!("no instance app has the client id {client_id}"));
+    };
+    say(&format!("rotated: {} ({})", app.client_id, app.name));
+    say(&format!("client_secret: {secret}"));
+    warn("the secret is shown this once: store it now");
+    Ok(())
+}
+
+async fn remove_app(
+    conn: &mut PgConnection,
+    tracker: &Tracker,
+    client_id: &str,
+    yes: bool,
+) -> Result<(), String> {
+    confirm(
+        yes,
+        &format!("Remove {client_id}? Everyone signed in to it is signed out of it, at once."),
+    )?;
+    let Some(removed) = instance_apps::remove(conn, tracker, client_id, chrono::Utc::now())
+        .await
+        .map_err(|e| format!("could not remove: {e}"))?
+    else {
+        return Err(format!("no instance app has the client id {client_id}"));
+    };
+    say(&format!(
+        "removed: {client_id}; {} consent(s) and {} sign-in(s) revoked",
+        removed.consents_revoked, removed.refresh_tokens_revoked
+    ));
+    Ok(())
+}
+
+/// `--scopes` as given: repeated, or several in one quoted value.
+fn split_scopes(given: &[String]) -> Vec<String> {
+    given
+        .iter()
+        .flat_map(|value| value.split([' ', ',']))
+        .filter(|scope| !scope.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn describe_app(app: &InstanceApp) -> String {
+    let date = |at: &chrono::DateTime<chrono::Utc>| at.format("%Y-%m-%d").to_string();
+    let mut parts = vec![
+        app.client_id.clone(),
+        app.name.clone(),
+        format!("since {}", date(&app.created_at)),
+        format!("scopes: {}", app.allowed_scopes.join(" ")),
+        format!("redirect: {}", app.redirect_uris.join(" ")),
+    ];
+    if !app.post_logout_redirect_uris.is_empty() {
+        parts.push(format!(
+            "after logout: {}",
+            app.post_logout_redirect_uris.join(" ")
+        ));
+    }
+    if let Some(at) = &app.secret_rotated_at {
+        parts.push(format!("secret rotated {}", date(at)));
+    }
+    parts.push(match &app.last_used_at {
+        Some(at) => format!("last used {}", date(at)),
+        None => "never used".to_owned(),
+    });
+    parts.join("  ")
 }
 
 /// A connection on the migration login, as `migrate` opens it.
@@ -376,6 +600,89 @@ mod tests {
         assert_eq!(parse_permission("jobs.retry"), Ok(Permission::JobsRetry));
         let err = parse_permission("root").unwrap_err();
         assert!(err.contains("system.read"), "{err}");
+    }
+
+    #[test]
+    fn scopes_may_come_repeated_or_in_one_value() {
+        assert_eq!(
+            split_scopes(&[
+                "openid profile".to_owned(),
+                "email".to_owned(),
+                "conversations:read,schedule:read".to_owned(),
+            ]),
+            [
+                "openid",
+                "profile",
+                "email",
+                "conversations:read",
+                "schedule:read"
+            ]
+        );
+    }
+
+    #[test]
+    fn the_apps_command_parses() {
+        use clap::Parser as _;
+        #[derive(Debug, clap::Parser)]
+        struct Cli {
+            #[command(subcommand)]
+            command: AdminCommand,
+        }
+        let cli = Cli::try_parse_from([
+            "admin",
+            "apps",
+            "add",
+            "--name",
+            "Applicamp",
+            "--redirect-uri",
+            "https://applicamp.example.com/auth/callback",
+            "--post-logout-redirect-uri",
+            "https://applicamp.example.com/",
+            "--scopes",
+            "openid",
+            "profile",
+            "email",
+            "offline_access",
+            "conversations:read",
+            "--yes",
+        ])
+        .unwrap();
+        let AdminCommand::Apps {
+            command:
+                AppsCommand::Add {
+                    name,
+                    redirect_uris,
+                    post_logout_redirect_uris,
+                    scopes,
+                    yes,
+                },
+        } = cli.command
+        else {
+            panic!("not `apps add`");
+        };
+        assert_eq!(name, "Applicamp");
+        assert_eq!(
+            redirect_uris,
+            ["https://applicamp.example.com/auth/callback"]
+        );
+        assert_eq!(
+            post_logout_redirect_uris,
+            ["https://applicamp.example.com/"]
+        );
+        assert_eq!(scopes.len(), 5);
+        assert!(yes);
+        for args in [
+            ["admin", "apps", "rotate-secret", "app_x"],
+            ["admin", "apps", "remove", "app_x"],
+        ] {
+            assert!(Cli::try_parse_from(args).is_ok(), "{args:?}");
+        }
+        assert!(Cli::try_parse_from(["admin", "apps", "list"]).is_ok());
+        // A redirect URI is required.
+        assert!(
+            Cli::try_parse_from(["admin", "apps", "add", "--name", "X", "--scopes", "openid"])
+                .is_err()
+        );
     }
 
     #[test]

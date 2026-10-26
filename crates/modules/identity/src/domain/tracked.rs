@@ -55,6 +55,7 @@ pub fn client_kind(kind: Kind) -> ClientKind {
         Kind::Workspace => ClientKind::Workspace,
         Kind::Dynamic => ClientKind::Dynamic,
         Kind::MetadataDocument => ClientKind::MetadataDocument,
+        Kind::Instance => ClientKind::Instance,
     }
 }
 
@@ -65,6 +66,7 @@ pub fn client_kind_of(id: &str) -> ClientKind {
     match minted_client_id(id) {
         Some(id) if FIRST_PARTY_CLIENT_IDS.contains(&id) => ClientKind::FirstParty,
         Some(id) if id.starts_with("cb_") => ClientKind::Workspace,
+        Some(id) if id.starts_with(super::instance_apps::CLIENT_ID_PREFIX) => ClientKind::Instance,
         Some(_) => ClientKind::Dynamic,
         None => ClientKind::MetadataDocument,
     }
@@ -258,6 +260,7 @@ pub async fn client(conn: &mut PgConnection, client_id: &str) -> Result<ClientSn
     let kind = match kind.as_str() {
         "workspace" => ClientKind::Workspace,
         "dynamic" => ClientKind::Dynamic,
+        "instance" => ClientKind::Instance,
         _ => ClientKind::MetadataDocument,
     };
     Ok(ClientSnapshot {
@@ -341,6 +344,9 @@ mod tests {
         let dynamic = "dcr_abcdefghijklmnopqrst-_";
         assert_eq!(client_ref(dynamic).as_deref(), Some(dynamic));
         assert_eq!(client_kind_of(dynamic), ClientKind::Dynamic);
+        let instance = "app_AAAAAAAAAAAAAAAAAAAAAA";
+        assert_eq!(client_ref(instance).as_deref(), Some(instance));
+        assert_eq!(client_kind_of(instance), ClientKind::Instance);
         let document = "https://app.example.com/oauth/client.json";
         assert_eq!(client_ref(document), None);
         assert_eq!(client_kind_of(document), ClientKind::MetadataDocument);

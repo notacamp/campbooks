@@ -62,7 +62,7 @@ pub const FIXED_ACTORS: &[(&str, &str, &str)] = &[
     ),
     (
         "client",
-        "the OAuth client id when Campbooks minted it (campbooks-web, campbooks-native, cb_…, dcr_…); none for any other client (one known by its metadata document has a URL for an id)",
+        "the OAuth client id when Campbooks minted it (campbooks-web, campbooks-native, cb_…, dcr_…, app_…); none for any other client (one known by its metadata document has a URL for an id)",
         "An app acting on its own behalf (client credentials).",
     ),
     (

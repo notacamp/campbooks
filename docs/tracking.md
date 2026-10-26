@@ -229,7 +229,7 @@ The kernel writes the envelope around each body; callers never set it:
 | `name`, `version` | the generated type |
 | `occurred_at` | the time it was tracked |
 | `workspace_id` | the event (checked against the transaction's) |
-| `actor`, `on_behalf_of` | the context: `{type, id}`, ids only. A `client` carries its client id only when Campbooks minted it (`campbooks-web`, `campbooks-native`, `cb_…`, `dcr_…`; `tracking::minted_client_id`); any other client, such as one known by its metadata document (a URL), is `{"type": "client"}` with no id |
+| `actor`, `on_behalf_of` | the context: `{type, id}`, ids only. A `client` carries its client id only when Campbooks minted it (`campbooks-web`, `campbooks-native`, `cb_…`, `dcr_…`, `app_…`; `tracking::minted_client_id`); any other client, such as one known by its metadata document (a URL), is `{"type": "client"}` with no id |
 | `operation` | the `operationId` being served |
 | `correlation` | the request's trace id (or a fresh one), carried into every job and delivery it causes |
 | `causation` | the job, or the event a delivery delivers |

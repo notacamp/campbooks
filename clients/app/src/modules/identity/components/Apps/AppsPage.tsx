@@ -198,6 +198,8 @@ function ConnectedAppRow({
       badge={
         app.verified ? (
           <Tag icon="check">{t("consent.campbooks")}</Tag>
+        ) : app.client_kind === "instance" ? (
+          <Tag icon="lock">{t("consent.instanceApp")}</Tag>
         ) : app.client_kind === "workspace" ? (
           <Tag icon="people">{t("apps.connected.workspaceApp")}</Tag>
         ) : (
