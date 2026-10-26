@@ -30,6 +30,9 @@ import {
 } from "../model";
 import { iconOf, type PagePlace, type PageSummary } from "../types";
 
+import type { UseNotionSource } from "../notion-source";
+
+import { ImportFromNotion } from "./ImportFromNotion";
 import { PageScreen } from "./PageScreen";
 import { TrashList } from "./TrashList";
 import { usePageActions } from "./use-page-actions";
@@ -40,6 +43,10 @@ export interface PagesPageProps {
   pageId?: string | undefined;
   /** `?new=1`: make a page and open it (`n g`). */
   creating?: boolean | undefined;
+  /** `?import=notion`: open the import from Notion (Settings → Notion → Import pages). */
+  importing?: boolean | undefined;
+  /** Notion, from the app shell; without it there is no import. */
+  notion?: { useSource: UseNotionSource } | undefined;
 }
 
 type Zone = "before" | "inside" | "after";
@@ -49,7 +56,13 @@ type Zone = "before" | "inside" | "after";
  * open page beside it from `lg`, as its own screen below. Pages are dragged
  * to reorder and nest; every change has an Undo.
  */
-export function PagesPage({ workspaceId, pageId, creating = false }: PagesPageProps) {
+export function PagesPage({
+  workspaceId,
+  pageId,
+  creating = false,
+  importing = false,
+  notion,
+}: PagesPageProps) {
   const { t } = useTranslation("pages");
   const navigate = useNavigate();
   const pages = usePages(workspaceId);
@@ -58,6 +71,16 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
   const actions = usePageActions(workspaceId);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [showTrash, setShowTrash] = useState(false);
+  const [importOpen, setImportOpen] = useState(importing);
+  // The import opens when the address asks for it (state adjusted while
+  // rendering, guarded by the change).
+  const [wasImporting, setWasImporting] = useState(importing);
+  if (importing !== wasImporting) {
+    setWasImporting(importing);
+    if (importing) {
+      setImportOpen(true);
+    }
+  }
   const [dragging, setDragging] = useState<string | undefined>();
   const [over, setOver] = useState<{ id: string; zone: Zone } | undefined>();
 
@@ -281,7 +304,23 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
             >
               {sections.workspace.length === 0 ? undefined : rows(sections.workspace)}
             </PageTreeGroup>
-            <PageTreeGroup name={t("tree.private")} empty={t("tree.privateEmpty")}>
+            <PageTreeGroup
+              name={t("tree.private")}
+              empty={t("tree.privateEmpty")}
+              action={
+                notion === undefined ? undefined : (
+                  <Button
+                    variant="ghost"
+                    icon="plus"
+                    onClick={() => {
+                      setImportOpen(true);
+                    }}
+                  >
+                    {t("notion.import.button")}
+                  </Button>
+                )
+              }
+            >
               {sections.private.length === 0 ? undefined : rows(sections.private)}
             </PageTreeGroup>
             {sections.shared.length === 0 ? null : (
@@ -290,6 +329,25 @@ export function PagesPage({ workspaceId, pageId, creating = false }: PagesPagePr
           </PageTree>
         ) : null}
       </ListPane>
+      {notion === undefined ? null : (
+        <ImportFromNotion
+          workspaceId={workspaceId}
+          open={importOpen}
+          useSource={notion.useSource}
+          settingsHref={`/w/${workspaceId}/settings/mailboxes`}
+          onClose={() => {
+            setImportOpen(false);
+            if (importing) {
+              void navigate({ to: base });
+            }
+          }}
+          onImported={(first) => {
+            if (first !== undefined) {
+              go(first);
+            }
+          }}
+        />
+      )}
       <ReaderPane label={t("screen.label")} narrow={pageId === undefined ? "hidden" : "shown"}>
         {pageId === undefined ? (
           <div className="flex flex-col items-center gap-2 p-6">

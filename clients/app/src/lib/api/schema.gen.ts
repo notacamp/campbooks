@@ -673,6 +673,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/connections/notion/authorizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start connecting Notion. */
+        post: operations["connectors.start_notion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/connections/{connection_id}": {
         parameters: {
             query?: never;
@@ -702,6 +719,23 @@ export interface paths {
         put?: never;
         /** Check a mailbox's address again. */
         post: operations["connectors.check_address"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/connections/{connection_id}/notion/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The pages a Notion connection can see. */
+        get: operations["connectors.list_notion_pages"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1552,6 +1586,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/pages/notion/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import pages from Notion. */
+        post: operations["pages.import_from_notion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/notion/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the pages kept in step with Notion. */
+        get: operations["pages.list_notion_links"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/pages/{page_id}": {
         parameters: {
             query?: never;
@@ -1634,6 +1702,57 @@ export interface paths {
         put?: never;
         /** Move a page. */
         post: operations["pages.move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/notion/conflicts/{block}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Settle a conflict with Notion. */
+        post: operations["pages.resolve_conflict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/notion/resolutions/{resolution}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back a choice for a conflict with Notion. */
+        post: operations["pages.undo_resolve_conflict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/notion/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop syncing a page with Notion. */
+        post: operations["pages.stop_sync"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3180,7 +3299,7 @@ export interface components {
          * @description What a connection lets Campbooks do with the account.
          * @enum {string}
          */
-        Capability: "messages" | "calendar" | "files" | "bank";
+        Capability: "messages" | "calendar" | "files" | "bank" | "pages";
         /** @description The new role. */
         ChangeRole: {
             /** @description The member's new role. */
@@ -4651,6 +4770,38 @@ export interface components {
          * @enum {string}
          */
         ImagesHeld: "under_review" | "checks_fail" | "unverified" | "cannot_authenticate" | "not_checked" | "rule_paused" | "rule_too_broad" | "spam";
+        /** @description What to import. */
+        ImportFromNotion: {
+            /**
+             * Format: uuid
+             * @description Your Notion connection.
+             */
+            connection: string;
+            /** @description The Notion pages, 1 to 100. */
+            pages: components["schemas"]["NotionPageToImport"][];
+            parent?: components["schemas"]["PageId"] | null;
+        };
+        /** @description What was imported. */
+        Imported: {
+            /** @description The pages made, in the order asked. */
+            pages: components["schemas"]["ImportedPage"][];
+            /**
+             * Format: int32
+             * @description How many were left alone: already linked through the connection, or
+             *     named twice.
+             */
+            skipped: number;
+        };
+        /** @description A page made. */
+        ImportedPage: {
+            /**
+             * Format: uuid
+             * @description Its page at Notion.
+             */
+            notion_page: string;
+            /** @description The new page. */
+            page: components["schemas"]["PageId"];
+        };
         /**
          * Format: uuid
          * @description InboxId (UUIDv7)
@@ -5306,6 +5457,110 @@ export interface components {
          * @enum {string}
          */
         NoticePatternSource: "template" | "phrase";
+        /**
+         * @description What to keep.
+         * @enum {string}
+         */
+        NotionKeep: "mine" | "notion" | "both";
+        /** @description A page's link to its Notion page, as the API shows it. */
+        NotionLink: {
+            /**
+             * Format: int32
+             * @description How many conflicts wait for a choice.
+             */
+            conflicts: number;
+            /**
+             * Format: uuid
+             * @description The Notion connection it is read through.
+             */
+            connection: string;
+            /**
+             * Format: date-time
+             * @description When a change from Notion was last applied.
+             */
+            last_inbound_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When a change here was last written to Notion.
+             */
+            last_outbound_at?: string | null;
+            /**
+             * Format: uuid
+             * @description The page at Notion.
+             */
+            notion_page: string;
+            /** @description The member whose Notion account it is. */
+            owner: components["schemas"]["UserId"];
+            /** @description The page. */
+            page: components["schemas"]["PageId"];
+            /** @description Where the link is. */
+            state: components["schemas"]["NotionLinkState"];
+            stopped_reason?: components["schemas"]["NotionStopReason"] | null;
+        };
+        /**
+         * @description Where a link is.
+         * @enum {string}
+         */
+        NotionLinkState: "syncing" | "paused" | "stopped";
+        /** @description The links. */
+        NotionLinks: {
+            /** @description The links of the pages the caller may open. */
+            links: components["schemas"]["NotionLink"][];
+        };
+        /** @description A page the connection can see. */
+        NotionPage: {
+            /**
+             * Format: date-time
+             * @description When Notion last edited it.
+             */
+            edited_at: string;
+            /** @description It is linked to a page already, through this connection. */
+            linked: boolean;
+            /**
+             * Format: uuid
+             * @description The page's id at Notion.
+             */
+            notion_page: string;
+            /**
+             * Format: uuid
+             * @description The page it is under, when that one is listed too.
+             */
+            parent?: string | null;
+            /**
+             * Format: int32
+             * @description How many of the listed pages are under it.
+             */
+            sub_pages: number;
+            /** @description Its title; empty when it has none. */
+            title: string;
+        };
+        /** @description One Notion page to bring in. */
+        NotionPageToImport: {
+            /**
+             * Format: uuid
+             * @description The page at Notion.
+             */
+            notion_page: string;
+            /** @description The title to show until Notion's is read (0 to 200 characters). */
+            title?: string | null;
+        };
+        /** @description The pages of a Notion connection. */
+        NotionPages: {
+            /** @description The pages, newest edit first. */
+            pages: components["schemas"]["NotionPage"][];
+            /**
+             * Format: int32
+             * @description How many requests the listing took of the connection's budget.
+             */
+            requests: number;
+            /** @description There are more than were read. */
+            truncated: boolean;
+        };
+        /**
+         * @description Why a link ended.
+         * @enum {string}
+         */
+        NotionStopReason: "stopped_by_member" | "disconnected" | "trashed_here" | "trashed_in_notion" | "not_shared" | "member_left" | "notion_unavailable";
         /** @description Who organises an event. */
         OrganizerView: {
             /**
@@ -5888,7 +6143,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google" | "zoho" | "imap" | "microsoft";
+        Provider: "google" | "zoho" | "imap" | "microsoft" | "notion";
         /** @description Where to add it. */
         PushTo: {
             /** @description One of your provider calendars that can be written. */
@@ -6214,6 +6469,29 @@ export interface components {
              * @example ana@example.com
              */
             wait_on?: string | null;
+        };
+        /** @description The choice. */
+        ResolveNotionConflict: {
+            /** @description What to keep. */
+            keep: components["schemas"]["NotionKeep"];
+        };
+        /** @description The conflict settled. */
+        Resolved: {
+            /**
+             * Format: int32
+             * @description How many conflicts still wait.
+             */
+            conflicts: number;
+            /**
+             * Format: uuid
+             * @description This choice: what `pages.undo_resolve_conflict` takes back.
+             */
+            resolution: string;
+            /**
+             * Format: int64
+             * @description The page's revision afterwards.
+             */
+            revision: number;
         };
         /**
          * @description The member's answer to an invitation.
@@ -6964,6 +7242,15 @@ export interface components {
             sign_in?: boolean | null;
             workspace_id?: components["schemas"]["WorkspaceId"] | null;
         };
+        /** @description What to connect. */
+        StartNotion: {
+            connection?: components["schemas"]["ConnectionId"] | null;
+            /**
+             * @description A path of this app to come back to, with `connected=<connection>` or
+             *     `link_error=<code>` added.
+             */
+            return_to?: string | null;
+        };
         /** @description A started consent. */
         StartedConnection: {
             /**
@@ -6987,6 +7274,19 @@ export interface components {
             expires_at: string;
             /** @description Send the browser here (same origin). */
             url: string;
+        };
+        /** @description A started consent. */
+        StartedNotion: {
+            /**
+             * @description Where to send the browser: this instance's `/auth/start/notion`, which
+             *     goes on to Notion and comes back to `return_to`.
+             */
+            authorize_url: string;
+            /**
+             * Format: date-time
+             * @description When the consent must be started by.
+             */
+            expires_at: string;
         };
         /**
          * @description The one place Campbooks sorts a conversation into. The built-in set; the
@@ -7418,6 +7718,19 @@ export interface components {
          * @enum {string}
          */
         Trust: "sure" | "check";
+        /** @description The choice taken back. */
+        Undone: {
+            /**
+             * Format: int32
+             * @description How many conflicts wait now.
+             */
+            conflicts: number;
+            /**
+             * Format: int64
+             * @description The page's revision afterwards.
+             */
+            revision: number;
+        };
         /** @description The event, back on the Campbooks calendar, and where it was removed from. */
         Unpushed: {
             /**
@@ -10156,6 +10469,78 @@ export interface operations {
             };
         };
     };
+    "connectors.start_notion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartNotion"];
+            };
+        };
+        responses: {
+            /** @description Send the browser to `authorize_url`. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedNotion"];
+                };
+            };
+            /** @description A `return_to` that is not a path of this app (`invalid_return_to`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or no such Notion connection of yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Notion is not set up on this instance (`provider_not_configured`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "connectors.get_connection": {
         parameters: {
             query?: never;
@@ -10326,6 +10711,85 @@ export interface operations {
             };
             /** @description Its address was checked 5 times today (`rate_limited`). */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.list_notion_pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The Notion connection. */
+                connection_id: components["schemas"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pages the connection can see. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotionPages"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a connection you may see but that is not yours (an admin, a client token). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such Notion connection, or you may not see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Notion needs you to connect again (`needs_reauth`), or is not set up on this instance (`provider_not_configured`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The connection's request budget with Notion is spent for now. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Notion could not be reached (`provider_unavailable`). */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13807,6 +14271,128 @@ export interface operations {
             };
         };
     };
+    "pages.import_from_notion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportFromNotion"];
+            };
+        };
+        responses: {
+            /** @description The pages made. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Imported"];
+                };
+            };
+            /** @description No page, or more than 100 (`invalid_import`), or a title over 200 characters (`invalid_title`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, a client token, or you may read the parent but not write in it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, a parent you cannot see, or a connection that is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The parent is in the trash (`page_trashed`), or pages would nest deeper than 12 levels (`page_too_deep`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.list_notion_links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The links. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotionLinks"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a token acting for nobody. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "pages.get": {
         parameters: {
             query?: never;
@@ -14321,6 +14907,215 @@ export interface operations {
                 };
             };
             /** @description The page changed since you saw it (`page_changed`), is in the trash (`page_trashed`), would go inside itself (`page_cycle`) or nest deeper than 12 levels (`page_too_deep`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.resolve_conflict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+                /** @description The block the conflict is about. */
+                block: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveNotionConflict"];
+            };
+        };
+        responses: {
+            /** @description The conflict is settled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Resolved"];
+                };
+            };
+            /** @description The page would not hold the result (`invalid_update`, `unknown_block`, …). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not change it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is in the trash (`page_trashed`), has no conflict about that block (`no_conflict`), or the block is gone (`conflict_block_gone`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.undo_resolve_conflict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+                /** @description The choice `pages.resolve_conflict` answered. */
+                resolution: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conflict is back. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Undone"];
+                };
+            };
+            /** @description The page would not hold the result. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not change it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description There is no such choice, it was taken back already or cannot be (`cannot_undo`), the block is gone (`conflict_block_gone`), or the page is in the trash. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.stop_sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, stopped. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotionLink"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the page but not change it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is not linked to a Notion page, or the link has ended already (`not_syncing`). */
             409: {
                 headers: {
                     [name: string]: unknown;

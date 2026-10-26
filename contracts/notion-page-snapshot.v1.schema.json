@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/notion-page-snapshot.v1.schema.json",
+  "title": "notion-page-snapshot v1 (blob)",
+  "description": "A Notion page's blocks as the connectors module read them, in the neutral form the pages module applies (`application/vnd.campbooks.notion-page-snapshot+json; version=1`). Block by block, kind to kind: a kind Pages lacks is `external` with its Notion type and nothing of its content. Rich text keeps bold, italic, strike, code, links and mentions of other Notion pages. The words are the member's own; the document is a blob, never an event.",
+  "type": "object",
+  "required": [
+    "version",
+    "notion_page",
+    "title",
+    "edited",
+    "read_at",
+    "complete",
+    "blocks"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "notion_page": {
+      "$ref": "#/$defs/uuid"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "edited": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "read_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "complete": {
+      "type": "boolean",
+      "description": "Every block was read; a page over the limits is read in part, and blocks not seen are not blocks that went away."
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/block"
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "bold": {
+          "const": true
+        },
+        "italic": {
+          "const": true
+        },
+        "strike": {
+          "const": true
+        },
+        "code": {
+          "const": true
+        },
+        "link": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^(?i:(https?:|mailto:))"
+        },
+        "page": {
+          "$ref": "#/$defs/uuid"
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid",
+          "description": "The block's id at Notion (in a change document: its id in the page)."
+        },
+        "kind": {
+          "enum": [
+            "paragraph",
+            "heading",
+            "bulleted_item",
+            "numbered_item",
+            "todo",
+            "toggle",
+            "quote",
+            "callout",
+            "divider",
+            "code",
+            "image",
+            "file",
+            "page_link",
+            "external"
+          ]
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run"
+          }
+        },
+        "file": {
+          "type": "object",
+          "required": [
+            "blob",
+            "size",
+            "content_type",
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "blob": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "content_type": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        },
+        "page": {
+          "$ref": "#/$defs/uuid",
+          "description": "A sub-page's Notion page."
+        },
+        "label": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]{1,32}$",
+          "description": "An external block's Notion type; nothing of its content."
+        },
+        "edited": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/block"
+          }
+        }
+      }
+    }
+  }
+}

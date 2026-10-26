@@ -32,6 +32,14 @@ produce or accept against the file.
 | `schedule.calendar_sync_changed.v1.schema.json` | `schedule` | `connectors` | A member turned a provider calendar on or off (ids, a flag and a blob reference to which calendar of the provider it is) |
 | `calendar-ref.v1.schema.json` | `schedule` | `connectors` | Which calendar of the provider a sync change is about, as the blob that event points at (`application/vnd.campbooks.calendar-ref+json; version=1`) |
 | `connectors.calendar_change_completed.v1.schema.json` | `connectors` | `schedule` | The event telling how a calendar change ended: applied (with the provider's id and etag), superseded, skipped or failed (with a reason code) |
+| `notion-page-snapshot.v1.schema.json` | `connectors` | `pages` | A Notion page's blocks as the connector read them (neutral kinds, rich text, files already downloaded), as a blob (`application/vnd.campbooks.notion-page-snapshot+json; version=1`) |
+| `connectors.notion_page_read.v1.schema.json` | `connectors` | `pages` | The event announcing a snapshot (ids, a blob reference and a time only) |
+| `connectors.notion_link_stopped.v1.schema.json` | `connectors` | `pages` | The event telling that a Notion page is no longer read (not shared, or trashed there), so the pages module ends the link |
+| `notion-block-changes.v1.schema.json` | `pages` | `connectors` | The blocks to write to a Notion page (updates, appends, deletes), as a blob (`application/vnd.campbooks.notion-block-changes+json; version=1`) |
+| `pages.notion_changes_requested.v1.schema.json` | `pages` | `connectors` | A member's edits asked for at Notion, once the pages module stored and bound them (ids and a blob reference only; confirmed back through the kernel's page-requests port) |
+| `connectors.notion_changes_completed.v1.schema.json` | `connectors` | `pages` | The event telling how each change of a request ended: applied (with the block's id and edit time at Notion), skipped or failed (with a reason code) |
+| `pages.notion_link_requested.v1.schema.json` | `pages` | `connectors` | A page was linked to a Notion page, which now needs a stream (ids only; the link is confirmed through the page-requests port) |
+| `pages.notion_link_ended.v1.schema.json` | `pages` | `connectors` | A page stopped being kept in step with its Notion page, so its stream goes (ids only) |
 
 Rules:
 

@@ -21,7 +21,7 @@ use crate::{
     operations::Operations,
     outbound::{
         CalendarPort, DestinationsPort, NoCalendarRequests, NoDestinations, NoOutboundRequests,
-        OutboundPort,
+        NoPageRequests, OutboundPort, PageRequestsPort,
     },
     preferences::{AskFirst, MemberPreferencesPort},
     rate_limit::{RateLimits, api::ApiLimits},
@@ -76,6 +76,11 @@ pub struct AppState {
     /// ([`outbound`](crate::outbound)). The server registers the `schedule`
     /// module's; until then nothing stands, so no calendar is changed.
     pub calendar_requests: CalendarPort,
+    /// Answers whether a change to a page kept in step with an outside page
+    /// still stands in the pages module's records, before it is made
+    /// ([`outbound`](crate::outbound)). The server registers the `pages`
+    /// module's; until then nothing stands, so nothing is written outside.
+    pub page_requests: PageRequestsPort,
     /// Answers a member's time zone ([`schedule`](crate::schedule)). The
     /// server registers the `schedule` module's; until then nobody has one
     /// and readers use UTC.
@@ -194,6 +199,7 @@ impl AppState {
             outbound: Arc::new(NoOutboundRequests),
             destinations: Arc::new(NoDestinations),
             calendar_requests: Arc::new(NoCalendarRequests),
+            page_requests: Arc::new(NoPageRequests),
             time_zones: Arc::new(NoTimeZones),
             availability: Arc::new(NoAvailability),
             holds: Arc::new(NoHolds),
@@ -276,6 +282,13 @@ impl AppState {
     #[must_use]
     pub fn with_calendar_requests(mut self, calendar_requests: CalendarPort) -> Self {
         self.calendar_requests = calendar_requests;
+        self
+    }
+
+    /// The same state, re-checking page changes through `page_requests`.
+    #[must_use]
+    pub fn with_page_requests(mut self, page_requests: PageRequestsPort) -> Self {
+        self.page_requests = page_requests;
         self
     }
 

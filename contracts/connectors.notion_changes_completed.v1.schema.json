@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/connectors.notion_changes_completed.v1.schema.json",
+  "title": "connectors.notion_changes_completed v1 (event payload)",
+  "description": "Published by the connectors module when every change of a request the pages module asked for has an end: written at Notion (`applied`, with the block's id and edit time there), not written (`skipped`: the block was edited at Notion since the last sync, it is gone, it is never written, the request did not stand) or `failed`. One item per change, in the request's order. Ids, closed codes and times; never any text. Workspace-scoped.",
+  "type": "object",
+  "required": [
+    "workspace",
+    "request",
+    "page",
+    "results"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": {
+      "type": "string"
+    },
+    "request": {
+      "$ref": "#/$defs/uuid"
+    },
+    "page": {
+      "$ref": "#/$defs/uuid"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "block",
+          "outcome"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "block": {
+            "$ref": "#/$defs/uuid"
+          },
+          "outcome": {
+            "enum": [
+              "applied",
+              "skipped",
+              "failed"
+            ]
+          },
+          "notion_block": {
+            "$ref": "#/$defs/uuid",
+            "description": "The block's id at Notion after the write (applied; for an added block, the new one)."
+          },
+          "edited_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Notion last edited the block after the write (applied)."
+          },
+          "reason": {
+            "enum": [
+              "changed_in_notion",
+              "unverified",
+              "not_connected",
+              "needs_reauth",
+              "rejected",
+              "not_found",
+              "unavailable",
+              "too_many_attempts",
+              "unsupported"
+            ],
+            "description": "Why it did not apply."
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

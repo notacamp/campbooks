@@ -18,7 +18,7 @@ use campbooks_kernel::{
 
 use crate::{
     domain::{
-        PageId, PageRow, PageSummary, Place, SELECT_ONE, access, announce, position, purge,
+        PageId, PageRow, PageSummary, Place, SELECT_ONE, access, announce, notion, position, purge,
         tracked, view,
     },
     events::PageChangeKind,
@@ -83,6 +83,18 @@ pub async fn trash(
     .bind(member)
     .fetch_all(&mut *tx)
     .await?;
+    // A page in the trash is not kept in step with Notion any more; nothing
+    // is deleted there.
+    for id in &gone {
+        notion::stop(
+            &state,
+            &mut tx,
+            access.workspace,
+            *id,
+            notion::StopReason::TrashedHere,
+        )
+        .await?;
+    }
     if !gone.is_empty() {
         tracked::simple(
             &state,

@@ -34,7 +34,8 @@
     "imap_not_an_imap_server": "Le serveur à cette adresse et sur ce port n’est pas un serveur de messagerie IMAP. Vérifiez le serveur et le port.",
     "host_refused": "Campbooks ne peut pas se connecter à ce serveur : il se trouve sur un réseau privé, ou ce port n’est pas un port de messagerie (993, 143, 465 ou 587).",
     "starttls_missing": "Le serveur ne propose pas de connexion chiffrée : Campbooks n’a donc pas envoyé votre mot de passe. Utilisez le port chiffré du serveur (993 pour IMAP, 465 pour SMTP).",
-    "address_check_not_needed": "L’adresse de cette boîte mail n’a pas besoin d’être vérifiée : elle l’est déjà, ou ce n’est pas une boîte IMAP."
+    "address_check_not_needed": "L’adresse de cette boîte mail n’a pas besoin d’être vérifiée : elle l’est déjà, ou ce n’est pas une boîte IMAP.",
+    "invalid_return_to": "Cette adresse n'est pas une page de cette application."
   },
   "address_check": {
     "subject": "Campbooks vérifie votre adresse",

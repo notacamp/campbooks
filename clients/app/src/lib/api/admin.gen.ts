@@ -812,7 +812,7 @@ export interface components {
          * @description What a connection lets Campbooks do with the account.
          * @enum {string}
          */
-        Capability: "messages" | "calendar" | "files" | "bank";
+        Capability: "messages" | "calendar" | "files" | "bank" | "pages";
         /**
          * @description What a signup code can still do.
          * @enum {string}
@@ -1096,7 +1096,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google" | "zoho" | "imap" | "microsoft";
+        Provider: "google" | "zoho" | "imap" | "microsoft" | "notion";
         /**
          * @description The queue at a glance: one row per queue and kind with unfinished or
          *     failed work. Succeeded jobs are pruned and not counted.

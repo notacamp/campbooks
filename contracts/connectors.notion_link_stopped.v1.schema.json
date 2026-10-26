@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/connectors.notion_link_stopped.v1.schema.json",
+  "title": "connectors.notion_link_stopped v1 (event payload)",
+  "description": "Published by the connectors module when it stops reading a Notion page: Notion no longer shares it with the integration, or it went to the trash there. Its stream is gone; the pages module ends the link and leaves the page as it is. Nothing is deleted at Notion. Ids and a closed reason; workspace-scoped.",
+  "type": "object",
+  "required": [
+    "workspace",
+    "connection",
+    "notion_page",
+    "page",
+    "reason"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": {
+      "type": "string"
+    },
+    "connection": {
+      "$ref": "#/$defs/uuid"
+    },
+    "notion_page": {
+      "$ref": "#/$defs/uuid"
+    },
+    "page": {
+      "$ref": "#/$defs/uuid"
+    },
+    "reason": {
+      "enum": [
+        "not_shared",
+        "trashed_in_notion",
+        "notion_unavailable"
+      ]
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

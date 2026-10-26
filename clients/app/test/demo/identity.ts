@@ -313,3 +313,15 @@ export const SIGN_UP_PASSKEY: Schema<"PasskeyView"> = {
   last_used_at: "2026-10-13T08:30:00Z",
   signed_up_with: true,
 };
+
+/** Ana's Notion, connected for Acme's pages (Notion gives no address; the connection is named for its workspace). */
+export const NOTION_CONNECTION: Schema<"ConnectionView"> = {
+  ...CONNECTION,
+  id: "0192f1a0-0000-7000-8000-0000000000c9",
+  provider: "notion",
+  address: "",
+  address_verified: false,
+  display_name: "Acme",
+  capabilities: ["pages"],
+  offers: [],
+};

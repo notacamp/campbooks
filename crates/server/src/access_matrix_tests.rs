@@ -1147,7 +1147,8 @@ fn body(world: &World, id: &str) -> Option<Value> {
         | "conversations.restore_rule"
         | "conversations.suggest_replies"
         | "conversations.write_nudge"
-        | "assistant.start_chat" => json!({}),
+        | "assistant.start_chat"
+        | "connectors.start_notion" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
@@ -1168,6 +1169,12 @@ fn body(world: &World, id: &str) -> Option<Value> {
         // An empty state vector and an update with nothing in it.
         "pages.sync" => json!({"state_vector": "AA==", "update": "AAA="}),
         "pages.share" => json!({"role": "reader"}),
+        // Importing needs a Notion connection of the caller's own.
+        "pages.import_from_notion" => json!({
+            "connection": world.instances["connectors.connection"],
+            "pages": [{"notion_page": Uuid::now_v7().to_string()}],
+        }),
+        "pages.resolve_conflict" => json!({"keep": "mine"}),
         // The bytes of a file: this text.
         "pages.upload_file" => json!({"file": "matrix"}),
         "assistant.ask_chat" | "assistant.stream_chat" => json!({"text": "Why is this here?"}),
@@ -1274,6 +1281,8 @@ fn fill(world: &World, path: &str, id: &str) -> String {
     path.replace("{workspace_id}", &world.a.to_string())
         .replace("{page_id}", page)
         .replace("{hash}", &world.instances["pages.file"])
+        .replace("{block}", &Uuid::now_v7().to_string())
+        .replace("{resolution}", &Uuid::now_v7().to_string())
         .replace("{member_id}", &world.users[&Who::Reader].to_string())
         .replace("{conversation_id}", message_conversation)
         .replace("{message_id}", &world.instances["conversations.message"])
@@ -1331,6 +1340,11 @@ fn expected(
     // One of Scout's suggestions reads as the list shows it: a member who
     // only reads its inbox is never shown it, so it is not there for them.
     if id == "conversations.get_rule_notice" && decision == Decision::Forbidden {
+        return Decision::NotFound;
+    }
+    // Importing from Notion goes through a Notion connection of the caller's
+    // own: through anyone else's, the answer is that there is none.
+    if id == "pages.import_from_notion" && decision == Decision::Allow && who != Who::Connector {
         return Decision::NotFound;
     }
     decision

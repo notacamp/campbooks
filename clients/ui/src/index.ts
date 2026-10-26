@@ -38,6 +38,7 @@ export { useFocusTrap } from "./internal/use-focus-trap";
 export { ActionBar, type ActionBarProps } from "./components/ActionBar/ActionBar";
 export { Avatar, avatarHue, initialsOf, type AvatarProps } from "./components/Avatar/Avatar";
 export { Banner, type BannerProps } from "./components/Banner/Banner";
+export { Panel, type PanelProps } from "./components/Panel/Panel";
 export {
   Button,
   ButtonLink,

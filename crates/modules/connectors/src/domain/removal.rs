@@ -84,7 +84,10 @@ pub async fn revoke(state: &AppState, deps: &Deps, workspace: WorkspaceId, id: C
         // provider. Microsoft has no endpoint that revokes one app's refresh
         // token (only one that signs the person out of every app): its tokens
         // are deleted with the connection.
-        Ok(Provider::Imap | Provider::Microsoft) | Err(_) => return,
+        // Notion has no endpoint that revokes one integration's tokens: they
+        // are deleted with the connection, and the member removes the
+        // integration from their Notion settings.
+        Ok(Provider::Imap | Provider::Microsoft | Provider::Notion) | Err(_) => return,
     };
     if let Err(err) = revoked {
         tracing::warn!(%workspace, connection = %id, provider = target.provider, error = %err, "could not revoke the grant at the provider");
@@ -197,6 +200,8 @@ pub async fn delete(
     }
     schedule::forget_budget(tx, &schedule::connection_budget(id)).await?;
     schedule::forget_budget(tx, &schedule::calendar_budget(id)).await?;
+    schedule::forget_budget(tx, &schedule::notion_budget(id)).await?;
+    schedule::forget_budget(tx, &schedule::notion_second_budget(id)).await?;
     if let (Some(cause), Some(connection)) = (cause, snapshot) {
         state
             .tracker

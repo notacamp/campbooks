@@ -39,7 +39,7 @@ pub const CALENDAR_LIST_SCOPE: &str =
 pub const fn capability_scope(capability: Capability) -> Option<&'static str> {
     match capability {
         Capability::Messages => Some(GMAIL_SCOPE),
-        Capability::Calendar | Capability::Files | Capability::Bank => None,
+        Capability::Calendar | Capability::Files | Capability::Bank | Capability::Pages => None,
     }
 }
 
@@ -49,7 +49,7 @@ pub const fn capability_scopes(capability: Capability) -> &'static [&'static str
     match capability {
         Capability::Messages => &[GMAIL_SCOPE],
         Capability::Calendar => &[CALENDAR_EVENTS_SCOPE, CALENDAR_LIST_SCOPE],
-        Capability::Files | Capability::Bank => &[],
+        Capability::Files | Capability::Bank | Capability::Pages => &[],
     }
 }
 

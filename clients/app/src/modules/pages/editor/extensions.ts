@@ -8,8 +8,19 @@ import { TaskList } from "@tiptap/extension-task-list";
 import { StarterKit } from "@tiptap/starter-kit";
 import type * as Y from "yjs";
 
+import { Bid } from "./bid";
 import { codeLanguage } from "./languages";
-import { Callout, Embed, FileBlock, ImageBlock, Mention, PageLink, Toggle } from "./nodes";
+import {
+  Callout,
+  Conflict,
+  Embed,
+  External,
+  FileBlock,
+  ImageBlock,
+  Mention,
+  PageLink,
+  Toggle,
+} from "./nodes";
 
 /** Links may only go to the web and to mail: the server refuses the rest. */
 export const isAllowedLink = (url: string) => /^(https?:|mailto:)/iu.test(url.trim());
@@ -91,6 +102,9 @@ export function createExtensions({ doc, placeholders, menus }: EditorExtensionOp
     PageLink,
     FileBlock,
     ImageBlock,
+    External,
+    Conflict,
+    Bid,
     Placeholder.configure({
       placeholder: ({ node }) =>
         node.type.name === "heading" ? placeholders.heading : placeholders.paragraph,

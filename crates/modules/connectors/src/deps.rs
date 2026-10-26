@@ -15,11 +15,12 @@ use campbooks_kernel::{
 use figment::Figment;
 
 use crate::{
-    config::{ConnectorsConfig, OAuthClientConfig},
+    config::{ConnectorsConfig, NotionClientConfig, OAuthClientConfig},
     domain::model::{Capability, Provider},
     google::{Endpoints, Google},
     imap::Imap,
     microsoft::{self, Microsoft},
+    notion::{self, Notion},
     provider::ClientSecret,
     zoho::{Centres, Zoho},
 };
@@ -42,6 +43,19 @@ pub struct Deps {
     /// (`CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED`, `CAMPBOOKS_MICROSOFT__*`
     /// and the instance secret): `None` means not offered.
     pub microsoft: Option<Arc<Microsoft>>,
+    /// The Notion client, only while Notion is offered
+    /// (`CAMPBOOKS_CONNECTORS__NOTION__ENABLED`, `CAMPBOOKS_NOTION__*` and
+    /// the instance secret): `None` means not offered.
+    pub notion: Option<Arc<Notion>>,
+    /// Where the secret of Notion's webhook subscription comes from
+    /// (`CAMPBOOKS_NOTION__WEBHOOK_SECRET[_FILE]`), when it is set and Notion
+    /// is offered: without it Notion's pages are polled and the webhook is
+    /// not served.
+    pub notion_webhook: Option<ClientSecret>,
+    /// Seals the verification token Notion posts while no webhook secret is
+    /// configured; present whenever Notion is on and the instance secret is
+    /// set.
+    pub notion_cipher: Option<Arc<Cipher>>,
     /// The IMAP adapter (`CAMPBOOKS_CONNECTORS__IMAP__*`); offered only
     /// when enabled ([`imap_enabled`](Self::imap_enabled)).
     pub imap: Arc<Imap>,
@@ -58,6 +72,7 @@ impl std::fmt::Debug for Deps {
             .field("google", &self.google.is_some())
             .field("zoho", &self.zoho.is_some())
             .field("microsoft", &self.microsoft.is_some())
+            .field("notion", &self.notion.is_some())
             .field("imap", &self.imap_enabled())
             .finish_non_exhaustive()
     }
@@ -70,6 +85,9 @@ impl Default for Deps {
             google: None,
             zoho: None,
             microsoft: None,
+            notion: None,
+            notion_webhook: None,
+            notion_cipher: None,
             imap: Arc::new(Imap::default()),
             cipher: None,
             clock: Arc::new(SystemClock),
@@ -92,7 +110,7 @@ impl Deps {
         let calendar = match provider {
             Provider::Google => self.google.is_some(),
             Provider::Zoho => self.zoho.is_some() && self.config.zoho_calendar,
-            Provider::Microsoft | Provider::Imap => false,
+            Provider::Microsoft | Provider::Imap | Provider::Notion => false,
         };
         if calendar && !held.contains(&Capability::Calendar) {
             vec![Capability::Calendar]
@@ -146,6 +164,19 @@ impl Deps {
         }
         deps.microsoft = microsoft_client(figment, &deps.config, development, secret.is_some())?
             .map(|client| with_notifications(client, &deps.config, &config.public_url));
+        (deps.notion, deps.notion_webhook) = notion_client(
+            figment,
+            &deps.config,
+            &config.public_url,
+            development,
+            secret.is_some(),
+        )?;
+        // The webhook's verification token is sealed whenever Notion is on,
+        // before the integration's own settings are complete.
+        deps.notion_cipher = secret
+            .as_ref()
+            .filter(|_| deps.config.notion.is_enabled())
+            .map(|secret| Arc::new(crate::domain::notion_webhook::cipher(secret)));
         // IMAP is on by default (campbooks-cloud#314) but needs the instance
         // secret to seal passwords: without one it is simply not offered,
         // unless an operator asked for it by name.
@@ -249,6 +280,87 @@ fn microsoft_client(
     )?)))
 }
 
+/// The Notion client and its webhook secret, only while Notion is offered:
+/// the flag on, the Notion integration configured and the instance secret
+/// set (`has_secret`). With the flag off nothing of Notion's is read, so no
+/// setting of it can stop the server; with it on, a missing client, secret
+/// or unreadable section is a warning and Notion is not offered. Only a
+/// development base outside development, which the flag asked to use, is an
+/// error.
+fn notion_client(
+    figment: &Figment,
+    settings: &ConnectorsConfig,
+    public_url: &str,
+    development: bool,
+    has_secret: bool,
+) -> Result<(Option<Arc<Notion>>, Option<ClientSecret>), String> {
+    if !settings.notion.is_enabled() {
+        return Ok((None, None));
+    }
+    let Ok(client) = NotionClientConfig::from_figment(figment) else {
+        tracing::warn!(
+            "CAMPBOOKS_NOTION__* could not be read: Notion is not offered although \
+             CAMPBOOKS_CONNECTORS__NOTION__ENABLED is on"
+        );
+        return Ok((None, None));
+    };
+    let secret_of =
+        |file: Option<&std::path::PathBuf>, inline: Option<&secrecy::SecretString>| match (
+            file, inline,
+        ) {
+            (Some(path), _) => Some(ClientSecret::File(path.clone())),
+            (_, Some(secret)) => Some(ClientSecret::Inline(secret.clone())),
+            _ => None,
+        };
+    let (Some(client_id), Some(client_secret)) = (
+        client.client_id.clone(),
+        secret_of(
+            client.client_secret_file.as_ref(),
+            client.client_secret.as_ref(),
+        ),
+    ) else {
+        tracing::warn!(
+            "CAMPBOOKS_CONNECTORS__NOTION__ENABLED is on but CAMPBOOKS_NOTION__CLIENT_ID and a \
+             secret are not set: Notion is not offered"
+        );
+        return Ok((None, None));
+    };
+    if !has_secret {
+        tracing::warn!(
+            "CAMPBOOKS_SECRET_KEY is not set: Notion cannot be connected (its tokens are sealed \
+             with it); set it to offer Notion"
+        );
+        return Ok((None, None));
+    }
+    let endpoints = match client.base_url.as_deref() {
+        None => notion::Endpoints::notion()?,
+        Some(_) if !development => {
+            return Err(
+                "CAMPBOOKS_NOTION__BASE_URL points notion at another server: it is for \
+                 development only (CAMPBOOKS_ENV=development)"
+                    .to_owned(),
+            );
+        }
+        Some(base) => {
+            let base = url::Url::parse(&format!("{}/", base.trim_end_matches('/')))
+                .map_err(|e| format!("CAMPBOOKS_NOTION__BASE_URL={base}: {e}"))?;
+            notion::Endpoints::under(&base)?
+        }
+    };
+    let path = client
+        .redirect_path
+        .as_deref()
+        .filter(|path| path.starts_with('/') && !path.starts_with("//"))
+        .unwrap_or(notion::CALLBACK_PATH);
+    let redirect = format!("{}{path}", public_url.trim().trim_end_matches('/'));
+    let notion = Notion::new(client_id, client_secret, endpoints, redirect)?;
+    let webhook = secret_of(
+        client.webhook_secret_file.as_ref(),
+        client.webhook_secret.as_ref(),
+    );
+    Ok((Some(Arc::new(notion)), webhook))
+}
+
 /// `client` posting Graph's change notifications to this instance when
 /// `CAMPBOOKS_CONNECTORS__MICROSOFT__NOTIFICATIONS` asks for them and
 /// `public_url` can take them ([`microsoft::notification_url`]); otherwise
@@ -322,6 +434,127 @@ mod tests {
 
     fn kernel_config() -> Config {
         campbooks_kernel::testing::config("postgres://test@localhost/test")
+    }
+
+    fn notion_on(extra: &serde_json::Value) -> Figment {
+        let mut settings = serde_json::json!({
+            "notion": {"client_id": "n", "client_secret": "s"},
+            "connectors": {"notion": {"enabled": true}}
+        });
+        for (key, value) in extra.as_object().cloned().unwrap_or_default() {
+            settings["notion"][key] = value;
+        }
+        Figment::from(Serialized::defaults(settings))
+    }
+
+    #[test]
+    fn notion_is_not_offered_while_its_flag_is_off() {
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        // The integration's credentials alone, and every other setting
+        // broken: it starts, Notion not offered.
+        let off = Figment::from(Serialized::defaults(serde_json::json!({
+            "notion": {"client_id": "n", "client_secret": "s",
+                       "base_url": "http://127.0.0.1:9051"},
+            "connectors": {"notion": {"enabled": false, "max_blocks": "lots"}}
+        })));
+        for secret in [None, key()] {
+            let deps = Deps::from_figment(&off, &kernel_config(), secret).unwrap();
+            assert!(deps.notion.is_none() && deps.notion_webhook.is_none());
+            assert!(deps.notion_cipher.is_none(), "off: no hook, no sealing");
+        }
+        // Production's settings: its poll bounds, no Notion variable.
+        let production = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}},
+            "google": {"client_id": "client-1", "client_secret": "s3cret"}
+        })));
+        let deps = Deps::from_figment(&production, &kernel_config(), key()).unwrap();
+        assert!(deps.notion.is_none());
+    }
+
+    #[test]
+    fn notion_is_offered_with_its_flag_its_integration_and_the_secret_key() {
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let mut public = kernel_config();
+        public.public_url = "https://campbooks.example.com/".to_owned();
+        let deps = Deps::from_figment(&notion_on(&serde_json::json!({})), &public, key()).unwrap();
+        assert!(deps.notion_cipher.is_some());
+        let notion = deps.notion.unwrap();
+        assert_eq!(
+            notion.redirect_uri(),
+            "https://campbooks.example.com/auth/callback/notion"
+        );
+        assert!(
+            deps.notion_webhook.is_none(),
+            "no webhook without its secret"
+        );
+        let hooked = notion_on(&serde_json::json!({"webhook_secret": "w"}));
+        assert!(
+            Deps::from_figment(&hooked, &public, key())
+                .unwrap()
+                .notion_webhook
+                .is_some()
+        );
+        // A redirect path must be a path of this instance.
+        for (path, expected) in [
+            ("/cb/notion", "https://campbooks.example.com/cb/notion"),
+            (
+                "//evil.example.com",
+                "https://campbooks.example.com/auth/callback/notion",
+            ),
+            ("evil", "https://campbooks.example.com/auth/callback/notion"),
+        ] {
+            let figment = notion_on(&serde_json::json!({"redirect_path": path}));
+            let deps = Deps::from_figment(&figment, &public, key()).unwrap();
+            assert_eq!(deps.notion.unwrap().redirect_uri(), expected, "{path}");
+        }
+    }
+
+    #[test]
+    fn notion_without_its_integration_or_the_secret_key_is_a_warning_not_a_stop() {
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let no_client = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {"notion": {"enabled": true}}
+        })));
+        let deps = Deps::from_figment(&no_client, &kernel_config(), key()).unwrap();
+        assert!(deps.notion.is_none());
+        // The hook still takes Notion's verification token: it seals it.
+        assert!(deps.notion_cipher.is_some());
+        let no_secret = Figment::from(Serialized::defaults(serde_json::json!({
+            "notion": {"client_id": "n"},
+            "connectors": {"notion": {"enabled": true}}
+        })));
+        assert!(
+            Deps::from_figment(&no_secret, &kernel_config(), key())
+                .unwrap()
+                .notion
+                .is_none()
+        );
+        let deps =
+            Deps::from_figment(&notion_on(&serde_json::json!({})), &kernel_config(), None).unwrap();
+        assert!(deps.notion.is_none() && deps.notion_cipher.is_none());
+    }
+
+    #[test]
+    fn a_notion_fake_outside_development_stops_the_server_but_not_in_development() {
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let fake = notion_on(&serde_json::json!({"base_url": "http://127.0.0.1:9051"}));
+        let err = Deps::from_figment(&fake, &kernel_config(), key()).unwrap_err();
+        assert!(err.contains("development only"), "{err}");
+        let mut dev = kernel_config();
+        dev.env = Environment::Development;
+        assert!(
+            Deps::from_figment(&fake, &dev, key())
+                .unwrap()
+                .notion
+                .is_some()
+        );
+        // On with a broken adapter setting: stopped, naming it.
+        let broken = Figment::from(Serialized::defaults(serde_json::json!({
+            "notion": {"client_id": "n", "client_secret": "s"},
+            "connectors": {"notion": {"enabled": true, "max_depth": 0}}
+        })));
+        let err = Deps::from_figment(&broken, &kernel_config(), key()).unwrap_err();
+        assert!(err.contains("MAX_DEPTH"), "{err}");
     }
 
     #[test]

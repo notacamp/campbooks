@@ -34,7 +34,9 @@ pub mod scopes;
 pub mod tracking;
 
 pub use config::Deps;
-pub use domain::{resources::visibility, search::source as search_source};
+pub use domain::{
+    notion::requests::page_requests, resources::visibility, search::source as search_source,
+};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "pages";
@@ -48,8 +50,16 @@ pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 pub fn module(deps: Deps) -> Module {
     let mut background = Background::new()
         .publishes::<events::PageChanged>()
+        .publishes::<events::NotionLinkRequested>()
+        .publishes::<events::NotionLinkEnded>()
+        .publishes::<events::NotionChangesRequested>()
         .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
         .on_event::<features::forget_member::ForgetMember>()
+        .on_event::<features::apply_notion_snapshot::ApplyNotionSnapshot>()
+        .on_event::<features::complete_notion_changes::CompleteNotionChanges>()
+        .on_event::<features::stop_notion_link::StopNotionLink>()
+        .on_event::<features::stop_notion_links_of_connection::StopNotionLinksOfConnection>()
+        .job::<features::push_to_notion::PushToNotion>()
         .job::<features::purge_workspace::PurgeWorkspace>()
         .job::<features::compact::Compact>()
         .job::<features::purge_trash::PurgeTrash>();
@@ -78,7 +88,8 @@ pub fn module(deps: Deps) -> Module {
 /// Every route of the module, one per feature.
 fn router() -> OpenApiRouter<AppState> {
     use features::{
-        backlinks, create, file, get, list, move_page, share, sync, trash, update, upload,
+        backlinks, create, file, get, import_from_notion, list, list_notion_links, move_page,
+        resolve_conflict, share, stop_sync, sync, trash, undo_resolve_conflict, update, upload,
     };
     // A file is up to 20 MiB; everything else is small.
     let uploads = OpenApiRouter::new()
@@ -87,6 +98,11 @@ fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(list::handler, create::handler))
         .routes(routes!(backlinks::handler))
+        .routes(routes!(import_from_notion::handler))
+        .routes(routes!(list_notion_links::handler))
+        .routes(routes!(resolve_conflict::handler))
+        .routes(routes!(undo_resolve_conflict::handler))
+        .routes(routes!(stop_sync::handler))
         .routes(routes!(get::handler, update::handler, trash::purge))
         .routes(routes!(move_page::handler))
         .routes(routes!(sync::handler))
@@ -101,6 +117,8 @@ fn router() -> OpenApiRouter<AppState> {
 mod access_tests;
 #[cfg(test)]
 mod testkit;
+#[cfg(test)]
+mod testkit_notion;
 #[cfg(test)]
 mod tracking_tests;
 

@@ -126,6 +126,12 @@
       "date": "2026-10-26",
       "plan_version": 16,
       "pr": "#683"
+    },
+    {
+      "change": "Sync with Notion (campbooks-cloud#376): provider notion and capability pages for connections; 5 pages events for pages imported from Notion (how many), a sync applied in either direction (how many blocks), a conflict raised, a conflict resolved (the choice) and a sync stopped (why); Coverage for every operation, job and handler of the change.",
+      "date": "2026-10-26",
+      "plan_version": 17,
+      "pr": "#680"
     }
   ],
   "coverage": [
@@ -201,6 +207,12 @@
     },
     {
       "events": [],
+      "exemption": "a page's link to its Notion page, made when pages asked for it: the stream that reads it; the link is tracked by pages (pages.notion_pages_imported)",
+      "kind": "handler",
+      "name": "connectors.link_notion_page"
+    },
+    {
+      "events": [],
       "exemption": "records the send conversations asked for (tracked there); its outcome is connectors.send_succeeded or connectors.send_failed",
       "kind": "handler",
       "name": "connectors.queue_send"
@@ -212,6 +224,12 @@
       "exemption": "",
       "kind": "handler",
       "name": "connectors.record_calendar_change"
+    },
+    {
+      "events": [],
+      "exemption": "records the block changes pages asked for, once pages confirms them, for the stream's next run, which reports how each ended; tracked there as pages.notion_sync_applied",
+      "kind": "handler",
+      "name": "connectors.record_notion_changes"
     },
     {
       "events": [],
@@ -232,6 +250,12 @@
       "exemption": "consequence of workspaces.workspace_deleted (tracked by workspaces): the deleted workspace's connections go with it",
       "kind": "handler",
       "name": "connectors.revoke_workspace_grants"
+    },
+    {
+      "events": [],
+      "exemption": "the stream of a Notion page that pages stopped syncing is deleted; the stop is tracked by pages (pages.notion_sync_stopped)",
+      "kind": "handler",
+      "name": "connectors.unlink_notion_page"
     },
     {
       "events": [
@@ -332,6 +356,24 @@
       "name": "identity.revoke_departed_consents"
     },
     {
+      "events": [
+        "pages.notion_sync_applied",
+        "pages.notion_conflict_raised",
+        "pages.page_created"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.apply_notion_snapshot"
+    },
+    {
+      "events": [
+        "pages.notion_sync_applied"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.complete_notion_changes"
+    },
+    {
       "events": [],
       "exemption": "cleanup after a member left: their grants on pages are deleted; the departure is tracked by workspaces",
       "kind": "handler",
@@ -342,6 +384,22 @@
       "exemption": "projection of workspaces.workspace_deleted: it only schedules the purge",
       "kind": "handler",
       "name": "pages.schedule_workspace_purge"
+    },
+    {
+      "events": [
+        "pages.notion_sync_stopped"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.stop_notion_link"
+    },
+    {
+      "events": [
+        "pages.notion_sync_stopped"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.stop_notion_links_of_connection"
     },
     {
       "events": [
@@ -675,6 +733,12 @@
     },
     {
       "events": [],
+      "exemption": "records the blocks a member changed as a request for the connector to write to Notion; the writes are tracked when the connector reports them (pages.notion_sync_applied)",
+      "kind": "job",
+      "name": "pages.push_to_notion"
+    },
+    {
+      "events": [],
       "exemption": "maintenance, no action of anyone: invitations stored before announced once",
       "kind": "job",
       "name": "schedule.announce_invitations"
@@ -956,6 +1020,12 @@
       "exemption": "only starts a consent through the identity module's front door; nothing of connectors changes, and the connection it becomes is tracked as connectors.connection_added or connectors.connection_reconnected",
       "kind": "operation",
       "name": "connectors.start_connection"
+    },
+    {
+      "events": [],
+      "exemption": "only records a consent started and sends the browser to Notion; nothing of connectors changes until the member comes back, and the connection it becomes is tracked as connectors.connection_added or connectors.connection_reconnected",
+      "kind": "operation",
+      "name": "connectors.start_notion"
     },
     {
       "events": [
@@ -1507,6 +1577,15 @@
     },
     {
       "events": [
+        "pages.notion_pages_imported",
+        "pages.page_created"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.import_from_notion"
+    },
+    {
+      "events": [
         "pages.page_moved"
       ],
       "exemption": "",
@@ -1520,6 +1599,14 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.purge"
+    },
+    {
+      "events": [
+        "pages.notion_conflict_resolved"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.resolve_conflict"
     },
     {
       "events": [
@@ -1538,6 +1625,14 @@
       "name": "pages.share"
     },
     {
+      "events": [
+        "pages.notion_sync_stopped"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.stop_sync"
+    },
+    {
       "events": [],
       "exemption": "a page's body is written by typing: many small edits, each carrying what the member wrote; the page's meta changes are tracked by the operations above",
       "kind": "operation",
@@ -1550,6 +1645,14 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.trash"
+    },
+    {
+      "events": [
+        "pages.notion_conflict_raised"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.undo_resolve_conflict"
     },
     {
       "events": [
@@ -2659,6 +2762,11 @@
       "value": "messages"
     },
     {
+      "description": "Pages kept in step both ways (Notion).",
+      "enum": "connectors.capability",
+      "value": "pages"
+    },
+    {
       "description": "Several runs in a row failed; syncing keeps retrying.",
       "enum": "connectors.health",
       "value": "failing"
@@ -2762,6 +2870,11 @@
       "description": "Microsoft: Outlook.com, Hotmail and Microsoft 365 mail.",
       "enum": "connectors.provider",
       "value": "microsoft"
+    },
+    {
+      "description": "Notion: pages kept in step with Pages.",
+      "enum": "connectors.provider",
+      "value": "notion"
     },
     {
       "description": "Zoho: Zoho Mail and Zoho Calendar.",
@@ -3604,6 +3717,21 @@
       "value": "running"
     },
     {
+      "description": "Keep both as ordinary blocks.",
+      "enum": "pages.conflict_choice",
+      "value": "both"
+    },
+    {
+      "description": "Keep the block as it is in Campbooks.",
+      "enum": "pages.conflict_choice",
+      "value": "mine"
+    },
+    {
+      "description": "Use Notion's version.",
+      "enum": "pages.conflict_choice",
+      "value": "notion"
+    },
+    {
       "description": "Its icon.",
       "enum": "pages.page_field",
       "value": "icon"
@@ -3637,6 +3765,51 @@
       "description": "Every member's.",
       "enum": "pages.place",
       "value": "workspace"
+    },
+    {
+      "description": "From Notion into the page.",
+      "enum": "pages.sync_direction",
+      "value": "inbound"
+    },
+    {
+      "description": "From the page to Notion.",
+      "enum": "pages.sync_direction",
+      "value": "outbound"
+    },
+    {
+      "description": "The Notion connection was disconnected.",
+      "enum": "pages.sync_stop_reason",
+      "value": "disconnected"
+    },
+    {
+      "description": "The member whose Notion account it was left the workspace.",
+      "enum": "pages.sync_stop_reason",
+      "value": "member_left"
+    },
+    {
+      "description": "Notion no longer shares the page with Campbooks.",
+      "enum": "pages.sync_stop_reason",
+      "value": "not_shared"
+    },
+    {
+      "description": "Notion is not offered on this instance any more.",
+      "enum": "pages.sync_stop_reason",
+      "value": "notion_unavailable"
+    },
+    {
+      "description": "A member stopped syncing.",
+      "enum": "pages.sync_stop_reason",
+      "value": "stopped_by_member"
+    },
+    {
+      "description": "The page was put in the trash in Campbooks.",
+      "enum": "pages.sync_stop_reason",
+      "value": "trashed_here"
+    },
+    {
+      "description": "The page was trashed in Notion.",
+      "enum": "pages.sync_stop_reason",
+      "value": "trashed_in_notion"
     },
     {
       "description": "Make the event at the provider.",
@@ -5884,7 +6057,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -5953,6 +6127,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6020,7 +6195,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6089,6 +6265,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6279,7 +6456,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6348,6 +6526,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6426,7 +6605,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6495,6 +6675,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6566,7 +6747,8 @@
                 "bank",
                 "calendar",
                 "files",
-                "messages"
+                "messages",
+                "pages"
               ],
               "type": "string"
             },
@@ -6589,7 +6771,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6658,6 +6841,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6743,7 +6927,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6812,6 +6997,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -6893,7 +7079,8 @@
                     "bank",
                     "calendar",
                     "files",
-                    "messages"
+                    "messages",
+                    "pages"
                   ],
                   "type": "string"
                 },
@@ -6962,6 +7149,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -7041,6 +7229,7 @@
               "google",
               "imap",
               "microsoft",
+              "notion",
               "zoho"
             ],
             "type": "string",
@@ -7145,6 +7334,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -7255,6 +7445,7 @@
                   "google",
                   "imap",
                   "microsoft",
+                  "notion",
                   "zoho"
                 ],
                 "type": "string",
@@ -7357,6 +7548,7 @@
               "google",
               "imap",
               "microsoft",
+              "notion",
               "zoho"
             ],
             "type": "string",
@@ -7372,7 +7564,8 @@
                   "bank",
                   "calendar",
                   "files",
-                  "messages"
+                  "messages",
+                  "pages"
                 ],
                 "type": "string",
                 "x-classification": "operational"
@@ -15327,6 +15520,407 @@
       "version": 1
     },
     {
+      "action": "raised",
+      "actor_types": [
+        "user",
+        "system"
+      ],
+      "added_in": 17,
+      "description": "The same block changed in Campbooks and in Notion between two syncs: Campbooks kept its version and added Notion's beneath it as a conflict for the member to choose. How many blocks.",
+      "fires_when": "Applying a Notion snapshot, or undoing a resolution, adds conflict blocks to the page, in that transaction.",
+      "module": "pages",
+      "name": "pages.notion_conflict_raised",
+      "object": "notion_conflict",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionConflictRaised",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_conflict_raised:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The same block changed in Campbooks and in Notion between two syncs: Campbooks kept its version and added Notion's beneath it as a conflict for the member to choose. How many blocks.",
+        "properties": {
+          "blocks": {
+            "description": "How many blocks are in conflict now that were not before.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "blocks",
+          "page"
+        ],
+        "title": "pages.notion_conflict_raised",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "resolved",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 17,
+      "description": "A member chose what to do with a conflict between a block and Notion's version of it.",
+      "fires_when": "pages.resolve_conflict applies the choice, in the transaction that changes the page.",
+      "module": "pages",
+      "name": "pages.notion_conflict_resolved",
+      "object": "notion_conflict",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionConflictResolved",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_conflict_resolved:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member chose what to do with a conflict between a block and Notion's version of it.",
+        "properties": {
+          "choice": {
+            "description": "What the member chose.",
+            "enum": [
+              "both",
+              "mine",
+              "notion"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "choice",
+          "page"
+        ],
+        "title": "pages.notion_conflict_resolved",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "imported",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 17,
+      "description": "A member picked pages in their Notion account to bring into Pages: how many were made, linked to their Notion pages. Never their titles or ids at Notion.",
+      "fires_when": "pages.import_from_notion makes the pages and their links, in the transaction that stores them; pages already linked from this connection make none and track nothing.",
+      "module": "pages",
+      "name": "pages.notion_pages_imported",
+      "object": "notion_pages",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionPagesImported",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_pages_imported:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member picked pages in their Notion account to bring into Pages: how many were made, linked to their Notion pages. Never their titles or ids at Notion.",
+        "properties": {
+          "connection": {
+            "description": "The Notion connection they were imported through.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "id"
+          },
+          "pages": {
+            "description": "How many pages were made.",
+            "type": "integer",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "connection",
+          "pages"
+        ],
+        "title": "pages.notion_pages_imported",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "applied",
+      "actor_types": [
+        "user",
+        "system"
+      ],
+      "added_in": 17,
+      "description": "A change crossed between a page and its Notion page, in one direction: how many blocks it moved. Never their text.",
+      "fires_when": "A Notion snapshot is applied to the page (inbound), or the connector reports blocks written to Notion (outbound), in the transaction that stores the result; a run that moves no block tracks nothing.",
+      "module": "pages",
+      "name": "pages.notion_sync_applied",
+      "object": "notion_sync",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionSyncApplied",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_sync_applied:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A change crossed between a page and its Notion page, in one direction: how many blocks it moved. Never their text.",
+        "properties": {
+          "blocks": {
+            "description": "How many blocks moved.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "direction": {
+            "description": "Which way the blocks moved.",
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "blocks",
+          "direction",
+          "page"
+        ],
+        "title": "pages.notion_sync_applied",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "stopped",
+      "actor_types": [
+        "user",
+        "system"
+      ],
+      "added_in": 17,
+      "description": "A page stopped being kept in step with its Notion page, and why. Nothing is deleted on either side.",
+      "fires_when": "A member stops it, Notion is disconnected, either side trashes the page, Notion stops sharing it, or its member leaves, in the transaction that ends the link; a link already stopped tracks nothing.",
+      "module": "pages",
+      "name": "pages.notion_sync_stopped",
+      "object": "notion_sync",
+      "openspec_change": "pages-notion-sync",
+      "rust_type": "NotionSyncStopped",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_sync_stopped:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A page stopped being kept in step with its Notion page, and why. Nothing is deleted on either side.",
+        "properties": {
+          "page": {
+            "additionalProperties": false,
+            "description": "The page.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "reason": {
+            "description": "Why the link ended.",
+            "enum": [
+              "disconnected",
+              "member_left",
+              "not_shared",
+              "notion_unavailable",
+              "stopped_by_member",
+              "trashed_here",
+              "trashed_in_notion"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "page",
+          "reason"
+        ],
+        "title": "pages.notion_sync_stopped",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "created",
       "actor_types": [
         "user",
@@ -22867,7 +23461,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-26",
-  "plan_version": 16,
+  "plan_version": 17,
   "properties": [
     {
       "classification": "operational",
@@ -25831,6 +26425,149 @@
       "property": "job",
       "required": true,
       "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many blocks are in conflict now that were not before.",
+      "event": "pages.notion_conflict_raised",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "blocks",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.notion_conflict_raised",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "What the member chose.",
+      "event": "pages.notion_conflict_resolved",
+      "example": "",
+      "list": false,
+      "of": "pages.conflict_choice",
+      "pattern": "",
+      "property": "choice",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.notion_conflict_resolved",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The Notion connection they were imported through.",
+      "event": "pages.notion_pages_imported",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "connection",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many pages were made.",
+      "event": "pages.notion_pages_imported",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "pages",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many blocks moved.",
+      "event": "pages.notion_sync_applied",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "blocks",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Which way the blocks moved.",
+      "event": "pages.notion_sync_applied",
+      "example": "",
+      "list": false,
+      "of": "pages.sync_direction",
+      "pattern": "",
+      "property": "direction",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.notion_sync_applied",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page.",
+      "event": "pages.notion_sync_stopped",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Why the link ended.",
+      "event": "pages.notion_sync_stopped",
+      "example": "",
+      "list": false,
+      "of": "pages.sync_stop_reason",
+      "pattern": "",
+      "property": "reason",
+      "required": true,
+      "type": "enum",
       "version": 1
     },
     {
