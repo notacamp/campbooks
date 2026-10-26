@@ -6,7 +6,7 @@
  */
 export type TabKey =
   /** The same-origin path to come back to once a sign-in finishes. */
-  "signIn.returnTo"
+  | "signIn.returnTo"
   /** The mailbox Add calendar access was started for (an id, to name it when the provider sends the member back). */
   | "calendarAccess.connection";
 
