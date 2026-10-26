@@ -21,6 +21,60 @@ export {
   type AttachmentListProps,
   type ImagePreviewProps,
 } from "./components/Attachments/Attachments";
+// Tables (cloud#365): the grid, the board, the row peek and their small parts.
+export {
+  OptionTag,
+  TypeGlyph,
+  CellButton,
+  CellEmpty,
+  HeaderButton,
+  SummaryButton,
+  CellInput,
+  CellLine,
+  CellRow,
+  CellLink,
+  type HeaderButtonProps,
+  type SummaryButtonProps,
+  type OptionTagColor,
+  type OptionTagProps,
+  type TypeGlyphProps,
+} from "./components/Table/Cells";
+export {
+  DataGrid,
+  type CellPos,
+  type CellState,
+  type DataGridProps,
+  type GridColumn,
+  type GridRow,
+} from "./components/Table/DataGrid";
+export { Board, type BoardCard, type BoardGroup, type BoardProps } from "./components/Table/Board";
+export {
+  CheckGroup,
+  MenuHeading,
+  MenuItem,
+  MenuList,
+  MenuSeparator,
+  type CheckGroupProps,
+  type MenuItemProps,
+  type MenuListProps,
+} from "./components/Table/Menu";
+export { Picker, type PickerItem, type PickerProps } from "./components/Table/Picker";
+export {
+  PropertyLine,
+  PropertyList,
+  RowPeek,
+  type PropertyLineProps,
+  type RowPeekProps,
+} from "./components/Table/Peek";
+export {
+  FilterChip,
+  TableToolbar,
+  ToolbarButton,
+  type FilterChipProps,
+  type TableToolbarProps,
+  type ToolbarButtonProps,
+  type TableTab,
+} from "./components/Table/Toolbar";
 // The Pages editor's own pieces (cloud#363).
 export {
   PageTree,

@@ -51,6 +51,18 @@ export function iconOf(icon: string | null | undefined): PageIcon {
   return PAGE_ICONS.find((name) => name === icon) ?? "document";
 }
 
+/** A page's icon in the tree: its own, else the table's mark for a table. */
+export function treeIcon(page: {
+  icon?: string | null | undefined;
+  kind: string;
+}): PageIcon | "table" {
+  return page.icon === null || page.icon === undefined
+    ? page.kind === "table"
+      ? "table"
+      : "document"
+    : iconOf(page.icon);
+}
+
 /** The record types a page may mention (the server's list). */
 const MENTION_TYPES = [
   "workspaces.member",

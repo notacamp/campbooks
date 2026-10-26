@@ -193,6 +193,10 @@
   padding: var(--space-6) var(--space-8) var(--space-10);
 }
 
+.readerBody[data-wide] {
+  max-width: none;
+}
+
 /* The reader's pinned bottom: the thread scrolls under it. */
 .readerFooter {
   position: sticky;

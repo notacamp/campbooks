@@ -50,6 +50,7 @@ async fn tables_off_means_no_routes_and_no_tables_in_the_list(db: PgPool) {
     let listed = kit.get(&marta, &Kit::pages(ws)).await;
     assert_eq!(listed.status, StatusCode::OK);
     assert_eq!(listed.json["pages"], json!([]));
+    assert_eq!(listed.json["tables"], false, "a client offers no tables");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -105,4 +106,43 @@ async fn a_stranger_does_not_see_the_table_and_a_reader_reads_it(db: PgPool) {
         .await;
     assert_eq!(not.status, StatusCode::CONFLICT);
     assert_eq!(not.json["code"], "not_a_table");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn pages_say_whether_they_are_tables_and_rows_are_never_listed(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let (marta, _) = kit.member("marta", ws);
+    let table = kit.table(&marta, ws).await;
+    let t = table["page"]["id"].as_str().unwrap();
+    let plain = kit
+        .add(&marta, ws, json!({"title": "Notes", "place": "workspace"}))
+        .await;
+    let row = kit.row(&marta, ws, t, json!({"title": "Acme"})).await;
+
+    let listed = kit.get(&marta, &Kit::pages(ws)).await.json;
+    let kind_of = |id: &str| {
+        listed["pages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == id)
+            .map(|p| p["kind"].clone())
+    };
+    assert_eq!(kind_of(t), Some(json!("table")));
+    assert_eq!(kind_of(plain["id"].as_str().unwrap()), Some(json!("page")));
+    assert_eq!(listed["pages"].as_array().unwrap().len(), 2);
+    assert_eq!(listed["tables"], true);
+
+    let got = kit
+        .get(&marta, &format!("{}/{t}", Kit::pages(ws)))
+        .await
+        .json;
+    assert_eq!(got["kind"], "table");
+    let row_id = row["page"]["id"].as_str().or(row["id"].as_str()).unwrap();
+    let got = kit
+        .get(&marta, &format!("{}/{row_id}", Kit::pages(ws)))
+        .await
+        .json;
+    assert_eq!(got["kind"], "row");
 }

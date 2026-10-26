@@ -201,3 +201,40 @@ async fn a_filter_naming_nothing_real_is_refused_and_operands_are_never_sql(db: 
     assert_eq!(bad.json["code"], "invalid_filter");
     assert_eq!(kit.page_count(ws).await, 2);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn rows_can_be_asked_for_by_id_and_only_the_tables_own(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let (marta, _) = kit.member("marta", ws);
+    let t = kit.table(&marta, ws).await["page"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let other = kit.table(&marta, ws).await["page"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let a = kit.row(&marta, ws, &t, json!({"title": "A"})).await;
+    kit.row(&marta, ws, &t, json!({"title": "B"})).await;
+    let elsewhere = kit.row(&marta, ws, &other, json!({"title": "Z"})).await;
+    let (a, z) = (
+        a["id"].as_str().unwrap().to_owned(),
+        elsewhere["id"].as_str().unwrap().to_owned(),
+    );
+
+    let asked = kit.query(&marta, ws, &t, json!({"rows": [a, z]})).await;
+    assert_eq!(asked.status, StatusCode::OK, "{:?}", asked.json);
+    let titles: Vec<_> = asked.json["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(titles, ["A"], "a row of another table is not the table's");
+    let none = kit.query(&marta, ws, &t, json!({"rows": []})).await;
+    assert_eq!(none.json["rows"], json!([]));
+    let many: Vec<String> = (0..101).map(|_| uuid::Uuid::now_v7().to_string()).collect();
+    let too_many = kit.query(&marta, ws, &t, json!({"rows": many})).await;
+    assert_eq!(too_many.status, StatusCode::BAD_REQUEST);
+}

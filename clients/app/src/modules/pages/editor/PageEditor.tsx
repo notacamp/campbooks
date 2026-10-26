@@ -25,6 +25,7 @@ import {
   filterSlash,
   runSlash,
   SLASH_ITEMS,
+  TABLE_SLASH_IDS,
   TURN_INTO,
   type SlashHelpers,
   type SlashId,
@@ -43,6 +44,22 @@ export interface PageEditorProps {
   upload: (file: File) => Promise<UploadedFile>;
   /** Make a sub-page under this page; its id. */
   createSubPage: () => Promise<string>;
+  /** Pages have sub-pages; the row of a table does not. Default true. */
+  subPages?: boolean | undefined;
+  /** What the table blocks need; none while tables are off, and the blocks are not offered. */
+  tables?: TableHelpers | undefined;
+}
+
+/** What the editor asks of tables (the `/table` and `/link to table` blocks). */
+export interface TableHelpers {
+  /** Make a table under this page: its id and its first view. */
+  create: () => Promise<{ table: string; view: string }>;
+  /** Put a table just made in the trash (the Undo of making it). */
+  discard: (table: string) => Promise<void>;
+  /** A table's first view. */
+  firstView: (table: string) => Promise<string>;
+  /** Whether a page is a table the viewer may open. */
+  isTable: (page: string) => boolean;
 }
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
@@ -66,6 +83,8 @@ export function PageEditor({
   pages,
   upload,
   createSubPage,
+  subPages = true,
+  tables,
 }: PageEditorProps) {
   const { t } = useTranslation("pages");
   const undo = useUndoToast();
@@ -77,12 +96,23 @@ export function PageEditor({
   const [blockMenu, setBlockMenu] = useState<Handle | undefined>();
 
   const [editorBox] = useState(() => new Latest<Editor | null>(null));
+  // The `@` menu is open for a table (`/link to table`), not for a mention.
+  const [tableNext] = useState(() => new Latest(false));
   const slash = useMenu<SlashItem>(() => {
     editorBox.current?.commands.focus();
   });
   const mention = useMenu<MentionCandidate>(() => {
+    tableNext.set(false);
     editorBox.current?.commands.focus();
   });
+
+  // The `@` menu closing ends a link to a table.
+  const mentionClosed = mention.menu === undefined;
+  useEffect(() => {
+    if (mentionClosed) {
+      tableNext.set(false);
+    }
+  }, [mentionClosed, tableNext]);
 
   const slashName = (id: SlashId) => t(`slash.${id}`);
   const [nameBox] = useState(() => new Latest(slashName));
@@ -91,13 +121,32 @@ export function PageEditor({
     // Nothing to do until the editor has mounted.
   };
   const [helpersBox] = useState(
-    () => new Latest<SlashHelpers>({ attach: idle, mention: idle, subPage: idle }),
+    () =>
+      new Latest<SlashHelpers>({
+        attach: idle,
+        mention: idle,
+        subPage: idle,
+        table: idle,
+        tableLink: idle,
+      }),
   );
+  // What the menus offer: no table blocks while tables are off, no sub-pages in a row.
+  const [offerBox] = useState(() => new Latest({ subPages, tables: tables !== undefined }));
+  const [tablesBox] = useState(() => new Latest<TableHelpers | undefined>(tables));
 
   const [extensions] = useState(() => [
     createSlashMenu<SlashItem>(
       slash.bridge,
-      (query) => filterSlash(SLASH_ITEMS, query, (id) => nameBox.current(id)),
+      (query) =>
+        filterSlash(
+          SLASH_ITEMS.filter(
+            (item) =>
+              (offerBox.current.subPages || item.id !== "subpage") &&
+              (offerBox.current.tables || !TABLE_SLASH_IDS.includes(item.id)),
+          ),
+          query,
+          (id) => nameBox.current(id),
+        ),
       (item, range) => {
         const current = editorBox.current;
         if (current !== null) {
@@ -107,13 +156,38 @@ export function PageEditor({
     ),
     createMentionMenu<MentionCandidate>(
       mention.bridge,
-      async (query, signal) =>
-        (await searchMentions(environment.workspaceId, query, pagesBox.current, signal)).flatMap(
-          (group) => group.candidates,
-        ),
+      async (query, signal) => {
+        const found = (
+          await searchMentions(environment.workspaceId, query, pagesBox.current, signal)
+        ).flatMap((group) => group.candidates);
+        // Linking to a table offers only the tables the viewer may open.
+        return tableNext.current
+          ? found.filter(
+              (item) => item.type === "pages.page" && tablesBox.current?.isTable(item.id) === true,
+            )
+          : found;
+      },
       (item, range) => {
         const current = editorBox.current;
         if (current === null) {
+          return;
+        }
+        if (tableNext.current) {
+          tableNext.set(false);
+          const tablesHelper = tablesBox.current;
+          current.chain().focus().deleteRange(range).run();
+          void tablesHelper?.firstView(item.id).then(
+            (view) => {
+              editorBox.current
+                ?.chain()
+                .focus()
+                .insertContent({ type: "tableView", attrs: { table: item.id, view } })
+                .run();
+            },
+            () => {
+              undo.fail({ label: t("tables.toast.linkFailed") });
+            },
+          );
           return;
         }
         const embed = embedNext.current;
@@ -198,7 +272,48 @@ export function PageEditor({
     editorBox.set(editor);
     pagesBox.set(pages);
     nameBox.set(slashName);
+    offerBox.set({ subPages, tables: tables !== undefined });
+    tablesBox.set(tables);
     helpersBox.set({
+      table: () => {
+        const made = tablesBox.current?.create();
+        if (made === undefined) {
+          return;
+        }
+        void made.then(
+          ({ table, view }) => {
+            editorBox.current
+              ?.chain()
+              .focus()
+              .insertContent({ type: "tableView", attrs: { table, view } })
+              .run();
+            undo.push({
+              label: t("tables.toast.inlineCreated"),
+              undo: () => {
+                const current = editorBox.current;
+                current?.state.doc.descendants((node, pos) => {
+                  if (node.type.name === "tableView" && node.attrs["table"] === table) {
+                    current
+                      .chain()
+                      .focus()
+                      .deleteRange({ from: pos, to: pos + node.nodeSize })
+                      .run();
+                    return false;
+                  }
+                  return true;
+                });
+                void tablesBox.current?.discard(table);
+              },
+            });
+          },
+          () => {
+            undo.fail({ label: t("tables.toast.createFailed") });
+          },
+        );
+      },
+      tableLink: () => {
+        tableNext.set(true);
+      },
       attach: (onlyImages) => {
         setImages(onlyImages);
         requestAnimationFrame(() => {

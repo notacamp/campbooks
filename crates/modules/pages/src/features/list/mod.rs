@@ -48,6 +48,9 @@ pub struct ListParams {
 pub struct PageList {
     /// The pages, sorted by position among their siblings.
     pub pages: Vec<PageSummary>,
+    /// Whether tables are on here: when not, there are no table routes, and
+    /// a client offers none.
+    pub tables: bool,
 }
 
 /// List the pages the caller may open.
@@ -116,7 +119,10 @@ pub async fn handler(
         .filter_map(|row| readable.get(&row.id).map(|role| (row, *role)))
         .map(|(row, role)| row.summary(role, with_children.contains(&row.id)))
         .collect::<Result<Vec<_>>>()?;
-    Ok(Json(PageList { pages }))
+    Ok(Json(PageList {
+        pages,
+        tables: tables.0,
+    }))
 }
 
 #[cfg(test)]

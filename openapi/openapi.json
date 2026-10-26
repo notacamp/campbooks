@@ -27499,11 +27499,21 @@
         "format": "uuid",
         "description": "PageId (UUIDv7)"
       },
+      "PageKind": {
+        "type": "string",
+        "description": "What a page is: an ordinary page, a table, or one row of a table.",
+        "enum": [
+          "page",
+          "table",
+          "row"
+        ]
+      },
       "PageList": {
         "type": "object",
         "description": "The pages.",
         "required": [
-          "pages"
+          "pages",
+          "tables"
         ],
         "properties": {
           "pages": {
@@ -27512,6 +27522,10 @@
               "$ref": "#/components/schemas/PageSummary"
             },
             "description": "The pages, sorted by position among their siblings."
+          },
+          "tables": {
+            "type": "boolean",
+            "description": "Whether tables are on here: when not, there are no table routes, and\na client offers none."
           }
         }
       },
@@ -27580,7 +27594,8 @@
           "role",
           "created_by",
           "edited_at",
-          "meta_revision"
+          "meta_revision",
+          "kind"
         ],
         "properties": {
           "created_by": {
@@ -27606,6 +27621,10 @@
           "id": {
             "$ref": "#/components/schemas/PageId",
             "description": "The page."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PageKind",
+            "description": "What it is: an ordinary page or a table (rows are never listed)."
           },
           "meta_revision": {
             "type": "integer",
@@ -27691,6 +27710,7 @@
           "edited_at",
           "revision",
           "meta_revision",
+          "kind",
           "grants",
           "ancestors",
           "document"
@@ -27742,6 +27762,10 @@
           "id": {
             "$ref": "#/components/schemas/PageId",
             "description": "The page."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PageKind",
+            "description": "What it is: a page, a table, or one row of a table."
           },
           "meta_revision": {
             "type": "integer",
@@ -32076,6 +32100,16 @@
             ],
             "description": "How many rows, 1 to 100. Default 100.",
             "minimum": 0
+          },
+          "rows": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PageId"
+            },
+            "description": "Only these rows (up to 100), if they are the table's and live: to\nread a few rows by id, such as the rows a relation cell names."
           },
           "sorts": {
             "description": "Sorts of your own (up to five `{\"property\", \"direction\"}`), in place\nof the view's."

@@ -17,6 +17,7 @@
     "unknown_block": "The change uses a block or a setting that a page can't hold.",
     "link_scheme": "Links can only start with https, http or mailto.",
     "foreign_blob": "The change names a file that was not uploaded to this page.",
+    "bad_table_view": "A table block can only show a table you can open, and one of its views.",
     "not_a_member": "You can only share a page with a member of this workspace.",
     "share_yourself": "Choose someone else to share it with.",
     "invalid_ref": "A page can't link to that kind of record.",

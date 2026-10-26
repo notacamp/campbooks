@@ -17,6 +17,7 @@ const page = (id: string, title: string): PageSummary => ({
   edited_at: "2026-10-12T09:00:00Z",
   trashed_at: null,
   meta_revision: 1,
+  kind: "page",
 });
 
 describe("a page mention's label", () => {

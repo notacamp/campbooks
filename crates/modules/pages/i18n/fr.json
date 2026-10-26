@@ -17,6 +17,7 @@
     "unknown_block": "La modification utilise un bloc ou un réglage qu'une page ne peut pas contenir.",
     "link_scheme": "Les liens ne peuvent commencer que par https, http ou mailto.",
     "foreign_blob": "La modification désigne un fichier qui n'a pas été envoyé sur cette page.",
+    "bad_table_view": "Un bloc de tableau ne peut montrer qu'un tableau que vous pouvez ouvrir, et l'une de ses vues.",
     "not_a_member": "Vous ne pouvez partager une page qu'avec un membre de cet espace de travail.",
     "share_yourself": "Choisissez quelqu'un d'autre pour le partage.",
     "invalid_ref": "Une page ne peut pas faire de lien vers ce type d'enregistrement.",

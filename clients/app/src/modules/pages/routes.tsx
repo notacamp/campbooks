@@ -18,7 +18,9 @@ export function buildPagesRoutes<TParent extends AnyRoute>(
 ) {
   function PagesRoute() {
     const params: { workspaceId?: string; pageId?: string } = useParams({ strict: false });
-    const search: { new?: 1; import?: "notion" } = useSearch({ strict: false });
+    const search: { new?: 1; import?: "notion"; view?: string; row?: string } = useSearch({
+      strict: false,
+    });
     return (
       <PagesPage
         key={params.workspaceId}
@@ -26,16 +28,25 @@ export function buildPagesRoutes<TParent extends AnyRoute>(
         pageId={params.pageId}
         creating={params.pageId === undefined && search.new === 1}
         importing={search.import === "notion"}
+        view={search.view}
+        row={search.row}
         notion={useNotionSource === undefined ? undefined : { useSource: useNotionSource }}
       />
     );
   }
-  // `new` and `import` are the page's only state: present (1, notion) or not.
-  const validateSearch = (search: Record<string, unknown>): { new?: 1; import?: "notion" } => ({
+  // `new` and `import` are present (1, notion) or not; `view` and `row` name a table's view and row.
+  const validateSearch = (
+    search: Record<string, unknown>,
+  ): { new?: 1; import?: "notion"; view?: string; row?: string } => ({
     ...(search["new"] === 1 || search["new"] === "1" || search["new"] === true
       ? { new: 1 as const }
       : {}),
     ...(search["import"] === "notion" ? { import: "notion" as const } : {}),
+    // A table page's current view and the row opened beside it.
+    ...(typeof search["view"] === "string" && search["view"] !== ""
+      ? { view: search["view"] }
+      : {}),
+    ...(typeof search["row"] === "string" && search["row"] !== "" ? { row: search["row"] } : {}),
   });
   const list = createRoute({
     getParentRoute: () => parent,

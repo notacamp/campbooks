@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { useUndoToast } from "~/lib/ui";
 
 import { usePageCalls, useRefreshPages } from "../api/queries";
+import { useTableCalls } from "../tables/api";
+import type { TableDetail } from "../tables/types";
 import type { NewPage, PagePlace, PageRole, PageSummary, PageView } from "../types";
 
 /** Where a page goes. */
@@ -20,6 +22,7 @@ export interface Destination {
 export function usePageActions(workspaceId: string) {
   const { t } = useTranslation("pages");
   const calls = usePageCalls(workspaceId);
+  const tableCalls = useTableCalls(workspaceId);
   const undo = useUndoToast();
   const refresh = useRefreshPages(workspaceId);
 
@@ -67,6 +70,7 @@ export function usePageActions(workspaceId: string) {
         edited_at: made.edited_at,
         trashed_at: null,
         meta_revision: made.meta_revision,
+        kind: made.kind,
       };
       undo.push({
         label: t("toast.created"),
@@ -82,6 +86,30 @@ export function usePageActions(workspaceId: string) {
         redo: () => {
           void attempt(t("toast.restoreFailed", { title: title(current) }), () =>
             calls.restore(current),
+          );
+        },
+      });
+      return made;
+    },
+    /** Make a table; it opens in the caller. Undo puts it in the trash. */
+    createTable: async (body: {
+      parent?: string;
+      place?: PagePlace;
+    }): Promise<TableDetail | undefined> => {
+      const made = await attempt(t("tables.toast.tableFailed"), () => tableCalls.createTable(body));
+      if (made === undefined) {
+        return undefined;
+      }
+      undo.push({
+        label: t("tables.toast.tableCreated"),
+        undo: () => {
+          void attempt(t("tables.toast.trashFailed", { title: title(made.page) }), () =>
+            tableCalls.trashPage(made.page.id),
+          );
+        },
+        redo: () => {
+          void attempt(t("tables.toast.restoreFailed", { title: title(made.page) }), () =>
+            tableCalls.restorePage(made.page.id),
           );
         },
       });

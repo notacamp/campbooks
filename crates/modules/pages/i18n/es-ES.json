@@ -17,6 +17,7 @@
     "unknown_block": "El cambio usa un bloque o un ajuste que una página no puede tener.",
     "link_scheme": "Los enlaces solo pueden empezar por https, http o mailto.",
     "foreign_blob": "El cambio indica un archivo que no se subió a esta página.",
+    "bad_table_view": "Un bloque de tabla solo puede mostrar una tabla que puedas abrir, y una de sus vistas.",
     "not_a_member": "Solo puedes compartir una página con un miembro de este espacio de trabajo.",
     "share_yourself": "Elige a otra persona con quien compartirla.",
     "invalid_ref": "Una página no puede enlazar a ese tipo de registro.",

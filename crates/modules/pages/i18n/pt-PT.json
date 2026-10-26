@@ -17,6 +17,7 @@
     "unknown_block": "A alteração usa um bloco ou uma definição que uma página não pode ter.",
     "link_scheme": "As ligações só podem começar por https, http ou mailto.",
     "foreign_blob": "A alteração indica um ficheiro que não foi carregado para esta página.",
+    "bad_table_view": "Um bloco de tabela só pode mostrar uma tabela que possa abrir, e uma das suas vistas.",
     "not_a_member": "Só pode partilhar uma página com um membro deste espaço de trabalho.",
     "share_yourself": "Escolha outra pessoa para partilhar.",
     "invalid_ref": "Uma página não pode ligar a esse tipo de registo.",

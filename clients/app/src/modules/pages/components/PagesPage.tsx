@@ -7,6 +7,7 @@ import {
   Button,
   EmptyState,
   Heading,
+  IconButton,
   ListPane,
   PageTree,
   PageTreeGroup,
@@ -18,7 +19,7 @@ import {
 } from "~/lib/ui";
 import { useMembers } from "~/modules/workspaces";
 
-import { usePages } from "../api/queries";
+import { usePages, useTablesAvailable } from "../api/queries";
 import {
   buildSections,
   byPosition,
@@ -28,7 +29,7 @@ import {
   zoneOf,
   type TreeNode,
 } from "../model";
-import { iconOf, type PagePlace, type PageSummary } from "../types";
+import { treeIcon, type PagePlace, type PageSummary } from "../types";
 
 import type { UseNotionSource } from "../notion-source";
 
@@ -45,6 +46,9 @@ export interface PagesPageProps {
   creating?: boolean | undefined;
   /** `?import=notion`: open the import from Notion (Settings → Notion → Import pages). */
   importing?: boolean | undefined;
+  /** `?view=` and `?row=`: a table page's current view and the row opened beside it. */
+  view?: string | undefined;
+  row?: string | undefined;
   /** Notion, from the app shell; without it there is no import. */
   notion?: { useSource: UseNotionSource } | undefined;
 }
@@ -61,6 +65,8 @@ export function PagesPage({
   pageId,
   creating = false,
   importing = false,
+  view,
+  row,
   notion,
 }: PagesPageProps) {
   const { t } = useTranslation("pages");
@@ -69,6 +75,7 @@ export function PagesPage({
   const members = useMembers(workspaceId).data ?? [];
   const me = members.find((member) => member.you)?.user_id;
   const actions = usePageActions(workspaceId);
+  const tablesOn = useTablesAvailable(workspaceId);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [showTrash, setShowTrash] = useState(false);
   const [importOpen, setImportOpen] = useState(importing);
@@ -98,6 +105,13 @@ export function PagesPage({
         setOpen((current) => new Set([...current, parent]));
       }
       go(made.id);
+    }
+  };
+
+  const makeTable = async (place: PagePlace = "private") => {
+    const made = await actions.createTable({ place });
+    if (made !== undefined) {
+      go(made.page.id);
     }
   };
 
@@ -171,7 +185,7 @@ export function PagesPage({
       <PageTreeRow
         key={page.id}
         label={page.title === "" ? t("untitled") : page.title}
-        icon={iconOf(page.icon)}
+        icon={treeIcon(page)}
         depth={depth}
         expanded={expanded}
         current={page.id === pageId}
@@ -185,7 +199,7 @@ export function PagesPage({
         onToggle={() => {
           toggle(page.id);
         }}
-        {...(page.role === "reader"
+        {...(page.role === "reader" || page.kind !== "page"
           ? {}
           : {
               onAdd: () => {
@@ -236,6 +250,15 @@ export function PagesPage({
           >
             {t("tree.trash")}
           </Button>
+          {tablesOn ? (
+            <IconButton
+              icon="table"
+              label={t("tables.newTable")}
+              onClick={() => {
+                void makeTable();
+              }}
+            />
+          ) : null}
           <Button
             icon="plus"
             shortcut="pages.create"
@@ -361,6 +384,18 @@ export function PagesPage({
             pageId={pageId}
             pages={all}
             actions={actions}
+            view={view}
+            row={row}
+            onTable={(change) => {
+              void navigate({
+                to: `${base}/${pageId}`,
+                search: {
+                  ...(change.view === undefined ? {} : { view: change.view }),
+                  ...(change.row === undefined ? {} : { row: change.row }),
+                },
+                replace: true,
+              });
+            }}
             onBack={() => {
               go();
             }}

@@ -170,9 +170,13 @@ export function ReaderPane({
   );
 }
 
-/** The padded, measure-limited column inside a reader. */
-export function ReaderBody({ children }: { children: ReactNode }) {
-  return <div className={styles["readerBody"]}>{children}</div>;
+/** The padded, measure-limited column inside a reader; `wide` spans the whole main column (a table). */
+export function ReaderBody({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
+  return (
+    <div className={styles["readerBody"]} data-wide={wide || undefined}>
+      {children}
+    </div>
+  );
 }
 
 export interface ReaderFooterProps {

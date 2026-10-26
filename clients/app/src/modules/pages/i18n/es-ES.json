@@ -2,7 +2,12 @@
   "title": "Páginas",
   "untitled": "Sin título",
   "shortcuts": {
-    "create": "Nueva página"
+    "create": "Nueva página",
+    "tableNewRow": "Nueva fila",
+    "tableOpenRow": "Abrir la fila",
+    "tableEdit": "Editar la celda",
+    "tableMove": "Moverse entre celdas",
+    "tableClear": "Vaciar la celda"
   },
   "tree": {
     "label": "Páginas",
@@ -176,7 +181,9 @@
     "embed": "Insertar un registro",
     "subpage": "Subpágina",
     "file": "Archivo",
-    "image": "Imagen"
+    "image": "Imagen",
+    "table": "Tabla",
+    "tableLink": "Enlace a tabla"
   },
   "upload": {
     "failed": "No se pudo subir {{name}}."
@@ -319,6 +326,296 @@
         "template": "Botón de plantilla",
         "unsupported": "Bloque"
       }
+    }
+  },
+  "tables": {
+    "newTable": "Nueva tabla",
+    "error": {
+      "title": "No se pudo cargar esta tabla",
+      "rows": "No se pudieron cargar las filas"
+    },
+    "type": {
+      "title": "Nombre",
+      "text": "Texto",
+      "number": "Número",
+      "select": "Selección",
+      "multi_select": "Selección múltiple",
+      "status": "Estado",
+      "date": "Fecha",
+      "checkbox": "Casilla",
+      "person": "Persona",
+      "files": "Archivos",
+      "url": "URL",
+      "email": "Correo",
+      "phone": "Teléfono",
+      "relation": "Relación",
+      "campbooks_link": "Enlace de Campbooks",
+      "created": "Creado",
+      "edited": "Editado",
+      "unique_id": "ID",
+      "notion_formula": "Fórmula (Notion)",
+      "notion_rollup": "Resumen (Notion)",
+      "notion_people": "Personas (Notion)",
+      "external": "Se queda en Notion"
+    },
+    "typeHint": {
+      "text": "texto sencillo",
+      "number": "simple, %, moneda",
+      "select": "una opción",
+      "multi_select": "etiquetas",
+      "status": "por hacer · en curso · hecho",
+      "date": "o un intervalo",
+      "checkbox": "sí o no",
+      "person": "un compañero",
+      "files": "cualquier archivo",
+      "url": "una dirección web",
+      "email": "una dirección",
+      "phone": "un número",
+      "relation": "filas de otra tabla",
+      "campbooks_link": "conversaciones, tareas, eventos, personas",
+      "created": "cuándo o quién",
+      "edited": "cuándo o quién",
+      "unique_id": "CL-12"
+    },
+    "typeGroup": {
+      "basic": "Básicos",
+      "links": "Enlaces",
+      "filled": "Rellenados por nosotros"
+    },
+    "column": {
+      "add": "Añadir una columna",
+      "name": "Nombre de la columna",
+      "namePlaceholder": "Nombre (opcional)",
+      "type": "Tipo de columna",
+      "menu": "Opciones de la columna {{property}}",
+      "rename": "Cambiar el nombre",
+      "changeType": "Cambiar el tipo",
+      "format": "Formato",
+      "includeTime": "Incluir la hora",
+      "showsWho": "Mostrar quién, no cuándo",
+      "filter": "Filtrar por esta columna",
+      "hide": "Ocultar columna",
+      "delete": "Eliminar columna",
+      "resize": "Cambiar el ancho de {{property}}",
+      "relatedTable": "Tabla relacionada",
+      "searchTables": "Buscar tablas",
+      "noTables": "Ninguna otra tabla que puedas abrir.",
+      "paired": "Mostrarla también en la otra tabla"
+    },
+    "numberFormat": {
+      "number": "Número",
+      "percent": "Porcentaje",
+      "EUR": "Euro (€)",
+      "USD": "Dólar estadounidense ($)",
+      "GBP": "Libra (£)"
+    },
+    "cell": {
+      "someone": "Alguien",
+      "keptInNotion": "Se queda en Notion",
+      "empty": "Vacío",
+      "edit": "Editar {{property}}"
+    },
+    "rows": {
+      "new": "Nueva fila",
+      "empty": "Aún no hay filas. Añade una con Nueva fila.",
+      "count_one": "{{count}} fila",
+      "count_other": "{{count}} filas",
+      "loadMore": "Cargar más filas ({{shown}} de {{total}})",
+      "loadedOf": "Mostrando {{shown}} de {{total}} filas"
+    },
+    "row": {
+      "open": "Abrir {{title}}"
+    },
+    "view": {
+      "label": "Vistas",
+      "add": "Añadir una vista",
+      "name": "Nombre de la vista",
+      "type": "Tipo de vista",
+      "table": "Tabla",
+      "board": "Tablero",
+      "groupBy": "Agrupar por",
+      "needGroup": "Añade antes una columna de selección o de estado.",
+      "create": "Crear vista",
+      "options": "Opciones de {{view}}",
+      "rename": "Cambiar el nombre de la vista",
+      "columns": "Columnas",
+      "remove": "Eliminar vista",
+      "default": {
+        "table": "Tabla",
+        "board": "Tablero"
+      },
+      "more": "Más vistas"
+    },
+    "filter": {
+      "label": "Filtrar",
+      "mode": "Coincidir",
+      "all": "Todas",
+      "any": "Cualquiera",
+      "add": "Añadir condición",
+      "apply": "Aplicar",
+      "clear": "Quitar el filtro",
+      "property": "Propiedad",
+      "operator": "Condición",
+      "value": "Valor",
+      "checked": "Marcado",
+      "unchecked": "Desmarcado",
+      "chooseMember": "Elige una persona",
+      "none": "Aún no hay condiciones.",
+      "nested": "Este filtro tiene grupos de condiciones. Puedes quitarlo aquí.",
+      "nestedChip": "Filtro con grupos",
+      "condition": "Condición {{number}}",
+      "remove": "Quitar la condición {{number}}",
+      "removeChip": "Quitar el filtro de {{property}}"
+    },
+    "operator": {
+      "is": "es",
+      "is_not": "no es",
+      "is_any_of": "es uno de",
+      "contains": "contiene",
+      "does_not_contain": "no contiene",
+      "starts_with": "empieza por",
+      "ends_with": "termina en",
+      "gt": "es mayor que",
+      "gte": "es al menos",
+      "lt": "es menor que",
+      "lte": "es como máximo",
+      "before": "es antes de",
+      "after": "es después de",
+      "on_or_before": "es hasta",
+      "on_or_after": "es desde",
+      "is_empty": "está vacío",
+      "is_not_empty": "no está vacío"
+    },
+    "sort": {
+      "label": "Ordenar",
+      "none": "Sin ordenar.",
+      "add": "Añadir orden",
+      "direction": "Sentido",
+      "asc": "Ascendente",
+      "desc": "Descendente",
+      "level": "Orden {{number}}",
+      "remove": "Quitar el orden {{number}}"
+    },
+    "summary": {
+      "menu": "Resumen de {{property}}",
+      "none": "Ninguno",
+      "count": "Recuento",
+      "sum": "Suma",
+      "average": "Media",
+      "min": "Mín.",
+      "max": "Máx.",
+      "percentChecked": "Marcado"
+    },
+    "status": {
+      "todo": "Por hacer",
+      "doing": "En curso",
+      "done": "Hecho",
+      "default": {
+        "todo": "Por hacer",
+        "doing": "En curso",
+        "done": "Hecho"
+      }
+    },
+    "colors": {
+      "default": "Predeterminado",
+      "gray": "Gris",
+      "brown": "Marrón",
+      "orange": "Naranja",
+      "yellow": "Amarillo",
+      "green": "Verde",
+      "blue": "Azul",
+      "purple": "Morado",
+      "pink": "Rosa",
+      "red": "Rojo"
+    },
+    "picker": {
+      "searchOptions": "Buscar opciones",
+      "noOptions": "Aún no hay opciones. Escribe un nombre para crear una.",
+      "createOption": "Crear «{{name}}»",
+      "editOption": "Editar la opción {{name}}",
+      "optionName": "Nombre de la opción",
+      "optionColor": "Color",
+      "saveOption": "Guardar",
+      "deleteOption": "Eliminar opción",
+      "back": "Volver",
+      "clear": "Quitar",
+      "done": "Hecho",
+      "people": "Personas",
+      "searchPeople": "Buscar personas",
+      "noPeople": "Nadie con ese nombre.",
+      "rows": "Filas",
+      "searchRows": "Buscar filas",
+      "noRows": "No se encontraron filas.",
+      "chosenRow": "Una fila",
+      "links": "Registros",
+      "searchLinks": "Buscar conversaciones, tareas, eventos, personas y páginas",
+      "noLinks": "No se encontró nada.",
+      "loading": "Buscando…"
+    },
+    "date": {
+      "start": "Fecha",
+      "startTime": "Hora",
+      "end": "Fecha final",
+      "endTime": "Hora final",
+      "range": "Añadir una fecha final"
+    },
+    "files": {
+      "list": "Archivos",
+      "add": "Añadir un archivo",
+      "choose": "Elegir un archivo",
+      "uploading": "Subiendo…",
+      "failed": "No se pudo subir ese archivo.",
+      "remove": "Quitar {{name}}",
+      "removeShort": "Quitar"
+    },
+    "board": {
+      "noGroupTitle": "Elige por qué agrupa el tablero",
+      "noGroupBody": "Un tablero necesita una columna de selección o de estado. Añade una antes.",
+      "pickGroupBody": "Elige la columna cuyas opciones serán las columnas del tablero.",
+      "pickGroup": "Elige una columna",
+      "none": "Sin {{property}}",
+      "moveTo": "Mover a",
+      "moveCard": "Mover {{title}} a",
+      "addCard": "Añadir una fila a {{group}}"
+    },
+    "peek": {
+      "label": "Fila",
+      "crumb": "{{table}} · fila",
+      "title": "Título de la fila",
+      "openAsPage": "Abrir como página",
+      "close": "Cerrar",
+      "trash": "Mover a la papelera"
+    },
+    "toast": {
+      "cell": "{{property}} cambiado",
+      "cellStale": "Otra persona también cambió {{property}}: se queda la tuya",
+      "cellFailed": "No se pudo cambiar {{property}}. No se cambió nada.",
+      "title": "Título cambiado",
+      "titleFailed": "No se pudo cambiar el título. No se cambió nada.",
+      "row": "Fila añadida",
+      "rowFailed": "No se pudo añadir la fila. No se guardó nada.",
+      "rowUndoFailed": "No se pudo deshacer. No se cambió nada.",
+      "trashed": "Fila movida a la papelera",
+      "trashFailed": "No se pudo mover a la papelera. No se cambió nada.",
+      "restoreFailed": "No se pudo restaurar. No se cambió nada.",
+      "column": "Columna {{property}} añadida",
+      "columnFailed": "No se pudo cambiar la columna. No se cambió nada.",
+      "columnUndoFailed": "No se pudo deshacer. No se cambió nada.",
+      "columnRenamed": "Columna renombrada a {{property}}",
+      "columnType": "Tipo de {{property}} cambiado",
+      "columnChanged": "{{property}} cambiada",
+      "columnRemoved": "Columna {{property}} eliminada",
+      "options": "Opciones de {{property}} cambiadas",
+      "optionsFailed": "No se pudieron cambiar las opciones. No se cambió nada.",
+      "view": "{{view}} cambiada",
+      "viewAdded": "Vista {{view}} añadida",
+      "viewRemoved": "Vista {{view}} eliminada",
+      "viewFailed": "No se pudo cambiar la vista. No se cambió nada.",
+      "tableCreated": "Tabla creada",
+      "tableFailed": "No se pudo crear la tabla. No se guardó nada.",
+      "createFailed": "No se pudo crear la tabla. No se guardó nada.",
+      "inlineCreated": "Tabla añadida a la página",
+      "linkFailed": "No se pudo enlazar esa tabla. No se cambió nada."
     }
   }
 }
