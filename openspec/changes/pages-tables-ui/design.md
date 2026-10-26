@@ -100,3 +100,9 @@ these screens, slash items or tree entries appear.
 - **A row is deleted from its peek** ("Move to trash", with Undo).
 - **Rows are windowed** past 120 loaded rows (the first row's height is measured), and more load
   as the end scrolls into view, or with the "Load more rows" button.
+- **Checks the stories run found, fixed:** a tab list holds only tabs (the current view's options
+  sit beside it), the "+" at the end of the header is a column header, option colours reach AA
+  contrast, the row peek is a `div` dialog, and a value with links keeps its Edit button beside it
+  (a button cannot hold links).
+- **The page screen hands the row's page down** (`RowBodyContext`): the editor holds tables, so the
+  table screens may not import the editor.

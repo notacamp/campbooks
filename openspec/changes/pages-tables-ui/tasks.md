@@ -19,13 +19,13 @@
 - [x] 3.1 Table page: view tabs, one-row toolbar, column menu, summaries, `n r`, ⌘↵, undo toasts, optimistic cells with the version check
 - [x] 3.2 Tree: table icon, "New table"; `/table` and `/link to table` blocks; "Something you can't open"
 - [x] 3.3 Change-feed refresh on `table_changed`
-- [ ] 3.4 i18n en/pt-PT/es-ES/fr; `pnpm test:fit` 375/1280; coverage ≥ 80%; idle stories with a stateful mock + recording scenario `pages-tables.ts`
+- [x] 3.4 i18n en/pt-PT/es-ES/fr; `pnpm test:fit` 375/1280; coverage ≥ 80%; idle stories with a stateful mock + recording scenario `pages-tables.ts`
 
 ## 4. Finish
 
 - [x] 4.1 Tracked events (patch 0019 if any) and Coverage rows: none needed; every screen action is one of part 1's operations, already tracked
 - [x] 4.2 OpenAPI and client types regenerated
 - [x] 4.3 Changelog entry `changelog/unreleased/added/365-pages-tables-ui.md`
-- [ ] 4.4 Gates green in CI
+- [x] 4.4 Gates green in CI
 - [ ] 4.5 Recording at 375 px and desktop
 - [ ] 4.6 `openspec archive pages-tables-ui --yes` before merge
