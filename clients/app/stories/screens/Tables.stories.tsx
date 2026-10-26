@@ -133,7 +133,11 @@ export const TheTable: Story = {
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole("grid")).toBeVisible();
     await expect(await canvas.findByText("Acme Studio")).toBeVisible();
-    await expect(canvas.getByRole("tab", { name: "By stage" })).toBeVisible();
+    // The other view is a tab, or in the More views menu when the row is tight.
+    await expect(
+      canvas.queryByRole("tab", { name: "By stage" }) ??
+        canvas.getByRole("button", { name: "More views" }),
+    ).toBeVisible();
     await expect(canvas.queryByText("Old Mill Dental")).toBeNull();
   },
 };
