@@ -464,30 +464,38 @@ pub async fn complete(
     if pending {
         return Ok(());
     }
-    let rows: Vec<(Uuid, Uuid, String, Option<String>, Option<Uuid>, Option<DateTime<Utc>>)> =
-        sqlx::query_as(
-            "SELECT page_id, block_id, state, reason, result_notion_id, result_edited_at
+    let rows: Vec<(
+        Uuid,
+        Uuid,
+        String,
+        Option<String>,
+        Option<Uuid>,
+        Option<DateTime<Utc>>,
+    )> = sqlx::query_as(
+        "SELECT page_id, block_id, state, reason, result_notion_id, result_edited_at
                FROM connectors.notion_changes WHERE request_id = $1 ORDER BY seq",
-        )
-        .bind(request)
-        .fetch_all(&mut **tx)
-        .await?;
+    )
+    .bind(request)
+    .fetch_all(&mut **tx)
+    .await?;
     let Some(page) = rows.first().map(|row| row.0) else {
         return Ok(());
     };
     let results = rows
         .into_iter()
-        .map(|(_, block, end, reason, notion_block, edited_at)| NotionItemResult {
-            block,
-            outcome: match end.as_str() {
-                "applied" => NotionOutcome::Applied,
-                "skipped" => NotionOutcome::Skipped,
-                _ => NotionOutcome::Failed,
+        .map(
+            |(_, block, end, reason, notion_block, edited_at)| NotionItemResult {
+                block,
+                outcome: match end.as_str() {
+                    "applied" => NotionOutcome::Applied,
+                    "skipped" => NotionOutcome::Skipped,
+                    _ => NotionOutcome::Failed,
+                },
+                notion_block,
+                edited_at,
+                reason: reason.as_deref().and_then(reason_of),
             },
-            notion_block,
-            edited_at,
-            reason: reason.as_deref().and_then(reason_of),
-        })
+        )
         .collect();
     state
         .events
@@ -545,14 +553,13 @@ pub async fn retag(
         let Some(mac) = binding.retag(&row.fields(workspace, *at), row.mac.as_deref()) else {
             continue;
         };
-        let done = sqlx::query(
-            "UPDATE connectors.notion_changes SET mac = $2 WHERE id = $1 AND mac = $3",
-        )
-        .bind(row.id)
-        .bind(mac)
-        .bind(row.mac.as_deref())
-        .execute(&mut *conn)
-        .await?;
+        let done =
+            sqlx::query("UPDATE connectors.notion_changes SET mac = $2 WHERE id = $1 AND mac = $3")
+                .bind(row.id)
+                .bind(mac)
+                .bind(row.mac.as_deref())
+                .execute(&mut *conn)
+                .await?;
         if done.rows_affected() == 0 {
             left += 1;
         } else {

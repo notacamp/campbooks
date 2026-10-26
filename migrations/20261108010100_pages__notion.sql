@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS pages.external_links (
     last_outbound_at timestamptz,
     -- The time of the newest snapshot applied: an older one never is.
     last_read_at timestamptz,
+    -- The title Notion had when it was last read: a title changed here since
+    -- is not overwritten.
+    last_title text CHECK (last_title IS NULL OR char_length(last_title) <= 200),
     -- When the page's body last changed on this side, and a push was asked for.
     push_requested_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -102,8 +105,18 @@ CREATE TABLE IF NOT EXISTS pages.conflict_resolutions (
     -- base before the choice moved it.
     ours jsonb NOT NULL,
     theirs jsonb NOT NULL,
+    -- Notion removed the block (there is no version of theirs), or last edited
+    -- its version at this time.
+    removed boolean NOT NULL DEFAULT false,
+    theirs_edited timestamptz,
+    -- The block at Notion, what kind it is, and the base it had before the
+    -- choice moved it (none when the block was not mapped).
+    notion_block_id uuid,
+    kind text CHECK (kind IS NULL OR char_length(kind) <= 32),
     base_hash bytea CHECK (octet_length(base_hash) = 32),
     base_edited_at timestamptz,
+    -- The block "keep both" made of Notion's version.
+    extra_bid uuid,
     undone boolean NOT NULL DEFAULT false,
     at timestamptz NOT NULL DEFAULT now()
 );

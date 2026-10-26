@@ -22,6 +22,7 @@
 //! Notion's short error code at most.
 
 pub mod blocks;
+pub mod changes;
 pub mod pace;
 pub mod read;
 pub mod write;

@@ -20,6 +20,11 @@
     "not_a_member": "Solo puedes compartir una página con un miembro de este espacio de trabajo.",
     "share_yourself": "Elige a otra persona con quien compartirla.",
     "invalid_ref": "Una página no puede enlazar a ese tipo de registro.",
-    "file_empty": "El archivo no tiene contenido."
+    "file_empty": "El archivo no tiene contenido.",
+    "invalid_import": "Elige entre 1 y 100 páginas para importar.",
+    "no_conflict": "Ese bloque no tiene ningún cambio de Notion pendiente.",
+    "conflict_block_gone": "El bloque al que se refiere este cambio ya no está en la página.",
+    "cannot_undo": "Ya no se puede deshacer esa elección.",
+    "not_syncing": "Esta página ya no se mantiene sincronizada con Notion."
   }
 }

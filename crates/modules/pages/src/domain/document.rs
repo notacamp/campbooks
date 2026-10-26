@@ -307,9 +307,11 @@ fn spec(name: &str) -> Option<Spec> {
         "taskList" => (Class::Block, Context::Items(&["taskItem"])),
         "listItem" | "taskItem" => (Class::Item, Context::Blocks),
         "toggle" | "blockquote" | "callout" => (Class::Block, Context::Blocks),
-        "horizontalRule" | "image" | "file" | "pageLink" | "embed" => {
+        "horizontalRule" | "image" | "file" | "pageLink" | "embed" | "external" => {
             (Class::Block, Context::Empty)
         }
+        // Notion's version of a block we disagree about, beneath ours.
+        "conflict" => (Class::Block, Context::Blocks),
         "mention" | "hardBreak" => (Class::Inline, Context::Empty),
         _ => return None,
     };
@@ -436,6 +438,20 @@ type Attributes = BTreeMap<String, Any>;
 fn check_attributes(name: &str, attributes: &Attributes) -> Result<(), Rejection> {
     for (key, value) in attributes {
         let fits = match (name, key.as_str()) {
+            // Every block has a stable id, the same block at Notion.
+            (_, "bid") => text_of(value).is_some_and(is_uuid),
+            ("conflict", "of") => text_of(value).is_some_and(is_uuid),
+            ("conflict", "hash") => text_of(value).is_some_and(is_hash),
+            ("conflict", "edited") => text_of(value)
+                .is_some_and(|t| t.len() <= 40 && t.chars().all(|c| c.is_ascii_graphic())),
+            ("conflict", "removed") => matches!(value, Any::Bool(_)),
+            // A block kept in Notion: its Notion type, nothing of its content.
+            ("external", "kind") => text_of(value).is_some_and(|t| {
+                !t.is_empty()
+                    && t.len() <= 32
+                    && t.bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+            }),
             ("heading", "level") => whole_of(value).is_some_and(|n| (1..=3).contains(&n)),
             ("orderedList", "start") => {
                 whole_of(value).is_some_and(|n| (1..=1_000_000).contains(&n))

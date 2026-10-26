@@ -95,10 +95,10 @@ pub struct NotionPages {
         (status = OK, description = "The pages the connection can see.", body = NotionPages),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope.", body = Problem,
-            content_type = "application/problem+json"),
-        (status = NOT_FOUND, description = "No such Notion connection of yours.", body = Problem,
-            content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope, or a connection you may see but that is not yours (an admin, a client token).",
+            body = Problem, content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such Notion connection, or you may not see it.",
+            body = Problem, content_type = "application/problem+json"),
         (status = CONFLICT, description = "Notion needs you to connect again (`needs_reauth`), or is not set up on this instance (`provider_not_configured`).",
             body = Problem, content_type = "application/problem+json"),
         (status = TOO_MANY_REQUESTS, description = "The connection's request budget with Notion is spent for now.",
@@ -126,22 +126,22 @@ pub async fn execute(
     access: &Access,
     connection: ConnectionId,
 ) -> Result<NotionPages> {
-    let Some(notion) = deps.notion.as_ref() else {
-        return Err(Error::Conflict(MESSAGES.reason("provider_not_configured")));
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     // Only the member whose account it is: the owner's action, which an
-    // admin or a client token does not have. Anyone else is told there is
-    // nothing there.
+    // admin or a client token, who may see the connection, does not have
+    // (403). Anyone who may not see it is told there is no such connection.
     authz::require(
         state,
         &mut tx,
         access,
         Action::Disconnect,
         &RecordRef::new(CONNECTION_RECORD, &connection),
-        || Error::NotFound,
+        || Error::Forbidden,
     )
     .await?;
+    let Some(notion) = deps.notion.as_ref() else {
+        return Err(Error::Conflict(MESSAGES.reason("provider_not_configured")));
+    };
     let found = connections::load(&mut tx, connection)
         .await?
         .filter(|c| c.provider == Provider::Notion)

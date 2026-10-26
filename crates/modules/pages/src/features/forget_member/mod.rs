@@ -8,7 +8,11 @@
 
 use campbooks_kernel::{Event, EventHandler, JobContext, JobError, tenancy::WorkspaceId};
 
-use crate::{events::MemberLeft, features::share::lock_member};
+use crate::{
+    domain::{PageId, notion},
+    events::MemberLeft,
+    features::share::lock_member,
+};
 
 /// `workspaces.member_left` → delete the grants made to the member.
 pub struct ForgetMember;
@@ -38,6 +42,18 @@ impl EventHandler for ForgetMember {
             .await?
             .rows_affected();
         tracing::info!(grants = removed, "a departed member's page grants removed");
+        // The pages kept in step with their Notion account stop: nothing is
+        // deleted there, and the pages stay.
+        let linked: Vec<PageId> = sqlx::query_scalar(
+            "SELECT page_id FROM pages.external_links
+              WHERE created_by = $1 AND state <> 'stopped' ORDER BY page_id",
+        )
+        .bind(left.user)
+        .fetch_all(&mut **tx)
+        .await?;
+        for page in linked {
+            notion::stop(&state, tx, workspace, page, notion::StopReason::MemberLeft).await?;
+        }
         Ok(())
     }
 }
