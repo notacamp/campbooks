@@ -346,7 +346,7 @@ describe("MailboxesPage", () => {
 
     const mailboxes = await rows();
     expect(mailboxes).toHaveLength(1);
-    expect(within(mailboxes[0] as HTMLElement).getByText("ana@example.com")).toBeVisible();
+    expect(within(mailboxes[0]!).getByText("ana@example.com")).toBeVisible();
     const card = await screen.findByRole("list", { name: "Notion connections" });
     expect(within(card).getByText("Acme")).toBeVisible();
     expect(within(card).getByRole("link", { name: "Import pages from Acme" })).toHaveAttribute(

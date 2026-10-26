@@ -18,7 +18,8 @@ export interface KeptInNotionProps {
 export function KeptInNotion({ kind, href }: KeptInNotionProps) {
   const { t } = useTranslation("pages");
   const known = KEPT_KINDS.find((candidate) => candidate === kind);
-  const what = known === undefined ? humanKind(kind) : t(`notion.kept.kind.${known satisfies KeptKind}`);
+  const what =
+    known === undefined ? humanKind(kind) : t(`notion.kept.kind.${known satisfies KeptKind}`);
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-strong bg-surface-sunken p-3">
       <Icon name="document" />
@@ -27,12 +28,7 @@ export function KeptInNotion({ kind, href }: KeptInNotionProps) {
         <span className="text-sm text-secondary">{t("notion.kept.body")}</span>
       </div>
       {href === undefined ? null : (
-        <a
-          className="text-sm underline"
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a className="text-sm underline" href={href} target="_blank" rel="noopener noreferrer">
           {t("notion.kept.edit")}
         </a>
       )}

@@ -25,7 +25,12 @@ const CHOICES = ["mine", "notion", "both"] as const satisfies readonly NotionKee
  * it cannot say who). Different paragraphs merge on their own; only the same
  * one asks.
  */
-export function ConflictBlock({ children, removed, onChoose, readOnly = false }: ConflictBlockProps) {
+export function ConflictBlock({
+  children,
+  removed,
+  onChoose,
+  readOnly = false,
+}: ConflictBlockProps) {
   const { t } = useTranslation("pages");
   const [busy, setBusy] = useState<NotionKeep | undefined>();
   const choose = (keep: NotionKeep) => {
@@ -41,7 +46,9 @@ export function ConflictBlock({ children, removed, onChoose, readOnly = false }:
     >
       <div className="flex flex-wrap items-center gap-2">
         <Icon name="warning" />
-        <Pill signal="look">{t(removed ? "notion.conflict.removed" : "notion.conflict.changed")}</Pill>
+        <Pill signal="look">
+          {t(removed ? "notion.conflict.removed" : "notion.conflict.changed")}
+        </Pill>
       </div>
       {removed ? (
         <p className="text-sm text-secondary">{t("notion.conflict.removedBody")}</p>
@@ -54,7 +61,11 @@ export function ConflictBlock({ children, removed, onChoose, readOnly = false }:
         </div>
       )}
       {readOnly ? null : (
-        <div className="flex flex-wrap gap-2" role="group" aria-label={t("notion.conflict.choices")}>
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label={t("notion.conflict.choices")}
+        >
           {CHOICES.map((keep) => (
             <Button
               key={keep}

@@ -217,7 +217,10 @@ describe("a page kept in step with Notion", () => {
     const mocked = api(view(), {
       ...linked(),
       [`POST ${P}/${HANDBOOK.id}/notion/stop`]: {
-        body: notionLink(HANDBOOK.id, NOTION_ROADMAP, { state: "stopped", stopped_reason: "stopped_by_member" }),
+        body: notionLink(HANDBOOK.id, NOTION_ROADMAP, {
+          state: "stopped",
+          stopped_reason: "stopped_by_member",
+        }),
       },
     });
     renderOpen(HANDBOOK.id);
@@ -225,9 +228,9 @@ describe("a page kept in step with Notion", () => {
     const group = await screen.findByRole("group", { name: /Stop keeping this page/u });
     fireEvent.click(within(group).getByRole("button", { name: "Stop syncing" }));
     await waitFor(() => {
-      expect(mocked.calls.some((call) => call.route === `POST ${P}/${HANDBOOK.id}/notion/stop`)).toBe(
-        true,
-      );
+      expect(
+        mocked.calls.some((call) => call.route === `POST ${P}/${HANDBOOK.id}/notion/stop`),
+      ).toBe(true);
     });
     expect(await screen.findByText("Stopped syncing with Notion")).toBeVisible();
   });
@@ -235,7 +238,10 @@ describe("a page kept in step with Notion", () => {
   it("says when stopping did not work", async () => {
     api(view(), {
       ...linked(),
-      [`POST ${P}/${HANDBOOK.id}/notion/stop`]: { status: 409, body: { status: 409, code: "not_syncing", title: "x" } },
+      [`POST ${P}/${HANDBOOK.id}/notion/stop`]: {
+        status: 409,
+        body: { status: 409, code: "not_syncing", title: "x" },
+      },
     });
     renderOpen(HANDBOOK.id);
     fireEvent.click(await screen.findByRole("button", { name: "Stop syncing" }));

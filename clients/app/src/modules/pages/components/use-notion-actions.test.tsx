@@ -22,9 +22,11 @@ function Buttons() {
       <button
         type="button"
         onClick={() =>
-          void notion.importPages({ connection: "c1", pages: [{ notion_page: "n1" }] }).then((r) => {
-            document.title = r === undefined ? "failed" : `made ${String(r.pages.length)}`;
-          })
+          void notion
+            .importPages({ connection: "c1", pages: [{ notion_page: "n1" }] })
+            .then((r) => {
+              document.title = r === undefined ? "failed" : `made ${String(r.pages.length)}`;
+            })
         }
       >
         import
@@ -44,11 +46,15 @@ describe("useNotionActions", () => {
     fireEvent.click(screen.getByRole("button", { name: "resolve" }));
 
     expect(
-      await screen.findByText("Kept both, one under the other — it goes to Notion on the next sync."),
+      await screen.findByText(
+        "Kept both, one under the other — it goes to Notion on the next sync.",
+      ),
     ).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Undo/u }));
     await waitFor(() => {
-      expect(mocked.calls.some((call) => call.route === `POST ${P}/notion/resolutions/r1/undo`)).toBe(true);
+      expect(
+        mocked.calls.some((call) => call.route === `POST ${P}/notion/resolutions/r1/undo`),
+      ).toBe(true);
     });
   });
 
@@ -64,7 +70,9 @@ describe("useNotionActions", () => {
     });
     renderWithProviders(<Buttons />);
     fireEvent.click(screen.getByRole("button", { name: "resolve" }));
-    expect(await screen.findByText("Couldn’t apply that choice. Nothing was changed.")).toBeVisible();
+    expect(
+      await screen.findByText("Couldn’t apply that choice. Nothing was changed."),
+    ).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Retry|Try again/u }));
     await waitFor(() => {
       expect(tries).toBe(2);
@@ -74,12 +82,17 @@ describe("useNotionActions", () => {
   it("says when an Undo failed", async () => {
     mockApi({
       [`POST ${P}/notion/conflicts/b1`]: { body: { resolution: "r1", revision: 4, conflicts: 0 } },
-      [`POST ${P}/notion/resolutions/r1/undo`]: { status: 409, body: { status: 409, code: "cannot_undo", title: "x" } },
+      [`POST ${P}/notion/resolutions/r1/undo`]: {
+        status: 409,
+        body: { status: 409, code: "cannot_undo", title: "x" },
+      },
     });
     renderWithProviders(<Buttons />);
     fireEvent.click(screen.getByRole("button", { name: "resolve" }));
     fireEvent.click(await screen.findByRole("button", { name: /Undo/u }));
-    expect(await screen.findByText("Couldn’t undo that choice. Nothing was changed.")).toBeVisible();
+    expect(
+      await screen.findByText("Couldn’t undo that choice. Nothing was changed."),
+    ).toBeVisible();
   });
 
   it("stops syncing and says so, or says it could not", async () => {
@@ -113,7 +126,9 @@ describe("useNotionActions", () => {
     });
     unmount();
 
-    mockApi({ [`POST ${W}/pages/notion/imports`]: { status: 500, body: { status: 500, title: "x" } } });
+    mockApi({
+      [`POST ${W}/pages/notion/imports`]: { status: 500, body: { status: 500, title: "x" } },
+    });
     renderWithProviders(<Buttons />);
     fireEvent.click(screen.getByRole("button", { name: "import" }));
     await waitFor(() => {

@@ -1,16 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  Banner,
-  Button,
-  ButtonLink,
-  Checkbox,
-  Dialog,
-  Select,
-  SkeletonList,
-  Text,
-} from "~/lib/ui";
+import { Banner, Button, ButtonLink, Checkbox, Dialog, Select, SkeletonList, Text } from "~/lib/ui";
 import { useMembers } from "~/modules/workspaces";
 
 import { choiceOf, importRequest, importTree, toggle, allNodes, type ImportNode } from "../notion";
@@ -113,9 +104,7 @@ export function ImportFromNotion({
             disabled={!ready || request.length === 0 || request.length > MAX_IMPORT || busy}
             onClick={submit}
           >
-            {count === 0
-              ? t("notion.import.submitNone")
-              : t("notion.import.submit", { count })}
+            {count === 0 ? t("notion.import.submitNone") : t("notion.import.submit", { count })}
           </Button>
         </>
       }
@@ -134,7 +123,9 @@ export function ImportFromNotion({
           />
         ) : null}
         <Body
-          connectionsKnown={connections !== undefined && (connections.length === 0 || chosen !== undefined)}
+          connectionsKnown={
+            connections !== undefined && (connections.length === 0 || chosen !== undefined)
+          }
           hasConnection={connection !== undefined}
           needsReauth={connection?.needsReauth === true}
           source={source}
@@ -147,11 +138,13 @@ export function ImportFromNotion({
           }}
         />
         {request.length > MAX_IMPORT ? (
-          <Banner tone="danger" role="alert" title={t("notion.import.tooMany", { max: MAX_IMPORT })} />
+          <Banner
+            tone="danger"
+            role="alert"
+            title={t("notion.import.tooMany", { max: MAX_IMPORT })}
+          />
         ) : null}
-        {failed ? (
-          <Banner tone="danger" role="alert" title={t("notion.import.failed")} />
-        ) : null}
+        {failed ? <Banner tone="danger" role="alert" title={t("notion.import.failed")} /> : null}
         <p className="rounded-md bg-surface-sunken p-3 text-sm text-secondary">
           {t("notion.import.info")}
         </p>
@@ -235,7 +228,11 @@ function Body({
         return (
           <div key={page.notion_page} className={INDENT[Math.min(depth, INDENT.length - 1)]}>
             <Checkbox
-              label={<span className="break-words">{page.title === "" ? t("untitled") : page.title}</span>}
+              label={
+                <span className="break-words">
+                  {page.title === "" ? t("untitled") : page.title}
+                </span>
+              }
               hint={
                 page.linked
                   ? t("notion.import.linked")

@@ -40,7 +40,11 @@ async function importPages(page: Page, phone: boolean) {
   await caption(page, "Sub-pages come along", 2200);
   await dialog.getByLabel("Meeting notes").check();
   await settle();
-  await caption(page, phone ? "Import 4 pages" : "Import 4 pages: two pages and the sub-pages", 2200);
+  await caption(
+    page,
+    phone ? "Import 4 pages" : "Import 4 pages: two pages and the sub-pages",
+    2200,
+  );
   await dialog.getByRole("button", { name: /^Import \d+ pages/u }).click();
   await settle();
 }
@@ -52,8 +56,15 @@ export default async function pagesNotion({ page }: ScenarioContext): Promise<vo
   await importPages(page, phone);
 
   // The roadmap opens synced, with a change waiting.
-  await page.getByText(/^Synced with Notion/u).first().waitFor();
-  await caption(page, "Synced with Notion: the page says so, and Open in Notion is one click away", 2600);
+  await page
+    .getByText(/^Synced with Notion/u)
+    .first()
+    .waitFor();
+  await caption(
+    page,
+    "Synced with Notion: the page says so, and Open in Notion is one click away",
+    2600,
+  );
   await page.getByText("Kept in Notion · Columns").scrollIntoViewIfNeeded();
   await caption(page, "Blocks Campbooks doesn’t have yet stay as they are in Notion", 2600);
 
@@ -74,8 +85,14 @@ export default async function pagesNotion({ page }: ScenarioContext): Promise<vo
   await settle();
   await page.getByRole("group", { name: /Stop keeping this page/u }).waitFor();
   await caption(page, "Stop syncing: the page stays, Notion is left alone", 2600);
-  await page.getByRole("group", { name: /Stop keeping this page/u }).getByRole("button", { name: "Stop syncing" }).click();
+  await page
+    .getByRole("group", { name: /Stop keeping this page/u })
+    .getByRole("button", { name: "Stop syncing" })
+    .click();
   await settle();
-  await page.getByText(/Stopped syncing with Notion/u).first().waitFor();
+  await page
+    .getByText(/Stopped syncing with Notion/u)
+    .first()
+    .waitFor();
   await pause(1500);
 }

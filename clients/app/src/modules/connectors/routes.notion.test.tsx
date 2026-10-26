@@ -1,4 +1,10 @@
-import { createMemoryHistory, createRootRoute, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
 import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 

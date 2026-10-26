@@ -73,7 +73,7 @@ export function idFixes(doc: ProseNode, fresh: () => string): IdFix[] {
 const attribute = {
   bid: {
     default: null,
-    parseHTML: (element: HTMLElement) => element.getAttribute("data-bid"),
+    parseHTML: (element: HTMLElement) => element.dataset.bid,
     renderHTML: (attributes: Record<string, unknown>) => {
       const bid = attributes["bid"];
       return typeof bid === "string" ? { "data-bid": bid } : {};
@@ -102,7 +102,9 @@ export const Bid = Extension.create({
             return null;
           }
           const remote = transactions.every(
-            (tr) => (tr.getMeta(ySyncPluginKey) as { isChangeOrigin?: boolean } | undefined)?.isChangeOrigin === true,
+            (tr) =>
+              (tr.getMeta(ySyncPluginKey) as { isChangeOrigin?: boolean } | undefined)
+                ?.isChangeOrigin === true,
           );
           if (remote) {
             return null;

@@ -32,7 +32,9 @@ export function buildPagesRoutes<TParent extends AnyRoute>(
   }
   // `new` and `import` are the page's only state: present (1, notion) or not.
   const validateSearch = (search: Record<string, unknown>): { new?: 1; import?: "notion" } => ({
-    ...(search["new"] === 1 || search["new"] === "1" || search["new"] === true ? { new: 1 as const } : {}),
+    ...(search["new"] === 1 || search["new"] === "1" || search["new"] === true
+      ? { new: 1 as const }
+      : {}),
     ...(search["import"] === "notion" ? { import: "notion" as const } : {}),
   });
   const list = createRoute({

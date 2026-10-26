@@ -89,7 +89,9 @@ describe("the Notion calls", () => {
         ].toSorted(),
       );
     });
-    expect(mocked.calls.find((c) => c.route.endsWith("/conflicts/b"))?.body).toEqual({ keep: "both" });
+    expect(mocked.calls.find((c) => c.route.endsWith("/conflicts/b"))?.body).toEqual({
+      keep: "both",
+    });
     expect(mocked.calls.find((c) => c.route.endsWith("/imports"))?.body).toEqual({
       connection: "c",
       pages: [{ notion_page: "n" }],

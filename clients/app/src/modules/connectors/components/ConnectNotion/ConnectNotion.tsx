@@ -29,7 +29,12 @@ export function ConnectNotion({ leave = leavePage, onBack }: ConnectNotionProps)
   const workspaces = useWorkspaces();
   const [chosen, setChosen] = useState<string | undefined>();
   if (workspaces.isPending) {
-    return <FocusPage leading={<Visor state="thinking" size="xl" announce />} title={t("connectNotion.opening")} />;
+    return (
+      <FocusPage
+        leading={<Visor state="thinking" size="xl" announce />}
+        title={t("connectNotion.opening")}
+      />
+    );
   }
   if (workspaces.isError) {
     return (

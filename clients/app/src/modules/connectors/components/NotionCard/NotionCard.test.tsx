@@ -36,13 +36,18 @@ describe("NotionCard", () => {
     const mocked = mockApi({
       [START]: {
         status: 201,
-        body: { authorize_url: "/auth/start/notion?ticket=abc", expires_at: "2026-10-25T09:10:00Z" },
+        body: {
+          authorize_url: "/auth/start/notion?ticket=abc",
+          expires_at: "2026-10-25T09:10:00Z",
+        },
       },
     });
     const { leave } = renderCard([]);
 
     expect(screen.getByRole("heading", { name: "Notion" })).toBeVisible();
-    expect(screen.getByText(/Only the pages you pick in Notion’s own screen are shared/u)).toBeVisible();
+    expect(
+      screen.getByText(/Only the pages you pick in Notion’s own screen are shared/u),
+    ).toBeVisible();
     expect(screen.getByText(/Disconnect any time/u)).toBeVisible();
     expect(screen.getByText(/Notion opens and asks which pages to share/u)).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Connect Notion" }));
@@ -72,7 +77,7 @@ describe("NotionCard", () => {
   });
 
   it("waits for the list before offering anything", () => {
-    renderCard(undefined);
+    renderCard();
     expect(screen.queryByRole("button", { name: "Connect Notion" })).toBeNull();
   });
 
@@ -95,7 +100,10 @@ describe("NotionCard", () => {
     const mocked = mockApi({
       [START]: {
         status: 201,
-        body: { authorize_url: "/auth/start/notion?ticket=again", expires_at: "2026-10-25T09:10:00Z" },
+        body: {
+          authorize_url: "/auth/start/notion?ticket=again",
+          expires_at: "2026-10-25T09:10:00Z",
+        },
       },
     });
     const { leave } = renderCard([{ ...NOTION_CONNECTION, health: "needs_reauth" }]);
@@ -155,7 +163,9 @@ describe("NotionCard", () => {
     expect(screen.queryByRole("group")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Disconnect Acme" }));
-    fireEvent.click(within(await screen.findByRole("group")).getByRole("button", { name: "Disconnect" }));
+    fireEvent.click(
+      within(await screen.findByRole("group")).getByRole("button", { name: "Disconnect" }),
+    );
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn’t disconnect Acme");
   });
 });

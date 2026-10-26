@@ -3739,6 +3739,119 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/connections/notion/authorizations": {
+      "post": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "Start connecting Notion.",
+        "operationId": "connectors.start_notion",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartNotion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Send the browser to `authorize_url`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedNotion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A `return_to` that is not a path of this app (`invalid_return_to`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or a client token (`connection_needs_user`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or no such Notion connection of yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Notion is not set up on this instance (`provider_not_configured`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "connectors.connection"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low",
+          "secret_once": true
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/connections/{connection_id}": {
       "get": {
         "tags": [
@@ -4030,6 +4143,127 @@
           "assistant": false,
           "automation": false,
           "mutates": true,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/connections/{connection_id}/notion/pages": {
+      "get": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "The pages a Notion connection can see.",
+        "operationId": "connectors.list_notion_pages",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "connection_id",
+            "in": "path",
+            "description": "The Notion connection.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConnectionId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pages the connection can see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotionPages"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or a connection you may see but that is not yours (an admin, a client token).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such Notion connection, or you may not see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Notion needs you to connect again (`needs_reauth`), or is not set up on this instance (`provider_not_configured`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The connection's request budget with Notion is spent for now.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Notion could not be reached (`provider_unavailable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "disconnect",
+            "resource": "connectors.connection"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
           "records": [
             "connectors.connection"
           ],
@@ -9925,6 +10159,200 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/pages/notion/imports": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Import pages from Notion.",
+        "operationId": "pages.import_from_notion",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportFromNotion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The pages made.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Imported"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No page, or more than 100 (`invalid_import`), or a title over 200 characters (`invalid_title`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, a client token, or you may read the parent but not write in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, a parent you cannot see, or a connection that is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The parent is in the trash (`page_trashed`), or pages would nest deeper than 12 levels (`page_too_deep`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/notion/links": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "List the pages kept in step with Notion.",
+        "operationId": "pages.list_notion_links",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The links.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotionLinks"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or a token acting for nobody.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/pages/{page_id}": {
       "get": {
         "tags": [
@@ -10801,6 +11229,360 @@
           ],
           "risk": "low",
           "undo": "pages.move"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/notion/conflicts/{block}": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Settle a conflict with Notion.",
+        "operationId": "pages.resolve_conflict",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "block",
+            "in": "path",
+            "description": "The block the conflict is about.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Resolve"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The conflict is settled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resolved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The page would not hold the result (`invalid_update`, `unknown_block`, …).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not change it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is in the trash (`page_trashed`), has no conflict about that block (`no_conflict`), or the block is gone (`conflict_block_gone`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.undo_resolve_conflict"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/notion/resolutions/{resolution}/undo": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Take back a choice for a conflict with Notion.",
+        "operationId": "pages.undo_resolve_conflict",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "resolution",
+            "in": "path",
+            "description": "The choice `pages.resolve_conflict` answered.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conflict is back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Undone"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The page would not hold the result.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not change it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "There is no such choice, it was taken back already or cannot be (`cannot_undo`), the block is gone (`conflict_block_gone`), or the page is in the trash.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/notion/stop": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Stop syncing a page with Notion.",
+        "operationId": "pages.stop_sync",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The link, stopped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotionLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the page but not change it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is not linked to a Notion page, or the link has ended already (`not_syncing`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
         }
       }
     },
@@ -19632,7 +20414,8 @@
           "messages",
           "calendar",
           "files",
-          "bank"
+          "bank",
+          "pages"
         ]
       },
       "ChangeRole": {
@@ -23051,6 +23834,82 @@
           "spam"
         ]
       },
+      "ImportFromNotion": {
+        "type": "object",
+        "description": "What to import.",
+        "required": [
+          "connection",
+          "pages"
+        ],
+        "properties": {
+          "connection": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Your Notion connection."
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotionPageToImport"
+            },
+            "description": "The Notion pages, 1 to 100."
+          },
+          "parent": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PageId",
+                "description": "The page they go under; none for the top level of your private place."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Imported": {
+        "type": "object",
+        "description": "What was imported.",
+        "required": [
+          "pages",
+          "skipped"
+        ],
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportedPage"
+            },
+            "description": "The pages made, in the order asked."
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many were left alone: already linked through the connection, or\nnamed twice.",
+            "minimum": 0
+          }
+        }
+      },
+      "ImportedPage": {
+        "type": "object",
+        "description": "A page made.",
+        "required": [
+          "page",
+          "notion_page"
+        ],
+        "properties": {
+          "notion_page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Its page at Notion."
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The new page."
+          }
+        }
+      },
       "InboxId": {
         "type": "string",
         "format": "uuid",
@@ -24474,6 +25333,216 @@
           "phrase"
         ]
       },
+      "NotionKeep": {
+        "type": "string",
+        "description": "What to keep.",
+        "enum": [
+          "mine",
+          "notion",
+          "both"
+        ]
+      },
+      "NotionLink": {
+        "type": "object",
+        "description": "A page's link to its Notion page, as the API shows it.",
+        "required": [
+          "page",
+          "connection",
+          "notion_page",
+          "state",
+          "owner",
+          "conflicts"
+        ],
+        "properties": {
+          "conflicts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many conflicts wait for a choice."
+          },
+          "connection": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion connection it is read through."
+          },
+          "last_inbound_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a change from Notion was last applied."
+          },
+          "last_outbound_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a change here was last written to Notion."
+          },
+          "notion_page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The page at Notion."
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member whose Notion account it is."
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The page."
+          },
+          "state": {
+            "$ref": "#/components/schemas/NotionLinkState",
+            "description": "Where the link is."
+          },
+          "stopped_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NotionStopReason",
+                "description": "Why it ended, when it did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "NotionLinkState": {
+        "type": "string",
+        "description": "Where a link is.",
+        "enum": [
+          "syncing",
+          "paused",
+          "stopped"
+        ]
+      },
+      "NotionLinks": {
+        "type": "object",
+        "description": "The links.",
+        "required": [
+          "links"
+        ],
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotionLink"
+            },
+            "description": "The links of the pages the caller may open."
+          }
+        }
+      },
+      "NotionPage": {
+        "type": "object",
+        "description": "A page the connection can see.",
+        "required": [
+          "notion_page",
+          "title",
+          "edited_at",
+          "sub_pages",
+          "linked"
+        ],
+        "properties": {
+          "edited_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Notion last edited it."
+          },
+          "linked": {
+            "type": "boolean",
+            "description": "It is linked to a page already, through this connection."
+          },
+          "notion_page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The page's id at Notion."
+          },
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The page it is under, when that one is listed too."
+          },
+          "sub_pages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many of the listed pages are under it.",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title; empty when it has none."
+          }
+        }
+      },
+      "NotionPageToImport": {
+        "type": "object",
+        "description": "One Notion page to bring in.",
+        "required": [
+          "notion_page"
+        ],
+        "properties": {
+          "notion_page": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The page at Notion."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The title to show until Notion's is read (0 to 200 characters)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "NotionPages": {
+        "type": "object",
+        "description": "The pages of a Notion connection.",
+        "required": [
+          "pages",
+          "truncated",
+          "requests"
+        ],
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotionPage"
+            },
+            "description": "The pages, newest edit first."
+          },
+          "requests": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many requests the listing took of the connection's budget.",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "There are more than were read."
+          }
+        }
+      },
+      "NotionStopReason": {
+        "type": "string",
+        "description": "Why a link ended.",
+        "enum": [
+          "stopped_by_member",
+          "disconnected",
+          "trashed_here",
+          "trashed_in_notion",
+          "not_shared",
+          "member_left",
+          "notion_unavailable"
+        ]
+      },
       "OrganizerView": {
         "type": "object",
         "description": "Who organises an event.",
@@ -25799,7 +26868,8 @@
           "google",
           "zoho",
           "imap",
-          "microsoft"
+          "microsoft",
+          "notion"
         ]
       },
       "PushTo": {
@@ -26488,6 +27558,32 @@
           }
         },
         "additionalProperties": false
+      },
+      "Resolved": {
+        "type": "object",
+        "description": "The conflict settled.",
+        "required": [
+          "resolution",
+          "revision",
+          "conflicts"
+        ],
+        "properties": {
+          "conflicts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many conflicts still wait."
+          },
+          "resolution": {
+            "type": "string",
+            "format": "uuid",
+            "description": "This choice: what `pages.undo_resolve_conflict` takes back."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The page's revision afterwards."
+          }
+        }
       },
       "Response": {
         "type": "string",
@@ -28343,6 +29439,31 @@
         },
         "additionalProperties": false
       },
+      "StartNotion": {
+        "type": "object",
+        "description": "What to connect.",
+        "properties": {
+          "connection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConnectionId",
+                "description": "An existing Notion connection of yours to connect again; the same\nNotion account must consent."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "return_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A path of this app to come back to, with `connected=<connection>` or\n`link_error=<code>` added."
+          }
+        },
+        "additionalProperties": false
+      },
       "StartedConnection": {
         "type": "object",
         "description": "A started consent.",
@@ -28378,6 +29499,25 @@
           "url": {
             "type": "string",
             "description": "Send the browser here (same origin)."
+          }
+        }
+      },
+      "StartedNotion": {
+        "type": "object",
+        "description": "A started consent.",
+        "required": [
+          "authorize_url",
+          "expires_at"
+        ],
+        "properties": {
+          "authorize_url": {
+            "type": "string",
+            "description": "Where to send the browser: this instance's `/auth/start/notion`, which\ngoes on to Notion and comes back to `return_to`."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the consent must be started by."
           }
         }
       },
@@ -29275,6 +30415,26 @@
           "sure",
           "check"
         ]
+      },
+      "Undone": {
+        "type": "object",
+        "description": "The choice taken back.",
+        "required": [
+          "revision",
+          "conflicts"
+        ],
+        "properties": {
+          "conflicts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many conflicts wait now."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The page's revision afterwards."
+          }
+        }
       },
       "Unpushed": {
         "type": "object",

@@ -138,13 +138,18 @@ describe("the share menu of a page kept in step with Notion", () => {
     withLink();
     renderWithProviders(<Menu page={shared()} />);
     await open();
-    expect(await screen.findByText("Edits here go to Notion through Ana Duarte’s connection.")).toBeVisible();
+    expect(
+      await screen.findByText("Edits here go to Notion through Ana Duarte’s connection."),
+    ).toBeVisible();
     expect(screen.getByText(/never with their subject/u)).toBeVisible();
   });
 
   it("says it for a private page only once it is shared", async () => {
     withLink();
-    const alone = viewOfDoc({ ...HANDBOOK, created_by: ANA.user_id, place: "private" }, plainDoc("x"));
+    const alone = viewOfDoc(
+      { ...HANDBOOK, created_by: ANA.user_id, place: "private" },
+      plainDoc("x"),
+    );
     renderWithProviders(<Menu page={alone} />);
     fireEvent.click(screen.getByRole("button", { name: "Share" }));
     await screen.findByText("People with access");

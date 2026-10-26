@@ -48,7 +48,7 @@ const story = (id: string) => `/iframe.html?id=screens-notion--${id}&viewMode=st
 /** The Pages the import makes, by their Notion page. */
 const pageIdOf = (notionPage: string) => {
   const at = NOTION_PAGES.findIndex((page) => page.notion_page === notionPage);
-  return `0192f1a0-0000-7000-8000-0000000009${(0xd0 + at).toString(16)}`;
+  return `0192f1a0-0000-7000-8000-0000000009${(0xD0 + at).toString(16)}`;
 };
 const ROADMAP = NOTION_PAGES[0]?.notion_page ?? "";
 const ROADMAP_PAGE = pageIdOf(ROADMAP);
@@ -113,7 +113,11 @@ function locate(doc: Y.Doc) {
 function settle(doc: Y.Doc, keep: Choice["keep"]): Choice | undefined {
   const { fragment, at, ours } = locate(doc);
   const conflict = fragment.toArray()[at + 1];
-  if (ours === undefined || !(conflict instanceof Y.XmlElement) || conflict.nodeName !== "conflict") {
+  if (
+    ours === undefined ||
+    !(conflict instanceof Y.XmlElement) ||
+    conflict.nodeName !== "conflict"
+  ) {
     return undefined;
   }
   const record: Choice = {
@@ -194,7 +198,9 @@ function server({
     );
     state.docs.set(
       page,
-      notionPage === ROADMAP ? notionDoc() : plainDoc(`${titleOf(notionPage)}, imported from Notion.`),
+      notionPage === ROADMAP
+        ? notionDoc()
+        : plainDoc(`${titleOf(notionPage)}, imported from Notion.`),
     );
   }
   const bump = (id: string) => {
@@ -251,11 +257,17 @@ function server({
       if (current === undefined) {
         return { status: 409, body: { status: 409, code: "not_syncing", title: "Not syncing" } };
       }
-      const stopped = { ...current, state: "stopped" as const, stopped_reason: "stopped_by_member" as const };
+      const stopped = {
+        ...current,
+        state: "stopped" as const,
+        stopped_reason: "stopped_by_member" as const,
+      };
       state.links.set(id, stopped);
       return { body: stopped };
     };
-    for (const resolution of ["0", "1", "2", "3"].map((n) => `0192f1a0-0000-7000-8000-0000000008d${n}`)) {
+    for (const resolution of ["0", "1", "2", "3"].map(
+      (n) => `0192f1a0-0000-7000-8000-0000000008d${n}`,
+    )) {
       per[`POST ${P}/${id}/notion/resolutions/${resolution}/undo`] = () => {
         const record = state.resolutions.get(resolution);
         const doc = state.docs.get(id);
@@ -449,7 +461,10 @@ export const NotAvailable: Story = {
   args: {
     path: SETTINGS,
     api: server({
-      start: { status: 409, body: { status: 409, code: "provider_not_configured", title: "No Notion" } },
+      start: {
+        status: 409,
+        body: { status: 409, code: "provider_not_configured", title: "No Notion" },
+      },
     }),
   },
   play: async ({ canvasElement }) => {
@@ -502,7 +517,9 @@ export const ConnectNotionPicker: Story = {
   args: { path: "/connect/notion", api: server({ workspaces: [DUARTE, HOUSEHOLD] }) },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByText("Which workspace should Notion connect to?")).toBeVisible();
+    await expect(
+      await canvas.findByText("Which workspace should Notion connect to?"),
+    ).toBeVisible();
   },
 };
 
@@ -511,7 +528,10 @@ export const ConnectNotionUnavailable: Story = {
   args: {
     path: "/connect/notion",
     api: server({
-      start: { status: 409, body: { status: 409, code: "provider_not_configured", title: "No Notion" } },
+      start: {
+        status: 409,
+        body: { status: 409, code: "provider_not_configured", title: "No Notion" },
+      },
     }),
   },
   play: async ({ canvasElement }) => {

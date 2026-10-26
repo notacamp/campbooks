@@ -2,7 +2,12 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { W } from "../../../../test/demo/conversations";
-import { NOTION_NOTES, NOTION_OKRS, NOTION_PAGES, NOTION_ROADMAP } from "../../../../test/demo/pages";
+import {
+  NOTION_NOTES,
+  NOTION_OKRS,
+  NOTION_PAGES,
+  NOTION_ROADMAP,
+} from "../../../../test/demo/pages";
 import { TEAM } from "../../../../test/demo/tasks";
 import { DUARTE } from "../../../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../../../test/render";
@@ -12,7 +17,10 @@ import { ImportFromNotion, MAX_IMPORT } from "./ImportFromNotion";
 
 const CONNECTION = { id: "c1", name: "Acme", needsReauth: false };
 
-function source(over: Partial<NotionSource["list"]> = {}, connections = [CONNECTION]): UseNotionSource {
+function source(
+  over: Partial<NotionSource["list"]> = {},
+  connections = [CONNECTION],
+): UseNotionSource {
   return () => ({
     connections,
     list: {
@@ -57,7 +65,9 @@ describe("ImportFromNotion", () => {
     renderImport(source());
 
     const dialog = await screen.findByRole("dialog", { name: "Import from Notion" });
-    expect(within(dialog).getByText(/These are the pages you shared with Campbooks in Notion/u)).toBeVisible();
+    expect(
+      within(dialog).getByText(/These are the pages you shared with Campbooks in Notion/u),
+    ).toBeVisible();
     await waitFor(() => {
       expect(within(dialog).getByText(/^Connected as .*Acme/u)).toBeVisible();
     });
@@ -126,7 +136,9 @@ describe("ImportFromNotion", () => {
     for (const box of within(dialog).getAllByRole("checkbox")) {
       fireEvent.click(box);
     }
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("Pick at most 100 pages at a time.");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "Pick at most 100 pages at a time.",
+    );
     expect(within(dialog).getByRole("button", { name: /^Import \d+ pages/u })).toBeDisabled();
   });
 

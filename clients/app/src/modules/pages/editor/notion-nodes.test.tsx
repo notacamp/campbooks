@@ -17,10 +17,19 @@ const PAGE = "page-1";
 const content = {
   type: "doc",
   content: [
-    { type: "paragraph", attrs: { bid: "b1" }, content: [{ type: "text", text: "We launch on the 14th." }] },
+    {
+      type: "paragraph",
+      attrs: { bid: "b1" },
+      content: [{ type: "text", text: "We launch on the 14th." }],
+    },
     {
       type: "conflict",
-      attrs: { of: "b1", hash: "ab".repeat(32), edited: "2026-10-25T09:00:00.000Z", removed: false },
+      attrs: {
+        of: "b1",
+        hash: "ab".repeat(32),
+        edited: "2026-10-25T09:00:00.000Z",
+        removed: false,
+      },
       content: [{ type: "paragraph", content: [{ type: "text", text: "We launch on the 21st." }] }],
     },
     { type: "external", attrs: { kind: "column_list" } },
@@ -35,7 +44,7 @@ function Editing({ editable = true }: { editable?: boolean }) {
   });
   return (
     <EditorEnvironmentContext
-      value={{ workspaceId: DUARTE.id, pageId: PAGE, open: () => undefined }}
+      value={{ workspaceId: DUARTE.id, pageId: PAGE, open: () => {} }}
     >
       <EditorContent editor={editor} />
     </EditorEnvironmentContext>
@@ -71,7 +80,8 @@ describe("the Notion blocks in the editor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Use Notion’s" }));
     await waitFor(() => {
       expect(
-        mocked.calls.find((call) => call.route === `POST ${W}/pages/${PAGE}/notion/conflicts/b1`)?.body,
+        mocked.calls.find((call) => call.route === `POST ${W}/pages/${PAGE}/notion/conflicts/b1`)
+          ?.body,
       ).toEqual({ keep: "notion" });
     });
     expect(await screen.findByText(/Using Notion’s version — it goes to Notion/u)).toBeVisible();

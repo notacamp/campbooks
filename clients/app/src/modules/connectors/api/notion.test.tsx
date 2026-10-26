@@ -40,7 +40,10 @@ describe("the Notion calls", () => {
     const mocked = mockApi({
       [`POST ${W}/connections/notion/authorizations`]: {
         status: 201,
-        body: { authorize_url: "/auth/start/notion?ticket=abc", expires_at: "2026-10-25T09:10:00Z" },
+        body: {
+          authorize_url: "/auth/start/notion?ticket=abc",
+          expires_at: "2026-10-25T09:10:00Z",
+        },
       },
     });
     renderWithProviders(<Start />);

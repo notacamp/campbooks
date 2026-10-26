@@ -273,7 +273,9 @@ function NotionRow({
           <span>{t("notion.disconnect.lead")}</span>
         </InlineConfirm>
       ) : null}
-      {failed ? <Banner tone="danger" role="alert" title={t("notion.disconnect.failed", { name })} /> : null}
+      {failed ? (
+        <Banner tone="danger" role="alert" title={t("notion.disconnect.failed", { name })} />
+      ) : null}
     </ListRow>
   );
 }

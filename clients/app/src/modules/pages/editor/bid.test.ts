@@ -66,7 +66,9 @@ describe("idFixes", () => {
   });
 
   it("numbers a block kept in Notion", () => {
-    expect(idFixes(doc({ type: "external", attrs: { kind: "column_list" } }), fresh)).toHaveLength(1);
+    expect(idFixes(doc({ type: "external", attrs: { kind: "column_list" } }), fresh)).toHaveLength(
+      1,
+    );
   });
 
   it("names the block types the server numbers", () => {
@@ -82,7 +84,11 @@ describe("the conflict and external nodes", () => {
       type: "conflict",
       attrs: { of: "b", hash: "ab".repeat(32), edited: "2026-10-25T09:00:00.000Z", removed: true },
     });
-    expect(node.attrs).toMatchObject({ of: "b", removed: true, edited: "2026-10-25T09:00:00.000Z" });
+    expect(node.attrs).toMatchObject({
+      of: "b",
+      removed: true,
+      edited: "2026-10-25T09:00:00.000Z",
+    });
     expect(node.content.childCount).toBe(0);
     const kept = schema.nodeFromJSON({ type: "external", attrs: { kind: "synced_block" } });
     expect(kept.attrs["kind"]).toBe("synced_block");
@@ -126,7 +132,9 @@ describe("the Bid extension", () => {
 
   it("leaves a read-only page alone", () => {
     const editor = make(false);
-    editor.view.dispatch(editor.state.tr.insert(editor.state.doc.content.size, schema.nodeFromJSON(p("x"))));
+    editor.view.dispatch(
+      editor.state.tr.insert(editor.state.doc.content.size, schema.nodeFromJSON(p("x"))),
+    );
     expect(bids(editor)).toEqual(["one", null]);
     editor.destroy();
   });

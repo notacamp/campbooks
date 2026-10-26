@@ -45,7 +45,10 @@ export interface NotionSource {
   };
 }
 
-export type UseNotionSource = (workspaceId: string, connectionId: string | undefined) => NotionSource;
+export type UseNotionSource = (
+  workspaceId: string,
+  connectionId: string | undefined,
+) => NotionSource;
 
 /** `connections` + `connectors.list_notion_pages`, in the shape the import asks for. */
 export const useNotionSource: UseNotionSource = (workspaceId, connectionId) => {

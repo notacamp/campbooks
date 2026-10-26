@@ -23,7 +23,13 @@ import { PagesPage } from "./PagesPage";
 const P = `${W}/pages`;
 const useSource: UseNotionSource = () => ({
   connections: [{ id: "c1", name: "Acme", needsReauth: false }],
-  list: { status: "ready", pages: NOTION_PAGES, truncated: false, error: undefined, retry: () => undefined },
+  list: {
+    status: "ready",
+    pages: NOTION_PAGES,
+    truncated: false,
+    error: undefined,
+    retry: () => {},
+  },
 });
 
 function Route({ withNotion }: { withNotion: boolean }) {

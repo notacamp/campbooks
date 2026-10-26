@@ -74,7 +74,7 @@ describe("knownReason", () => {
     expect(knownReason("not_shared")).toBe("not_shared");
     expect(knownReason("something_new")).toBeUndefined();
     expect(knownReason(null)).toBeUndefined();
-    expect(knownReason(undefined)).toBeUndefined();
+    expect(knownReason()).toBeUndefined();
   });
 });
 
@@ -83,7 +83,7 @@ describe("importTree", () => {
     expect(ids(tree)).toEqual([ROADMAP, NOTES, HIRING]);
     expect(ids(tree[0]?.children ?? [])).toEqual([OKRS, RETRO]);
     expect(allNodes(tree).map((n) => n.depth)).toEqual([0, 1, 1, 0, 0]);
-    expect(ids(flatten(tree[0] as (typeof tree)[number]))).toEqual([ROADMAP, OKRS, RETRO]);
+    expect(ids(flatten(tree[0]!))).toEqual([ROADMAP, OKRS, RETRO]);
   });
 
   it("makes a root of a page whose parent is not listed, and survives a cycle", () => {
@@ -104,7 +104,9 @@ describe("ticking", () => {
     const ticked = toggle(tree, new Set(), ROADMAP);
     const choice = choiceOf(tree, ticked);
     expect([...choice.included].toSorted()).toEqual([ROADMAP, OKRS, RETRO].toSorted());
-    expect(importRequest(tree, ticked)).toEqual([{ notion_page: ROADMAP, title: "Product roadmap" }]);
+    expect(importRequest(tree, ticked)).toEqual([
+      { notion_page: ROADMAP, title: "Product roadmap" },
+    ]);
   });
 
   it("asks for a sub-page alone when only it is ticked", () => {

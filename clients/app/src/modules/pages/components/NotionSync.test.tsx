@@ -70,7 +70,11 @@ describe("NotionSync", () => {
     });
     // Refused: still asking.
     expect(await screen.findByRole("group", { name: /Stop keeping this page/u })).toBeVisible();
-    fireEvent.click(within(screen.getByRole("group", { name: /Stop keeping/u })).getByRole("button", { name: "Stop syncing" }));
+    fireEvent.click(
+      within(screen.getByRole("group", { name: /Stop keeping/u })).getByRole("button", {
+        name: "Stop syncing",
+      }),
+    );
     await waitFor(() => {
       expect(screen.queryByRole("group", { name: /Stop keeping/u })).toBeNull();
     });
@@ -128,7 +132,7 @@ function renderWithProvidersFor(link: ReturnType<typeof notionLink>) {
       link={link}
       canStop
       onStop={() => Promise.resolve(true)}
-      onShowConflict={() => undefined}
+      onShowConflict={() => {}}
       now={NOW}
     />,
   );
