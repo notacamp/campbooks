@@ -144,3 +144,6 @@ impl EventConsumer for LinkNotionPage {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

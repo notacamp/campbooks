@@ -1007,6 +1007,104 @@ mod tests {
     }
 
     #[test]
+    fn notion_is_off_by_default_and_never_stops_a_server_that_does_not_offer_it() {
+        let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
+        assert!(!config.notion.is_enabled());
+        assert_eq!(config.notion.adapter(), NotionAdapter::default());
+        // Production's settings: its poll bounds and no Notion variable.
+        let production = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}}
+        })))
+        .unwrap();
+        assert!(!production.notion.is_enabled());
+        // Off: any shape of any setting starts.
+        for stray in [
+            serde_json::json!({"requests_per_second": "lots", "max_blocks": -1}),
+            serde_json::json!({"enabled": false, "max_depth": 0, "patience_seconds": [1]}),
+            serde_json::json!({"enabled": "nope", "unknown_key": {"a": 1}}),
+            serde_json::json!({"enabled": 0, "requests_per_minute": {"a": 1}}),
+        ] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}, "notion": stray}
+            })))
+            .unwrap();
+            assert!(!config.notion.is_enabled());
+        }
+    }
+
+    #[test]
+    fn notion_is_on_for_the_usual_spellings_and_its_settings_are_read() {
+        for spelling in ["true", "TRUE", " 1 ", "yes", "On"] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"notion": {"enabled": spelling}}
+            })))
+            .unwrap();
+            assert!(config.notion.is_enabled(), "{spelling}");
+        }
+        let on = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {
+                "poll": {"min_seconds": 60, "max_seconds": 120},
+                "notion": {"enabled": true, "requests_per_second": "2", "requests_per_minute": 90,
+                           "max_blocks": 500, "max_depth": 6, "patience_seconds": 60}
+            }
+        })))
+        .unwrap();
+        assert_eq!(
+            on.notion.adapter(),
+            NotionAdapter {
+                requests_per_second: 2,
+                requests_per_minute: 90,
+                max_blocks: 500,
+                max_depth: 6,
+                patience_seconds: 60,
+            }
+        );
+    }
+
+    #[test]
+    fn notion_with_a_broken_value_is_refused_naming_it() {
+        for (bad, name) in [
+            (serde_json::json!({"requests_per_second": 0}), "REQUESTS_PER_SECOND"),
+            (serde_json::json!({"requests_per_second": 5000}), "REQUESTS_PER_SECOND"),
+            (serde_json::json!({"requests_per_minute": "many"}), "REQUESTS_PER_MINUTE"),
+            (serde_json::json!({"max_blocks": 0}), "MAX_BLOCKS"),
+            (serde_json::json!({"max_blocks": 100_000}), "MAX_BLOCKS"),
+            (serde_json::json!({"max_depth": 99}), "MAX_DEPTH"),
+            (serde_json::json!({"patience_seconds": 0}), "PATIENCE_SECONDS"),
+        ] {
+            let mut settings = bad.clone();
+            settings["enabled"] = serde_json::json!(true);
+            let refused = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"notion": settings}
+            })))
+            .unwrap_err();
+            assert!(refused.contains(name), "{bad}: {refused}");
+            assert!(refused.contains("NOTION__ENABLED"), "{refused}");
+        }
+    }
+
+    #[test]
+    fn the_notion_integration_is_read_as_text_whatever_its_shape() {
+        let none = NotionClientConfig::from_figment(&Figment::new()).unwrap();
+        assert!(none.client_id.is_none() && none.client_secret.is_none());
+        let client = NotionClientConfig::from_figment(&figment(serde_json::json!({
+            "notion": {
+                "client_id": "  notion-client  ", "client_secret": "s3cret",
+                "redirect_path": "/auth/callback/notion", "webhook_secret": "w",
+                "client_secret_file": "", "base_url": 7
+            }
+        })))
+        .unwrap();
+        assert_eq!(client.client_id.as_deref(), Some("notion-client"));
+        assert!(client.client_secret.is_some() && client.webhook_secret.is_some());
+        // An empty setting is no setting.
+        assert!(client.client_secret_file.is_none());
+        assert_eq!(client.base_url.as_deref(), Some("7"));
+        // The secret never shows in a debug print.
+        assert!(!format!("{client:?}").contains("s3cret"));
+    }
+
+    #[test]
     fn defaults() {
         let config = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
         assert_eq!(config, ConnectorsConfig::default());

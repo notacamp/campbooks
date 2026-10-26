@@ -49,3 +49,6 @@ impl EventConsumer for UnlinkNotionPage {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

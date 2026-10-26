@@ -425,6 +425,121 @@ mod tests {
         campbooks_kernel::testing::config("postgres://test@localhost/test")
     }
 
+    fn notion_on(extra: serde_json::Value) -> Figment {
+        let mut settings = serde_json::json!({
+            "notion": {"client_id": "n", "client_secret": "s"},
+            "connectors": {"notion": {"enabled": true}}
+        });
+        for (key, value) in extra.as_object().cloned().unwrap_or_default() {
+            settings["notion"][key] = value;
+        }
+        Figment::from(Serialized::defaults(settings))
+    }
+
+    #[test]
+    fn notion_is_not_offered_while_its_flag_is_off() {
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        // The integration's credentials alone, and every other setting
+        // broken: it starts, Notion not offered.
+        let off = Figment::from(Serialized::defaults(serde_json::json!({
+            "notion": {"client_id": "n", "client_secret": "s",
+                       "base_url": "http://127.0.0.1:9051"},
+            "connectors": {"notion": {"enabled": false, "max_blocks": "lots"}}
+        })));
+        for secret in [None, key()] {
+            let deps = Deps::from_figment(&off, &kernel_config(), secret).unwrap();
+            assert!(deps.notion.is_none() && deps.notion_webhook.is_none());
+        }
+        // Production's settings: its poll bounds, no Notion variable.
+        let production = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}},
+            "google": {"client_id": "client-1", "client_secret": "s3cret"}
+        })));
+        let deps = Deps::from_figment(&production, &kernel_config(), key()).unwrap();
+        assert!(deps.notion.is_none());
+    }
+
+    #[test]
+    fn notion_is_offered_with_its_flag_its_integration_and_the_secret_key() {
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let mut public = kernel_config();
+        public.public_url = "https://campbooks.example.com/".to_owned();
+        let deps = Deps::from_figment(&notion_on(serde_json::json!({})), &public, key()).unwrap();
+        let notion = deps.notion.unwrap();
+        assert_eq!(
+            notion.redirect_uri(),
+            "https://campbooks.example.com/auth/callback/notion"
+        );
+        assert!(deps.notion_webhook.is_none(), "no webhook without its secret");
+        let hooked = notion_on(serde_json::json!({"webhook_secret": "w"}));
+        assert!(
+            Deps::from_figment(&hooked, &public, key())
+                .unwrap()
+                .notion_webhook
+                .is_some()
+        );
+        // A redirect path must be a path of this instance.
+        for (path, expected) in [
+            ("/cb/notion", "https://campbooks.example.com/cb/notion"),
+            ("//evil.example.com", "https://campbooks.example.com/auth/callback/notion"),
+            ("evil", "https://campbooks.example.com/auth/callback/notion"),
+        ] {
+            let figment = notion_on(serde_json::json!({"redirect_path": path}));
+            let deps = Deps::from_figment(&figment, &public, key()).unwrap();
+            assert_eq!(deps.notion.unwrap().redirect_uri(), expected, "{path}");
+        }
+    }
+
+    #[test]
+    fn notion_without_its_integration_or_the_secret_key_is_a_warning_not_a_stop() {
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let no_client = Figment::from(Serialized::defaults(serde_json::json!({
+            "connectors": {"notion": {"enabled": true}}
+        })));
+        assert!(
+            Deps::from_figment(&no_client, &kernel_config(), key())
+                .unwrap()
+                .notion
+                .is_none()
+        );
+        let no_secret = Figment::from(Serialized::defaults(serde_json::json!({
+            "notion": {"client_id": "n"},
+            "connectors": {"notion": {"enabled": true}}
+        })));
+        assert!(
+            Deps::from_figment(&no_secret, &kernel_config(), key())
+                .unwrap()
+                .notion
+                .is_none()
+        );
+        let deps = Deps::from_figment(&notion_on(serde_json::json!({})), &kernel_config(), None)
+            .unwrap();
+        assert!(deps.notion.is_none());
+    }
+
+    #[test]
+    fn a_notion_fake_outside_development_stops_the_server_but_not_in_development() {
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let fake = notion_on(serde_json::json!({"base_url": "http://127.0.0.1:9051"}));
+        let err = Deps::from_figment(&fake, &kernel_config(), key()).unwrap_err();
+        assert!(err.contains("development only"), "{err}");
+        let mut dev = kernel_config();
+        dev.env = Environment::Development;
+        assert!(
+            Deps::from_figment(&fake, &dev, key())
+                .unwrap()
+                .notion
+                .is_some()
+        );
+        // On with a broken adapter setting: stopped, naming it.
+        let broken = Figment::from(Serialized::defaults(serde_json::json!({
+            "notion": {"client_id": "n", "client_secret": "s"},
+            "connectors": {"notion": {"enabled": true, "max_depth": 0}}
+        })));
+        let err = Deps::from_figment(&broken, &kernel_config(), key()).unwrap_err();
+        assert!(err.contains("MAX_DEPTH"), "{err}");
+    }
+
     #[test]
     fn inert_without_a_google_client() {
         let deps = Deps::from_figment(&Figment::new(), &kernel_config(), None).unwrap();

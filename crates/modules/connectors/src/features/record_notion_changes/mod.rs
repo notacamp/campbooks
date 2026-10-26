@@ -206,3 +206,6 @@ async fn target_of(
         paused: paused || health == "needs_reauth",
     }))
 }
+
+#[cfg(test)]
+mod tests;
