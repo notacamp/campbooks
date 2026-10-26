@@ -640,7 +640,9 @@ const copiedPlay: Story["play"] = async ({ canvasElement }) => {
   // Selected, its actions show under it.
   await userEvent.click(line);
   const actions = await canvas.findByRole("group", { name: "Actions for Ana Costa" });
-  await expect(within(actions).getByRole("button", { name: /^Nudge Águas do Ribatejo…/u })).toBeVisible();
+  await expect(
+    within(actions).getByRole("button", { name: /^Nudge Águas do Ribatejo…/u }),
+  ).toBeVisible();
   await expect(within(actions).getByRole("button", { name: /^Reply to Ana…/u })).toBeVisible();
   await expect(within(actions).getByRole("button", { name: /^Nothing for me/u })).toBeVisible();
 };
