@@ -27,5 +27,5 @@
 - [x] 4.2 OpenAPI and client types regenerated
 - [x] 4.3 Changelog entry `changelog/unreleased/added/365-pages-tables-ui.md`
 - [x] 4.4 Gates green in CI
-- [ ] 4.5 Recording at 375 px and desktop
-- [ ] 4.6 `openspec archive pages-tables-ui --yes` before merge
+- [x] 4.5 Recording at 375 px and desktop
+- [x] 4.6 `openspec archive pages-tables-ui --yes` before merge
