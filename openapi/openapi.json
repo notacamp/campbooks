@@ -11273,7 +11273,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Resolve"
+                "$ref": "#/components/schemas/ResolveNotionConflict"
               }
             }
           },
@@ -27574,6 +27574,20 @@
             ],
             "description": "With Not needed on a question about a reply or an action: the address\nof the person on the email who has the move. The conversation then\nwaits on them.",
             "example": "ana@example.com"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResolveNotionConflict": {
+        "type": "object",
+        "description": "The choice.",
+        "required": [
+          "keep"
+        ],
+        "properties": {
+          "keep": {
+            "$ref": "#/components/schemas/NotionKeep",
+            "description": "What to keep."
           }
         },
         "additionalProperties": false

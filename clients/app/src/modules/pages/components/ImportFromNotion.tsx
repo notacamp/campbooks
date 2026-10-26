@@ -62,7 +62,9 @@ export function ImportFromNotion({
   // The first connection that works, once they are known (state adjusted
   // while rendering, which React allows when it is guarded like this).
   const firstWorking =
-    connections === undefined ? undefined : (connections.find((c) => !c.needsReauth) ?? connections[0]);
+    connections === undefined
+      ? undefined
+      : (connections.find((c) => !c.needsReauth) ?? connections[0]);
   if (open && chosen === undefined && firstWorking !== undefined) {
     setChosen(firstWorking.id);
   }

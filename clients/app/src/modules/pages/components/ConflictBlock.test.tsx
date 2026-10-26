@@ -7,7 +7,7 @@ import { ConflictBlock } from "./ConflictBlock";
 
 describe("ConflictBlock", () => {
   it("shows Notion’s version with the three choices", async () => {
-    let finish: (settled: boolean) => void = () => undefined;
+    let finish: (settled: boolean) => void = () => {};
     const onChoose = vi.fn(
       () =>
         new Promise<boolean>((resolve) => {
