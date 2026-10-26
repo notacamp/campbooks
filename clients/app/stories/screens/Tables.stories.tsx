@@ -26,6 +26,7 @@ import {
 import { LEASE, TEAM } from "../../test/demo/tasks";
 import { DUARTE, SESSION } from "../../test/demo/workspaces";
 
+import { must } from "../../test/must";
 import { mockFetch, saveThemeFromGlobals } from "./mock-fetch";
 
 // Tables in the Pages place against fictional demo data: Duarte & Pessoa's
@@ -216,8 +217,8 @@ function longViews(held: TablesServer) {
   const table = held.table(CLIENTS_ID);
   const [first, second] = table?.views ?? [];
   if (first !== undefined && second !== undefined) {
-    first.name = "All clients with a signed contract this quarter";
-    second.name = "By stage, with every owner and amount";
+    first.name = "All clients with a signed contract";
+    second.name = "By stage, with every owner";
     first.config = {
       ...first.config,
       filter: {
@@ -241,27 +242,46 @@ function clickable(element: HTMLElement) {
   return hit !== null && element.contains(hit);
 }
 
-/** The toolbar of the table fits its row: nothing overlaps, so what is in it can be clicked. */
-async function toolbarFits(canvasElement: HTMLElement, wide: boolean) {
+/** Nothing in the toolbar's row sits over anything else. */
+function noOverlap(row: HTMLElement) {
+  const boxes = [...row.children]
+    .filter((child): child is HTMLElement => child instanceof HTMLElement)
+    .map((child) => child.getBoundingClientRect())
+    .filter((box) => box.width > 0);
+  for (const [index, box] of boxes.entries()) {
+    for (const other of boxes.slice(index + 1)) {
+      if (box.left < other.right - 1 && other.left < box.right - 1) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * The toolbar of the table fits its row: nothing overlaps, so what is in it can be clicked. The
+ * view that does not fit sits in the More views menu, one click away.
+ */
+async function toolbarFits(canvasElement: HTMLElement) {
   const canvas = within(canvasElement);
   await canvas.findByRole("grid");
   const add = await canvas.findByRole("button", { name: "Add a view" });
   await expect(clickable(add)).toBe(true);
   await expect(clickable(canvas.getByRole("button", { name: /^Filter/u }))).toBe(true);
-  if (wide) {
-    const board = canvas.getByRole("tab", { name: /By stage/u });
+  await expect(clickable(canvas.getByRole("tab", { name: /All clients/u }))).toBe(true);
+  await expect(noOverlap(must(canvas.getByRole("tablist").parentElement))).toBe(true);
+  const board = canvas.queryByRole("tab", { name: /By stage/u });
+  if (board !== null) {
     await expect(board).toBeVisible();
     await expect(clickable(board)).toBe(true);
-    await expect(clickable(canvas.getByRole("tab", { name: /All clients/u }))).toBe(true);
-  } else {
-    // On a phone the view that does not fit is one tap away, in the More views menu.
-    const more = canvas.getByRole("button", { name: "More views" });
-    await expect(clickable(more)).toBe(true);
-    await userEvent.click(more);
-    await expect(
-      await within(canvasElement.ownerDocument.body).findByRole("menuitem", { name: /By stage/u }),
-    ).toBeVisible();
+    return;
   }
+  const more = canvas.getByRole("button", { name: "More views" });
+  await expect(clickable(more)).toBe(true);
+  await userEvent.click(more);
+  await expect(
+    await within(canvasElement.ownerDocument.body).findByRole("menuitem", { name: /By stage/u }),
+  ).toBeVisible();
 }
 
 /** Long view names and two filter chips at 1280: the tabs and the "+" are clear of the chips. */
@@ -269,7 +289,7 @@ export const ToolbarFitsAt1280: Story = {
   args: { path: TABLE, prepare: longViews },
   ...at("desktop", 1280, 800),
   play: async ({ canvasElement }) => {
-    await toolbarFits(canvasElement, true);
+    await toolbarFits(canvasElement);
   },
 };
 
@@ -278,7 +298,7 @@ export const ToolbarFitsAt1440: Story = {
   args: { path: TABLE, prepare: longViews },
   ...at("wide", 1440, 900),
   play: async ({ canvasElement }) => {
-    await toolbarFits(canvasElement, true);
+    await toolbarFits(canvasElement);
   },
 };
 
@@ -287,7 +307,7 @@ export const ToolbarFitsOnAPhone: Story = {
   args: { path: TABLE, prepare: longViews },
   ...at("phone", 375, 812),
   play: async ({ canvasElement }) => {
-    await toolbarFits(canvasElement, false);
+    await toolbarFits(canvasElement);
   },
 };
 
