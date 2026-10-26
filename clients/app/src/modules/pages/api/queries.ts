@@ -53,6 +53,23 @@ export function usePages(workspaceId: string) {
   });
 }
 
+/** Whether tables are on here (`pages.list` says so); nothing is offered while that is not known. */
+export function useTablesAvailable(workspaceId: string): boolean {
+  const pages = useQuery({
+    queryKey: keys.list(workspaceId),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/pages", {
+          params: { path: { workspace_id: workspaceId }, query: {} },
+          signal,
+        }),
+      ),
+    select: (list: PageList) => list.tables,
+    retry: retryUnlessMissing,
+  });
+  return pages.data === true;
+}
+
 /** `pages.list?trashed=true`: what was deleted in the last 30 days. */
 export function useTrash(workspaceId: string, enabled: boolean) {
   return useQuery({

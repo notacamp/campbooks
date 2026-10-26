@@ -323,7 +323,7 @@ fn element_nodes<T: ReadTxn>(
             leaf(block)
         }
         // A record of Campbooks shown in the page: nothing Notion has.
-        "embed" => {
+        "embed" | "tableView" => {
             let mut block = blank();
             block.label = Some("campbooks_embed".to_owned());
             leaf(block)

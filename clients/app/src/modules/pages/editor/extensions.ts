@@ -19,6 +19,7 @@ import {
   ImageBlock,
   Mention,
   PageLink,
+  TableViewBlock,
   Toggle,
 } from "./nodes";
 
@@ -103,6 +104,7 @@ export function createExtensions({ doc, placeholders, menus }: EditorExtensionOp
     FileBlock,
     ImageBlock,
     External,
+    TableViewBlock,
     Conflict,
     Bid,
     Placeholder.configure({

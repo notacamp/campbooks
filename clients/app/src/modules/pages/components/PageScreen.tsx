@@ -20,8 +20,11 @@ import {
 } from "~/lib/ui";
 
 import { useNotionLink } from "../api/notion";
-import { useBacklinks, usePage } from "../api/queries";
-import { PageEditor } from "../editor/PageEditor";
+import { useBacklinks, usePage, useTablesAvailable } from "../api/queries";
+import { PageEditor, type TableHelpers } from "../editor/PageEditor";
+import { useTableCalls } from "../tables/api";
+import { RowHeader } from "../tables/components/RowHeader";
+import { TableView } from "../tables/components/TableView";
 import type { SaveState } from "../editor/sync";
 import { usePageDocument } from "../editor/use-page-document";
 import type { PageSummary, PageView } from "../types";
@@ -153,6 +156,21 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
   const section = t(page.place === "workspace" ? "tree.workspace" : "tree.private");
   const backlinks = useBacklinks(workspaceId, "pages.page", page.id).data ?? [];
   const summary = pages.find((candidate) => candidate.id === page.id) ?? summaryOf(page);
+  const tablesOn = useTablesAvailable(workspaceId);
+  const tableCalls = useTableCalls(workspaceId);
+  const tableHelpers: TableHelpers = {
+    create: async () => {
+      const made = await tableCalls.createTable({ parent: page.id });
+      return { table: made.page.id, view: made.views[0]?.id ?? "" };
+    },
+    discard: async (table) => {
+      await tableCalls.trashPage(table);
+    },
+    firstView: async (table) => (await tableCalls.getTable(table)).views[0]?.id ?? "",
+    isTable: (id) => pages.some((candidate) => candidate.id === id && candidate.kind === "table"),
+  };
+  const isTable = page.kind === "table";
+  const isRow = page.kind === "row" && page.parent !== null && page.parent !== undefined;
 
   return (
     <>
@@ -208,7 +226,14 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
         </Popover>
       </div>
       <ReaderBody>
-        <article ref={article} className="mx-auto flex w-full max-w-measure flex-col gap-3 p-4">
+        <article
+          ref={article}
+          className={
+            isTable
+              ? "mx-auto flex w-full flex-col gap-3 p-4"
+              : "mx-auto flex w-full max-w-measure flex-col gap-3 p-4"
+          }
+        >
           {trashed ? <Text tone="secondary">{t("screen.inTrash")}</Text> : null}
           <div className="flex items-start gap-2">
             {editable ? (
@@ -247,20 +272,42 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
               onShowConflict={showConflict}
             />
           )}
-          <PageEditor
-            environment={{ workspaceId, pageId: page.id, open }}
-            doc={doc}
-            editable={editable}
-            pages={pages}
-            upload={(file) => actions.calls.upload(page.id, file)}
-            createSubPage={async () => {
-              const made = await actions.create({ parent: page.id });
-              if (made === undefined) {
-                throw new Error("sub-page not made");
-              }
-              return made.id;
-            }}
-          />
+          {isRow ? (
+            <RowHeader
+              workspaceId={workspaceId}
+              rowId={page.id}
+              tableId={page.parent ?? ""}
+              pages={pages}
+              pageActions={actions}
+              open={open}
+            />
+          ) : null}
+          {isTable ? (
+            <TableView
+              workspaceId={workspaceId}
+              tableId={page.id}
+              pages={pages}
+              pageActions={actions}
+              open={open}
+            />
+          ) : (
+            <PageEditor
+              environment={{ workspaceId, pageId: page.id, open }}
+              doc={doc}
+              editable={editable}
+              pages={pages}
+              subPages={page.kind === "page"}
+              tables={page.kind === "page" && tablesOn ? tableHelpers : undefined}
+              upload={(file) => actions.calls.upload(page.id, file)}
+              createSubPage={async () => {
+                const made = await actions.create({ parent: page.id });
+                if (made === undefined) {
+                  throw new Error("sub-page not made");
+                }
+                return made.id;
+              }}
+            />
+          )}
           {backlinks.length === 0 ? null : (
             <section className="flex flex-col gap-2 pt-6">
               <Heading level={2} size="pane">
@@ -306,5 +353,6 @@ function summaryOf(page: PageView): PageSummary {
     edited_at: page.edited_at,
     trashed_at: page.trashed_at ?? null,
     meta_revision: page.meta_revision,
+    kind: page.kind,
   };
 }

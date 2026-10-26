@@ -89,6 +89,7 @@ pub async fn page_view(
         trashed_at: row.trashed_at,
         revision: row.revision,
         meta_revision: row.meta_revision,
+        kind: row.kind()?,
         grants: grants_view,
         ancestors,
         document: DocumentState {

@@ -8,6 +8,7 @@ use campbooks_kernel::{
     AppState, Error, Result,
     blobs::{BlobHash, BlobOwner, BlobRef},
     jobs::{self, EnqueueOptions},
+    authz::Action,
     tenancy::Access,
 };
 use chrono::{TimeDelta, Utc};
@@ -88,10 +89,53 @@ pub async fn accept(
     if !added.is_empty() {
         hold_blobs(state, tx, access, page, &added).await?;
     }
+    let shown: Vec<&(String, String)> = inspection
+        .table_views
+        .difference(&before.table_views)
+        .collect();
+    if !shown.is_empty() {
+        check_table_views(state, tx, access, &shown).await?;
+    }
     Ok(Accepted {
         changed,
         inspection,
     })
+}
+
+/// Every table a body newly shows must be a live table the caller may read,
+/// with the view one of its own. Anything else is the one answer, so a
+/// block cannot be used to find out what exists.
+async fn check_table_views(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    access: &Access,
+    shown: &[&(String, String)],
+) -> Result<()> {
+    let refused = || Error::BadRequest(crate::MESSAGES.reason("bad_table_view"));
+    for (table, view) in shown {
+        let (Ok(table), Ok(view)) = (table.parse::<PageId>(), view.parse::<sqlx::types::Uuid>())
+        else {
+            return Err(refused());
+        };
+        let row = match super::access::require_page(state, tx, access, Action::Read, table, false)
+            .await
+        {
+            Ok(row) => row,
+            Err(Error::NotFound | Error::Denied(_) | Error::Forbidden) => return Err(refused()),
+            Err(other) => return Err(other),
+        };
+        let own: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM pages.table_views WHERE id = $1 AND table_id = $2)",
+        )
+        .bind(view)
+        .bind(table)
+        .fetch_one(&mut **tx)
+        .await?;
+        if row.kind != "table" || row.is_trashed() || !own {
+            return Err(refused());
+        }
+    }
+    Ok(())
 }
 
 /// Every blob in `hashes` must be one the caller uploaded (to any page) or

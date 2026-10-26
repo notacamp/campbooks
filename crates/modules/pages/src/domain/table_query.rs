@@ -42,6 +42,8 @@ pub struct Query<'a> {
     pub limit: usize,
     /// How many to skip.
     pub offset: usize,
+    /// Only these rows (of the table, and live): to read a few by id.
+    pub only: Option<&'a [PageId]>,
 }
 
 /// One summary, computed over every row the filter keeps.
@@ -120,7 +122,17 @@ pub async fn run(conn: &mut PgConnection, query: &Query<'_>) -> Result<Answer> {
         }
         None => "true".to_owned(),
     };
-    let wheres = format!("WHERE tr.table_id = $1 AND p.trashed_at IS NULL AND {filter_sql}");
+    // Row ids are parsed UUIDs, so listing them as text carries nothing else.
+    let only_sql = match query.only {
+        Some(ids) if !ids.is_empty() => {
+            let list: Vec<String> = ids.iter().map(|id| format!("'{id}'")).collect();
+            format!(" AND p.id IN ({})", list.join(", "))
+        }
+        Some(_) => " AND false".to_owned(),
+        None => String::new(),
+    };
+    let wheres =
+        format!("WHERE tr.table_id = $1 AND p.trashed_at IS NULL AND {filter_sql}{only_sql}");
 
     // The rows, in order.
     let mut binds = filter_binds.clone();
@@ -421,6 +433,7 @@ mod tests {
                 group_by: None,
                 limit: PAGE_LIMIT,
                 offset: 0,
+                only: None,
             },
         )
         .await
@@ -605,6 +618,7 @@ mod tests {
                         group_by: Some(select.id),
                         limit: 100,
                         offset: 0,
+                        only: None,
                     },
                 )
                 .await

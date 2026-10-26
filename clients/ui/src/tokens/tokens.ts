@@ -111,6 +111,20 @@ export const COMPONENT_TOKENS = [
   "calendar-grid-min",
   "calendar-sheet-width",
   "calendar-when-width",
+  "table-row-height",
+  "table-head-height",
+  "table-max-height",
+  "table-column-min",
+  "table-peek-width",
+  "table-board-column",
+  "option-brown",
+  "option-orange",
+  "option-yellow",
+  "option-green",
+  "option-blue",
+  "option-purple",
+  "option-pink",
+  "option-red",
 ] as const;
 
 export type SemanticToken = (typeof SEMANTIC_TOKENS)[keyof typeof SEMANTIC_TOKENS][number];

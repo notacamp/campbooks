@@ -20,6 +20,7 @@ import {
 import { useNotionLink } from "../api/notion";
 import { useRecordLabel, type RecordLabel } from "../api/records";
 import { ConflictBlock } from "../components/ConflictBlock";
+import { InlineTable } from "../tables/components/InlineTable";
 import { KeptInNotion } from "../components/KeptInNotion";
 import { useNotionActions } from "../components/use-notion-actions";
 import { notionUrl } from "../notion";
@@ -466,5 +467,48 @@ export const Conflict = BlockNode.create({
   },
   addNodeView() {
     return ReactNodeViewRenderer(ConflictView);
+  },
+});
+
+function TableViewBlockView({ node }: NodeViewProps) {
+  const environment = useEditorEnvironment();
+  return (
+    <NodeViewWrapper contentEditable={false}>
+      <InlineTable
+        workspaceId={environment.workspaceId}
+        tableId={text(node.attrs["table"])}
+        viewId={text(node.attrs["view"])}
+        open={environment.open}
+      />
+    </NodeViewWrapper>
+  );
+}
+
+/**
+ * A table shown in the page: the table and one of its views, by id. The
+ * table's rows are never copied into the page; the viewer reads them with
+ * their own access, and a table they cannot open is "Something you can't open".
+ */
+export const TableViewBlock = BlockNode.create({
+  name: "tableView",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: false,
+  addAttributes() {
+    return { table: stringAttribute("table", null), view: stringAttribute("view", null) };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="table-view"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "table-view" })];
+  },
+  addNodeView() {
+    // The table inside has its own keys: the editor leaves its events alone.
+    return ReactNodeViewRenderer(TableViewBlockView, {
+      stopEvent: () => true,
+      ignoreMutation: () => true,
+    });
   },
 });

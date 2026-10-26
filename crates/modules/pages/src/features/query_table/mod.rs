@@ -60,6 +60,10 @@ pub struct TableQuery {
     /// The `next_cursor` of the previous answer.
     #[serde(default)]
     pub cursor: Option<String>,
+    /// Only these rows (up to 100), if they are the table's and live: to
+    /// read a few rows by id, such as the rows a relation cell names.
+    #[serde(default)]
+    pub rows: Option<Vec<PageId>>,
 }
 
 /// The rows asked for.
@@ -126,6 +130,9 @@ pub async fn handler(
     if limit == 0 || limit > PAGE {
         return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_cursor")));
     }
+    if request.rows.as_ref().is_some_and(|rows| rows.len() > PAGE) {
+        return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_cursor")));
+    }
     let offset = offset_of(request.cursor.as_deref())?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let table =
@@ -174,6 +181,7 @@ pub async fn handler(
                 .filter(|_| view_type == Some(ViewType::Board)),
             limit,
             offset,
+            only: request.rows.as_deref(),
         },
     )
     .await?;

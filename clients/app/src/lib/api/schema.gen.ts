@@ -5936,10 +5936,20 @@ export interface components {
          * @description PageId (UUIDv7)
          */
         PageId: string;
+        /**
+         * @description What a page is: an ordinary page, a table, or one row of a table.
+         * @enum {string}
+         */
+        PageKind: "page" | "table" | "row";
         /** @description The pages. */
         PageList: {
             /** @description The pages, sorted by position among their siblings. */
             pages: components["schemas"]["PageSummary"][];
+            /**
+             * @description Whether tables are on here: when not, there are no table routes, and
+             *     a client offers none.
+             */
+            tables: boolean;
         };
         /** @description Where the page should end up. */
         PageMove: {
@@ -5976,6 +5986,8 @@ export interface components {
             icon?: string | null;
             /** @description The page. */
             id: components["schemas"]["PageId"];
+            /** @description What it is: an ordinary page or a table (rows are never listed). */
+            kind: components["schemas"]["PageKind"];
             /**
              * Format: int64
              * @description Grows with a change of the title, icon or position.
@@ -6034,6 +6046,8 @@ export interface components {
             icon?: string | null;
             /** @description The page. */
             id: components["schemas"]["PageId"];
+            /** @description What it is: a page, a table, or one row of a table. */
+            kind: components["schemas"]["PageKind"];
             /**
              * Format: int64
              * @description Grows with a change of the title, icon or position: send the one
@@ -7939,6 +7953,11 @@ export interface components {
             filter?: unknown;
             /** @description How many rows, 1 to 100. Default 100. */
             limit?: number | null;
+            /**
+             * @description Only these rows (up to 100), if they are the table's and live: to
+             *     read a few rows by id, such as the rows a relation cell names.
+             */
+            rows?: components["schemas"]["PageId"][] | null;
             /**
              * @description Sorts of your own (up to five `{"property", "direction"}`), in place
              *     of the view's.

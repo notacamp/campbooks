@@ -228,6 +228,8 @@ pub struct PageSummary {
     pub trashed_at: Option<DateTime<Utc>>,
     /// Grows with a change of the title, icon or position.
     pub meta_revision: i64,
+    /// What it is: an ordinary page or a table (rows are never listed).
+    pub kind: Kind,
 }
 
 /// A member a page is shared with.
@@ -291,6 +293,8 @@ pub struct PageView {
     /// Grows with a change of the title, icon or position: send the one
     /// you saw with `pages.update` and `pages.move`.
     pub meta_revision: i64,
+    /// What it is: a page, a table, or one row of a table.
+    pub kind: Kind,
     /// The members it is shared with.
     pub grants: Vec<GrantView>,
     /// The pages above it that the caller may open, outermost first.
@@ -315,6 +319,7 @@ impl PageRow {
             edited_at: self.edited_at,
             trashed_at: self.trashed_at,
             meta_revision: self.meta_revision,
+            kind: self.kind()?,
         })
     }
 }

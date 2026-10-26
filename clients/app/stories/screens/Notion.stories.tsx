@@ -68,6 +68,7 @@ const summary = (notionPage: string, title: string, position: string): Summary =
   edited_at: "2026-10-25T09:00:00Z",
   trashed_at: null,
   meta_revision: 1,
+  kind: "page",
 });
 
 interface Choice {

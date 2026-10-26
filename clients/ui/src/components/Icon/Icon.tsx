@@ -160,6 +160,19 @@ const ICONS = {
   hourglass: [path("M6.5 3h11M6.5 21h11M7.5 3c0 5 9 5 9 9s-9 4-9 9M16.5 3c0 5-9 5-9 9s9 4 9 9")],
   task: [<circle key="c" cx="12" cy="12" r="8.5" />, path("m8.8 12.2 2.3 2.3 4.2-4.6")],
   edit: [path("M4.5 19.5 5 15.5 15.5 5a2 2 0 0 1 3 3L8 18.5ZM13.5 7l3.5 3.5")],
+  // Tables: the grid, the board of columns, the filter, the sort, a link out.
+  table: [
+    <rect key="r" x="3.5" y="4.5" width="17" height="15" rx="2" />,
+    path("M3.5 9.5h17M9.5 9.5v10"),
+  ],
+  board: [
+    <rect key="a" x="4" y="4.5" width="4.6" height="15" rx="1.2" />,
+    <rect key="b" x="9.7" y="4.5" width="4.6" height="9" rx="1.2" />,
+    <rect key="c" x="15.4" y="4.5" width="4.6" height="6" rx="1.2" />,
+  ],
+  filter: [path("M4 5.5h16l-6 7.2v5.3l-4 1.5v-6.8Z")],
+  sort: [path("M8 5v14M8 19l-3-3M8 19l3-3M16 19V5M16 5l-3 3M16 5l3 3")],
+  link: [path("M9 15 15 9M10 6.5l1-1a4 4 0 0 1 5.7 5.7l-1 1M14 17.5l-1 1a4 4 0 0 1-5.7-5.7l1-1")],
 } satisfies Record<string, ReactElement[]>;
 
 export type IconName = keyof typeof ICONS;

@@ -2,7 +2,12 @@
   "title": "Pages",
   "untitled": "Sans titre",
   "shortcuts": {
-    "create": "Nouvelle page"
+    "create": "Nouvelle page",
+    "tableNewRow": "Nouvelle ligne",
+    "tableOpenRow": "Ouvrir la ligne",
+    "tableEdit": "Modifier la cellule",
+    "tableMove": "Se déplacer entre les cellules",
+    "tableClear": "Vider la cellule"
   },
   "tree": {
     "label": "Pages",
@@ -176,7 +181,9 @@
     "embed": "Intégrer un élément",
     "subpage": "Sous-page",
     "file": "Fichier",
-    "image": "Image"
+    "image": "Image",
+    "table": "Tableau",
+    "tableLink": "Lien vers un tableau"
   },
   "upload": {
     "failed": "Impossible d’envoyer {{name}}."
@@ -319,6 +326,294 @@
         "template": "Bouton de modèle",
         "unsupported": "Bloc"
       }
+    }
+  },
+  "tables": {
+    "newTable": "Nouveau tableau",
+    "error": {
+      "title": "Impossible de charger ce tableau",
+      "rows": "Impossible de charger les lignes"
+    },
+    "type": {
+      "title": "Nom",
+      "text": "Texte",
+      "number": "Nombre",
+      "select": "Sélection",
+      "multi_select": "Sélection multiple",
+      "status": "Statut",
+      "date": "Date",
+      "checkbox": "Case à cocher",
+      "person": "Personne",
+      "files": "Fichiers",
+      "url": "URL",
+      "email": "E-mail",
+      "phone": "Téléphone",
+      "relation": "Relation",
+      "campbooks_link": "Lien Campbooks",
+      "created": "Créé",
+      "edited": "Modifié",
+      "unique_id": "ID",
+      "notion_formula": "Formule (Notion)",
+      "notion_rollup": "Cumul (Notion)",
+      "notion_people": "Personnes (Notion)",
+      "external": "Resté dans Notion"
+    },
+    "typeHint": {
+      "text": "texte simple",
+      "number": "simple, %, devise",
+      "select": "une option",
+      "multi_select": "étiquettes",
+      "status": "à faire · en cours · fait",
+      "date": "ou une période",
+      "checkbox": "oui ou non",
+      "person": "un collègue",
+      "files": "tout fichier",
+      "url": "une adresse web",
+      "email": "une adresse",
+      "phone": "un numéro",
+      "relation": "lignes d’un autre tableau",
+      "campbooks_link": "conversations, tâches, événements, personnes",
+      "created": "quand ou qui",
+      "edited": "quand ou qui",
+      "unique_id": "CL-12"
+    },
+    "typeGroup": {
+      "basic": "De base",
+      "links": "Liens",
+      "filled": "Remplis pour vous"
+    },
+    "column": {
+      "add": "Ajouter une colonne",
+      "name": "Nom de la colonne",
+      "namePlaceholder": "Nom (facultatif)",
+      "type": "Type de colonne",
+      "menu": "Colonne {{property}}",
+      "rename": "Renommer",
+      "changeType": "Changer le type",
+      "format": "Format",
+      "includeTime": "Inclure l’heure",
+      "showsWho": "Afficher qui, pas quand",
+      "filter": "Filtrer par cette colonne",
+      "hide": "Masquer la colonne",
+      "delete": "Supprimer la colonne",
+      "resize": "Redimensionner {{property}}",
+      "relatedTable": "Tableau lié",
+      "searchTables": "Chercher un tableau",
+      "noTables": "Aucun autre tableau que vous puissiez ouvrir.",
+      "paired": "L’afficher aussi dans l’autre tableau"
+    },
+    "numberFormat": {
+      "number": "Nombre",
+      "percent": "Pourcentage",
+      "EUR": "Euro (€)",
+      "USD": "Dollar américain ($)",
+      "GBP": "Livre sterling (£)"
+    },
+    "cell": {
+      "someone": "Quelqu’un",
+      "keptInNotion": "Resté dans Notion",
+      "empty": "Vide",
+      "edit": "Modifier {{property}}"
+    },
+    "rows": {
+      "new": "Nouvelle ligne",
+      "empty": "Pas encore de lignes. Ajoutez-en une avec Nouvelle ligne.",
+      "count_one": "{{count}} ligne",
+      "count_other": "{{count}} lignes",
+      "loadMore": "Charger plus de lignes ({{shown}} sur {{total}})",
+      "loadedOf": "{{shown}} lignes sur {{total}} affichées"
+    },
+    "row": {
+      "open": "Ouvrir {{title}}"
+    },
+    "view": {
+      "label": "Vues",
+      "add": "Ajouter une vue",
+      "name": "Nom de la vue",
+      "type": "Type de vue",
+      "table": "Tableau",
+      "board": "Tableau kanban",
+      "groupBy": "Grouper par",
+      "needGroup": "Ajoutez d’abord une colonne de sélection ou de statut.",
+      "create": "Créer la vue",
+      "options": "Options de {{view}}",
+      "rename": "Renommer la vue",
+      "columns": "Colonnes",
+      "remove": "Supprimer la vue",
+      "default": {
+        "table": "Tableau",
+        "board": "Tableau kanban"
+      }
+    },
+    "filter": {
+      "label": "Filtrer",
+      "mode": "Correspondance",
+      "all": "Toutes",
+      "any": "Une au moins",
+      "add": "Ajouter une condition",
+      "apply": "Appliquer",
+      "clear": "Effacer le filtre",
+      "property": "Propriété",
+      "operator": "Condition",
+      "value": "Valeur",
+      "checked": "Coché",
+      "unchecked": "Décoché",
+      "chooseMember": "Choisir une personne",
+      "none": "Pas encore de conditions.",
+      "nested": "Ce filtre contient des groupes de conditions. Vous pouvez l’effacer ici.",
+      "nestedChip": "Filtre avec groupes",
+      "condition": "Condition {{number}}",
+      "remove": "Retirer la condition {{number}}",
+      "removeChip": "Retirer le filtre sur {{property}}"
+    },
+    "operator": {
+      "is": "est",
+      "is_not": "n’est pas",
+      "is_any_of": "est l’un de",
+      "contains": "contient",
+      "does_not_contain": "ne contient pas",
+      "starts_with": "commence par",
+      "ends_with": "finit par",
+      "gt": "est supérieur à",
+      "gte": "est au moins",
+      "lt": "est inférieur à",
+      "lte": "est au plus",
+      "before": "est avant le",
+      "after": "est après le",
+      "on_or_before": "est au plus tard le",
+      "on_or_after": "est à partir du",
+      "is_empty": "est vide",
+      "is_not_empty": "n’est pas vide"
+    },
+    "sort": {
+      "label": "Trier",
+      "none": "Pas de tri.",
+      "add": "Ajouter un tri",
+      "direction": "Sens",
+      "asc": "Croissant",
+      "desc": "Décroissant",
+      "level": "Tri {{number}}",
+      "remove": "Retirer le tri {{number}}"
+    },
+    "summary": {
+      "menu": "Résumé de {{property}}",
+      "none": "Aucun",
+      "count": "Nombre",
+      "sum": "Somme",
+      "average": "Moyenne",
+      "min": "Min.",
+      "max": "Max.",
+      "percentChecked": "Coché"
+    },
+    "status": {
+      "todo": "À faire",
+      "doing": "En cours",
+      "done": "Fait",
+      "default": {
+        "todo": "À faire",
+        "doing": "En cours",
+        "done": "Fait"
+      }
+    },
+    "colors": {
+      "default": "Par défaut",
+      "gray": "Gris",
+      "brown": "Marron",
+      "orange": "Orange",
+      "yellow": "Jaune",
+      "green": "Vert",
+      "blue": "Bleu",
+      "purple": "Violet",
+      "pink": "Rose",
+      "red": "Rouge"
+    },
+    "picker": {
+      "searchOptions": "Chercher une option",
+      "noOptions": "Pas encore d’options. Tapez un nom pour en créer une.",
+      "createOption": "Créer « {{name}} »",
+      "editOption": "Modifier l’option {{name}}",
+      "optionName": "Nom de l’option",
+      "optionColor": "Couleur",
+      "saveOption": "Enregistrer",
+      "deleteOption": "Supprimer l’option",
+      "back": "Retour",
+      "clear": "Effacer",
+      "done": "Terminé",
+      "people": "Personnes",
+      "searchPeople": "Chercher une personne",
+      "noPeople": "Personne de ce nom.",
+      "rows": "Lignes",
+      "searchRows": "Chercher une ligne",
+      "noRows": "Aucune ligne trouvée.",
+      "chosenRow": "Une ligne",
+      "links": "Éléments",
+      "searchLinks": "Chercher conversations, tâches, événements, personnes et pages",
+      "noLinks": "Rien trouvé.",
+      "loading": "Recherche…"
+    },
+    "date": {
+      "start": "Date",
+      "startTime": "Heure",
+      "end": "Date de fin",
+      "endTime": "Heure de fin",
+      "range": "Ajouter une date de fin"
+    },
+    "files": {
+      "list": "Fichiers",
+      "add": "Ajouter un fichier",
+      "choose": "Choisir un fichier",
+      "uploading": "Envoi en cours…",
+      "failed": "Impossible d’envoyer ce fichier.",
+      "remove": "Retirer {{name}}",
+      "removeShort": "Retirer"
+    },
+    "board": {
+      "noGroupTitle": "Choisissez le regroupement du tableau",
+      "noGroupBody": "Un tableau kanban a besoin d’une colonne de sélection ou de statut. Ajoutez-en une d’abord.",
+      "pickGroupBody": "Choisissez la colonne dont les options deviennent les colonnes du tableau.",
+      "pickGroup": "Choisir une colonne",
+      "none": "Sans {{property}}",
+      "moveTo": "Déplacer vers",
+      "moveCard": "Déplacer {{title}} vers",
+      "addCard": "Ajouter une ligne à {{group}}"
+    },
+    "peek": {
+      "label": "Ligne",
+      "crumb": "{{table}} · ligne",
+      "title": "Titre de la ligne",
+      "openAsPage": "Ouvrir comme page",
+      "close": "Fermer"
+    },
+    "toast": {
+      "cell": "{{property}} modifié",
+      "cellStale": "Quelqu’un d’autre a aussi modifié {{property}} : la vôtre est conservée",
+      "cellFailed": "Impossible de modifier {{property}}. Rien n’a été modifié.",
+      "title": "Titre modifié",
+      "titleFailed": "Impossible de modifier le titre. Rien n’a été modifié.",
+      "row": "Ligne ajoutée",
+      "rowFailed": "Impossible d’ajouter la ligne. Rien n’a été enregistré.",
+      "rowUndoFailed": "Impossible d’annuler. Rien n’a été modifié.",
+      "trashed": "Ligne mise à la corbeille",
+      "trashFailed": "Impossible de mettre à la corbeille. Rien n’a été modifié.",
+      "restoreFailed": "Impossible de restaurer. Rien n’a été modifié.",
+      "column": "Colonne {{property}} ajoutée",
+      "columnFailed": "Impossible de modifier la colonne. Rien n’a été modifié.",
+      "columnUndoFailed": "Impossible d’annuler. Rien n’a été modifié.",
+      "columnRenamed": "Colonne renommée en {{property}}",
+      "columnType": "Type de {{property}} modifié",
+      "columnChanged": "{{property}} modifiée",
+      "columnRemoved": "Colonne {{property}} supprimée",
+      "options": "Options de {{property}} modifiées",
+      "optionsFailed": "Impossible de modifier les options. Rien n’a été modifié.",
+      "view": "{{view}} modifiée",
+      "viewAdded": "Vue {{view}} ajoutée",
+      "viewRemoved": "Vue {{view}} supprimée",
+      "viewFailed": "Impossible de modifier la vue. Rien n’a été modifié.",
+      "tableCreated": "Tableau créé",
+      "tableFailed": "Impossible de créer le tableau. Rien n’a été enregistré.",
+      "createFailed": "Impossible de créer le tableau. Rien n’a été enregistré.",
+      "inlineCreated": "Tableau ajouté à la page",
+      "linkFailed": "Impossible de lier ce tableau. Rien n’a été modifié."
     }
   }
 }

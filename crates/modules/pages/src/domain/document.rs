@@ -165,6 +165,8 @@ pub struct Inspection {
     pub blobs: BTreeSet<String>,
     /// What it mentions, embeds and links to.
     pub links: BTreeSet<Link>,
+    /// The tables it shows, as (table, view) ids.
+    pub table_views: BTreeSet<(String, String)>,
     /// Its plain text, one line per text block; mentions add nothing.
     pub text: String,
     /// Its size as a full update, in bytes.
@@ -257,6 +259,7 @@ pub fn inspect(doc: &Doc) -> Result<Inspection, Rejection> {
             blocks: 0,
             blobs: BTreeSet::new(),
             links: BTreeSet::new(),
+            table_views: BTreeSet::new(),
             text: String::new(),
         };
         walk.children(&root, Context::Blocks, 1)?;
@@ -264,6 +267,7 @@ pub fn inspect(doc: &Doc) -> Result<Inspection, Rejection> {
             blocks: walk.blocks,
             blobs: walk.blobs,
             links: walk.links,
+            table_views: walk.table_views,
             text: walk.text,
             size,
         })
@@ -309,7 +313,7 @@ fn spec(name: &str) -> Option<Spec> {
         // A conflict is Notion's version of a block we disagree about,
         // beneath ours.
         "toggle" | "blockquote" | "callout" | "conflict" => (Class::Block, Context::Blocks),
-        "horizontalRule" | "image" | "file" | "pageLink" | "embed" | "external" => {
+        "horizontalRule" | "image" | "file" | "pageLink" | "embed" | "external" | "tableView" => {
             (Class::Block, Context::Empty)
         }
         "mention" | "hardBreak" => (Class::Inline, Context::Empty),
@@ -443,6 +447,8 @@ fn check_attributes(name: &str, attributes: &Attributes) -> Result<(), Rejection
             (_, "bid") | ("conflict", "of") | ("pageLink", "page") => {
                 text_of(value).is_some_and(is_uuid)
             }
+            // A table shown in the page: the table and one of its views, by id only.
+            ("tableView", "table" | "view") => text_of(value).is_some_and(is_uuid),
             ("conflict", "hash") | ("image" | "file", "blob") => {
                 text_of(value).is_some_and(is_hash)
             }
@@ -492,6 +498,7 @@ struct Walk<'a, T: ReadTxn> {
     blocks: usize,
     blobs: BTreeSet<String>,
     links: BTreeSet<Link>,
+    table_views: BTreeSet<(String, String)>,
     text: String,
 }
 
@@ -577,6 +584,16 @@ impl<T: ReadTxn> Walk<'_, T> {
                     ref_type: "pages.page".to_owned(),
                     ref_id: page.to_owned(),
                     kind: LinkKind::Child,
+                });
+            }
+            "tableView" => {
+                let table = held("table").ok_or(Rejection::BadReference)?;
+                let view = held("view").ok_or(Rejection::BadReference)?;
+                self.table_views.insert((table.to_owned(), view.to_owned()));
+                self.links.insert(Link {
+                    ref_type: "pages.page".to_owned(),
+                    ref_id: table.to_owned(),
+                    kind: LinkKind::Embed,
                 });
             }
             "mention" | "embed" => {

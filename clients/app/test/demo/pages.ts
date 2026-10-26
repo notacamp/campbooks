@@ -24,6 +24,7 @@ const page = (n: number, over: Partial<Summary>): Summary => ({
   edited_at: "2026-10-12T09:00:00Z",
   trashed_at: null,
   meta_revision: 1,
+  kind: "page",
   ...over,
 });
 
