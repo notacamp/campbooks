@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { readTabValue, writeTabValue } from "~/lib/storage/tab";
 import {
   Banner,
   Button,
@@ -57,25 +58,6 @@ function zoneOptions(current: string): { value: string; label: string }[] {
     typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
   const zones = known.includes(current) ? known : [current, ...known];
   return zones.map((zone) => ({ value: zone, label: zone.replaceAll("_", " ") }));
-}
-
-/** Where the mailbox Add calendar access was started for is remembered across the provider's screens. */
-const ATTEMPT_KEY = "campbooks.calendar-access";
-
-function rememberAttempt(connection: string): void {
-  try {
-    globalThis.sessionStorage.setItem(ATTEMPT_KEY, connection);
-  } catch {
-    // Without storage the page names the only mailbox that could have been meant.
-  }
-}
-
-function recalledAttempt(): string | undefined {
-  try {
-    return globalThis.sessionStorage.getItem(ATTEMPT_KEY) ?? undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 const PROVIDER_NAMES: Record<string, string> = {
@@ -161,8 +143,9 @@ function CalendarsSection({
       connection.offers.includes("calendar") && !connection.capabilities.includes("calendar"),
   );
   // The mailbox this return was for: the one asked about, else the only one that could be.
-  const [attempt] = useState(recalledAttempt);
-  const asked = (connections ?? []).find((connection) => connection.id === attempt);
+  const [attempt] = useState(() => readTabValue("calendarAccess.connection"));
+  // Only a mailbox still without access can have been refused it.
+  const asked = withoutAccess.find((connection) => connection.id === attempt);
   const only = withoutAccess.length === 1 ? withoutAccess[0] : undefined;
   return (
     <SettingsSection
@@ -231,7 +214,7 @@ function CalendarsSection({
                   <Button
                     disabled={consent.starting}
                     onClick={() => {
-                      rememberAttempt(connection.id);
+                      writeTabValue("calendarAccess.connection", connection.id);
                       consent.start({
                         purpose: "reconnect",
                         connection: connection.id,
