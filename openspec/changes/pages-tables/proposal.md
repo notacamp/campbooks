@@ -25,18 +25,21 @@ Modules touched:
   properties, row values, views and the table query.
 - **`search`**: row titles and text values are searchable through the pages
   `SearchSource`.
-- **Client**:
-  - the table page, with table and board views;
-  - cell editors;
-  - the row peek;
-  - the new-column menu;
-  - filters and sorts;
-  - the inline table block.
+- **Client**: nothing in this part. Part 2 adds the screens.
 
 **ADR 0022** (added by this change): tables live in `pages`, and their
 property types are written as a self-contained library that ADR 0008's
 future `records` module can adopt. It amends ADR 0008's plan that
 user-defined record types wait for `records`.
+
+## Delivered in two changes
+
+The owner asked (2026-10-26) for smaller steps. **This change is part 1:** the
+model and API, behind `CAMPBOOKS_PAGES__TABLES__ENABLED`. That covers the
+properties library, typed values, views, the query and search, with tests and
+no screens. **Part 2** (`pages-tables-ui`, its own PR) adds the table and board
+screens, the row peek, the column menu, the inline blocks and the recording.
+The prototype covers both.
 
 ## What Changes
 

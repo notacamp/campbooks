@@ -6,7 +6,7 @@
 
 ## 1. Model
 
-- [ ] 1.1 Migration: `pages.pages.kind`, `table_properties`, `row_values`, `table_views`, unique-id sequence; forced RLS; flag `CAMPBOOKS_PAGES__TABLES__ENABLED` with the flag-off production-values test
+- [ ] 1.1 Migration (version from 20261110010000, tracking patch 0018, per the merge coordinator): `pages.pages.kind`, `table_properties`, `row_values`, `table_views`, unique-id sequence; forced RLS; flag `CAMPBOOKS_PAGES__TABLES__ENABLED` with the flag-off production-values test
 - [ ] 1.2 `pages::properties` library: every type's config + value validation, option ids, comparison, SQL casts, conversions on type change; property-based tests per type
 - [ ] 1.3 Access through the page chain (table for schema/views, row for values); reader 403 tests
 
@@ -20,10 +20,7 @@
 
 ## 3. Client
 
-- [ ] 3.1 Table page: view tabs, one-row toolbar, grid with type headers + column menu, cell editors per type, keys, summaries
-- [ ] 3.2 Board view with drag between groups; row peek with properties + body
-- [ ] 3.3 New-column type menu; filter and sort builders; `/table` and `/link to table` blocks
-- [ ] 3.4 i18n en/pt-PT/es-ES/fr; Storybook screen stories (idle twins); `pnpm test:fit` 375/1280; coverage ≥ 80%
+- [x] 3.1 None in this part: the table and board screens, row peek, column menu, inline blocks and recording are part 2 (`pages-tables-ui`)
 
 ## 4. Finish
 
@@ -31,5 +28,5 @@
 - [ ] 4.2 OpenAPI and client types regenerated (CI artifacts)
 - [ ] 4.3 Changelog entry `changelog/unreleased/added/365-pages-tables.md`
 - [ ] 4.4 Gates green in CI
-- [ ] 4.5 Recording at 375 px and desktop (Storybook, demo data only)
+- [ ] 4.5 Recording: a terminal demo of the API (vhs, demo data), since this part has no UI
 - [ ] 4.6 `openspec archive pages-tables --yes` before merge
