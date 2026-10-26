@@ -5,7 +5,9 @@ import { caption } from "./inbox.ts";
 // Adding calendar access (campbooks-cloud#373), in Storybook with demo data
 // only, at 375px and on the desktop: a Google and a Zoho mailbox that gave
 // mail only are both offered it, and when the sign-in is too old the page
-// says so and offers Sign in again instead of a dead end.
+// says so and offers Sign in again instead of a dead end; and when the
+// provider answers as another account, it names the address to switch to
+// (campbooks-cloud#381).
 //   pnpm --dir clients storybook
 //   pnpm --dir clients record calendar-access --base-url http://localhost:6006
 const story = (id: string) => `/iframe.html?id=screens-calendar--${id}&viewMode=story`;
@@ -22,4 +24,11 @@ export default async function calendarAccess({ page }: ScenarioContext): Promise
   await again.waitFor();
   await again.scrollIntoViewIfNeeded();
   await caption(page, "Sign-in too old: it says so and offers Sign in again", 3000);
+
+  // Back from Zoho as another account: the page names the address to switch to.
+  await page.goto(story("settings-account-mismatch-idle"));
+  const mismatch = page.getByRole("alert");
+  await mismatch.waitFor();
+  await mismatch.scrollIntoViewIfNeeded();
+  await caption(page, "Zoho answered as another account: the page says which to switch to", 3200);
 }

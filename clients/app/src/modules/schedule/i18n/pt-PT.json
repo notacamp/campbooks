@@ -187,7 +187,15 @@
         "action": "Iniciar sessão novamente"
       },
       "unsupported": "Este Campbooks não pode dar acesso ao calendário a essa conta.",
-      "rateLimited": "Demasiadas tentativas. Aguarde alguns minutos e tente de novo."
+      "rateLimited": "Demasiadas tentativas. Aguarde alguns minutos e tente de novo.",
+      "outcome": {
+        "added": "Acesso ao calendário adicionado.",
+        "addedFor": "Acesso ao calendário adicionado para {{address}}.",
+        "mismatch": "O {{provider}} respondeu como outra conta. Mude para {{address}} no {{provider}} e tente de novo.",
+        "mismatchAnother": "Essa não era a conta da própria caixa de correio. Mude de conta no fornecedor e tente de novo.",
+        "cancelled": "Saiu antes de terminar. O acesso ao calendário não foi adicionado.",
+        "failed": "O acesso ao calendário não foi adicionado. Tente de novo."
+      }
     },
     "kinds": {
       "title": "O que o Scout adiciona a partir do seu correio",

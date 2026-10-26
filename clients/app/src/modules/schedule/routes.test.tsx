@@ -560,6 +560,34 @@ describe("Settings → Calendar", () => {
     expect(signInAgain).toHaveBeenCalledTimes(1);
   });
 
+  it("names the address to switch to when the provider answered as another account", async () => {
+    api({
+      [`GET ${W}/connections`]: {
+        body: { connections: [connections[0], { ...connections[1], offers: ["calendar"] }] },
+      },
+    });
+    const { router } = renderAt(`/w/${DUARTE.id}/settings/calendar?link_error=account_mismatch`);
+
+    expect(
+      await screen.findByText(
+        "Zoho answered as another account. Switch to ana@lopesimoveis.example at Zoho, then try again.",
+      ),
+    ).toBeVisible();
+    // Read once, then cleared from the address bar.
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({});
+    });
+  });
+
+  it("says calendar access was added for the mailbox it came back for", async () => {
+    settings();
+    renderAt(`/w/${DUARTE.id}/settings/calendar?connected=${connections[0]?.id ?? ""}`);
+
+    expect(
+      await screen.findByText(`Calendar access added for ${connections[0]?.address ?? ""}.`),
+    ).toBeVisible();
+  });
+
   it("says plainly why else adding calendar access was refused", async () => {
     settings();
     const { unmount } = renderAt(`/w/${DUARTE.id}/settings/calendar`, { refusal: "rate_limited" });

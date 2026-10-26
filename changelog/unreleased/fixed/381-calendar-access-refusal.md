@@ -1,0 +1,1 @@
+- **Adding calendar access now says why it came back refused** (Settings → Calendar, campbooks-cloud#381). If the provider answered as a different account, the page names the address to switch to; a success says which mailbox got calendar access. Zoho now always shows its own screen when you connect or reconnect a mailbox, so you can see which account is answering.

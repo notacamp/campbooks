@@ -676,6 +676,26 @@ export const SettingsStepUp: Story = {
   },
 };
 
+function mismatchApi() {
+  return {
+    ...settingsApi(),
+    [`GET ${W}/connections`]: { body: { connections: [CALENDAR_ACCESS, ZOHO_OFFERED] } },
+  } satisfies Record<string, MockRoute>;
+}
+
+/** Zoho answered as another account: the page names the address to switch to. */
+export const SettingsAccountMismatch: Story = {
+  args: { path: `${BASE}/settings/calendar?link_error=account_mismatch`, api: mismatchApi },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText(
+        "Zoho answered as another account. Switch to ana@lopesimoveis.example at Zoho, then try again.",
+      ),
+    ).toBeVisible();
+  },
+};
+
 export const SettingsPhone: Story = {
   args: { path: `${BASE}/settings/calendar`, api: settingsApi },
   ...at("phone", 375, 812),
@@ -728,6 +748,11 @@ export const SettingsStepUpIdle: Story = {
       [`GET ${W}/connections`]: { body: { connections: [GOOGLE_MAIL_ONLY, ZOHO_OFFERED] } },
     }),
   },
+};
+
+/** The same refusal, to drive by hand (the recording). */
+export const SettingsAccountMismatchIdle: Story = {
+  args: { path: `${BASE}/settings/calendar?link_error=account_mismatch`, api: mismatchApi },
 };
 
 /** The invitation Google refused a change to, to drive by hand. */

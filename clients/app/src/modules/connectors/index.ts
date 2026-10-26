@@ -13,6 +13,7 @@ export type {
   WayInFate,
 } from "./consent";
 export { WorkspaceConnectionsAdmin } from "./components/WorkspaceConnectionsAdmin/WorkspaceConnectionsAdmin";
-export { buildConnectNotionRoute, buildConnectorsRoutes } from "./routes";
+export { mailboxResult, type MailboxResult } from "./model";
 export { useNotionSource } from "./notion-source";
+export { buildConnectNotionRoute, buildConnectorsRoutes } from "./routes";
 export { CONNECTORS_SHORTCUTS } from "./shortcuts";
