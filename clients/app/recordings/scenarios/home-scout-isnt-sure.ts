@@ -34,14 +34,12 @@ export default async function homeScoutIsntSure({ page }: ScenarioContext): Prom
   }
 
   // 1 (or tap): someone else has the move. The conversation waits on them.
-  if (phone) {
-    await page
-      .getByRole("button", { name: /^Nudge Águas do Ribatejo/u })
-      .first()
-      .click();
-  } else {
-    await page.keyboard.press("1");
-  }
+  await (phone
+    ? page
+        .getByRole("button", { name: /^Nudge Águas do Ribatejo/u })
+        .first()
+        .click()
+    : page.keyboard.press("1"));
   await page.getByRole("dialog").waitFor();
   await caption(
     page,
