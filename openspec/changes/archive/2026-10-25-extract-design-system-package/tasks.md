@@ -21,3 +21,4 @@
 ## 4. Done
 
 - [x] 4.1 No changelog entry (a refactor, nothing a user notices); gates green; UI verified at 375px and desktop in Storybook (recording)
+- [x] The import boundary names the package: modules and the app shell reach `@notacamp/ui` only through `src/lib/ui/index.ts` (spec delta MODIFIED; enforced by `.dependency-cruiser.cjs`)

@@ -45,7 +45,10 @@ CI SHALL fail when CSS outside the token files contains a colour, size,
 duration or easing literal, when a class name uses a Tailwind arbitrary
 value or a palette colour, when a module uses an inline style or a
 non-layout utility, or when code outside the design system imports anything
-but its public index.
+but its public index. The app's design system is `@notacamp/ui` (`clients/ui`)
+plus the app's own components in `src/lib/ui/`, and its only entry point for
+modules and the app shell is `src/lib/ui/index.ts`, which re-exports the
+package.
 
 #### Scenario: A literal colour in a component
 - **WHEN** a component stylesheet declares `color: #123456`
@@ -53,6 +56,10 @@ but its public index.
 
 #### Scenario: A module reaching into a component
 - **WHEN** a module imports a file under `src/lib/ui/` other than `index.ts`
+- **THEN** `pnpm deps:check` fails
+
+#### Scenario: A module importing the package directly
+- **WHEN** a module or the app shell imports `@notacamp/ui` or a file under `clients/ui` instead of `~/lib/ui`
 - **THEN** `pnpm deps:check` fails
 
 ### Requirement: Accessible components
