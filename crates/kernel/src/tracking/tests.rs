@@ -382,6 +382,7 @@ fn only_client_ids_campbooks_minted_are_recorded() {
         "campbooks-native",
         SYNC_APP,
         "dcr_abcdefghijklmnopqrst-_",
+        "app_abcdefghijklmnopqrst-_",
     ] {
         assert_eq!(minted_client_id(minted), Some(minted));
         assert_eq!(Actor::client(minted).id.as_deref(), Some(minted));
@@ -390,6 +391,7 @@ fn only_client_ids_campbooks_minted_are_recorded() {
         DOCUMENT_CLIENT,
         "cb_short",
         "dcr_abcdefghijklmnopqrst@x",
+        "app_short",
         "another-idp-client",
         "",
     ] {

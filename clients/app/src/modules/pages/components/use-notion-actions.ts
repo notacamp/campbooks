@@ -62,12 +62,22 @@ export function useNotionActions(workspaceId: string) {
     }
   };
 
-  const importPages = async (body: ImportFromNotionBody): Promise<Imported | undefined> => {
+  // `chosen` is every page the member ticked, sub-pages included: only the
+  // top-most are sent (the rest come along on the first read), so the toast
+  // counts what they chose, less what was already linked.
+  const importPages = async (
+    body: ImportFromNotionBody,
+    chosen?: number,
+  ): Promise<Imported | undefined> => {
     try {
       const imported = await calls.import(body);
       refreshPages();
       refresh();
-      undo.notify(t("notion.import.done", { count: imported.pages.length }));
+      const count =
+        chosen === undefined
+          ? imported.pages.length
+          : Math.max(imported.pages.length, chosen - imported.skipped);
+      undo.notify(t("notion.import.done", { count }));
       return imported;
     } catch {
       return undefined;

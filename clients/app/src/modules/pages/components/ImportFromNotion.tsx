@@ -88,7 +88,7 @@ export function ImportFromNotion({
     }
     setBusy(true);
     setFailed(false);
-    void actions.importPages({ connection: chosen, pages: request }).then((imported) => {
+    void actions.importPages({ connection: chosen, pages: request }, count).then((imported) => {
       setBusy(false);
       if (imported === undefined) {
         setFailed(true);

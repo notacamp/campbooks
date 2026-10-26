@@ -7,7 +7,7 @@
     },
     {
       "description": "An app acting on its own behalf (client credentials).",
-      "id_is": "the OAuth client id when Campbooks minted it (campbooks-web, campbooks-native, cb_…, dcr_…); none for any other client (one known by its metadata document has a URL for an id)",
+      "id_is": "the OAuth client id when Campbooks minted it (campbooks-web, campbooks-native, cb_…, dcr_…, app_…); none for any other client (one known by its metadata document has a URL for an id)",
       "type": "client"
     },
     {
@@ -122,9 +122,15 @@
       "pr": "#676"
     },
     {
+      "change": "Instance apps (campbooks-cloud#369): 3 instance-wide events for an instance app registered, its secret rotated and its removal (with the consents and refresh tokens it held) by the server's admin command, as system; the client kind instance; the instance apps' app_ ids in every client-id pattern; no Coverage rows (the CLI serves no operation and runs no job, schedule or handler).",
+      "date": "2026-10-26",
+      "plan_version": 16,
+      "pr": "#683"
+    },
+    {
       "change": "Sync with Notion (campbooks-cloud#376): provider notion and capability pages for connections; 5 pages events for pages imported from Notion (how many), a sync applied in either direction (how many blocks), a conflict raised, a conflict resolved (the choice) and a sync stopped (why); Coverage for every operation, job and handler of the change.",
-      "date": "2026-10-25",
-      "plan_version": 15,
+      "date": "2026-10-26",
+      "plan_version": 17,
       "pr": "#680"
     }
   ],
@@ -3559,6 +3565,11 @@
       "description": "Campbooks' own (web, desktop and mobile).",
       "enum": "identity.client_kind",
       "value": "first_party"
+    },
+    {
+      "description": "An instance app: registered by an instance administrator from the server's CLI (first-party sign-in for the instance's own other apps).",
+      "enum": "identity.client_kind",
+      "value": "instance"
     },
     {
       "description": "Known by its Client ID Metadata Document (its id is a URL, never kept).",
@@ -13106,7 +13117,7 @@
             "properties": {
               "client_id": {
                 "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -13126,6 +13137,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13202,7 +13214,7 @@
           },
           "client_id": {
             "description": "The client's id.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -13249,7 +13261,7 @@
             "properties": {
               "client_id": {
                 "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -13269,6 +13281,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13401,7 +13414,7 @@
           },
           "client_id": {
             "description": "Its client id, when Campbooks minted it; absent for a metadata-document client.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -13410,6 +13423,7 @@
             "enum": [
               "dynamic",
               "first_party",
+              "instance",
               "metadata_document",
               "workspace"
             ],
@@ -13465,7 +13479,7 @@
               },
               "client_id": {
                 "description": "The client it lets in, when Campbooks minted its id; absent for a metadata-document client.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -13474,6 +13488,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13569,7 +13584,7 @@
               },
               "client_id": {
                 "description": "The client it lets in, when Campbooks minted its id; absent for a metadata-document client.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -13578,6 +13593,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13703,7 +13719,7 @@
             "properties": {
               "client_id": {
                 "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
-                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
                 "type": "string",
                 "x-classification": "id"
               },
@@ -13723,6 +13739,7 @@
                 "enum": [
                   "dynamic",
                   "first_party",
+                  "instance",
                   "metadata_document",
                   "workspace"
                 ],
@@ -13877,6 +13894,236 @@
           "provider"
         ],
         "title": "identity.held_grant_discarded",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "registered",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 16,
+      "description": "An instance administrator registered an instance app (a confidential sign-in client of the whole instance) with the server's `campbooks-server admin apps add`. The snapshot is the client, never its name, secret, scopes or redirect URIs.",
+      "fires_when": "admin apps add (campbooks_identity::domain::instance_apps::register) stores it, in the transaction that writes the client and its audit entry.",
+      "module": "identity",
+      "name": "identity.instance_app_registered",
+      "object": "instance_app",
+      "openspec_change": "instance-apps",
+      "rust_type": "InstanceAppRegistered",
+      "schema": {
+        "$id": "urn:campbooks:tracking:identity.instance_app_registered:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An instance administrator registered an instance app (a confidential sign-in client of the whole instance) with the server's `campbooks-server admin apps add`. The snapshot is the client, never its name, secret, scopes or redirect URIs.",
+        "properties": {
+          "client": {
+            "additionalProperties": false,
+            "description": "The new client.",
+            "properties": {
+              "client_id": {
+                "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "confidential": {
+                "description": "Whether it authenticates with a secret.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was registered.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "kind": {
+                "description": "What kind of client it is.",
+                "enum": [
+                  "dynamic",
+                  "first_party",
+                  "instance",
+                  "metadata_document",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "redirect_uri_count": {
+                "description": "How many redirect URIs it registered (never the URIs).",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "scope_count": {
+                "description": "How many scopes it may ask for.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "secret_rotated_at": {
+                "description": "When its secret was last rotated.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "confidential",
+              "created_at",
+              "kind",
+              "redirect_uri_count",
+              "scope_count"
+            ],
+            "title": "identity.client",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "client"
+        ],
+        "title": "identity.instance_app_registered",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "removed",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 16,
+      "description": "An instance app was removed by the server's `campbooks-server admin apps remove`, with every consent and refresh token it held.",
+      "fires_when": "admin apps remove (campbooks_identity::domain::instance_apps::remove) deletes it and revokes its consents and refresh tokens; an unknown client id tracks nothing.",
+      "module": "identity",
+      "name": "identity.instance_app_removed",
+      "object": "instance_app",
+      "openspec_change": "instance-apps",
+      "rust_type": "InstanceAppRemoved",
+      "schema": {
+        "$id": "urn:campbooks:tracking:identity.instance_app_removed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An instance app was removed by the server's `campbooks-server admin apps remove`, with every consent and refresh token it held.",
+        "properties": {
+          "client_id": {
+            "description": "The client's id.",
+            "pattern": "^app_[A-Za-z0-9_-]{22}$",
+            "type": "string",
+            "x-classification": "id"
+          },
+          "consents_revoked": {
+            "description": "How many live consents it held were revoked.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "refresh_tokens_revoked": {
+            "description": "How many live refresh-token families (sign-ins) it held were revoked.",
+            "type": "integer",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "client_id",
+          "consents_revoked",
+          "refresh_tokens_revoked"
+        ],
+        "title": "identity.instance_app_removed",
+        "type": "object"
+      },
+      "scope": "instance",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "rotated",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 16,
+      "description": "An instance app got a new secret from the server's `campbooks-server admin apps rotate-secret`; the old one stopped working.",
+      "fires_when": "admin apps rotate-secret (campbooks_identity::domain::instance_apps::rotate_secret) stores the new secret's hash; an unknown client id tracks nothing.",
+      "module": "identity",
+      "name": "identity.instance_app_secret_rotated",
+      "object": "instance_app_secret",
+      "openspec_change": "instance-apps",
+      "rust_type": "InstanceAppSecretRotated",
+      "schema": {
+        "$id": "urn:campbooks:tracking:identity.instance_app_secret_rotated:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "An instance app got a new secret from the server's `campbooks-server admin apps rotate-secret`; the old one stopped working.",
+        "properties": {
+          "client": {
+            "additionalProperties": false,
+            "description": "The client afterwards.",
+            "properties": {
+              "client_id": {
+                "description": "Its client id, when Campbooks minted it; absent for a metadata-document client, whose id is a URL.",
+                "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "confidential": {
+                "description": "Whether it authenticates with a secret.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was registered.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "kind": {
+                "description": "What kind of client it is.",
+                "enum": [
+                  "dynamic",
+                  "first_party",
+                  "instance",
+                  "metadata_document",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "redirect_uri_count": {
+                "description": "How many redirect URIs it registered (never the URIs).",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "scope_count": {
+                "description": "How many scopes it may ask for.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "secret_rotated_at": {
+                "description": "When its secret was last rotated.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "confidential",
+              "created_at",
+              "kind",
+              "redirect_uri_count",
+              "scope_count"
+            ],
+            "title": "identity.client",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "client"
+        ],
+        "title": "identity.instance_app_secret_rotated",
         "type": "object"
       },
       "scope": "instance",
@@ -14276,7 +14523,7 @@
           },
           "client_id": {
             "description": "Its client id, when Campbooks minted it; absent for a metadata-document client.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -14285,6 +14532,7 @@
             "enum": [
               "dynamic",
               "first_party",
+              "instance",
               "metadata_document",
               "workspace"
             ],
@@ -14330,7 +14578,7 @@
           },
           "client_id": {
             "description": "Its client id, when Campbooks minted it; absent for a metadata-document client.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -14339,6 +14587,7 @@
             "enum": [
               "dynamic",
               "first_party",
+              "instance",
               "metadata_document",
               "workspace"
             ],
@@ -14701,7 +14950,7 @@
           },
           "client_id": {
             "description": "Its client id, when Campbooks minted it; absent for a metadata-document client.",
-            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+            "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
             "type": "string",
             "x-classification": "id"
           },
@@ -14710,6 +14959,7 @@
             "enum": [
               "dynamic",
               "first_party",
+              "instance",
               "metadata_document",
               "workspace"
             ],
@@ -15275,7 +15525,7 @@
         "user",
         "system"
       ],
-      "added_in": 15,
+      "added_in": 17,
       "description": "The same block changed in Campbooks and in Notion between two syncs: Campbooks kept its version and added Notion's beneath it as a conflict for the member to choose. How many blocks.",
       "fires_when": "Applying a Notion snapshot, or undoing a resolution, adds conflict blocks to the page, in that transaction.",
       "module": "pages",
@@ -15358,7 +15608,7 @@
       "actor_types": [
         "user"
       ],
-      "added_in": 15,
+      "added_in": 17,
       "description": "A member chose what to do with a conflict between a block and Notion's version of it.",
       "fires_when": "pages.resolve_conflict applies the choice, in the transaction that changes the page.",
       "module": "pages",
@@ -15446,7 +15696,7 @@
       "actor_types": [
         "user"
       ],
-      "added_in": 15,
+      "added_in": 17,
       "description": "A member picked pages in their Notion account to bring into Pages: how many were made, linked to their Notion pages. Never their titles or ids at Notion.",
       "fires_when": "pages.import_from_notion makes the pages and their links, in the transaction that stores them; pages already linked from this connection make none and track nothing.",
       "module": "pages",
@@ -15489,7 +15739,7 @@
         "user",
         "system"
       ],
-      "added_in": 15,
+      "added_in": 17,
       "description": "A change crossed between a page and its Notion page, in one direction: how many blocks it moved. Never their text.",
       "fires_when": "A Notion snapshot is applied to the page (inbound), or the connector reports blocks written to Notion (outbound), in the transaction that stores the result; a run that moves no block tracks nothing.",
       "module": "pages",
@@ -15583,7 +15833,7 @@
         "user",
         "system"
       ],
-      "added_in": 15,
+      "added_in": 17,
       "description": "A page stopped being kept in step with its Notion page, and why. Nothing is deleted on either side.",
       "fires_when": "A member stops it, Notion is disconnected, either side trashes the page, Notion stops sharing it, or its member leaves, in the transaction that ends the link; a link already stopped tracks nothing.",
       "module": "pages",
@@ -23210,8 +23460,8 @@
     }
   ],
   "generated_by": "campbooks-tracking-plan",
-  "plan_date": "2026-10-25",
-  "plan_version": 15,
+  "plan_date": "2026-10-26",
+  "plan_version": 17,
   "properties": [
     {
       "classification": "operational",
@@ -25300,7 +25550,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": true,
       "type": "code",
@@ -25404,7 +25654,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": false,
       "type": "code",
@@ -25581,6 +25831,71 @@
     },
     {
       "classification": "operational",
+      "description": "The new client.",
+      "event": "identity.instance_app_registered",
+      "example": "",
+      "list": false,
+      "of": "identity.client",
+      "pattern": "",
+      "property": "client",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The client's id.",
+      "event": "identity.instance_app_removed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "^app_[A-Za-z0-9_-]{22}$",
+      "property": "client_id",
+      "required": true,
+      "type": "code",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many live consents it held were revoked.",
+      "event": "identity.instance_app_removed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "consents_revoked",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many live refresh-token families (sign-ins) it held were revoked.",
+      "event": "identity.instance_app_removed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "refresh_tokens_revoked",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The client afterwards.",
+      "event": "identity.instance_app_secret_rotated",
+      "example": "",
+      "list": false,
+      "of": "identity.client",
+      "pattern": "",
+      "property": "client",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "The passkey after the sign-in.",
       "event": "identity.passkey_counter_regressed",
       "example": "",
@@ -25664,7 +25979,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": false,
       "type": "code",
@@ -25703,7 +26018,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": false,
       "type": "code",
@@ -25872,7 +26187,7 @@
       "example": "",
       "list": false,
       "of": "",
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "property": "client_id",
       "required": false,
       "type": "code",
@@ -28822,7 +29137,7 @@
       "enum": "",
       "field": "client_id",
       "list": false,
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "record": "identity.client",
       "required": false,
       "type": "code"
@@ -28921,7 +29236,7 @@
       "enum": "",
       "field": "client_id",
       "list": false,
-      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22})$",
+      "pattern": "^(campbooks-web|campbooks-native|cb_[A-Za-z0-9_-]{22}|dcr_[A-Za-z0-9_-]{22}|app_[A-Za-z0-9_-]{22})$",
       "record": "identity.consent",
       "required": false,
       "type": "code"

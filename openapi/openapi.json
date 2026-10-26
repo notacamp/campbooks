@@ -21217,7 +21217,7 @@
               "string",
               "null"
             ],
-            "description": "`first_party`, `workspace`, `dynamic` or `metadata_document`."
+            "description": "`first_party`, `workspace`, `dynamic`, `metadata_document` or\n`instance` (registered by this instance's administrator)."
           },
           "client_name": {
             "type": [
@@ -21434,7 +21434,7 @@
           },
           "kind": {
             "type": "string",
-            "description": "`first_party`, `workspace`, `dynamic` or `metadata_document`."
+            "description": "`first_party`, `workspace`, `dynamic`, `metadata_document` or\n`instance` (registered by this instance's administrator)."
           },
           "logo_uri": {
             "type": [
@@ -21456,7 +21456,7 @@
           },
           "verified": {
             "type": "boolean",
-            "description": "Whether it is Campbooks' own app. Every other app's name is its\nregistrant's word."
+            "description": "Whether it is Campbooks' own app. Every other app's name is its\nregistrant's word (an instance app's, the instance administrator's)."
           },
           "workspace_name": {
             "type": [

@@ -9,7 +9,7 @@ import { useNotionActions } from "./use-notion-actions";
 
 const P = `${W}/pages/p1`;
 
-function Buttons() {
+function Buttons({ chosen }: { chosen?: number } = {}) {
   const notion = useNotionActions(DUARTE.id);
   return (
     <>
@@ -23,7 +23,7 @@ function Buttons() {
         type="button"
         onClick={() =>
           void notion
-            .importPages({ connection: "c1", pages: [{ notion_page: "n1" }] })
+            .importPages({ connection: "c1", pages: [{ notion_page: "n1" }] }, chosen)
             .then((r) => {
               document.title = r === undefined ? "failed" : `made ${String(r.pages.length)}`;
             })
@@ -108,6 +108,25 @@ describe("useNotionActions", () => {
     renderWithProviders(<Buttons />);
     fireEvent.click(screen.getByRole("button", { name: "stop" }));
     expect(await screen.findByText("Couldn’t stop syncing. Nothing was changed.")).toBeVisible();
+  });
+
+  it("counts every page chosen, sub-pages included, less those already linked", async () => {
+    mockApi({
+      [`POST ${W}/pages/notion/imports`]: {
+        status: 201,
+        body: {
+          pages: [
+            { page: "a", notion_page: "n1" },
+            { page: "b", notion_page: "n2" },
+          ],
+          skipped: 1,
+        },
+      },
+      [`GET ${W}/pages`]: { body: { pages: [] } },
+    });
+    renderWithProviders(<Buttons chosen={5} />);
+    fireEvent.click(screen.getByRole("button", { name: "import" }));
+    expect(await screen.findByText("Imported 4 pages from Notion")).toBeVisible();
   });
 
   it("imports pages and says how many, or answers nothing when it failed", async () => {

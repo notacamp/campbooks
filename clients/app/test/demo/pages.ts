@@ -199,9 +199,9 @@ export function viewOfDoc(summary: Summary, doc: Y.Doc, extra: Partial<View> = {
 /** Notion's pages, as the connection lists them: Ana shared a roadmap with two sub-pages. */
 export const NOTION_ROADMAP = "0192f1a0-0000-7000-8000-0000000007a1";
 export const NOTION_OKRS = "0192f1a0-0000-7000-8000-0000000007a2";
-export const NOTION_RETRO = "0192f1a0-0000-7000-8000-0000000007a3";
+const NOTION_RETRO = "0192f1a0-0000-7000-8000-0000000007a3";
 export const NOTION_NOTES = "0192f1a0-0000-7000-8000-0000000007a4";
-export const NOTION_HIRING = "0192f1a0-0000-7000-8000-0000000007a5";
+const NOTION_HIRING = "0192f1a0-0000-7000-8000-0000000007a5";
 
 type NotionPage = Schema<"NotionPage">;
 

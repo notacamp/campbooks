@@ -19,7 +19,7 @@ export function notionListError(error: unknown): NotionListError {
 }
 
 /** A page the connection can see. */
-export interface NotionSourcePage {
+interface NotionSourcePage {
   notion_page: string;
   title: string;
   edited_at: string;
@@ -33,7 +33,7 @@ export interface NotionSourcePage {
  * app shell (the pages module never imports `connectors`): the caller's own
  * Notion connections, and the pages of the chosen one.
  */
-export interface NotionSource {
+interface NotionSource {
   /** The caller's Notion connections (undefined until known). */
   connections: readonly { id: string; name: string; needsReauth: boolean }[] | undefined;
   list: {

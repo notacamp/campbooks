@@ -5,10 +5,10 @@
 # handler this change adds. Never a title, a block's text, a Notion page's
 # name or id, a workspace's name or a token: ids, enums and counts only.
 # Applied with
-# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0015-pages-notion.yaml`.
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0017-pages-notion.yaml`.
 changelog:
-  - date: "2026-10-25"
-    plan_version: 15
+  - date: "2026-10-26"
+    plan_version: 17
     change: "Sync with Notion (campbooks-cloud#376): provider notion and capability pages for connections; 5 pages events for pages imported from Notion (how many), a sync applied in either direction (how many blocks), a conflict raised, a conflict resolved (the choice) and a sync stopped (why); Coverage for every operation, job and handler of the change."
     pr: "#680"
 
@@ -23,7 +23,7 @@ events:
     actor_types: [user]
     description: "A member picked pages in their Notion account to bring into Pages: how many were made, linked to their Notion pages. Never their titles or ids at Notion."
     fires_when: "pages.import_from_notion makes the pages and their links, in the transaction that stores them; pages already linked from this connection make none and track nothing."
-    added_in: 15
+    added_in: 17
     openspec_change: "pages-notion-sync"
   - name: "pages.notion_sync_applied"
     version: 1
@@ -35,7 +35,7 @@ events:
     actor_types: [user, system]
     description: "A change crossed between a page and its Notion page, in one direction: how many blocks it moved. Never their text."
     fires_when: "A Notion snapshot is applied to the page (inbound), or the connector reports blocks written to Notion (outbound), in the transaction that stores the result; a run that moves no block tracks nothing."
-    added_in: 15
+    added_in: 17
     openspec_change: "pages-notion-sync"
   - name: "pages.notion_conflict_raised"
     version: 1
@@ -47,7 +47,7 @@ events:
     actor_types: [user, system]
     description: "The same block changed in Campbooks and in Notion between two syncs: Campbooks kept its version and added Notion's beneath it as a conflict for the member to choose. How many blocks."
     fires_when: "Applying a Notion snapshot, or undoing a resolution, adds conflict blocks to the page, in that transaction."
-    added_in: 15
+    added_in: 17
     openspec_change: "pages-notion-sync"
   - name: "pages.notion_conflict_resolved"
     version: 1
@@ -59,7 +59,7 @@ events:
     actor_types: [user]
     description: "A member chose what to do with a conflict between a block and Notion's version of it."
     fires_when: "pages.resolve_conflict applies the choice, in the transaction that changes the page."
-    added_in: 15
+    added_in: 17
     openspec_change: "pages-notion-sync"
   - name: "pages.notion_sync_stopped"
     version: 1
@@ -71,7 +71,7 @@ events:
     actor_types: [user, system]
     description: "A page stopped being kept in step with its Notion page, and why. Nothing is deleted on either side."
     fires_when: "A member stops it, Notion is disconnected, either side trashes the page, Notion stops sharing it, or its member leaves, in the transaction that ends the link; a link already stopped tracks nothing."
-    added_in: 15
+    added_in: 17
     openspec_change: "pages-notion-sync"
 
 properties:

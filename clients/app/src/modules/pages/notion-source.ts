@@ -4,7 +4,7 @@
  * imports it): the caller's own Notion connections, and the pages the chosen
  * one can see.
  */
-export interface NotionSourcePage {
+interface NotionSourcePage {
   notion_page: string;
   title: string;
   edited_at: string;

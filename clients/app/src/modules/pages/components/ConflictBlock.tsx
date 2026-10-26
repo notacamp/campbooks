@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, Icon, Panel, Pill, Text } from "~/lib/ui";
+import { Button, Icon, Panel, Text } from "~/lib/ui";
 
 import type { NotionKeep } from "../types";
 
@@ -43,9 +43,9 @@ export function ConflictBlock({
     <Panel label={t("notion.conflict.label")}>
       <div className="flex flex-wrap items-center gap-2">
         <Icon name="warning" />
-        <Pill signal="look">
+        <Text as="span" weight="semibold" className="min-w-0 flex-1">
           {t(removed ? "notion.conflict.removed" : "notion.conflict.changed")}
-        </Pill>
+        </Text>
       </div>
       {removed ? (
         <Text tone="secondary" size="sm">
