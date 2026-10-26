@@ -105,6 +105,8 @@ pub struct EventView {
     pub quote: Option<String>,
     /// Your answer to the invitation, if it is one.
     pub response: Option<Response>,
+    /// Who organises it, when the provider said and it is not you.
+    pub organizer: Option<OrganizerView>,
     /// Whether your last change still waits to reach the provider.
     pub pending: bool,
     /// Why it does not show what you last asked for.
@@ -116,6 +118,20 @@ pub struct EventView {
     /// The keys of the things Scout read that this event stands for (a read
     /// item's `key`), so a reader can tell which event an item became.
     pub item_keys: Vec<String>,
+}
+
+/// Who organises an event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct OrganizerView {
+    /// Their name, when the provider gave one.
+    #[schema(example = "João Pereira")]
+    pub name: Option<String>,
+    /// Their address, when the provider gave one.
+    #[schema(example = "joao@example.com")]
+    pub address: Option<String>,
+    /// Whether a person rather than a machine (a no-reply or service
+    /// address) organises it, from the address alone; `null` when unknown.
+    pub person: Option<bool>,
 }
 
 /// `row`, shown in `zone`; `occurrence` is the one occurrence of a series it
@@ -144,6 +160,13 @@ pub fn event_view(row: &EventRow, zone: Tz, occurrence: Option<&Occurrence>) -> 
         source_conversation: row.source_conversation.map(|id| id.to_string()),
         quote: row.quote.clone(),
         response: row.response.as_deref().and_then(|r| r.parse().ok()),
+        organizer: (!row.organizer_self
+            && (row.organizer_name.is_some() || row.organizer_address.is_some()))
+        .then(|| OrganizerView {
+            name: row.organizer_name.clone(),
+            address: row.organizer_address.clone(),
+            person: row.organizer_person,
+        }),
         pending: row.is_pending(),
         notice: row.notice.as_deref().and_then(|n| n.parse().ok()),
         on_provider: row.provider_event_id.is_some(),

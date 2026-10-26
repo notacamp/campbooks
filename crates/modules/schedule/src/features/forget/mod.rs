@@ -10,8 +10,15 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 
 use crate::{
-    domain::{blobs::CALENDAR_REF_OWNER, outbound::BLOB_OWNER, tracked},
+    domain::{
+        blobs::CALENDAR_REF_OWNER,
+        invitations,
+        outbound::BLOB_OWNER,
+        rows::{CALENDAR_COLUMNS, CalendarRow},
+        tracked,
+    },
     inbound::{ConnectionRemoved, MemberLeft, WorkspaceDeleting},
+    model::InvitationClosed,
     tracking,
 };
 
@@ -34,6 +41,17 @@ impl EventHandler for ForgetMember {
             .map_err(|_| JobError::fatal("member_left names an invalid workspace"))?;
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
+        // Their invitations leave Home with their calendars.
+        let going = sqlx::query_as::<_, CalendarRow>(sqlx::AssertSqlSafe(format!(
+            "SELECT {CALENDAR_COLUMNS} FROM schedule.calendars
+              WHERE workspace_id = $1 AND member_id = $2 AND created_at <= $3"
+        )))
+        .bind(workspace)
+        .bind(left.user)
+        .bind(before)
+        .fetch_all(&mut **tx)
+        .await?;
+        invitations::close_all(&state, tx, workspace, &going, InvitationClosed::Removed).await?;
         let requests: Vec<Uuid> = sqlx::query_scalar(
             "DELETE FROM schedule.change_requests
               WHERE workspace_id = $1 AND member_id = $2 AND created_at <= $3
@@ -108,6 +126,14 @@ impl EventHandler for ForgetConnection {
         let tx = ctx.tx().await?;
         // The calendars as they stand, for the record of their removal.
         let standing = tracked::calendars_of_connection(tx, removed.connection).await?;
+        // Their invitations leave Home with them.
+        let going = sqlx::query_as::<_, CalendarRow>(sqlx::AssertSqlSafe(format!(
+            "SELECT {CALENDAR_COLUMNS} FROM schedule.calendars WHERE connection_id = $1"
+        )))
+        .bind(removed.connection)
+        .fetch_all(&mut **tx)
+        .await?;
+        invitations::close_all(&state, tx, workspace, &going, InvitationClosed::Removed).await?;
         // Campbooks events that were added to these calendars are theirs
         // again: their copy goes with the calendar.
         sqlx::query(
@@ -195,6 +221,7 @@ impl Job for PurgeWorkspace {
             .ok_or_else(|| JobError::fatal("purge enqueued outside a workspace"))?;
         let tx = ctx.tx().await?;
         for table in [
+            "invitation_backfills",
             "change_requests",
             "removed_items",
             "member_settings",

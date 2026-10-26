@@ -11,11 +11,12 @@ use campbooks_kernel::{
         Action, Facts, FactsFuture, Owner, OwnerFact, ResourceFacts, ResourceType, Resources,
         Tenancy,
     },
+    changes::{ContainersFuture, Visibility, VisibilityFuture, VisibilityPort},
     tenancy::{Access, UserId},
 };
-use sqlx::PgConnection;
+use sqlx::{PgConnection, PgPool};
 
-use crate::model::{CALENDAR_RECORD, CalendarId, EVENT_RECORD, EventId};
+use crate::model::{CALENDAR_RECORD, CalendarId, EVENT_RECORD, EventId, MEMBER_RECORD};
 
 /// What a member does with their own calendars and events.
 const OWNER_ACTIONS: &[Action] = &[Action::Read, Action::Write, Action::Delete, Action::Create];
@@ -87,5 +88,102 @@ impl ResourceFacts for CalendarFacts {
             };
             Ok(owner.map(|member| Facts::owned_by(OwnerFact::User(member))))
         })
+    }
+}
+
+/// The change feed's port for this module's container, for the server to
+/// register: `schedule.member:<member>` holds what concerns one member's
+/// calendars outside this module (their invitations, as attention items,
+/// campbooks-cloud#360), and only that member sees inside.
+pub fn visibility() -> VisibilityPort {
+    Arc::new(MemberVisibility)
+}
+
+/// A member's calendars are seen by that member alone.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MemberVisibility;
+
+impl Visibility for MemberVisibility {
+    fn container_types(&self) -> &'static [&'static str] {
+        &[MEMBER_RECORD]
+    }
+
+    fn container_visible<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        access: &'a Access,
+        container: &'a RecordRef,
+    ) -> VisibilityFuture<'a> {
+        let visible = container.record_type == MEMBER_RECORD
+            && access
+                .user
+                .is_some_and(|user| user.to_string() == container.id);
+        Box::pin(async move { Ok(visible) })
+    }
+
+    fn visible_containers<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        access: &'a Access,
+        container_type: &'a str,
+    ) -> ContainersFuture<'a> {
+        let listed: Vec<RecordRef> = if container_type == MEMBER_RECORD {
+            access
+                .user
+                .map(|user| RecordRef::new(MEMBER_RECORD, &user))
+                .into_iter()
+                .collect()
+        } else {
+            Vec::new()
+        };
+        Box::pin(async move { Ok(listed) })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use campbooks_kernel::{
+        RecordRef,
+        changes::Visibility as _,
+        tenancy::{Access, UserId, WorkspaceId},
+    };
+    use sqlx::PgPool;
+
+    use super::MemberVisibility;
+    use crate::model::MEMBER_RECORD;
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn only_the_member_sees_inside_their_container(db: PgPool) {
+        let workspace = WorkspaceId::new();
+        let ana = UserId::new();
+        let access = |user| Access {
+            workspace,
+            user,
+            role: None,
+        };
+        let theirs = RecordRef::new(MEMBER_RECORD, &ana);
+        let port = MemberVisibility;
+        assert!(
+            port.container_visible(&db, &access(Some(ana)), &theirs)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !port
+                .container_visible(&db, &access(Some(UserId::new())), &theirs)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !port
+                .container_visible(&db, &access(None), &theirs)
+                .await
+                .unwrap()
+        );
+        let listed = port
+            .visible_containers(&db, &access(Some(ana)), MEMBER_RECORD)
+            .await
+            .unwrap();
+        assert_eq!(listed, vec![theirs]);
     }
 }

@@ -57,7 +57,7 @@ pub const OPERATIONS: &[(ChatTool, &[&str])] = &[
     (ChatTool::FindPeople, &["conversations.list_senders"]),
     (
         ChatTool::WhatNeedsMe,
-        &["attention.list", "conversations.list"],
+        &["attention.list", "conversations.list", "schedule.get_event"],
     ),
     (
         ChatTool::MyInboxes,
@@ -654,6 +654,23 @@ impl Toolbox {
             .filter_map(|item| item["record"]["id"].as_str().map(ToOwned::to_owned))
             .collect();
         let conversations = self.conversations(&ids).await?;
+        // An invitation awaiting an answer (campbooks-cloud#360) is about an
+        // event: what it is, and who asked. One that cannot be read (gone
+        // meanwhile) is listed without it.
+        let mut invitations: Vec<(String, Value)> = Vec::new();
+        for item in &items {
+            if item["record"]["type"] != EVENT {
+                continue;
+            }
+            if let Some(id) = item["record"]["id"].as_str()
+                && let Ok(event) = self
+                    .member
+                    .read("schedule.get_event", json!({ "event_id": id }))
+                    .await
+            {
+                invitations.push((id.to_owned(), project::invitation(&event)));
+            }
+        }
         let needs: Vec<Value> = items
             .iter()
             .map(|item| {
@@ -661,6 +678,10 @@ impl Toolbox {
                     .iter()
                     .find(|c| c["id"] == item["record"]["id"])
                     .map(project::summary);
+                let invitation = invitations
+                    .iter()
+                    .find(|(id, _)| item["record"]["id"] == id.as_str())
+                    .map(|(_, event)| event.clone());
                 // Home's order and why (campbooks-cloud#358): the band and
                 // its rule, worked out from facts, rather than Scout's own
                 // urgency.
@@ -672,12 +693,14 @@ impl Toolbox {
                     "overdue": item["overdue"],
                     "since": item["since"],
                     "conversation": about,
+                    "invitation": invitation,
                 })
             })
             .collect();
         let records = ids
             .iter()
             .map(|id| RecordRef::new(CONVERSATION, id))
+            .chain(invitations.iter().map(|(id, _)| RecordRef::new(EVENT, id)))
             .collect();
         Ok((
             json!({

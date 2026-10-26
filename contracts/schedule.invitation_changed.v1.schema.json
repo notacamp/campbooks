@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/schedule.invitation_changed.v1.schema.json",
+  "title": "schedule.invitation_changed v1 (event payload)",
+  "description": "Published by the schedule module, in the transaction of the change, when an invitation that awaits the member's answer opens, changes or closes (campbooks-cloud#360): an event of one of the member's provider calendars that syncs, which the member was asked to (`needs_action`) and did not organise, a single event or a series, not cancelled, deleted or started. `revision` grows with every announcement of the event's invitation, so a consumer applies only newer ones; `invitation` is present while it awaits an answer, `closed_because` once it does not. Ids, a day, a time and flags only: never the title, the place or who asked. Workspace-scoped.",
+  "type": "object",
+  "required": ["workspace", "event", "calendar", "owner", "revision"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "event": { "$ref": "#/$defs/uuid" },
+    "calendar": { "$ref": "#/$defs/uuid" },
+    "owner": {
+      "$ref": "#/$defs/uuid",
+      "description": "The member whose calendar it is, who is asked."
+    },
+    "revision": { "type": "integer", "minimum": 1 },
+    "invitation": {
+      "type": "object",
+      "required": ["on", "lapses_at"],
+      "additionalProperties": false,
+      "properties": {
+        "on": {
+          "type": "string",
+          "format": "date",
+          "description": "The day the event starts, in the member's time zone."
+        },
+        "lapses_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When it stops awaiting an answer: when the event starts, or for an all-day event when its first day ends."
+        },
+        "from_person": {
+          "type": "boolean",
+          "description": "Whether a person rather than a machine sent it, from the organiser's address alone; absent when unknown."
+        }
+      }
+    },
+    "closed_because": {
+      "enum": ["answered", "cancelled", "removed", "hidden", "started"]
+    }
+  },
+  "oneOf": [
+    { "required": ["invitation"], "not": { "required": ["closed_because"] } },
+    { "required": ["closed_because"], "not": { "required": ["invitation"] } }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

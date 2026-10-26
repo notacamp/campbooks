@@ -194,6 +194,23 @@ impl Response {
     }
 }
 
+/// Why an invitation no longer awaits the member's answer
+/// (`schedule.invitation_changed`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InvitationClosed {
+    /// The member answered it (or organised it).
+    Answered,
+    /// It was cancelled.
+    Cancelled,
+    /// It was deleted, or its calendar removed.
+    Removed,
+    /// Its calendar is turned off, or it is no invitation of one.
+    Hidden,
+    /// The event has started (an all-day one: its first day is over).
+    Started,
+}
+
 impl std::str::FromStr for Response {
     type Err = ();
 
@@ -254,6 +271,9 @@ pub enum CalendarSource {
 pub const CALENDAR_RECORD: &str = "schedule.calendar";
 /// Record type of an event.
 pub const EVENT_RECORD: &str = "schedule.event";
+/// Container type of what concerns one member's calendars (their
+/// invitations, for the attention module): only that member sees inside.
+pub const MEMBER_RECORD: &str = "schedule.member";
 
 /// The change connectors is asked to make at the provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]

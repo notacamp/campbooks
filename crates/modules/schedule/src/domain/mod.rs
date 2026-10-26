@@ -5,6 +5,7 @@
 pub mod binding;
 pub mod blobs;
 pub mod free;
+pub mod invitations;
 pub mod listing;
 pub mod moment;
 pub mod ops;

@@ -215,6 +215,10 @@ path = "crates/modules/conversations/src/features/wake_needs/mod.rs"
 reason = "Needs that change with time alone (campbooks-cloud#275): the one-minute dispatcher reads which workspaces have a due row in `conversations.need_clocks` (its maintenance policy: read only, ids and times) and enqueues each workspace's wake job in that workspace; it reads and writes nothing else."
 
 [[access.maintenance_scope]]
+path = "crates/modules/schedule/src/features/announce_invitations/mod.rs"
+reason = "Invitations stored before invitations were announced (campbooks-cloud#360): the one-minute dispatcher reads which workspaces still have a row in `schedule.invitation_backfills` (its maintenance policy: read only, ids) and enqueues each workspace's announcing job in that workspace; it reads and writes nothing else."
+
+[[access.maintenance_scope]]
 path = "crates/modules/assistant/src/features/expire_chats/mod.rs"
 reason = "Chats are kept 30 days after their last message (campbooks-cloud#305): the daily dispatcher reads which workspaces hold a chat to expire (`assistant.chats` maintenance policy: read only, ids and times) and enqueues each workspace's expiry job in that workspace; it deletes nothing itself."
 

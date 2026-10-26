@@ -332,6 +332,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "event",
         "the event's id (a UUID), never its content",
     ),
+    (
+        "schedule.release_response",
+        "event",
+        "the event's id (a UUID), never its content or the answer",
+    ),
 ];
 
 /// Where the structs a job's origin is made of are defined.

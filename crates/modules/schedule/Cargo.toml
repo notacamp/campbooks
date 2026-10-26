@@ -10,6 +10,8 @@ publish.workspace = true
 
 [dependencies]
 axum.workspace = true
+# Who organises an invitation: a person or a machine, from the address alone.
+campbooks-ai.workspace = true
 campbooks-kernel.workspace = true
 chrono.workspace = true
 chrono-tz.workspace = true
