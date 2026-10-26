@@ -119,7 +119,7 @@ describe("What needs you: Scout isn't sure", () => {
     renderHome();
     const row = await selected();
     const labels = row.getAllByRole("button").map((b) => b.textContent);
-    expect(labels[0]).toMatch(/^Nudge Águas…/u);
+    expect(labels[0]).toMatch(/^Nudge Águas do Ribatejo…/u);
     expect(labels[1]).toMatch(/^Reply to Ana…/u);
     expect(labels[2]).toMatch(/^Nothing for me/u);
     expect(labels[3]).toMatch(/^Snooze…/u);

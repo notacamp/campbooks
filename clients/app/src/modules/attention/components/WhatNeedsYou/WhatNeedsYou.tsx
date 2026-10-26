@@ -987,7 +987,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
         }
         // Scout isn't sure: the person it went to, the person who wrote, or nothing.
         case "wait": {
-          return t("actions.nudge", { name: firstNameOf(displayName(unsure?.party)) });
+          // The whole name: the person it went to may be an organisation ("Águas do Ribatejo").
+          return t("actions.nudge", { name: displayName(unsure?.party) });
         }
         case "reply_to": {
           return tc("needs.actions.replyTo", { name: firstNameOf(row.name) });

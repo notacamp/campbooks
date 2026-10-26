@@ -213,7 +213,7 @@ export function ConversationReader({
               : [
                   {
                     label: t("needs.actions.nudgeParty", {
-                      name: firstName(displayName(unsureParty)),
+                      name: displayName(unsureParty),
                     }),
                     ...choiceKey("item.choice1"),
                     onSelect: () => {
