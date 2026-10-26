@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { Board, CellRow, EmptyState, Select, type BoardGroup } from "~/lib/ui";
+import { Board, EmptyState, Select, type BoardGroup } from "~/lib/ui";
 
 import { CellDisplay } from "../cells/CellDisplay";
 import type { CellContext } from "../cells/context";
@@ -143,7 +143,8 @@ export function BoardPane({
             onOpenRow(row.id);
           },
           body: (
-            <CellRow>
+            // A card's properties wrap onto more lines; a cell keeps them on one.
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               {cardProperties
                 .filter((property) => !isEmptyValue(row.cells[property.id]?.value))
                 .map((property) => (
@@ -155,7 +156,7 @@ export function BoardPane({
                     value={row.cells[property.id]?.value}
                   />
                 ))}
-            </CellRow>
+            </span>
           ),
         })),
       };

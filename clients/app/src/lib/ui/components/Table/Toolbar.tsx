@@ -214,7 +214,7 @@ export function TableToolbar({
             placement="bottom-start"
             layer="top"
             renderTrigger={(trigger) => (
-              <IconButton {...trigger} icon="more" label={moreViewsLabel} />
+              <IconButton {...trigger} icon="chevron-down" label={moreViewsLabel} />
             )}
           >
             {(close) => (

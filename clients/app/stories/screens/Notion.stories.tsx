@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import * as Y from "yjs";
 
 import { UndoProvider } from "~/lib/ui";
@@ -481,7 +481,9 @@ export const ImportDialog: Story = {
   play: async ({ canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole("dialog", { name: "Import from Notion" });
-    await expect(await within(dialog).findByLabelText("Product roadmap")).toBeVisible();
+    // The dialog fades in: wait for it to be shown, not just in the DOM.
+    const roadmap = await within(dialog).findByLabelText("Product roadmap");
+    await waitFor(() => expect(roadmap).toBeVisible());
     await expect(within(dialog).getByText("2 sub-pages")).toBeVisible();
     await userEvent.click(within(dialog).getByLabelText("Product roadmap"));
     await expect(within(dialog).getByRole("button", { name: "Import 3 pages" })).toBeEnabled();

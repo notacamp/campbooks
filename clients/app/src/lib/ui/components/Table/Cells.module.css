@@ -94,6 +94,13 @@
   gap: var(--space-1);
   min-width: 0;
   overflow: hidden;
+  /* One line in a cell, whatever is in it (mention chips wrap in prose):
+     what does not fit is cut at the cell's edge, never spilled over the row. */
+  white-space: nowrap;
+}
+
+.row > * {
+  flex: none;
 }
 
 .link {
