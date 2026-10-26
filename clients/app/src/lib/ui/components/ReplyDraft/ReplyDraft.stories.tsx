@@ -2,8 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 
-import { Button } from "../Button/Button";
-import { Dialog, DialogChoices } from "../Dialog/Dialog";
+import { Button, Dialog, DialogChoices } from "@notacamp/ui";
 
 import { AskLine, ReplyDraft, ReplyQuote } from "./ReplyDraft";
 

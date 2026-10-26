@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "home": "Início",
+    "inbox": "Caixa de entrada",
+    "schedule": "Calendário",
+    "tasks": "Tarefas",
+    "documents": "Documentos",
+    "money": "Dinheiro",
+    "settings": "Definições"
+  },
+  "item": {
+    "reply": "Responder",
+    "done": "Concluir",
+    "snooze": "Adiar",
+    "hold": "Reservar tempo",
+    "choice1": "Primeira opção",
+    "choice2": "Segunda opção",
+    "choice3": "Terceira opção",
+    "nextAction": "Ação seguinte do item",
+    "previousAction": "Ação anterior do item"
+  },
+  "compose": {
+    "draft": "Escrever por mim",
+    "send": "Enviar",
+    "bold": "Negrito",
+    "italic": "Itálico",
+    "ask": "Perguntar"
+  },
+  "workspace": {
+    "switch": "Mudar de espaço de trabalho"
+  }
+}

@@ -8,14 +8,17 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { cx } from "../../internal/cx";
-import { useFocusTrap } from "../../internal/use-focus-trap";
-import { Button } from "../Button/Button";
-import { Icon } from "../Icon/Icon";
-import { IconButton } from "../IconButton/IconButton";
-import { Popover } from "../Popover/Popover";
-import { VisuallyHidden } from "../Typography/Typography";
-import { Visor, type VisorState } from "../Visor/Visor";
+import {
+  cx,
+  useFocusTrap,
+  Button,
+  Icon,
+  IconButton,
+  Popover,
+  VisuallyHidden,
+  Visor,
+  type VisorState,
+} from "@notacamp/ui";
 
 import styles from "./Chat.module.css";
 

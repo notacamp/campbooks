@@ -1,7 +1,9 @@
 // Fails when the UI's messages are not at parity across the shipped locales.
 //
-// Every directory named `i18n` under src/ that holds JSON messages is one
-// namespace (src/lib/i18n is the loader code, not a namespace) and must hold
+// Every directory named `i18n` under src/, and under the design system's
+// clients/ui/src/, that holds JSON messages is one namespace (or one part of
+// one: @notacamp/ui's and the app's `ui` and `shortcuts` parts are merged)
+// (src/lib/i18n is the loader code, not a namespace) and must hold
 // one JSON file per locale in SUPPORTED_LOCALES, each with exactly the same keys
 // (nested keys compared by path) and no empty strings.
 //
@@ -11,7 +13,11 @@ import path from "node:path";
 
 import { SUPPORTED_LOCALES } from "../src/lib/i18n/locales.ts";
 
-const root = new URL("../src", import.meta.url).pathname;
+const roots = [
+  new URL("../src", import.meta.url).pathname,
+  new URL("../../ui/src", import.meta.url).pathname,
+];
+const base = new URL("../..", import.meta.url).pathname;
 
 interface Messages {
   [key: string]: string | Messages;
@@ -49,10 +55,10 @@ function keyPaths(messages: Messages, prefix = ""): Map<string, string> {
 }
 
 const problems: string[] = [];
-const dirs = namespaceDirs(root);
+const dirs = roots.flatMap((root) => namespaceDirs(root));
 
 for (const dir of dirs) {
-  const name = path.relative(root, dir);
+  const name = path.relative(base, dir);
   const files = new Set(readdirSync(dir).filter((file) => file.endsWith(".json")));
   const byLocale = new Map<string, Map<string, string>>();
 

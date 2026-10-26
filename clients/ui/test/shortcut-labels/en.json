@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "home": "Home",
+    "inbox": "Inbox",
+    "schedule": "Calendar",
+    "tasks": "Tasks",
+    "documents": "Documents",
+    "money": "Money",
+    "settings": "Settings"
+  },
+  "item": {
+    "reply": "Reply",
+    "done": "Done",
+    "snooze": "Snooze",
+    "hold": "Hold time",
+    "choice1": "First choice",
+    "choice2": "Second choice",
+    "choice3": "Third choice",
+    "nextAction": "Next action on the item",
+    "previousAction": "Previous action on the item"
+  },
+  "compose": {
+    "draft": "Draft it for me",
+    "send": "Send",
+    "bold": "Bold",
+    "italic": "Italic",
+    "ask": "Ask"
+  },
+  "workspace": {
+    "switch": "Switch workspace"
+  }
+}

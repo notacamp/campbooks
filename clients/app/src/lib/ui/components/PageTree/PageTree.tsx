@@ -1,7 +1,6 @@
 import type { CSSProperties, DragEventHandler, ReactNode } from "react";
 
-import { Icon, type IconName } from "../Icon/Icon";
-import { IconButton } from "../IconButton/IconButton";
+import { Icon, type IconName, IconButton } from "@notacamp/ui";
 
 import styles from "./PageTree.module.css";
 

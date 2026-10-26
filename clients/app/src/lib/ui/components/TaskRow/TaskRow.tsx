@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { Signal } from "../../tokens/tokens";
-import { Icon } from "../Icon/Icon";
-import { Pill } from "../Pill/Pill";
-import { Tag } from "../Tag/Tag";
+import { type Signal, Icon, Pill, Tag } from "@notacamp/ui";
 
 import styles from "./TaskRow.module.css";
 

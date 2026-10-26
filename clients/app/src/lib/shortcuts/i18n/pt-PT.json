@@ -9,11 +9,6 @@
     "money": "Dinheiro",
     "settings": "Definições"
   },
-  "list": {
-    "next": "Item seguinte",
-    "previous": "Item anterior",
-    "open": "Abrir"
-  },
   "item": {
     "reply": "Responder",
     "done": "Concluir",
@@ -32,24 +27,7 @@
     "italic": "Itálico",
     "ask": "Perguntar"
   },
-  "command": {
-    "open": "Pesquise ou pergunte"
-  },
-  "undo": "Anular",
   "workspace": {
     "switch": "Mudar de espaço de trabalho"
-  },
-  "sheet": {
-    "open": "Atalhos de teclado"
-  },
-  "overlay": {
-    "close": "Fechar"
-  },
-  "groups": {
-    "navigation": "Ir para",
-    "general": "Geral",
-    "list": "Listas",
-    "item": "Item selecionado",
-    "compose": "Escrita"
   }
 }

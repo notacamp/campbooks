@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from "react";
 
-import { Visor, type VisorState } from "../Visor/Visor";
+import { Visor, type VisorState } from "@notacamp/ui";
 
 import styles from "./Offer.module.css";
 

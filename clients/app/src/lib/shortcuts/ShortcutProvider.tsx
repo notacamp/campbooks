@@ -1,121 +1,17 @@
 import {
-  createContext,
-  use,
-  useEffect,
-  useMemo,
-  useRef,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
-
-import { DEFAULT_SHORTCUTS, type ShortcutId } from "./catalog";
-import { createDispatcher } from "./dispatcher";
-import { detectPlatform, type Platform } from "./keys";
-import {
+  ShortcutProvider as DesignSystemShortcutProvider,
   ShortcutRegistry,
-  type ShortcutBindOptions,
-  type ShortcutDefinition,
-  type ShortcutHandler,
-} from "./registry";
+  type ShortcutProviderProps,
+} from "@notacamp/ui/shortcuts";
+import { useMemo } from "react";
 
-interface ShortcutContextValue {
-  registry: ShortcutRegistry;
-  platform: Platform;
-}
-
-let fallback: ShortcutContextValue | undefined;
-
-/** Used outside a provider (stories, tests): the defaults, no key listener. */
-function fallbackContext(): ShortcutContextValue {
-  fallback ??= {
-    registry: new ShortcutRegistry(DEFAULT_SHORTCUTS),
-    platform: typeof navigator === "undefined" ? "other" : detectPlatform(),
-  };
-  return fallback;
-}
-
-const ShortcutContext = createContext<ShortcutContextValue | null>(null);
-
-export interface ShortcutProviderProps {
-  children: ReactNode;
-  /** Defaults to a registry holding {@link DEFAULT_SHORTCUTS}. */
-  registry?: ShortcutRegistry;
-  /** Defaults to the detected platform (⌘ on Apple, Ctrl elsewhere). */
-  platform?: Platform;
-}
-
-/** Installs the single keydown listener and shares the registry. */
-export function ShortcutProvider({ children, registry, platform }: ShortcutProviderProps) {
-  const value = useMemo<ShortcutContextValue>(
-    () => ({
-      registry: registry ?? new ShortcutRegistry(DEFAULT_SHORTCUTS),
-      platform: platform ?? detectPlatform(),
-    }),
-    [registry, platform],
-  );
-
-  useEffect(() => {
-    const onKeyDown = createDispatcher(value.registry, value.platform);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [value]);
-
-  return <ShortcutContext value={value}>{children}</ShortcutContext>;
-}
-
-/** The registry and platform in effect (the defaults outside a provider). */
-export function useShortcuts(): ShortcutContextValue {
-  return use(ShortcutContext) ?? fallbackContext();
-}
-
-/** One shortcut's definition, or undefined when no such id is defined. */
-export function useShortcutDefinition(id: ShortcutId): ShortcutDefinition | undefined {
-  const { registry } = useShortcuts();
-  useSyncExternalStore(registry.subscribe, registry.getVersion, registry.getVersion);
-  return registry.get(id);
-}
-
-/** Every definition, re-rendering when definitions or bindings change. */
-export function useShortcutDefinitions(): {
-  definitions: ShortcutDefinition[];
-  isBound: (id: string) => boolean;
-} {
-  const { registry } = useShortcuts();
-  useSyncExternalStore(registry.subscribe, registry.getVersion, registry.getVersion);
-  return { definitions: registry.definitions(), isBound: (id) => registry.isBound(id) };
-}
-
-export interface UseShortcutOptions extends ShortcutBindOptions {
-  /** Bind only while true (e.g. only for the selected row). Default true. */
-  enabled?: boolean;
-}
+import { DEFAULT_SHORTCUTS } from "./catalog";
 
 /**
- * Binds `handler` to the shortcut `id` while the component is mounted (and
- * `enabled`). The latest handler is always called; re-renders don't rebind.
+ * The design system's provider, defaulting to a registry of Campbooks'
+ * {@link DEFAULT_SHORTCUTS} (the app passes its own, with every module's).
  */
-export function useShortcut(
-  id: ShortcutId,
-  handler: ShortcutHandler,
-  { enabled = true, alternates = true }: UseShortcutOptions = {},
-): void {
-  const { registry } = useShortcuts();
-  const latest = useRef(handler);
-  useEffect(() => {
-    latest.current = handler;
-  });
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-    return registry.bind(
-      id,
-      (event) => {
-        latest.current(event);
-      },
-      { alternates },
-    );
-  }, [registry, id, enabled, alternates]);
+export function ShortcutProvider({ registry, ...props }: ShortcutProviderProps) {
+  const defaults = useMemo(() => registry ?? new ShortcutRegistry(DEFAULT_SHORTCUTS), [registry]);
+  return <DesignSystemShortcutProvider registry={defaults} {...props} />;
 }

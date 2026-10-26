@@ -147,7 +147,7 @@ jobs:
         env:
           BODY: ${{ github.event.pull_request.body }}
         run: |
-          ui=$(git diff --name-only "$PR_RANGE" -- clients/app/src clients/app/index.html \
+          ui=$(git diff --name-only "$PR_RANGE" -- clients/app/src clients/app/index.html clients/ui/src \
                  | grep -vE '\.(test|spec)\.[jt]sx?$|/schema\.gen\.ts$' || true)
           if [ -z "$ui" ]; then echo "No client UI changes — no recording required."; exit 0; fi
           echo "UI files changed:"; echo "$ui" | sed 's/^/  /'

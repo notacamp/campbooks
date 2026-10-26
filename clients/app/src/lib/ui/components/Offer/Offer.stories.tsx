@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 
-import { Button } from "../Button/Button";
-import { ChoiceCards } from "../ChoiceCards/ChoiceCards";
-import { Progress } from "../Progress/Progress";
+import { Button, ChoiceCards, Progress } from "@notacamp/ui";
 import { Line } from "../Queue/Queue";
 
 import { Offer } from "./Offer";

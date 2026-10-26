@@ -1,9 +1,7 @@
 import { useEffect, useId, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Avatar } from "../Avatar/Avatar";
-import { Icon } from "../Icon/Icon";
-import { KbdHint } from "../Kbd/Kbd";
+import { Avatar, Icon, KbdHint } from "@notacamp/ui";
 
 import styles from "./RecipientField.module.css";
 

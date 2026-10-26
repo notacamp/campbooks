@@ -1,0 +1,86 @@
+{
+  "close": "Fermer",
+  "undo": "Annuler",
+  "redo": "Rétablir",
+  "loading": "Chargement",
+  "kbd": {
+    "then": "puis",
+    "or": "ou",
+    "shortcut": "Raccourci : {{keys}}"
+  },
+  "toast": {
+    "region": "Notifications",
+    "undone": "Annulé : {{label}}",
+    "redone": "Rétabli : {{label}}",
+    "dismiss": "Fermer",
+    "retry": "Réessayer",
+    "cancelled": "Arrêté : {{label}}"
+  },
+  "note": {
+    "label": "Où en sont les choses"
+  },
+  "search": {
+    "label": "Chercher, demander"
+  },
+  "commandMenu": {
+    "label": "Menu des commandes",
+    "placeholder": "Chercher, demander ou agir",
+    "empty": "Rien ne correspond à « {{query}} »",
+    "results": "Commandes",
+    "ask": "Demander à Scout : {{query}}",
+    "askAlone": "Demander à Scout",
+    "askGroup": "Demander",
+    "hintMove": "Naviguer",
+    "hintOpen": "Ouvrir",
+    "hintAll": "Tous les résultats",
+    "hintClose": "Fermer"
+  },
+  "shortcutSheet": {
+    "title": "Raccourcis clavier"
+  },
+  "workspace": {
+    "switch": "Changer d’espace de travail",
+    "current": "Changer d’espace de travail (actuel : {{name}})",
+    "create": "Créer un espace de travail"
+  },
+  "visor": {
+    "idle": "Campbooks",
+    "reading": "Campbooks lit",
+    "thinking": "Campbooks réfléchit",
+    "unsure": "Campbooks n’est pas sûr",
+    "happy": "Campbooks est content",
+    "alert": "Campbooks a besoin de votre attention",
+    "asleep": "Campbooks est en pause",
+    "dizzy": "Campbooks a eu un accroc",
+    "starry": "Campbooks est ravi",
+    "hearts": "Campbooks adore"
+  },
+  "signal": {
+    "review": "Vérifier",
+    "reply": "Répondre",
+    "decide": "Décider",
+    "do": "Faire",
+    "pay": "Payer",
+    "nudge": "À relancer",
+    "sort": "Trier",
+    "look": "À voir"
+  },
+  "navigation": {
+    "main": "Principale"
+  },
+  "searchField": {
+    "clear": "Effacer la recherche",
+    "filters": "Filtres de recherche",
+    "remove": "Retirer le filtre : {{filter}}"
+  },
+  "datePicker": {
+    "choose": "Choisir une date",
+    "previous": "Mois précédent",
+    "next": "Mois suivant",
+    "today": "Aujourd’hui",
+    "clear": "Effacer"
+  },
+  "timePicker": {
+    "choose": "Choisir une heure"
+  }
+}
