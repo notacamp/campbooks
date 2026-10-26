@@ -27,6 +27,6 @@
 - [x] 4.1 Tracked events and Coverage rows
 - [x] 4.2 OpenAPI and client types regenerated (CI artifacts)
 - [x] 4.3 Changelog entry `changelog/unreleased/added/365-pages-tables.md`
-- [ ] 4.4 Gates green in CI
-- [ ] 4.5 Recording: a terminal demo of the API (vhs, demo data), since this part has no UI
-- [ ] 4.6 `openspec archive pages-tables --yes` before merge
+- [x] 4.4 Gates green in CI
+- [x] 4.5 Recording: a terminal demo of the API (vhs, demo data), since this part has no UI
+- [x] 4.6 `openspec archive pages-tables --yes` before merge
