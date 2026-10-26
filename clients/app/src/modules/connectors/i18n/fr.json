@@ -3,7 +3,8 @@
     "google": "Gmail",
     "zoho": "Zoho Mail",
     "microsoft": "Microsoft 365",
-    "imap": "IMAP"
+    "imap": "IMAP",
+    "notion": "Notion"
   },
   "mail": {
     "title": "Vos e-mails",
@@ -342,6 +343,77 @@
       "retryFailed": "La vérification n’a pas pu démarrer. Réessayez dans un moment.",
       "retryLimited": "Cette adresse a été vérifiée trop souvent aujourd’hui. Réessayez demain.",
       "done": "Terminé"
+    }
+  },
+  "notion": {
+    "title": "Notion",
+    "description": "Faites venir dans Pages les pages Notion que vous choisissez et gardez-les synchronisées dans les deux sens. Seules les pages que vous choisissez dans l’écran propre à Notion sont partagées, et vous pouvez le modifier dans Notion à tout moment.",
+    "bullets": {
+      "mine": "La connexion est la vôtre et les pages importées commencent dans votre espace Privé.",
+      "sync": "Les modifications se synchronisent environ une minute après avoir été faites, dans un sens comme dans l’autre.",
+      "stop": "Déconnectez-vous quand vous voulez : les pages restent dans Campbooks mais cessent de se synchroniser."
+    },
+    "connect": "Connecter Notion",
+    "next": "Ensuite : Notion s’ouvre et demande quelles pages partager avec Campbooks (« Sélectionner des pages »). Rien d’autre dans votre Notion ne nous est visible.",
+    "list": "Connexions Notion",
+    "import": "Importer des pages",
+    "importLabel": "Importer des pages depuis {{name}}",
+    "reconnectLabel": "Reconnecter {{name}}",
+    "disconnectLabel": "Déconnecter {{name}}",
+    "health": {
+      "ok": "Connecté"
+    },
+    "connected": {
+      "title": "Notion ({{name}}) est connecté",
+      "lead": "Choisissez les pages à faire venir avec Importer des pages."
+    },
+    "disconnected": {
+      "title": "Notion est déconnecté",
+      "lead": "Ses pages restent dans Campbooks et ne se synchronisent plus. Rien n’a été supprimé dans Notion."
+    },
+    "disconnect": {
+      "question": "Déconnecter {{name}} ?",
+      "lead": "Ses pages restent dans Campbooks mais cessent de se synchroniser. Rien n’est supprimé dans Notion.",
+      "failed": "Impossible de déconnecter {{name}}. Rien n’a été modifié."
+    },
+    "refusal": {
+      "failed": "La connexion à Notion n’a pas pu démarrer. Réessayez.",
+      "rate_limited": "Trop d’essais. Attendez quelques minutes, puis recommencez.",
+      "not_member": "Seuls les membres de cet espace de travail peuvent connecter Notion."
+    },
+    "unavailable": {
+      "title": "Notion n’est pas disponible sur cette instance.",
+      "lead": "La personne qui gère ce Campbooks ne l’a pas activé."
+    }
+  },
+  "connectNotion": {
+    "opening": "Ouverture de Notion…",
+    "openingLead": "Connexion à {{workspace}}.",
+    "choose": "À quel espace de travail Notion doit-il se connecter ?",
+    "chooseLead": "Les pages que vous choisissez dans Notion sont importées dans l’espace de travail choisi ici.",
+    "retry": "Réessayer",
+    "back": "Retour à Campbooks",
+    "loadError": {
+      "title": "Vos espaces de travail ne se sont pas chargés",
+      "lead": "Rien n’a été modifié. Réessayez dans un instant."
+    },
+    "refused": {
+      "unavailable": {
+        "title": "Notion n’est pas disponible sur cette instance",
+        "lead": "La personne qui gère ce Campbooks ne l’a pas activé : il n’y a rien à connecter."
+      },
+      "not_member": {
+        "title": "Seuls les membres peuvent connecter Notion",
+        "lead": "Demandez à un membre de cet espace de travail de le connecter, ou choisissez un autre espace."
+      },
+      "rate_limited": {
+        "title": "Trop d’essais",
+        "lead": "Attendez quelques minutes, puis réessayez."
+      },
+      "failed": {
+        "title": "Notion n’a pas pu être ouvert",
+        "lead": "Rien n’a été modifié. Réessayez."
+      }
     }
   }
 }

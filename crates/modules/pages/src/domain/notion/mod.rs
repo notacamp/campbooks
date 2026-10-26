@@ -208,9 +208,12 @@ fn hash_of(bytes: &[u8]) -> Option<[u8; 32]> {
     <[u8; 32]>::try_from(bytes).ok()
 }
 
+/// A mapping as the database keeps it: block, Notion block, kind, hash, time.
+type MappingRow = (Uuid, Uuid, String, Vec<u8>, DateTime<Utc>);
+
 /// What the last sync agreed about each of `page`'s blocks.
 pub async fn mappings(conn: &mut PgConnection, page: PageId) -> Result<Vec<Mapping>> {
-    let rows: Vec<(Uuid, Uuid, String, Vec<u8>, DateTime<Utc>)> = sqlx::query_as(
+    let rows: Vec<MappingRow> = sqlx::query_as(
         "SELECT bid, notion_block_id, kind, base_hash, base_edited_at
            FROM pages.external_blocks WHERE page_id = $1",
     )

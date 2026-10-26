@@ -123,6 +123,10 @@ pub struct Resolved {
             body = Problem, content_type = "application/problem+json"),
     )
 )]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction read top to bottom: resolve, store, record, track"
+)]
 pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<PagesWrite>,

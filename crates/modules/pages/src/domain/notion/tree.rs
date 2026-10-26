@@ -216,6 +216,10 @@ fn blocks<T: ReadTxn>(
     nodes
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "one match over every element of the schema"
+)]
 fn element_nodes<T: ReadTxn>(
     txn: &T,
     element: &XmlElementRef,

@@ -136,6 +136,10 @@ impl Kind {
     }
 }
 
+#[allow(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if takes a reference"
+)]
 fn is_false(value: &bool) -> bool {
     !*value
 }
@@ -330,6 +334,10 @@ pub struct ChangeItem {
 
 /// The canonical content of a run: what its hash is made of. A page
 /// mention is its page and nothing of the words Notion showed for it.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the four marks Pages can show, each independent"
+)]
 #[derive(Serialize)]
 struct CanonRun<'a> {
     t: &'a str,

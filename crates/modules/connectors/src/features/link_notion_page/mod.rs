@@ -38,6 +38,10 @@ impl EventConsumer for LinkNotionPage {
     const NAME: &'static str = "connectors.link_notion_page";
     const QUEUE: &'static str = "events";
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one transaction read top to bottom: confirm, connection, stream, link"
+    )]
     async fn handle(
         &self,
         ctx: &mut JobContext,

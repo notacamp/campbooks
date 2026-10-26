@@ -3,7 +3,8 @@
     "google": "Gmail",
     "zoho": "Zoho Mail",
     "microsoft": "Microsoft 365",
-    "imap": "IMAP"
+    "imap": "IMAP",
+    "notion": "Notion"
   },
   "mail": {
     "title": "Your mail",
@@ -342,6 +343,77 @@
       "retryFailed": "The check couldn't start. Try again in a while.",
       "retryLimited": "This address was checked too often today. Try again tomorrow.",
       "done": "Done"
+    }
+  },
+  "notion": {
+    "title": "Notion",
+    "description": "Bring the Notion pages you choose into Pages and keep them in step both ways. Only the pages you pick in Notion’s own screen are shared, and you can change that in Notion at any time.",
+    "bullets": {
+      "mine": "Your connection is yours, and imported pages start in your Private place.",
+      "sync": "Edits sync about a minute after they happen, in either direction.",
+      "stop": "Disconnect any time: the pages stay in Campbooks but stop syncing."
+    },
+    "connect": "Connect Notion",
+    "next": "Next: Notion opens and asks which pages to share with Campbooks (“Select pages”). Nothing else in your Notion is visible to us.",
+    "list": "Notion connections",
+    "import": "Import pages",
+    "importLabel": "Import pages from {{name}}",
+    "reconnectLabel": "Reconnect {{name}}",
+    "disconnectLabel": "Disconnect {{name}}",
+    "health": {
+      "ok": "Connected"
+    },
+    "connected": {
+      "title": "Notion ({{name}}) is connected",
+      "lead": "Choose the pages to bring in with Import pages."
+    },
+    "disconnected": {
+      "title": "Notion is disconnected",
+      "lead": "Its pages stay in Campbooks and no longer sync. Nothing was deleted in Notion."
+    },
+    "disconnect": {
+      "question": "Disconnect {{name}}?",
+      "lead": "Its pages stay in Campbooks but stop syncing. Nothing is deleted in Notion.",
+      "failed": "Couldn’t disconnect {{name}}. Nothing was changed."
+    },
+    "refusal": {
+      "failed": "Connecting Notion couldn’t start. Try again.",
+      "rate_limited": "Too many tries. Wait a few minutes, then start again.",
+      "not_member": "Only members of this workspace can connect Notion."
+    },
+    "unavailable": {
+      "title": "Notion isn’t available on this instance.",
+      "lead": "Whoever runs this Campbooks hasn’t turned it on."
+    }
+  },
+  "connectNotion": {
+    "opening": "Opening Notion…",
+    "openingLead": "Connecting it to {{workspace}}.",
+    "choose": "Which workspace should Notion connect to?",
+    "chooseLead": "The pages you pick in Notion are imported into the workspace you choose here.",
+    "retry": "Try again",
+    "back": "Back to Campbooks",
+    "loadError": {
+      "title": "Your workspaces didn’t load",
+      "lead": "Nothing changed. Try again in a moment."
+    },
+    "refused": {
+      "unavailable": {
+        "title": "Notion isn’t available on this instance",
+        "lead": "Whoever runs this Campbooks hasn’t turned it on, so there is nothing to connect."
+      },
+      "not_member": {
+        "title": "Only members can connect Notion",
+        "lead": "Ask a member of this workspace to connect it, or choose another workspace."
+      },
+      "rate_limited": {
+        "title": "Too many tries",
+        "lead": "Wait a few minutes, then try again."
+      },
+      "failed": {
+        "title": "Notion couldn’t be opened",
+        "lead": "Nothing was changed. Try again."
+      }
     }
   }
 }

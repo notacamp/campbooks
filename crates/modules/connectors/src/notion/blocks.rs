@@ -288,6 +288,10 @@ pub struct Parsed {
 
 /// A block of Notion's, as the neutral form. `None` for a block that is in
 /// the trash or that has no id or edit time.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one match over every Notion block type"
+)]
 pub fn parse(raw: &Value) -> Option<Parsed> {
     let id = raw
         .get("id")

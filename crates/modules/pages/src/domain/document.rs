@@ -306,12 +306,12 @@ fn spec(name: &str) -> Option<Spec> {
         "bulletList" | "orderedList" => (Class::Block, Context::Items(&["listItem"])),
         "taskList" => (Class::Block, Context::Items(&["taskItem"])),
         "listItem" | "taskItem" => (Class::Item, Context::Blocks),
-        "toggle" | "blockquote" | "callout" => (Class::Block, Context::Blocks),
+        // A conflict is Notion's version of a block we disagree about,
+        // beneath ours.
+        "toggle" | "blockquote" | "callout" | "conflict" => (Class::Block, Context::Blocks),
         "horizontalRule" | "image" | "file" | "pageLink" | "embed" | "external" => {
             (Class::Block, Context::Empty)
         }
-        // Notion's version of a block we disagree about, beneath ours.
-        "conflict" => (Class::Block, Context::Blocks),
         "mention" | "hardBreak" => (Class::Inline, Context::Empty),
         _ => return None,
     };
@@ -438,13 +438,19 @@ type Attributes = BTreeMap<String, Any>;
 fn check_attributes(name: &str, attributes: &Attributes) -> Result<(), Rejection> {
     for (key, value) in attributes {
         let fits = match (name, key.as_str()) {
-            // Every block has a stable id, the same block at Notion.
-            (_, "bid") => text_of(value).is_some_and(is_uuid),
-            ("conflict", "of") => text_of(value).is_some_and(is_uuid),
-            ("conflict", "hash") => text_of(value).is_some_and(is_hash),
+            // Every block has a stable id, the same block at Notion; a
+            // conflict names the block it is about.
+            (_, "bid") | ("conflict", "of") | ("pageLink", "page") => {
+                text_of(value).is_some_and(is_uuid)
+            }
+            ("conflict", "hash") | ("image" | "file", "blob") => {
+                text_of(value).is_some_and(is_hash)
+            }
             ("conflict", "edited") => text_of(value)
                 .is_some_and(|t| t.len() <= 40 && t.chars().all(|c| c.is_ascii_graphic())),
-            ("conflict", "removed") => matches!(value, Any::Bool(_)),
+            ("conflict", "removed") | ("taskItem", "checked") | ("toggle", "open") => {
+                matches!(value, Any::Bool(_))
+            }
             // A block kept in Notion: its Notion type, nothing of its content.
             ("external", "kind") => text_of(value).is_some_and(|t| {
                 !t.is_empty()
@@ -458,19 +464,16 @@ fn check_attributes(name: &str, attributes: &Attributes) -> Result<(), Rejection
             }
             ("orderedList", "type") => text_of(value)
                 .is_some_and(|t| t.len() <= 8 && t.chars().all(|c| c.is_ascii_alphanumeric())),
-            ("taskItem", "checked") | ("toggle", "open") => matches!(value, Any::Bool(_)),
             ("callout", "tone") => {
                 text_of(value).is_some_and(|t| ["neutral", "info", "warning"].contains(&t))
             }
             ("codeBlock", "language") => text_of(value).is_some_and(|t| LANGUAGES.contains(&t)),
-            ("image" | "file", "blob") => text_of(value).is_some_and(is_hash),
             ("image" | "file", "name") => text_of(value).is_some_and(|t| {
                 t.chars().count() <= 255 && t.chars().all(campbooks_kernel::text::is_displayable)
             }),
             ("image" | "file", "size") => {
                 whole_of(value).is_some_and(|n| (0..=MAX_FILE_BYTES).contains(&n))
             }
-            ("pageLink", "page") => text_of(value).is_some_and(is_uuid),
             ("mention" | "embed", "ref_type") => {
                 text_of(value).is_some_and(|t| REF_TYPES.contains(&t))
             }

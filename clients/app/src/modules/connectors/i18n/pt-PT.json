@@ -3,7 +3,8 @@
     "google": "Gmail",
     "zoho": "Zoho Mail",
     "microsoft": "Microsoft 365",
-    "imap": "IMAP"
+    "imap": "IMAP",
+    "notion": "Notion"
   },
   "mail": {
     "title": "O seu correio",
@@ -342,6 +343,77 @@
       "retryFailed": "Não foi possível iniciar a verificação. Tente de novo daqui a pouco.",
       "retryLimited": "Este endereço já foi verificado demasiadas vezes hoje. Tente amanhã.",
       "done": "Concluído"
+    }
+  },
+  "notion": {
+    "title": "Notion",
+    "description": "Traga para as Páginas as páginas do Notion que escolher e mantenha-as sincronizadas nos dois sentidos. Só são partilhadas as páginas que escolher no ecrã do próprio Notion, e pode alterá-lo no Notion a qualquer momento.",
+    "bullets": {
+      "mine": "A ligação é sua e as páginas importadas começam no seu espaço Privado.",
+      "sync": "As edições sincronizam cerca de um minuto depois de acontecerem, nos dois sentidos.",
+      "stop": "Desligue quando quiser: as páginas ficam no Campbooks, mas deixam de sincronizar."
+    },
+    "connect": "Ligar o Notion",
+    "next": "A seguir: o Notion abre e pergunta que páginas partilhar com o Campbooks (“Selecionar páginas”). Mais nada do seu Notion fica visível para nós.",
+    "list": "Ligações ao Notion",
+    "import": "Importar páginas",
+    "importLabel": "Importar páginas de {{name}}",
+    "reconnectLabel": "Voltar a ligar {{name}}",
+    "disconnectLabel": "Desligar {{name}}",
+    "health": {
+      "ok": "Ligado"
+    },
+    "connected": {
+      "title": "O Notion ({{name}}) está ligado",
+      "lead": "Escolha as páginas a trazer com Importar páginas."
+    },
+    "disconnected": {
+      "title": "O Notion está desligado",
+      "lead": "As suas páginas ficam no Campbooks e deixam de sincronizar. Nada foi apagado no Notion."
+    },
+    "disconnect": {
+      "question": "Desligar {{name}}?",
+      "lead": "As suas páginas ficam no Campbooks, mas deixam de sincronizar. Nada é apagado no Notion.",
+      "failed": "Não foi possível desligar {{name}}. Nada foi alterado."
+    },
+    "refusal": {
+      "failed": "Não foi possível começar a ligar o Notion. Tente novamente.",
+      "rate_limited": "Demasiadas tentativas. Espere alguns minutos e comece de novo.",
+      "not_member": "Só os membros deste espaço de trabalho podem ligar o Notion."
+    },
+    "unavailable": {
+      "title": "O Notion não está disponível nesta instância.",
+      "lead": "Quem gere este Campbooks ainda não o ativou."
+    }
+  },
+  "connectNotion": {
+    "opening": "A abrir o Notion…",
+    "openingLead": "A ligá-lo a {{workspace}}.",
+    "choose": "A que espaço de trabalho deve o Notion ligar-se?",
+    "chooseLead": "As páginas que escolher no Notion são importadas para o espaço de trabalho que escolher aqui.",
+    "retry": "Tentar novamente",
+    "back": "Voltar ao Campbooks",
+    "loadError": {
+      "title": "Os seus espaços de trabalho não carregaram",
+      "lead": "Nada foi alterado. Tente novamente dentro de instantes."
+    },
+    "refused": {
+      "unavailable": {
+        "title": "O Notion não está disponível nesta instância",
+        "lead": "Quem gere este Campbooks ainda não o ativou, por isso não há nada a ligar."
+      },
+      "not_member": {
+        "title": "Só os membros podem ligar o Notion",
+        "lead": "Peça a um membro deste espaço de trabalho que o ligue, ou escolha outro espaço."
+      },
+      "rate_limited": {
+        "title": "Demasiadas tentativas",
+        "lead": "Espere alguns minutos e tente novamente."
+      },
+      "failed": {
+        "title": "Não foi possível abrir o Notion",
+        "lead": "Nada foi alterado. Tente novamente."
+      }
     }
   }
 }

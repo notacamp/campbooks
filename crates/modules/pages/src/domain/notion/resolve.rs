@@ -69,6 +69,10 @@ pub struct Resolution {
 
 /// Settle the conflict about block `bid` with `choice`. `mapping` is what
 /// the last sync agreed about the block, if anything.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction of the document: find, remove the conflict, apply the choice"
+)]
 pub fn resolve(
     doc: &Doc,
     resolver: &Resolver,
@@ -117,8 +121,8 @@ pub fn resolve(
                     upsert = base(conflict.edited);
                 }
             }
-            Choice::Notion => match (&conflict.theirs, conflict.removed) {
-                (Some(theirs), false) => {
+            Choice::Notion => {
+                if let (Some(theirs), false) = (&conflict.theirs, conflict.removed) {
                     let Some(located) = edit::locate(&txn, &place, bid) else {
                         return Err(Refused::BlockGone);
                     };
@@ -136,15 +140,14 @@ pub fn resolve(
                         }
                     }
                     upsert = base(conflict.edited);
-                }
-                _ => {
+                } else {
                     // Notion removed it: so is ours, with what is under it.
                     let mut below = Vec::new();
                     node.walk(&mut below);
                     deletes.extend(below.iter().filter_map(|n| n.bid));
                     edit::remove(&mut txn, &root, bid);
                 }
-            },
+            }
             Choice::Both => {
                 if conflict.removed {
                     deletes.push(bid);

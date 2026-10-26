@@ -120,6 +120,10 @@ pub async fn handler(
 
 /// The pages `connection` can see, for the member of `access` whose Notion
 /// account it is.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one listing read top to bottom: authority, token, search, counts"
+)]
 pub async fn execute(
     state: &AppState,
     deps: &Deps,
