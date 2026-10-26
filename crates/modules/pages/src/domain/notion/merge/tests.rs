@@ -242,8 +242,8 @@ fn consecutive_list_items_share_a_list_and_a_toggle_holds_its_blocks() {
     let txn = s.doc.transact();
     // Two bullet lists (split by the paragraph), a paragraph and a toggle.
     assert_eq!(root.len(&txn), 4);
-    document::inspect(&s.doc).expect("a valid body");
     drop(txn);
+    document::inspect(&s.doc).expect("a valid body");
     let tree = s.tree();
     let toggle = tree
         .nodes

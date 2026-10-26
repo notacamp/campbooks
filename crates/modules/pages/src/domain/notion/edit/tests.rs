@@ -31,15 +31,16 @@ fn a_block_is_found_by_its_id_at_any_depth_and_inside_its_list() {
     ];
     s.apply(&snapshot(vec![toggle], 5, true));
     let two = s.bid_of("Two");
+    let at = place(&s.doc);
     let txn = s.doc.transact();
-    let found = locate(&txn, &place(&s.doc), two).expect("found");
+    let found = locate(&txn, &at, two).expect("found");
     assert_eq!(found.index, 1);
     let list = found.list.as_ref().expect("an item of a list");
     assert_eq!(&**list.element.tag(), "bulletList");
     let (after_place, after_index) = found.after();
     assert!(matches!(after_place, Place::Element(_)));
     assert_eq!(after_index, list.index + 1, "a sibling goes after the list");
-    assert!(locate(&txn, &place(&s.doc), Uuid::now_v7()).is_none());
+    assert!(locate(&txn, &at, Uuid::now_v7()).is_none());
 }
 
 #[test]
@@ -58,8 +59,9 @@ fn rewriting_keeps_the_element_and_the_neighbours() {
         ..Run::default()
     }];
     {
+        let at = place(&s.doc);
         let mut txn = s.doc.transact_mut();
-        let found = locate(&txn, &place(&s.doc), b).unwrap();
+        let found = locate(&txn, &at, b).unwrap();
         assert!(rewrite(&mut txn, &found, &next, &resolver()));
         // Another kind cannot be written into this element.
         let heading = Block::new(b, Kind::Heading);
@@ -94,8 +96,9 @@ fn removing_a_block_takes_what_is_under_it_and_an_emptied_list() {
         assert!(!remove(&mut txn, &r, Uuid::now_v7()));
     }
     assert_eq!(s.texts(), ["After"]);
+    let top = root(&s.doc);
     let txn = s.doc.transact();
-    assert_eq!(root(&s.doc).len(&txn), 1, "the emptied list went too");
+    assert_eq!(top.len(&txn), 1, "the emptied list went too");
 }
 
 #[test]
@@ -107,9 +110,10 @@ fn a_new_first_block_goes_after_the_own_text_of_a_block_that_leads_with_it() {
         true,
     ));
     let more = s.bid_of("More");
+    let at = place(&s.doc);
     let txn = s.doc.transact();
-    assert_eq!(first_index(&txn, &place(&s.doc)), 0);
-    let found = locate(&txn, &place(&s.doc), more).unwrap();
+    assert_eq!(first_index(&txn, &at), 0);
+    let found = locate(&txn, &at, more).unwrap();
     assert_eq!(first_index(&txn, &Place::Element(found.element)), 1);
 }
 
@@ -153,8 +157,9 @@ fn a_conflict_is_made_beneath_a_block_and_listed() {
     s.apply(&snapshot(vec![para(1, "A", 1)], 5, true));
     let a = s.bid_of("A");
     {
+        let at = place(&s.doc);
         let mut txn = s.doc.transact_mut();
-        let found = locate(&txn, &place(&s.doc), a).unwrap();
+        let found = locate(&txn, &at, a).unwrap();
         let (p, i) = found.after();
         build_conflict(
             &mut txn,
@@ -166,8 +171,9 @@ fn a_conflict_is_made_beneath_a_block_and_listed() {
             &resolver(),
         );
     }
+    let at = place(&s.doc);
     let txn = s.doc.transact();
-    let listed = conflicts(&txn, &place(&s.doc));
+    let listed = conflicts(&txn, &at);
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].0, a);
     drop(txn);

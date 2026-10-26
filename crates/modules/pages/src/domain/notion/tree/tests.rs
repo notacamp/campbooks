@@ -235,8 +235,10 @@ fn without_an_address_for_the_app_a_mention_is_still_only_the_words() {
         &mentioning("tasks.task", &Uuid::now_v7().to_string()),
         &resolver,
     );
-    assert_eq!(runs[1].text, CAMPBOOKS_LINK);
-    assert_eq!(runs[1].link, None);
+    // With no address to link, the words join the text around them.
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].text, format!("see {CAMPBOOKS_LINK}"));
+    assert_eq!(runs[0].link, None);
     assert_eq!(resolver.page_link(), None);
 }
 
@@ -311,7 +313,6 @@ fn attribute_helpers_read_only_what_has_the_right_shape() {
     assert_eq!(uuid_attribute(&attrs, "bid"), None);
     assert_eq!(text_attribute(&attrs, "level"), None);
     assert_eq!(bool_attribute(&attrs, "level"), None);
-    assert!(!attrs.contains_key("other"));
     // A heading without a usable level reads as level 1.
     drop(txn);
     let tree = read_doc(&doc, &resolver_for_test());

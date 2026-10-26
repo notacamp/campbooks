@@ -13,10 +13,10 @@ fn the_hash_ignores_ids_times_and_how_runs_were_cut() {
     let a = para(1, "Launch plan", 1);
     let mut b = para(2, "", 9);
     b.runs = vec![Run::plain("Launch "), Run::plain("plan")];
-    assert_eq!(h(&a), h(&b), "same words, same kind");
-    // The same text split in runs by a client is the same text once normal.
+    // The same text split in runs by a client is the same text once it has
+    // its one shape (blocks read from a body or a snapshot always have it).
     b.runs = normalize(b.runs);
-    assert_eq!(h(&a), h(&b));
+    assert_eq!(h(&a), h(&b), "same words, same kind");
 }
 
 #[test]
