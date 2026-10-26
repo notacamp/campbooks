@@ -351,7 +351,7 @@ async fn the_cli_lists_rotates_and_removes_and_the_secret_is_kept_hashed(db: PgP
     assert_eq!(secret.len(), 43, "256 random bits");
 
     let listed = instance_apps::list(&mut conn).await.unwrap();
-    assert_eq!(listed, [app.clone()]);
+    assert_eq!(listed, std::slice::from_ref(&app));
     assert_eq!(listed[0].allowed_scopes, CEILING);
     assert_eq!(listed[0].post_logout_redirect_uris, [AFTER_LOGOUT]);
 
