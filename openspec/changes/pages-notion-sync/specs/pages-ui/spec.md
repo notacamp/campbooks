@@ -10,6 +10,25 @@ kept in Notion, and SHALL import the ones picked.
 - **WHEN** Marta ticks "Product roadmap" and "Q4 OKRs" and imports
 - **THEN** both appear in her Private place, marked as synced with Notion
 
+### Requirement: Notion's installation address
+The app SHALL serve `/connect/notion`, outside any workspace, for Notion's
+listing to point at. A signed-out browser SHALL sign in and come back to it.
+With one workspace it SHALL start the Notion connect flow for that workspace
+at once; with several it SHALL first ask "Which workspace should Notion
+connect to?" and then start it. The flow is the Settings card's own (members
+only, bound to the browser that started it): this page only gets there. When
+the instance does not offer Notion it SHALL say "Notion isn't available on
+this instance", and when the person is not a member it SHALL say only members
+can connect Notion.
+
+#### Scenario: Installing from Notion's listing with two workspaces
+- **WHEN** Marta, signed in to Acme and Household, opens `/connect/notion`
+- **THEN** she is asked which workspace Notion should connect to, and choosing Acme sends her to Notion's own consent screen
+
+#### Scenario: An instance without Notion
+- **WHEN** someone opens `/connect/notion` where Notion is off
+- **THEN** the page says Notion isn't available on this instance, with a way back, and nothing is started
+
 ### Requirement: A synced page says so
 A linked page SHALL show its sync state ("Synced with Notion · 1 min ago",
 paused, or stopped with its reason), "Open in Notion" and "Stop syncing". An

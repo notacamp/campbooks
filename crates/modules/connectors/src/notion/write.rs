@@ -85,6 +85,10 @@ fn moved_on(raw: &Value, base: Option<DateTime<Utc>>) -> bool {
 /// (`None` for a delete); `notion_page` is the page the stream reads; `made`
 /// has the blocks added so far by their ids in the pages module, and gains
 /// this one.
+#[allow(
+    clippy::implicit_hasher,
+    reason = "the map is this module's own, never another hasher"
+)]
 pub async fn make(
     notion: &Notion,
     token: &str,

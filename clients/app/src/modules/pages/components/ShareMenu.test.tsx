@@ -2,7 +2,13 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { W } from "../../../../test/demo/conversations";
-import { HANDBOOK, plainDoc, viewOfDoc } from "../../../../test/demo/pages";
+import {
+  HANDBOOK,
+  NOTION_ROADMAP,
+  notionLink,
+  plainDoc,
+  viewOfDoc,
+} from "../../../../test/demo/pages";
 import { TEAM } from "../../../../test/demo/tasks";
 import { ANA, DUARTE, RUI, SOFIA } from "../../../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../../../test/render";
@@ -115,5 +121,41 @@ describe("the share menu", () => {
     expect(screen.queryByRole("button", { name: "Remove Rui Matos" })).toBeNull();
     expect(screen.queryByRole("combobox", { name: "Access for Rui Matos" })).toBeNull();
     expect(screen.getByText("Can read")).toBeTruthy();
+  });
+});
+
+describe("the share menu of a page kept in step with Notion", () => {
+  const withLink = (over: Parameters<typeof notionLink>[2] = {}) => {
+    mockApi({
+      [`GET ${W}/members`]: { body: { members: TEAM } },
+      [`GET ${W}/pages/notion/links`]: {
+        body: { links: [notionLink(HANDBOOK.id, NOTION_ROADMAP, { owner: ANA.user_id, ...over })] },
+      },
+    });
+  };
+
+  it("says edits go to Notion through its owner's connection", async () => {
+    withLink();
+    renderWithProviders(<Menu page={shared()} />);
+    await open();
+    expect(await screen.findByText("Edits here go to Notion through Ana Duarte’s connection.")).toBeVisible();
+    expect(screen.getByText(/never with their subject/u)).toBeVisible();
+  });
+
+  it("says it for a private page only once it is shared", async () => {
+    withLink();
+    const alone = viewOfDoc({ ...HANDBOOK, created_by: ANA.user_id, place: "private" }, plainDoc("x"));
+    renderWithProviders(<Menu page={alone} />);
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await screen.findByText("People with access");
+    expect(screen.queryByText(/Edits here go to Notion/u)).toBeNull();
+  });
+
+  it("says nothing once the link has ended", async () => {
+    withLink({ state: "stopped", stopped_reason: "stopped_by_member" });
+    renderWithProviders(<Menu page={shared()} />);
+    await open();
+    await screen.findByText("Rui Matos");
+    expect(screen.queryByText(/Edits here go to Notion/u)).toBeNull();
   });
 });

@@ -201,7 +201,6 @@ async fn a_request_does_not_stand_once_the_link_ended_or_in_another_workspace(db
     // Another workspace asks about it: not found there (and not bound there).
     let elsewhere = campbooks_kernel::tenancy::WorkspaceId::new();
     {
-        use campbooks_kernel::outbound::PageRequests as _;
         let mut tx = rig.kit.begin(elsewhere).await;
         let crossed = crate::domain::notion::requests::page_requests()
             .stored_changes(&rig.kit.state, &mut tx, elsewhere, request)

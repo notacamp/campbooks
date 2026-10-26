@@ -74,7 +74,9 @@
       "reader": "Can read",
       "writer": "Can edit",
       "manager": "Can manage"
-    }
+    },
+    "syncedNote": "Edits here go to Notion through {{name}}’s connection.",
+    "syncedMentions": "Mentions are sent to Notion as a plain “Campbooks link”, never with their subject."
   },
   "trash": {
     "label": "Pages in the trash",
@@ -199,5 +201,124 @@
     "dining": "Dining",
     "parcel": "Parcel",
     "ticket": "Ticket"
+  },
+  "notion": {
+    "import": {
+      "title": "Import from Notion",
+      "button": "Import from Notion",
+      "connectedAs": "Connected as {{who}}",
+      "lead": "These are the pages you shared with Campbooks in Notion. Sub-pages come along.",
+      "account": "Notion account",
+      "listLabel": "Pages from Notion",
+      "subPages_one": "{{count}} sub-page",
+      "subPages_other": "{{count}} sub-pages",
+      "linked": "Already synced",
+      "info": "Blocks Campbooks doesn’t have yet (synced blocks, columns, embeds, databases) come across as a “Kept in Notion” box: you see them, they stay intact in Notion, and editing them happens there.",
+      "cancel": "Cancel",
+      "submit_one": "Import {{count}} page",
+      "submit_other": "Import {{count}} pages",
+      "submitNone": "Import pages",
+      "truncated": "Notion lists more pages than are shown here. Share fewer pages in Notion to see the rest.",
+      "empty": {
+        "title": "No pages shared yet",
+        "lead": "In Notion, choose “Select pages” for Campbooks, then come back."
+      },
+      "noConnection": {
+        "title": "Connect Notion first",
+        "lead": "Campbooks needs your Notion connection to list your pages.",
+        "settings": "Open Settings"
+      },
+      "errors": {
+        "needs_reauth": {
+          "title": "Notion needs you to connect again",
+          "lead": "Reconnect Notion in Settings, then come back to import."
+        },
+        "rate_limited": {
+          "title": "Notion asked us to slow down",
+          "lead": "Wait a minute, then try again."
+        },
+        "not_connected": {
+          "title": "This Notion connection isn’t yours",
+          "lead": "Only the member who connected Notion can import its pages."
+        },
+        "unavailable": {
+          "title": "Notion couldn’t be reached",
+          "lead": "Nothing was changed. Try again in a moment."
+        }
+      },
+      "retry": "Try again",
+      "tooMany": "Pick at most {{max}} pages at a time.",
+      "failed": "Couldn’t import. Nothing was changed.",
+      "done_one": "Imported {{count}} page from Notion",
+      "done_other": "Imported {{count}} pages from Notion"
+    },
+    "sync": {
+      "label": "Sync with Notion",
+      "badge": "Synced with Notion · {{ago}}",
+      "waiting": "Linked to Notion, waiting for the first sync",
+      "paused": "Sync with Notion is paused",
+      "reason": {
+        "stopped_by_member": "Stopped syncing with Notion",
+        "disconnected": "Not synced: Notion was disconnected",
+        "trashed_here": "Not synced: the page was moved to the trash",
+        "trashed_in_notion": "Not synced: the page is in the trash in Notion",
+        "not_shared": "Not synced: the page isn’t shared with Campbooks in Notion any more",
+        "member_left": "Not synced: the member who connected Notion left",
+        "notion_unavailable": "Not synced: Notion isn’t available on this instance",
+        "other": "Not synced with Notion any more"
+      },
+      "open": "Open in Notion",
+      "stop": "Stop syncing",
+      "stopConfirm": "Stop syncing",
+      "stopCancel": "Keep syncing",
+      "stopQuestion": "Stop keeping this page in step with Notion? The page stays here and the Notion page is left alone. Starting again is an import.",
+      "stopped": "Stopped syncing with Notion",
+      "stopFailed": "Couldn’t stop syncing. Nothing was changed.",
+      "conflicts_one": "{{count}} change to look at",
+      "conflicts_other": "{{count}} changes to look at",
+      "conflictsHint": "Jump to the first one"
+    },
+    "conflict": {
+      "label": "A change from Notion",
+      "changed": "Changed in Notion, while you were editing it here",
+      "removed": "Removed in Notion, while you were editing it here",
+      "removedBody": "Notion no longer has this block. Keep it here, or remove it too.",
+      "theirs": "Notion’s version",
+      "choices": "Choose a version",
+      "mine": "Keep mine",
+      "notion": "Use Notion’s",
+      "both": "Keep both",
+      "footer": "Changes to different paragraphs merge on their own; only the same one needs a choice.",
+      "resolved": {
+        "mine": "Kept your version",
+        "notion": "Using Notion’s version",
+        "both": "Kept both, one under the other"
+      },
+      "done": "{{what}} — it goes to Notion on the next sync.",
+      "failed": "Couldn’t apply that choice. Nothing was changed.",
+      "undoFailed": "Couldn’t undo that choice. Nothing was changed."
+    },
+    "kept": {
+      "title": "Kept in Notion · {{what}}",
+      "body": "Campbooks shows it but doesn’t edit it yet; it stays exactly as it is in Notion.",
+      "edit": "Edit in Notion",
+      "kind": {
+        "column_list": "Columns",
+        "synced_block": "Synced block",
+        "table": "Table",
+        "child_database": "Database",
+        "bookmark": "Bookmark",
+        "embed": "Embed",
+        "link_preview": "Link preview",
+        "equation": "Equation",
+        "video": "Video",
+        "audio": "Audio",
+        "pdf": "PDF",
+        "table_of_contents": "Table of contents",
+        "breadcrumb": "Breadcrumb",
+        "template": "Template button",
+        "unsupported": "Block"
+      }
+    }
   }
 }

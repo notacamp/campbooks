@@ -705,6 +705,10 @@ impl ConnectorsConfig {
         Ok(config)
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one check of every setting, top to bottom"
+    )]
     fn check(&self) -> Result<(), String> {
         if self.gmail.backfill_days == 0 || self.gmail.backfill_days > 3650 {
             return Err("CAMPBOOKS_CONNECTORS__GMAIL__BACKFILL_DAYS must be 1 to 3650".to_owned());

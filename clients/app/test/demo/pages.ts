@@ -193,3 +193,80 @@ export function viewOfDoc(summary: Summary, doc: Y.Doc, extra: Partial<View> = {
     ...extra,
   };
 }
+
+// --- Notion (campbooks-cloud#376) -------------------------------------------
+
+/** Notion's pages, as the connection lists them: Ana shared a roadmap with two sub-pages. */
+export const NOTION_ROADMAP = "0192f1a0-0000-7000-8000-0000000007a1";
+export const NOTION_OKRS = "0192f1a0-0000-7000-8000-0000000007a2";
+export const NOTION_RETRO = "0192f1a0-0000-7000-8000-0000000007a3";
+export const NOTION_NOTES = "0192f1a0-0000-7000-8000-0000000007a4";
+export const NOTION_HIRING = "0192f1a0-0000-7000-8000-0000000007a5";
+
+type NotionPage = Schema<"NotionPage">;
+
+const notionPage = (id: string, title: string, over: Partial<NotionPage> = {}): NotionPage => ({
+  notion_page: id,
+  title,
+  edited_at: "2026-10-25T09:00:00Z",
+  parent: null,
+  sub_pages: 0,
+  linked: false,
+  ...over,
+});
+
+export const NOTION_PAGES: readonly NotionPage[] = [
+  notionPage(NOTION_ROADMAP, "Product roadmap", { sub_pages: 2 }),
+  notionPage(NOTION_OKRS, "Q4 OKRs", { parent: NOTION_ROADMAP }),
+  notionPage(NOTION_RETRO, "Launch retro", { parent: NOTION_ROADMAP }),
+  notionPage(NOTION_NOTES, "Meeting notes"),
+  notionPage(NOTION_HIRING, "Hiring plan", { linked: true }),
+];
+
+/** The link of a page to its Notion page, syncing, last moved a minute ago. */
+export function notionLink(
+  page: string,
+  notionPageId: string,
+  over: Partial<Schema<"NotionLink">> = {},
+): Schema<"NotionLink"> {
+  return {
+    page,
+    connection: "0192f1a0-0000-7000-8000-0000000000c9",
+    notion_page: notionPageId,
+    state: "syncing",
+    stopped_reason: null,
+    owner: ANA.user_id,
+    conflicts: 0,
+    last_inbound_at: "2026-10-25T09:00:00Z",
+    last_outbound_at: null,
+    ...over,
+  };
+}
+
+/** The stable id of the paragraph the demo conflict is about. */
+export const CONFLICT_BLOCK = "0192f1a0-0000-7000-8000-0000000008b1";
+
+/**
+ * A page synced with Notion: a paragraph with a conflict beneath it (the
+ * launch date, changed on both sides), a block kept in Notion, and a
+ * paragraph nobody disagrees about. Blocks carry their stable ids.
+ */
+export function notionDoc(): Y.Doc {
+  const doc = new Y.Doc();
+  const withId = (name: string, bid: string, ...inline: string[]) => {
+    const element = block(name, { bid }, ...inline);
+    return element;
+  };
+  doc.getXmlFragment("default").push([
+    withId("heading", "0192f1a0-0000-7000-8000-0000000008a0", "Product roadmap"),
+    withId("paragraph", CONFLICT_BLOCK, "We launch on the 14th."),
+    wrap(
+      "conflict",
+      { of: CONFLICT_BLOCK, hash: "ab".repeat(32), edited: "2026-10-25T09:00:00.000Z", removed: false },
+      block("paragraph", {}, "We launch on the 21st."),
+    ),
+    block("external", { bid: "0192f1a0-0000-7000-8000-0000000008b2", kind: "column_list" }),
+    withId("paragraph", "0192f1a0-0000-7000-8000-0000000008b3", "Rui owns the launch checklist."),
+  ]);
+  return doc;
+}

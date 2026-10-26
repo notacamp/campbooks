@@ -123,8 +123,6 @@ pub async fn execute(
         Provider::Zoho => deps.zoho.is_some(),
         // Offered only while its flag is on (`Deps::microsoft`).
         Provider::Microsoft => deps.microsoft.is_some(),
-        // Notion has its own consent (`notion_connect`): it is not a way in.
-        Provider::Notion => false,
         // An IMAP mailbox has no consent page: it is connected with its
         // password (`connect_imap`).
         Provider::Imap if deps.imap_enabled() => {
@@ -132,7 +130,8 @@ pub async fn execute(
                 MESSAGES.reason("imap_connects_with_a_password"),
             ));
         }
-        Provider::Imap => false,
+        // Notion has its own consent (`notion_connect`): it is not a way in.
+        Provider::Imap | Provider::Notion => false,
     };
     if !configured || deps.cipher.is_none() {
         return Err(Error::Conflict(MESSAGES.reason("provider_not_configured")));

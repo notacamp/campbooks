@@ -286,7 +286,6 @@ impl Rig {
         &self,
         request: Uuid,
     ) -> Option<campbooks_kernel::outbound::StoredPageChanges> {
-        use campbooks_kernel::outbound::PageRequests as _;
         let mut tx = self.kit.begin(self.ws).await;
         let stored = crate::domain::notion::requests::page_requests()
             .stored_changes(&self.kit.state, &mut tx, self.ws, request)

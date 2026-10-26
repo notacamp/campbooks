@@ -446,6 +446,17 @@ pub async fn made(conn: &mut PgConnection, requests: &[Uuid]) -> Result<HashMap<
     Ok(rows.into_iter().collect())
 }
 
+/// A change's end as the database keeps it: page, block, state, reason, the
+/// block made and its edit time.
+type CompletedRow = (
+    Uuid,
+    Uuid,
+    String,
+    Option<String>,
+    Option<Uuid>,
+    Option<DateTime<Utc>>,
+);
+
 /// Tell the pages module how a request ended once every one of its changes
 /// has an end (`connectors.notion_changes_completed`, in `tx`).
 pub async fn complete(
@@ -464,14 +475,7 @@ pub async fn complete(
     if pending {
         return Ok(());
     }
-    let rows: Vec<(
-        Uuid,
-        Uuid,
-        String,
-        Option<String>,
-        Option<Uuid>,
-        Option<DateTime<Utc>>,
-    )> = sqlx::query_as(
+    let rows: Vec<CompletedRow> = sqlx::query_as(
         "SELECT page_id, block_id, state, reason, result_notion_id, result_edited_at
                FROM connectors.notion_changes WHERE request_id = $1 ORDER BY seq",
     )

@@ -26,8 +26,8 @@
 
 ## 4. Client
 
-- [ ] 4.1 Settings → Connections → Notion card and connect flow; reconnect state
-- [ ] 4.2 "Import from Notion" dialog; sync badge, Open in Notion, Stop syncing; "Kept in Notion" block; conflict block with the three choices and Undo; Share dialog warning
+- [x] 4.1 Settings → Connections → Notion card and connect flow; reconnect state; the `/connect/notion` route outside any workspace (sign-in and back, one workspace starts the flow, several ask which, Notion off says so)
+- [x] 4.2 "Import from Notion" dialog; sync badge, Open in Notion, Stop syncing; "Kept in Notion" block; conflict block with the three choices and Undo; Share dialog warning
 - [ ] 4.3 i18n en/pt-PT/es-ES/fr; Storybook screen stories (idle twins); `pnpm test:fit` 375/1280; tests for coverage ≥ 80%
 
 ## 5. Finish

@@ -82,7 +82,8 @@ impl SyncStream {
     /// trouble recorded, or applied).
     #[allow(
         clippy::too_many_lines,
-        reason = "one run read top to bottom: token, push, page, read, apply"
+        clippy::similar_names,
+        reason = "one run read top to bottom: token, push, page, read, apply; the page and the pace are different things"
     )]
     pub(super) async fn run_notion(
         &self,
@@ -265,7 +266,7 @@ impl SyncStream {
         let mut documents: HashMap<String, Option<ChangeDocument>> = HashMap::new();
         for row in &backlog.pending {
             let hash = row.body.0.hash.to_string();
-            if !documents.contains_key(&hash) {
+            if let std::collections::hash_map::Entry::Vacant(slot) = documents.entry(hash) {
                 let document = read_json::<ChangeDocument>(
                     &state.blobs,
                     workspace,
@@ -273,7 +274,7 @@ impl SyncStream {
                     MAX_CHANGE_BYTES,
                 )
                 .await?;
-                documents.insert(hash, document);
+                slot.insert(document);
             }
         }
         let mut made: HashMap<Uuid, Uuid> = {

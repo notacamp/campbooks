@@ -53,6 +53,10 @@ const PATIENCE_SECONDS: u32 = 10;
 
 /// A page the connection can see.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[allow(
+    clippy::struct_field_names,
+    reason = "the API's field names, which the client reads"
+)]
 pub struct NotionPage {
     /// The page's id at Notion.
     pub notion_page: Uuid,
@@ -122,7 +126,8 @@ pub async fn handler(
 /// account it is.
 #[allow(
     clippy::too_many_lines,
-    reason = "one listing read top to bottom: authority, token, search, counts"
+    clippy::similar_names,
+    reason = "one listing read top to bottom: authority, token, search, counts; the page and the pace are different things"
 )]
 pub async fn execute(
     state: &AppState,

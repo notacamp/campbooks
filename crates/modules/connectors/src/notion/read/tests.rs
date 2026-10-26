@@ -10,6 +10,7 @@ use crate::{
     config::NotionAdapter,
     domain::model::ConnectionId,
     notion::{ClientSecret, Endpoints, Notion},
+    provider::ProviderError,
     testkit::Kit,
     testkit_notion::{CLIENT_ID, CLIENT_SECRET, FakeNotion, rich},
 };

@@ -112,6 +112,10 @@ impl Kind {
     }
 }
 
+#[allow(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if takes a reference"
+)]
 fn is_false(value: &bool) -> bool {
     !*value
 }
@@ -466,15 +470,12 @@ fn percent_decode(raw: &str) -> String {
             .flatten()
             .and_then(|pair| std::str::from_utf8(pair).ok())
             .and_then(|pair| u8::from_str_radix(pair, 16).ok());
-        match decoded {
-            Some(value) => {
-                out.push(value);
-                at += 3;
-            }
-            None => {
-                out.push(byte);
-                at += 1;
-            }
+        if let Some(value) = decoded {
+            out.push(value);
+            at += 3;
+        } else {
+            out.push(byte);
+            at += 1;
         }
     }
     String::from_utf8_lossy(&out).into_owned()

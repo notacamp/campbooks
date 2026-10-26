@@ -13,6 +13,18 @@ export type UploadedFile = Schema<"UploadedFile">;
 export type NewPage = Schema<"NewPage">;
 export type PageMoveBody = Schema<"PageMove">;
 
+// The Notion shapes of the pages API, named once here so a rename in the
+// generated document is a one-line fix.
+export type NotionLink = Schema<"NotionLink">;
+export type NotionLinks = Schema<"NotionLinks">;
+export type NotionLinkState = Schema<"NotionLinkState">;
+export type NotionStopReason = Schema<"NotionStopReason">;
+export type ImportFromNotionBody = Schema<"ImportFromNotion">;
+export type Imported = Schema<"Imported">;
+export type NotionKeep = Schema<"NotionKeep">;
+export type Resolved = Schema<"Resolved">;
+export type Undone = Schema<"Undone">;
+
 /** The icons a page may have: the server's fixed set, by the design system's icon names. */
 export const PAGE_ICONS = [
   "document",

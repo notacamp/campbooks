@@ -83,7 +83,8 @@ struct Reader<'a> {
 /// Read the blocks of `page` as they are now.
 #[allow(
     clippy::too_many_arguments,
-    reason = "one call site; the values are distinct"
+    clippy::similar_names,
+    reason = "one call site; the values are distinct, and the page is not the pace"
 )]
 pub async fn read_page(
     notion: &Notion,

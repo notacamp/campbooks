@@ -125,8 +125,6 @@ pub async fn finish(
 /// The Notion page a `pages` stream reads, and the page it feeds.
 #[derive(Debug, Clone, Copy, sqlx::FromRow)]
 pub struct Link {
-    /// The stream.
-    pub stream_id: StreamId,
     /// The Notion page.
     pub notion_page_id: Uuid,
     /// The pages module's page.
@@ -136,7 +134,7 @@ pub struct Link {
 /// The link of `stream`, when it has one.
 pub async fn link_of(conn: &mut PgConnection, stream: StreamId) -> Result<Option<Link>> {
     Ok(sqlx::query_as(
-        "SELECT stream_id, notion_page_id, page_id FROM connectors.notion_links
+        "SELECT notion_page_id, page_id FROM connectors.notion_links
           WHERE stream_id = $1",
     )
     .bind(stream)
