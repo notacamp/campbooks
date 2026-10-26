@@ -3528,7 +3528,10 @@ export interface components {
         ConnectedApp: {
             /** @description The app's client id. */
             client_id: string;
-            /** @description `first_party`, `workspace`, `dynamic` or `metadata_document`. */
+            /**
+             * @description `first_party`, `workspace`, `dynamic`, `metadata_document` or
+             *     `instance` (registered by this instance's administrator).
+             */
             client_kind?: string | null;
             /** @description Its name; `null` when the app is gone (its tokens no longer work). */
             client_name?: string | null;
@@ -3630,7 +3633,10 @@ export interface components {
             document_host?: string | null;
             /** @description Its client id. */
             id: string;
-            /** @description `first_party`, `workspace`, `dynamic` or `metadata_document`. */
+            /**
+             * @description `first_party`, `workspace`, `dynamic`, `metadata_document` or
+             *     `instance` (registered by this instance's administrator).
+             */
             kind: string;
             /** @description Its logo (a workspace's own app only). */
             logo_uri?: string | null;
@@ -3643,7 +3649,7 @@ export interface components {
             redirect_host?: string | null;
             /**
              * @description Whether it is Campbooks' own app. Every other app's name is its
-             *     registrant's word.
+             *     registrant's word (an instance app's, the instance administrator's).
              */
             verified: boolean;
             /**
