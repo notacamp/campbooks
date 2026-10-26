@@ -164,7 +164,9 @@ fn scalar(spec: &Spec, alias: &str) -> Result<(String, Kind)> {
         PropertyType::Created => ("p.created_at".into(), Kind::Instant),
         PropertyType::Edited => ("p.edited_at".into(), Kind::Instant),
         PropertyType::Checkbox => (
-            format!("(CASE WHEN jsonb_typeof({a}.value) = 'boolean' THEN ({a}.value #>> '{{}}')::boolean END)"),
+            format!(
+                "(CASE WHEN jsonb_typeof({a}.value) = 'boolean' THEN ({a}.value #>> '{{}}')::boolean END)"
+            ),
             Kind::Bool,
         ),
         PropertyType::MultiSelect
@@ -216,7 +218,10 @@ pub fn condition(
     let negated = matches!(condition.operator, IsNot | DoesNotContain);
     let positive = match (kind, condition.operator, &condition.operand) {
         (Kind::Text, Is | IsNot, Operand::Text(text)) => {
-            format!("lower({e}) = lower({})", binds.push(Bind::Text(text.clone())))
+            format!(
+                "lower({e}) = lower({})",
+                binds.push(Bind::Text(text.clone()))
+            )
         }
         (Kind::Text, Contains | DoesNotContain, Operand::Text(text)) => format!(
             "strpos(lower({e}), lower({})) > 0",
@@ -245,7 +250,10 @@ pub fn condition(
             format!("{e} = {}", binds.push(Bind::Text(id.clone())))
         }
         (Kind::Id, IsAnyOf, Operand::Ids(ids)) => {
-            format!("{e} = ANY({}::text[])", binds.push(Bind::Texts(ids.clone())))
+            format!(
+                "{e} = ANY({}::text[])",
+                binds.push(Bind::Texts(ids.clone()))
+            )
         }
         (Kind::Json, Contains | DoesNotContain, Operand::Id(id)) => format!(
             "(jsonb_typeof({e}) = 'array' AND {e} @> jsonb_build_array({}::text))",
@@ -335,7 +343,10 @@ pub fn order_by(
                 .into_iter()
                 .map(|option| option.id)
                 .collect();
-            format!("array_position({}::text[], {e})", binds.push(Bind::Texts(ids)))
+            format!(
+                "array_position({}::text[], {e})",
+                binds.push(Bind::Texts(ids))
+            )
         }
         (_, Kind::Text) => format!("lower({e})"),
         (_, Kind::Bool) => format!("COALESCE({e}, false)"),
@@ -363,7 +374,11 @@ pub fn aggregate(spec: &Spec, alias: &str, kind: SummaryKind) -> Result<String> 
         (SummaryKind::Sum, _) => format!("sum({e})::text"),
         (SummaryKind::Average, _) => format!("round(avg({e}), 9)::text"),
         (SummaryKind::Min | SummaryKind::Max, Kind::Instant) => {
-            let function = if kind == SummaryKind::Min { "min" } else { "max" };
+            let function = if kind == SummaryKind::Min {
+                "min"
+            } else {
+                "max"
+            };
             format!(
                 "to_char({function}({e}) AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"')"
             )

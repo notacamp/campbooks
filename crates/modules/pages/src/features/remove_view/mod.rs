@@ -71,7 +71,14 @@ pub async fn handler(
         .bind(path.table_id)
         .execute(&mut *tx)
         .await?;
-    tables::changed(&state, &mut tx, access, path.table_id, &[TableChangeKind::Views]).await?;
+    tables::changed(
+        &state,
+        &mut tx,
+        access,
+        path.table_id,
+        &[TableChangeKind::Views],
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(removed))
 }

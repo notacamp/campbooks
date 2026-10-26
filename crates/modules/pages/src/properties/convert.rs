@@ -107,9 +107,9 @@ fn names_of(from: &Spec, cell: &Value) -> Vec<String> {
             .filter(|option| value::id_list(cell).contains(&option.id))
             .map(|option| option.name)
             .collect(),
-        PropertyType::Select | PropertyType::Status => {
-            plain_text(from.ty, &from.config, cell).into_iter().collect()
-        }
+        PropertyType::Select | PropertyType::Status => plain_text(from.ty, &from.config, cell)
+            .into_iter()
+            .collect(),
         PropertyType::Text | PropertyType::Url | PropertyType::Email | PropertyType::Phone => {
             plain_text(from.ty, &from.config, cell)
                 .map(|text| text.split(',').map(|part| part.trim().to_owned()).collect())
@@ -212,10 +212,10 @@ fn date(config: &Value, cell: &Value) -> Option<Value> {
     if let Some(end) = cell.get("end").and_then(Value::as_str) {
         candidate.insert("end".into(), Value::String(cut(end)?));
     }
-    if config::date_has_time(config) {
-        if let Some(zone) = cell.get("time_zone") {
-            candidate.insert("time_zone".into(), zone.clone());
-        }
+    if config::date_has_time(config)
+        && let Some(zone) = cell.get("time_zone")
+    {
+        candidate.insert("time_zone".into(), zone.clone());
     }
     value::validate(PropertyType::Date, config, &Value::Object(candidate)).ok()
 }

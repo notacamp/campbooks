@@ -93,8 +93,10 @@ pub fn module(deps: Deps) -> Module {
 /// Every route of the module, one per feature.
 fn router(deps: Deps) -> OpenApiRouter<AppState> {
     use features::{
-        add_property, add_row, backlinks, create, create_table, create_view, file, get, get_table, query_table, remove_property, remove_view, restore_property, set_cells, set_options, update_property, update_view, import_from_notion, list, list_notion_links, move_page,
-        resolve_conflict, share, stop_sync, sync, trash, undo_resolve_conflict, update, upload,
+        add_property, add_row, backlinks, create, create_table, create_view, file, get, get_table,
+        import_from_notion, list, list_notion_links, move_page, query_table, remove_property,
+        remove_view, resolve_conflict, restore_property, set_cells, set_options, share, stop_sync,
+        sync, trash, undo_resolve_conflict, update, update_property, update_view, upload,
     };
     // A file is up to 20 MiB; everything else is small.
     let uploads = OpenApiRouter::new()

@@ -21,6 +21,11 @@
 //!
 //! Errors are [`PropertyError`]s: a stable code, never the value.
 
+#![allow(
+    clippy::implicit_hasher,
+    reason = "the library takes the standard map of a table's properties, nothing else makes one"
+)]
+
 pub mod config;
 pub mod convert;
 pub mod eval;
@@ -228,7 +233,8 @@ impl PropertyType {
         !self.computed()
     }
 
-    /// Whether rows can be ordered by it.
+    /// Whether rows can be ordered by it (a created or edited property that
+    /// shows who cannot: see [`Spec::sortable`]).
     pub const fn sortable(self) -> bool {
         matches!(
             self,
@@ -267,6 +273,13 @@ pub struct Spec {
 }
 
 impl Spec {
+    /// Whether rows can be ordered by this property.
+    pub fn sortable(&self) -> bool {
+        self.ty.sortable()
+            && !(matches!(self.ty, PropertyType::Created | PropertyType::Edited)
+                && config::shows_who(&self.config))
+    }
+
     /// A property.
     pub fn new(id: uuid::Uuid, ty: PropertyType, config: serde_json::Value) -> Self {
         Self { id, ty, config }

@@ -123,8 +123,8 @@ END
 $$;
 
 -- The daily purge also finds, across workspaces, which hold a property
--- removed more than 30 days ago: read only, and it reads nothing but ids and
+-- removed, or changed of type, more than 30 days ago: read only, and it reads nothing but ids and
 -- times.
 DROP POLICY IF EXISTS maintenance_reads_removed_properties ON pages.table_properties;
 CREATE POLICY maintenance_reads_removed_properties ON pages.table_properties FOR SELECT
-    USING (current_setting('campbooks.maintenance_scope', true) = 'on' AND removed_at IS NOT NULL);
+    USING (current_setting('campbooks.maintenance_scope', true) = 'on' AND (removed_at IS NOT NULL OR converted_at IS NOT NULL));

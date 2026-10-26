@@ -17,11 +17,29 @@ async fn every_type_a_member_may_make_can_be_made_and_the_reserved_ones_cannot(d
     let other = kit.table(&marta, ws).await;
     let uri = format!("{}/{id}/properties", Kit::tables(ws));
     for ty in [
-        "text", "number", "select", "multi_select", "status", "date", "checkbox", "person",
-        "files", "url", "email", "phone", "campbooks_link", "created", "edited", "unique_id",
+        "text",
+        "number",
+        "select",
+        "multi_select",
+        "status",
+        "date",
+        "checkbox",
+        "person",
+        "files",
+        "url",
+        "email",
+        "phone",
+        "campbooks_link",
+        "created",
+        "edited",
+        "unique_id",
     ] {
         let made = kit
-            .post(&marta, &uri, Some(json!({"name": format!("P {ty}"), "type": ty})))
+            .post(
+                &marta,
+                &uri,
+                Some(json!({"name": format!("P {ty}"), "type": ty})),
+            )
             .await;
         assert_eq!(made.status, StatusCode::CREATED, "{ty}: {:?}", made.json);
         assert_eq!(made.json["property"]["type"], ty);
@@ -35,7 +53,13 @@ async fn every_type_a_member_may_make_can_be_made_and_the_reserved_ones_cannot(d
         )
         .await;
     assert_eq!(relation.status, StatusCode::CREATED, "{:?}", relation.json);
-    for ty in ["title", "notion_formula", "notion_rollup", "notion_people", "external"] {
+    for ty in [
+        "title",
+        "notion_formula",
+        "notion_rollup",
+        "notion_people",
+        "external",
+    ] {
         let refused = kit
             .post(&marta, &uri, Some(json!({"name": "X", "type": ty})))
             .await;
@@ -55,7 +79,11 @@ async fn every_type_a_member_may_make_can_be_made_and_the_reserved_ones_cannot(d
     }
     let tracked = campbooks_kernel::testing::tracked_events(&kit.db, "pages.property_added").await;
     assert_eq!(tracked.len(), 17);
-    assert!(!tracked.iter().any(|e| e.body.to_string().contains("P text")));
+    assert!(
+        !tracked
+            .iter()
+            .any(|e| e.body.to_string().contains("P text"))
+    );
     let events = kit.events("pages.table_changed").await;
     assert!(!events.is_empty());
     assert!(!events.iter().any(|e| e.to_string().contains("P text")));
@@ -93,15 +121,30 @@ async fn a_paired_relation_makes_its_other_side_and_both_are_written_together(db
         project["id"].as_str().unwrap(),
     );
     let set = kit
-        .cells(&marta, ws, c, client_id, json!([{"property": forward, "value": [project_id]}]))
+        .cells(
+            &marta,
+            ws,
+            c,
+            client_id,
+            json!([{"property": forward, "value": [project_id]}]),
+        )
         .await;
     assert_eq!(set.status, StatusCode::OK, "{:?}", set.json);
     // The other side shows it.
     let rows = kit.query(&marta, ws, p, json!({})).await;
-    assert_eq!(rows.json["rows"][0]["cells"][back]["value"], json!([client_id]));
+    assert_eq!(
+        rows.json["rows"][0]["cells"][back]["value"],
+        json!([client_id])
+    );
     // And taking it away on this side takes it off the other.
-    kit.cells(&marta, ws, c, client_id, json!([{"property": forward, "value": null}]))
-        .await;
+    kit.cells(
+        &marta,
+        ws,
+        c,
+        client_id,
+        json!([{"property": forward, "value": null}]),
+    )
+    .await;
     let rows = kit.query(&marta, ws, p, json!({})).await;
     assert!(rows.json["rows"][0]["cells"].get(back).is_none());
 }
@@ -147,9 +190,15 @@ async fn a_reader_cannot_add_a_property_and_a_stranger_does_not_see_the_table(db
     let id = made.json["page"]["id"].as_str().unwrap().to_owned();
     let uri = format!("{}/{id}/properties", Kit::tables(ws));
     let body = json!({"name": "X", "type": "text"});
-    assert_eq!(kit.post(&rui, &uri, Some(body.clone())).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        kit.post(&rui, &uri, Some(body.clone())).await.status,
+        StatusCode::NOT_FOUND
+    );
     kit.share(&marta, ws, &id, rui_id, "reader").await;
-    assert_eq!(kit.post(&rui, &uri, Some(body)).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        kit.post(&rui, &uri, Some(body)).await.status,
+        StatusCode::FORBIDDEN
+    );
     let got = kit.get(&marta, &format!("{}/{id}", Kit::tables(ws))).await;
     assert_eq!(got.json["properties"].as_array().unwrap().len(), 1);
 }

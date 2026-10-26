@@ -79,9 +79,9 @@ fn datum(spec: &Spec, row: &RowFacts) -> Datum {
             };
             match spec.ty {
                 PropertyType::Text => Datum::Text(runs_text(value)),
-                PropertyType::Url | PropertyType::Email | PropertyType::Phone => {
-                    value.as_str().map_or(Datum::Empty, |t| Datum::Text(t.into()))
-                }
+                PropertyType::Url | PropertyType::Email | PropertyType::Phone => value
+                    .as_str()
+                    .map_or(Datum::Empty, |t| Datum::Text(t.into())),
                 PropertyType::Number => value
                     .as_str()
                     .and_then(scaled)
@@ -94,6 +94,19 @@ fn datum(spec: &Spec, row: &RowFacts) -> Datum {
                     .and_then(Value::as_str)
                     .and_then(parse_when)
                     .map_or(Datum::Empty, |when| Datum::Instant(when.instant())),
+                PropertyType::Files => Datum::Ids(
+                    value
+                        .as_array()
+                        .map(|files| {
+                            files
+                                .iter()
+                                .filter_map(|file| {
+                                    file.get("hash")?.as_str().map(ToOwned::to_owned)
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                ),
                 PropertyType::CampbooksLink => Datum::Links(
                     value
                         .as_array()
@@ -249,7 +262,11 @@ pub fn summarise(spec: &Spec, kind: SummaryKind, rows: &[&RowFacts]) -> Option<S
     let render = |scaled: i128| {
         let sign = if scaled < 0 { "-" } else { "" };
         let magnitude = scaled.unsigned_abs();
-        let text = format!("{sign}{}.{:09}", magnitude / 1_000_000_000, magnitude % 1_000_000_000);
+        let text = format!(
+            "{sign}{}.{:09}",
+            magnitude / 1_000_000_000,
+            magnitude % 1_000_000_000
+        );
         parse_decimal(&text)
     };
     let numbers: Vec<i128> = rows
@@ -273,7 +290,8 @@ pub fn summarise(spec: &Spec, kind: SummaryKind, rows: &[&RowFacts]) -> Option<S
                 .iter()
                 .filter(|row| datum(spec, row) == Datum::Bool(true))
                 .count();
-            let hundredths = i128::try_from(checked).ok()? * 10_000 / i128::try_from(rows.len()).ok()?;
+            let hundredths =
+                i128::try_from(checked).ok()? * 10_000 / i128::try_from(rows.len()).ok()?;
             // `round(…, 2)` rounds half up; the test data keeps to counts
             // whose share is exact to two decimals.
             let text = format!("{}.{:02}", hundredths / 100, hundredths % 100);

@@ -153,12 +153,11 @@ pub async fn readable(conn: &mut PgConnection, access: &Access) -> Result<HashMa
     let Some(caller) = Caller::of(access) else {
         return Ok(HashMap::new());
     };
-    let rows: Vec<NodeRow> =
-        sqlx::query_as(
-            "SELECT id, parent_id, place, created_by FROM pages.pages WHERE kind <> 'row'",
-        )
-            .fetch_all(&mut *conn)
-            .await?;
+    let rows: Vec<NodeRow> = sqlx::query_as(
+        "SELECT id, parent_id, place, created_by FROM pages.pages WHERE kind <> 'row'",
+    )
+    .fetch_all(&mut *conn)
+    .await?;
     let nodes: Vec<Node> = rows.into_iter().map(node_of).collect::<Result<_>>()?;
     let rows: Vec<(PageId, String)> =
         sqlx::query_as("SELECT page_id, role FROM pages.grants WHERE member_id = $1")

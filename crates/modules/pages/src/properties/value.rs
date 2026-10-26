@@ -245,10 +245,9 @@ fn text(raw: &Value) -> Result<Value> {
     let mut length = 0;
     for run in &runs {
         let object = run.as_object().ok_or(PropertyError::VALUE)?;
-        if object
-            .keys()
-            .any(|key| !["text", "bold", "italic", "strike", "code", "href"].contains(&key.as_str()))
-        {
+        if object.keys().any(|key| {
+            !["text", "bold", "italic", "strike", "code", "href"].contains(&key.as_str())
+        }) {
             return Err(PropertyError::VALUE);
         }
         let content = clean_text(
@@ -373,10 +372,10 @@ fn date(config: &Value, raw: &Value) -> Result<Value> {
     if has_time && !date_has_time(config) {
         return Err(PropertyError::VALUE);
     }
-    if let Some(end) = end {
-        if matches!(end, When::At(_)) != has_time || end.instant() < start.instant() {
-            return Err(PropertyError::VALUE);
-        }
+    if let Some(end) = end
+        && (matches!(end, When::At(_)) != has_time || end.instant() < start.instant())
+    {
+        return Err(PropertyError::VALUE);
     }
     let mut out = Map::new();
     out.insert("start".into(), Value::String(start.text()));
@@ -574,10 +573,7 @@ pub fn plain_text(ty: PropertyType, config: &Value, value: &Value) -> Option<Str
         }
         PropertyType::Select | PropertyType::Status => value.as_str().and_then(name_of),
         PropertyType::MultiSelect => {
-            let names: Vec<String> = id_list(value)
-                .iter()
-                .filter_map(|id| name_of(id))
-                .collect();
+            let names: Vec<String> = id_list(value).iter().filter_map(|id| name_of(id)).collect();
             Some(names.join(", ")).filter(|text| !text.is_empty())
         }
         PropertyType::Date => value

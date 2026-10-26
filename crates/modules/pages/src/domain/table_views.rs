@@ -12,6 +12,11 @@
 //! Views are stored generically: `list`, `calendar` and `gallery` are
 //! reserved types, refused until they are built, with no data to change.
 
+#![allow(
+    clippy::implicit_hasher,
+    reason = "it takes the standard map of a table's properties, nothing else makes one"
+)]
+
 use std::{collections::HashMap, str::FromStr};
 
 use campbooks_kernel::{Error, Result};
@@ -95,6 +100,10 @@ fn property_of(raw: &Value, specs: &HashMap<Uuid, Spec>) -> Result<Uuid> {
         .ok_or_else(invalid)
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "one pass over every key a view config may hold"
+)]
 /// `raw` as the stored config of a view of type `ty` for a table with
 /// `specs`, or why not.
 pub fn normalise(ty: ViewType, raw: &Value, specs: &HashMap<Uuid, Spec>) -> Result<Value> {
@@ -189,9 +198,9 @@ pub fn normalise(ty: ViewType, raw: &Value, specs: &HashMap<Uuid, Spec>) -> Resu
                         .filter(|id| {
                             !id.is_empty()
                                 && id.len() <= 40
-                                && id.chars().all(|c| {
-                                    c.is_ascii_alphanumeric() || c == '_' || c == '-'
-                                })
+                                && id
+                                    .chars()
+                                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
                         })
                         .map(ToOwned::to_owned)
                         .ok_or_else(invalid)
@@ -243,7 +252,7 @@ pub fn resolve(config: &Value, specs: &HashMap<Uuid, Spec>) -> Result<Resolved> 
         .unwrap_or_default();
     let sorts = sorts
         .into_iter()
-        .filter(|sort| specs.get(&sort.property).is_some_and(|spec| spec.ty.sortable()))
+        .filter(|sort| specs.get(&sort.property).is_some_and(Spec::sortable))
         .collect();
     let summaries: Vec<Summary> = config
         .get("summaries")

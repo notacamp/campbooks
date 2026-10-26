@@ -138,9 +138,22 @@ pub async fn handler(
     .bind(creator)
     .execute(&mut *tx)
     .await?;
-    tables::changed(&state, &mut tx, access, path.table_id, &[TableChangeKind::Views]).await?;
-    tracked::view_created(&state, &mut tx, access.workspace, path.table_id, request.view_type)
-        .await?;
+    tables::changed(
+        &state,
+        &mut tx,
+        access,
+        path.table_id,
+        &[TableChangeKind::Views],
+    )
+    .await?;
+    tracked::view_created(
+        &state,
+        &mut tx,
+        access.workspace,
+        path.table_id,
+        request.view_type,
+    )
+    .await?;
     let made: ViewRow = tables::views(&mut tx, path.table_id)
         .await?
         .into_iter()

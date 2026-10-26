@@ -179,7 +179,6 @@ macro_rules! property_columns {
     };
 }
 
-
 impl PropertyRow {
     /// Its type.
     pub fn ty(&self) -> Result<PropertyType> {
@@ -190,7 +189,11 @@ impl PropertyRow {
 
     /// The library's view of it.
     pub fn spec(&self) -> Result<Spec> {
-        Ok(Spec::new(*self.id.as_uuid(), self.ty()?, self.config.clone()))
+        Ok(Spec::new(
+            *self.id.as_uuid(),
+            self.ty()?,
+            self.config.clone(),
+        ))
     }
 
     /// As the API shows it.
@@ -259,7 +262,6 @@ macro_rules! view_columns {
         "id, name, type AS view_type, position, config"
     };
 }
-
 
 impl ViewRow {
     /// As the API shows it.
@@ -473,7 +475,18 @@ pub async fn rows(conn: &mut PgConnection, table: PageId, ids: &[PageId]) -> Res
     let mut views: HashMap<PageId, RowView> = heads
         .into_iter()
         .map(
-            |(id, table, number, title, created_by, created_at, edited_by, edited_at, revision, meta_revision)| {
+            |(
+                id,
+                table,
+                number,
+                title,
+                created_by,
+                created_at,
+                edited_by,
+                edited_at,
+                revision,
+                meta_revision,
+            )| {
                 (
                     id,
                     RowView {
@@ -555,10 +568,10 @@ pub async fn row_set_changed(
     access: &Access,
     page: &PageRow,
 ) -> Result<()> {
-    if page.kind()? == Kind::Row {
-        if let Some(table) = page.parent_id {
-            changed(state, tx, access, table, &[TableChangeKind::Rows]).await?;
-        }
+    if page.kind()? == Kind::Row
+        && let Some(table) = page.parent_id
+    {
+        changed(state, tx, access, table, &[TableChangeKind::Rows]).await?;
     }
     Ok(())
 }

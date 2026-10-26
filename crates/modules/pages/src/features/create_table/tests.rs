@@ -98,7 +98,10 @@ async fn a_stranger_does_not_see_the_table_and_a_reader_reads_it(db: PgPool) {
     // An ordinary page is not a table.
     let page = kit.add(&marta, ws, json!({"title": "P"})).await;
     let not = kit
-        .get(&marta, &format!("{}/{}", Kit::tables(ws), page["id"].as_str().unwrap()))
+        .get(
+            &marta,
+            &format!("{}/{}", Kit::tables(ws), page["id"].as_str().unwrap()),
+        )
         .await;
     assert_eq!(not.status, StatusCode::CONFLICT);
     assert_eq!(not.json["code"], "not_a_table");

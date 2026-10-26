@@ -47,8 +47,17 @@ impl Rng {
     }
 }
 
-const WORDS: &[&str] = &[
-    "alpha", "Beta", "gamma", "delta alpha", "x%y", "a_b", "north", "Zulu", "100%", "o'clock",
+pub(crate) const WORDS: &[&str] = &[
+    "alpha",
+    "Beta",
+    "gamma",
+    "delta alpha",
+    "x%y",
+    "a_b",
+    "north",
+    "Zulu",
+    "100%",
+    "o'clock",
 ];
 
 fn option(id: &str, name: &str, group: Option<StatusGroup>) -> SelectOption {
@@ -63,12 +72,19 @@ fn option(id: &str, name: &str, group: Option<StatusGroup>) -> SelectOption {
 /// One property of every filterable and storable type, with its config.
 pub fn specs() -> Vec<(&'static str, Spec)> {
     let make = |name, ty, config: Value| {
-        (name, Spec::new(Uuid::now_v7(), ty, config::normalise(ty, &config).unwrap()))
+        (
+            name,
+            Spec::new(Uuid::now_v7(), ty, config::normalise(ty, &config).unwrap()),
+        )
     };
     vec![
         make("title", T::Title, json!({})),
         make("text", T::Text, json!({})),
-        make("number", T::Number, json!({"format": "currency", "currency": "EUR"})),
+        make(
+            "number",
+            T::Number,
+            json!({"format": "currency", "currency": "EUR"}),
+        ),
         (
             "select",
             Spec::new(
@@ -76,7 +92,11 @@ pub fn specs() -> Vec<(&'static str, Spec)> {
                 T::Select,
                 config::with_options(
                     T::Select,
-                    &[option("s1", "One", None), option("s2", "Two", None), option("s3", "Three", None)],
+                    &[
+                        option("s1", "One", None),
+                        option("s2", "Two", None),
+                        option("s3", "Three", None),
+                    ],
                 )
                 .unwrap(),
             ),
@@ -88,7 +108,11 @@ pub fn specs() -> Vec<(&'static str, Spec)> {
                 T::MultiSelect,
                 config::with_options(
                     T::MultiSelect,
-                    &[option("m1", "Red", None), option("m2", "Green", None), option("m3", "Blue", None)],
+                    &[
+                        option("m1", "Red", None),
+                        option("m2", "Green", None),
+                        option("m3", "Blue", None),
+                    ],
                 )
                 .unwrap(),
             ),
@@ -117,8 +141,16 @@ pub fn specs() -> Vec<(&'static str, Spec)> {
         make("url", T::Url, json!({})),
         make("email", T::Email, json!({})),
         make("phone", T::Phone, json!({})),
-        make("relation", T::Relation, json!({"table": Uuid::now_v7().to_string()})),
-        make("link", T::CampbooksLink, json!({"types": ["tasks.task", "schedule.event"]})),
+        make(
+            "relation",
+            T::Relation,
+            json!({"table": Uuid::now_v7().to_string()}),
+        ),
+        make(
+            "link",
+            T::CampbooksLink,
+            json!({"types": ["tasks.task", "schedule.event"]}),
+        ),
         make("created", T::Created, json!({"of": "time"})),
         make("created_by", T::Created, json!({"of": "who"})),
         make("edited", T::Edited, json!({"of": "time"})),
@@ -126,15 +158,15 @@ pub fn specs() -> Vec<(&'static str, Spec)> {
     ]
 }
 
-fn members() -> Vec<Uuid> {
-    (1..=4).map(|n| Uuid::from_u128(n)).collect()
+pub(crate) fn members() -> Vec<Uuid> {
+    (1..=4).map(Uuid::from_u128).collect()
 }
 
-fn day(rng: &mut Rng) -> String {
+pub(crate) fn day(rng: &mut Rng) -> String {
     format!("2026-{:02}-{:02}", 1 + rng.below(12), 1 + rng.below(28))
 }
 
-fn instant(rng: &mut Rng) -> String {
+pub(crate) fn instant(rng: &mut Rng) -> String {
     format!(
         "{}T{:02}:{:02}:00+00:00",
         day(rng),
@@ -159,7 +191,9 @@ pub fn generate(rng: &mut Rng, spec: &Spec) -> Value {
         return Value::Null;
     }
     let raw = match spec.ty {
-        T::Text => json!([{"text": *rng.pick(WORDS), "bold": rng.chance(30)}, {"text": *rng.pick(WORDS)}]),
+        T::Text => {
+            json!([{"text": *rng.pick(WORDS), "bold": rng.chance(30)}, {"text": *rng.pick(WORDS)}])
+        }
         T::Number => json!(decimal(rng)),
         T::Select | T::Status => {
             let options = config::options_of(&spec.config);
@@ -167,7 +201,11 @@ pub fn generate(rng: &mut Rng, spec: &Spec) -> Value {
         }
         T::MultiSelect => {
             let options = config::options_of(&spec.config);
-            let ids: Vec<&String> = options.iter().filter(|_| rng.chance(50)).map(|o| &o.id).collect();
+            let ids: Vec<&String> = options
+                .iter()
+                .filter(|_| rng.chance(50))
+                .map(|o| &o.id)
+                .collect();
             json!(ids)
         }
         T::Date => {
@@ -178,14 +216,22 @@ pub fn generate(rng: &mut Rng, spec: &Spec) -> Value {
         T::Checkbox => json!(rng.chance(50)),
         T::Person => {
             let people = members();
-            let ids: Vec<String> = people.iter().filter(|_| rng.chance(40)).map(Uuid::to_string).collect();
+            let ids: Vec<String> = people
+                .iter()
+                .filter(|_| rng.chance(40))
+                .map(Uuid::to_string)
+                .collect();
             json!(ids)
         }
         T::Relation => {
-            let ids: Vec<String> = (0..rng.below(3)).map(|_| Uuid::from_u128(100 + rng.below(5) as u128).to_string()).collect();
+            let ids: Vec<String> = (0..rng.below(3))
+                .map(|_| Uuid::from_u128(100 + rng.below(5) as u128).to_string())
+                .collect();
             json!(ids)
         }
-        T::Files => json!([{"hash": "ab".repeat(32), "name": "plan.pdf", "size": rng.below(5000), "type": "application/pdf"}]),
+        T::Files => {
+            json!([{"hash": "ab".repeat(32), "name": "plan.pdf", "size": rng.below(5000), "type": "application/pdf"}])
+        }
         T::Url => json!(format!("https://example.com/{}", rng.below(50))),
         T::Email => json!(format!("user{}@example.com", rng.below(50))),
         T::Phone => json!(format!("+351 {}", 900_000_000 + rng.below(99_999))),
@@ -256,7 +302,13 @@ fn computed_and_reserved_types_are_never_written() {
 
 #[test]
 fn reserved_types_cannot_be_created_by_a_member() {
-    for ty in [T::NotionFormula, T::NotionRollup, T::NotionPeople, T::External, T::Title] {
+    for ty in [
+        T::NotionFormula,
+        T::NotionRollup,
+        T::NotionPeople,
+        T::External,
+        T::Title,
+    ] {
         assert!(!ty.creatable(), "{ty:?}");
     }
     assert!(T::ALL.iter().filter(|ty| ty.creatable()).count() >= 17);
@@ -268,22 +320,42 @@ fn numbers_are_canonical_decimals_with_a_total_order() {
     for _ in 0..500 {
         let a = decimal(&mut rng);
         let canonical = parse_decimal(&a).unwrap();
-        assert_eq!(parse_decimal(&canonical).as_deref(), Some(canonical.as_str()));
-        let (x, y) = (eval::scaled(&a).unwrap(), eval::scaled(&decimal(&mut rng)).unwrap());
+        assert_eq!(
+            parse_decimal(&canonical).as_deref(),
+            Some(canonical.as_str())
+        );
+        let (x, y) = (
+            eval::scaled(&a).unwrap(),
+            eval::scaled(&decimal(&mut rng)).unwrap(),
+        );
         assert_eq!(x.cmp(&y), y.cmp(&x).reverse());
     }
-    for bad in ["", "-", "1e5", "1,5", "+1", ".5", "5.", "lots", "1 2", "--1", "1.2.3"] {
+    for bad in [
+        "", "-", "1e5", "1,5", "+1", ".5", "5.", "lots", "1 2", "--1", "1.2.3",
+    ] {
         assert_eq!(parse_decimal(bad), None, "{bad}");
-        assert!(validate(T::Number, &json!({"format": "number"}), &json!(bad)).is_err() || bad.is_empty());
+        assert!(
+            validate(T::Number, &json!({"format": "number"}), &json!(bad)).is_err()
+                || bad.is_empty()
+        );
     }
     assert_eq!(parse_decimal("-0.0").as_deref(), Some("0"));
     assert_eq!(parse_decimal("007.500").as_deref(), Some("7.5"));
     assert_eq!(parse_decimal("1234567890123456"), None);
     assert_eq!(parse_decimal("0.1234567891"), None);
     let number = json!({"format": "number"});
-    assert_eq!(validate(T::Number, &number, &json!(12)).unwrap(), json!("12"));
-    assert_eq!(validate(T::Number, &number, &json!(0.5)).unwrap(), json!("0.5"));
-    assert_eq!(validate(T::Number, &number, &json!("")).unwrap(), Value::Null);
+    assert_eq!(
+        validate(T::Number, &number, &json!(12)).unwrap(),
+        json!("12")
+    );
+    assert_eq!(
+        validate(T::Number, &number, &json!(0.5)).unwrap(),
+        json!("0.5")
+    );
+    assert_eq!(
+        validate(T::Number, &number, &json!("")).unwrap(),
+        Value::Null
+    );
 }
 
 #[test]
@@ -294,11 +366,22 @@ fn text_is_cleaned_bounded_and_links_are_safe() {
     assert_eq!(validate(T::Text, &text, &json!("")).unwrap(), Value::Null);
     assert!(validate(T::Text, &text, &json!("x".repeat(2001))).is_err());
     assert!(validate(T::Text, &text, &json!("x".repeat(2000))).is_ok());
-    for href in ["https://example.com", "http://example.com/a", "mailto:a@example.com"] {
+    for href in [
+        "https://example.com",
+        "http://example.com/a",
+        "mailto:a@example.com",
+    ] {
         let run = json!([{"text": "link", "href": href}]);
         assert!(validate(T::Text, &text, &run).is_ok(), "{href}");
     }
-    for href in ["javascript:alert(1)", "data:text/html,x", "//example.com", "https://", "ftp://x.test", "https:///x"] {
+    for href in [
+        "javascript:alert(1)",
+        "data:text/html,x",
+        "//example.com",
+        "https://",
+        "ftp://x.test",
+        "https:///x",
+    ] {
         let run = json!([{"text": "link", "href": href}]);
         assert!(validate(T::Text, &text, &run).is_err(), "{href}");
     }
@@ -314,9 +397,18 @@ fn text_is_cleaned_bounded_and_links_are_safe() {
 
 #[test]
 fn select_values_are_option_ids() {
-    let (_, select) = specs().into_iter().find(|(name, _)| *name == "select").unwrap();
-    let (_, multi) = specs().into_iter().find(|(name, _)| *name == "multi").unwrap();
-    assert_eq!(validate(T::Select, &select.config, &json!("s2")).unwrap(), json!("s2"));
+    let (_, select) = specs()
+        .into_iter()
+        .find(|(name, _)| *name == "select")
+        .unwrap();
+    let (_, multi) = specs()
+        .into_iter()
+        .find(|(name, _)| *name == "multi")
+        .unwrap();
+    assert_eq!(
+        validate(T::Select, &select.config, &json!("s2")).unwrap(),
+        json!("s2")
+    );
     // A name is not an id.
     assert!(validate(T::Select, &select.config, &json!("Two")).is_err());
     assert!(validate(T::Select, &select.config, &json!(["s1"])).is_err());
@@ -326,7 +418,10 @@ fn select_values_are_option_ids() {
     );
     assert!(validate(T::MultiSelect, &multi.config, &json!(["m1", "m1"])).is_err());
     assert!(validate(T::MultiSelect, &multi.config, &json!(["nope"])).is_err());
-    assert_eq!(validate(T::MultiSelect, &multi.config, &json!([])).unwrap(), Value::Null);
+    assert_eq!(
+        validate(T::MultiSelect, &multi.config, &json!([])).unwrap(),
+        Value::Null
+    );
 }
 
 #[test]
@@ -352,10 +447,23 @@ fn options_have_unique_names_known_colours_and_groups_only_on_status() {
     ] {
         assert!(config::normalise(T::Select, &bad).is_err(), "{bad}");
     }
-    let status = config::normalise(T::Status, &json!({"options": [{"name": "A"}, {"name": "B", "group": "done"}]})).unwrap();
-    let groups: Vec<_> = config::options_of(&status).iter().map(|o| o.group).collect();
+    let status = config::normalise(
+        T::Status,
+        &json!({"options": [{"name": "A"}, {"name": "B", "group": "done"}]}),
+    )
+    .unwrap();
+    let groups: Vec<_> = config::options_of(&status)
+        .iter()
+        .map(|o| o.group)
+        .collect();
     assert_eq!(groups, [Some(StatusGroup::Todo), Some(StatusGroup::Done)]);
-    assert!(config::normalise(T::Status, &json!({"options": [{"name": "A", "group": "later"}]})).is_err());
+    assert!(
+        config::normalise(
+            T::Status,
+            &json!({"options": [{"name": "A", "group": "later"}]})
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -369,7 +477,10 @@ fn configs_are_canonical_and_closed() {
         let once = config::normalise(ty, &default).unwrap();
         assert_eq!(config::normalise(ty, &once).unwrap(), once, "{ty:?}");
         let mut extra = once.clone();
-        extra.as_object_mut().unwrap().insert("extra".into(), json!(1));
+        extra
+            .as_object_mut()
+            .unwrap()
+            .insert("extra".into(), json!(1));
         assert!(config::normalise(ty, &extra).is_err(), "{ty:?}");
     }
     let table = Uuid::now_v7().to_string();
@@ -377,10 +488,20 @@ fn configs_are_canonical_and_closed() {
     assert!(config::normalise(T::Relation, &json!({"table": "nope"})).is_err());
     assert!(config::normalise(T::Relation, &json!({"table": table, "pair": "nope"})).is_err());
     assert!(config::normalise(T::Number, &json!({"format": "currency"})).is_err());
-    assert!(config::normalise(T::Number, &json!({"format": "currency", "currency": "eur"})).is_err());
-    assert!(config::normalise(T::Number, &json!({"format": "percent", "currency": "EUR"})).is_err());
+    assert!(
+        config::normalise(T::Number, &json!({"format": "currency", "currency": "eur"})).is_err()
+    );
+    assert!(
+        config::normalise(T::Number, &json!({"format": "percent", "currency": "EUR"})).is_err()
+    );
     assert!(config::normalise(T::UniqueId, &json!({"prefix": "a b"})).is_err());
-    assert!(config::normalise(T::CampbooksLink, &json!({"types": ["tasks.task", "tasks.task"]})).is_err());
+    assert!(
+        config::normalise(
+            T::CampbooksLink,
+            &json!({"types": ["tasks.task", "tasks.task"]})
+        )
+        .is_err()
+    );
     assert!(config::normalise(T::CampbooksLink, &json!({"types": ["Tasks"]})).is_err());
 }
 
@@ -392,8 +513,22 @@ fn dates_follow_their_config() {
         validate(T::Date, &day_only, &json!({"start": "2026-10-26"})).unwrap(),
         json!({"start": "2026-10-26"})
     );
-    assert!(validate(T::Date, &day_only, &json!({"start": "2026-10-26T10:00:00+01:00"})).is_err());
-    assert!(validate(T::Date, &with_time, &json!({"start": "2026-10-26T10:00:00+01:00", "time_zone": "Europe/Lisbon"})).is_ok());
+    assert!(
+        validate(
+            T::Date,
+            &day_only,
+            &json!({"start": "2026-10-26T10:00:00+01:00"})
+        )
+        .is_err()
+    );
+    assert!(
+        validate(
+            T::Date,
+            &with_time,
+            &json!({"start": "2026-10-26T10:00:00+01:00", "time_zone": "Europe/Lisbon"})
+        )
+        .is_ok()
+    );
     // A day is allowed where times are.
     assert!(validate(T::Date, &with_time, &json!({"start": "2026-10-26"})).is_ok());
     for bad in [
@@ -408,7 +543,14 @@ fn dates_follow_their_config() {
     ] {
         assert!(validate(T::Date, &with_time, &bad).is_err(), "{bad}");
     }
-    assert!(validate(T::Date, &day_only, &json!({"start": "2026-10-26", "end": "2026-10-28"})).is_ok());
+    assert!(
+        validate(
+            T::Date,
+            &day_only,
+            &json!({"start": "2026-10-26", "end": "2026-10-28"})
+        )
+        .is_ok()
+    );
     let mut rng = Rng(11);
     for _ in 0..200 {
         let text = instant(&mut rng);
@@ -420,13 +562,22 @@ fn dates_follow_their_config() {
 fn ids_files_and_links_are_unique_bounded_and_shaped() {
     let none = json!({});
     let a = Uuid::now_v7().to_string();
-    assert_eq!(validate(T::Person, &none, &json!([a, a])).unwrap(), json!([a]));
+    assert_eq!(
+        validate(T::Person, &none, &json!([a, a])).unwrap(),
+        json!([a])
+    );
     assert!(validate(T::Person, &none, &json!(["not-a-uuid"])).is_err());
-    let many: Vec<String> = (0..101).map(|n| Uuid::from_u128(n + 1).to_string()).collect();
+    let many: Vec<String> = (0..101)
+        .map(|n| Uuid::from_u128(n + 1).to_string())
+        .collect();
     assert!(validate(T::Relation, &none, &json!(many)).is_err());
     assert!(validate(T::Relation, &none, &json!(many[..100])).is_ok());
-    let file = json!({"hash": "0".repeat(64), "name": " a.pdf ", "size": 10, "type": "application/pdf"});
-    assert_eq!(validate(T::Files, &none, &json!([file])).unwrap()[0]["name"], "a.pdf");
+    let file =
+        json!({"hash": "0".repeat(64), "name": " a.pdf ", "size": 10, "type": "application/pdf"});
+    assert_eq!(
+        validate(T::Files, &none, &json!([file])).unwrap()[0]["name"],
+        "a.pdf"
+    );
     for bad in [
         json!({"hash": "G".repeat(64), "name": "a", "size": 1, "type": "text/plain"}),
         json!({"hash": "0".repeat(64), "name": "", "size": 1, "type": "text/plain"}),
@@ -436,16 +587,54 @@ fn ids_files_and_links_are_unique_bounded_and_shaped() {
         assert!(validate(T::Files, &none, &json!([bad])).is_err());
     }
     let link = json!({"types": ["tasks.task"]});
-    assert!(validate(T::CampbooksLink, &link, &json!([{"type": "tasks.task", "id": "abc"}])).is_ok());
-    assert!(validate(T::CampbooksLink, &link, &json!([{"type": "schedule.event", "id": "abc"}])).is_err());
-    assert!(validate(T::CampbooksLink, &link, &json!([{"type": "tasks.task", "id": "a b"}])).is_err());
-    assert!(validate(T::CampbooksLink, &link, &json!([{"type": "tasks.task", "id": "abc", "title": "x"}])).is_err());
-    assert!(validate(T::CampbooksLink, &json!({"types": []}), &json!([{"type": "x", "id": "1"}])).is_err());
+    assert!(
+        validate(
+            T::CampbooksLink,
+            &link,
+            &json!([{"type": "tasks.task", "id": "abc"}])
+        )
+        .is_ok()
+    );
+    assert!(
+        validate(
+            T::CampbooksLink,
+            &link,
+            &json!([{"type": "schedule.event", "id": "abc"}])
+        )
+        .is_err()
+    );
+    assert!(
+        validate(
+            T::CampbooksLink,
+            &link,
+            &json!([{"type": "tasks.task", "id": "a b"}])
+        )
+        .is_err()
+    );
+    assert!(
+        validate(
+            T::CampbooksLink,
+            &link,
+            &json!([{"type": "tasks.task", "id": "abc", "title": "x"}])
+        )
+        .is_err()
+    );
+    assert!(
+        validate(
+            T::CampbooksLink,
+            &json!({"types": []}),
+            &json!([{"type": "x", "id": "1"}])
+        )
+        .is_err()
+    );
 }
 
-fn row(rng: &mut Rng, specs: &[(&str, Spec)], number: i64) -> eval::RowFacts {
-    let base = chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z").unwrap().to_utc();
-    let at = |rng: &mut Rng| base + chrono::TimeDelta::hours(i64::try_from(rng.below(5000)).unwrap());
+pub(crate) fn row(rng: &mut Rng, specs: &[(&str, Spec)], number: i64) -> eval::RowFacts {
+    let base = chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
+        .unwrap()
+        .to_utc();
+    let at =
+        |rng: &mut Rng| base + chrono::TimeDelta::hours(i64::try_from(rng.below(5000)).unwrap());
     let people = members();
     let cells = specs
         .iter()
@@ -453,7 +642,11 @@ fn row(rng: &mut Rng, specs: &[(&str, Spec)], number: i64) -> eval::RowFacts {
         .map(|(_, spec)| (spec.id, generate(rng, spec)))
         .collect();
     eval::RowFacts {
-        title: if rng.chance(10) { String::new() } else { rng.pick(WORDS).to_string() },
+        title: if rng.chance(10) {
+            String::new()
+        } else {
+            rng.pick(WORDS).to_string()
+        },
         number,
         created_at: at(rng),
         created_by: *rng.pick(&people),
@@ -468,7 +661,7 @@ fn ordering_is_total_with_empty_cells_last() {
     let all = specs();
     let mut rng = Rng(99);
     let rows: Vec<_> = (1..=40).map(|n| row(&mut rng, &all, n)).collect();
-    for (name, spec) in all.iter().filter(|(_, spec)| spec.ty.sortable()) {
+    for (name, spec) in all.iter().filter(|(_, spec)| spec.sortable()) {
         for direction in [Direction::Asc, Direction::Desc] {
             let cmp = |a: &eval::RowFacts, b: &eval::RowFacts| eval::compare(spec, direction, a, b);
             for a in &rows {
@@ -486,7 +679,7 @@ fn ordering_is_total_with_empty_cells_last() {
     }
 }
 
-fn spec_of<'a>(all: &'a [(&str, Spec)], name: &str) -> &'a Spec {
+pub(crate) fn spec_of<'a>(all: &'a [(&str, Spec)], name: &str) -> &'a Spec {
     &all.iter().find(|(n, _)| *n == name).unwrap().1
 }
 
@@ -543,7 +736,9 @@ fn sorts_and_summaries_are_checked() {
         .collect();
     assert!(filter::parse_sorts(&json!(six), &map).is_err());
     assert!(filter::parse_summaries(&json!([{"property": number, "kind": "sum"}, {"property": checkbox, "kind": "percent_checked"}]), &map).is_ok());
-    assert!(filter::parse_summaries(&json!([{"property": checkbox, "kind": "sum"}]), &map).is_err());
+    assert!(
+        filter::parse_summaries(&json!([{"property": checkbox, "kind": "sum"}]), &map).is_err()
+    );
     assert!(filter::parse_summaries(&json!([{"property": person, "kind": "count"}]), &map).is_ok());
 }
 
@@ -556,7 +751,11 @@ fn the_oracle_agrees_with_itself_on_complements() {
     let map: HashMap<Uuid, Spec> = all.iter().map(|(_, s)| (s.id, s.clone())).collect();
     for (name, spec) in &all {
         let ops = filter::operators(spec);
-        for (positive, negative) in [(Operator::Is, Operator::IsNot), (Operator::Contains, Operator::DoesNotContain), (Operator::IsEmpty, Operator::IsNotEmpty)] {
+        for (positive, negative) in [
+            (Operator::Is, Operator::IsNot),
+            (Operator::Contains, Operator::DoesNotContain),
+            (Operator::IsEmpty, Operator::IsNotEmpty),
+        ] {
             if !ops.contains(&positive) || !ops.contains(&negative) {
                 continue;
             }
@@ -567,11 +766,16 @@ fn the_oracle_agrees_with_itself_on_complements() {
                 T::Relation => json!(Uuid::from_u128(100).to_string()),
                 T::Number | T::UniqueId => json!("5"),
                 T::CampbooksLink => json!({"type": "tasks.task", "id": "id-1"}),
-                T::Created | T::Edited if matches!(*name, "created_by") => json!(Uuid::from_u128(1).to_string()),
+                T::Created | T::Edited if matches!(*name, "created_by") => {
+                    json!(Uuid::from_u128(1).to_string())
+                }
                 _ => json!("alpha"),
             };
             let condition = |op: Operator| {
-                filter::parse(&json!({"property": spec.id, "operator": op, "value": operand}), &map)
+                filter::parse(
+                    &json!({"property": spec.id, "operator": op, "value": operand}),
+                    &map,
+                )
             };
             let (Ok(p), Ok(n)) = (condition(positive), condition(negative)) else {
                 continue;
@@ -593,7 +797,11 @@ fn a_changed_type_converts_what_it_can_and_the_result_is_always_valid() {
     let mut rng = Rng(2026);
     for (from_name, from) in all.iter().filter(|(_, s)| s.ty.editable()) {
         let cells: Vec<(usize, Value)> = (0..60).map(|k| (k, generate(&mut rng, from))).collect();
-        for to in T::ALL.iter().copied().filter(|ty| ty.editable() && ty.creatable()) {
+        for to in T::ALL
+            .iter()
+            .copied()
+            .filter(|ty| ty.editable() && ty.creatable())
+        {
             if to == T::Relation {
                 continue;
             }
@@ -631,13 +839,21 @@ fn text_becomes_a_select_with_one_option_per_distinct_name() {
     let plan = convert::plan(text, T::Select, None, &cells).unwrap();
     let options = config::options_of(&plan.config);
     assert_eq!(options.len(), 2);
-    let ids: Vec<_> = plan.values.iter().map(|(_, v)| v.clone().unwrap()).collect();
+    let ids: Vec<_> = plan
+        .values
+        .iter()
+        .map(|(_, v)| v.clone().unwrap())
+        .collect();
     assert_eq!(ids[0], ids[1]);
     assert_eq!(ids[0], ids[3]);
     assert_ne!(ids[0], ids[2]);
     // And back: the names are the text.
     let select = Spec::new(Uuid::now_v7(), T::Select, plan.config.clone());
-    let back_cells: Vec<(usize, Value)> = plan.values.iter().map(|(k, v)| (*k, v.clone().unwrap())).collect();
+    let back_cells: Vec<(usize, Value)> = plan
+        .values
+        .iter()
+        .map(|(k, v)| (*k, v.clone().unwrap()))
+        .collect();
     let back = convert::plan(&select, T::Text, None, &back_cells).unwrap();
     assert_eq!(value::runs_text(back.values[2].1.as_ref().unwrap()), "Blue");
 }

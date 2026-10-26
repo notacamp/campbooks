@@ -117,7 +117,14 @@ pub async fn handler(
     .bind(config)
     .execute(&mut *tx)
     .await?;
-    tables::changed(&state, &mut tx, access, path.table_id, &[TableChangeKind::Views]).await?;
+    tables::changed(
+        &state,
+        &mut tx,
+        access,
+        path.table_id,
+        &[TableChangeKind::Views],
+    )
+    .await?;
     let updated = tables::views(&mut tx, path.table_id)
         .await?
         .into_iter()

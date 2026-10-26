@@ -252,6 +252,10 @@ name = "conversations.inbox_changed"
 reason = "The change feed: a membership ended or the inbox was kept read-only, so open streams ask again who sees it."
 
 [[access.unconsumed_events]]
+name = "pages.table_changed"
+reason = "The change feed: an open table asks again when its properties, views or set of rows change (pages-tables, campbooks-cloud#365)."
+
+[[access.unconsumed_events]]
 name = "identity.account_created"
 reason = "The security log and automation to come."
 

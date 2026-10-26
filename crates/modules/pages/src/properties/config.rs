@@ -99,6 +99,7 @@ fn ascii_token(text: &str, max: usize) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
+#[allow(clippy::too_many_lines, reason = "one arm per type")]
 /// `raw` as the canonical config of a property of type `ty`, or why not.
 pub fn normalise(ty: PropertyType, raw: &Value) -> Result<Value> {
     match ty {

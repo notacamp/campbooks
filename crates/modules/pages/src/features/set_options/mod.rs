@@ -96,7 +96,14 @@ pub async fn handler(
         .bind(&new)
         .execute(&mut *tx)
         .await?;
-    tables::changed(&state, &mut tx, access, path.table_id, &[TableChangeKind::Schema]).await?;
+    tables::changed(
+        &state,
+        &mut tx,
+        access,
+        path.table_id,
+        &[TableChangeKind::Schema],
+    )
+    .await?;
     let row = tables::property(&mut tx, path.table_id, path.property_id, false).await?;
     let view = row.view()?;
     tx.commit().await?;

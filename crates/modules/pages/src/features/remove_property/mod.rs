@@ -69,7 +69,14 @@ pub async fn handler(
         .bind(path.property_id)
         .execute(&mut *tx)
         .await?;
-    tables::changed(&state, &mut tx, access, path.table_id, &[TableChangeKind::Schema]).await?;
+    tables::changed(
+        &state,
+        &mut tx,
+        access,
+        path.table_id,
+        &[TableChangeKind::Schema],
+    )
+    .await?;
     let view = property.view()?;
     tx.commit().await?;
     Ok(Json(view))

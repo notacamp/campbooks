@@ -47,6 +47,10 @@ pub struct PropertyUpdate {
 }
 
 /// Change a property.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction: the property and its cells"
+)]
 #[utoipa::path(
     patch,
     path = "/api/v1/w/{workspace_id}/tables/{table_id}/properties/{property_id}",
@@ -200,7 +204,14 @@ pub async fn handler(
     .execute(&mut *tx)
     .await?;
     tracing::debug!(converted, "property changed");
-    tables::changed(&state, &mut tx, access, path.table_id, &[TableChangeKind::Schema]).await?;
+    tables::changed(
+        &state,
+        &mut tx,
+        access,
+        path.table_id,
+        &[TableChangeKind::Schema],
+    )
+    .await?;
     let row = tables::property(&mut tx, path.table_id, path.property_id, false).await?;
     let view = row.view()?;
     tx.commit().await?;

@@ -15,8 +15,8 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        Kind, MAX_DEPTH, PageId, PageRow, Place, SELECT_ONE, ViewId, access, announce,
-        clean_icon, clean_title, expect_live, position,
+        Kind, MAX_DEPTH, PageId, PageRow, Place, SELECT_ONE, ViewId, access, announce, clean_icon,
+        clean_title, expect_live, position,
         resources::PAGE_RECORD,
         roles,
         table_views::ViewType,
@@ -105,8 +105,8 @@ pub async fn handler(
     }
     let property_name =
         clean_name(request.title_property.as_deref().unwrap_or("Name")).map_err(tables::refused)?;
-    let view_name = clean_name(request.view_name.as_deref().unwrap_or("Table"))
-        .map_err(tables::refused)?;
+    let view_name =
+        clean_name(request.view_name.as_deref().unwrap_or("Table")).map_err(tables::refused)?;
 
     let mut tx = state.db.begin_for(access.workspace).await?;
     let (parent, place) = match request.parent {
@@ -181,11 +181,27 @@ pub async fn handler(
     .bind(creator)
     .execute(&mut *tx)
     .await?;
-    announce(&state, &mut tx, access, id, vec![PageChangeKind::Meta, PageChangeKind::Schema])
-        .await?;
-    tracked::simple(&state, &mut tx, access.workspace, id, tracked::Change::Created).await?;
+    announce(
+        &state,
+        &mut tx,
+        access,
+        id,
+        vec![PageChangeKind::Meta, PageChangeKind::Schema],
+    )
+    .await?;
+    tracked::simple(
+        &state,
+        &mut tx,
+        access.workspace,
+        id,
+        tracked::Change::Created,
+    )
+    .await?;
     tracked::table_created(&state, &mut tx, access.workspace, id).await?;
-    let row: PageRow = sqlx::query_as(SELECT_ONE).bind(id).fetch_one(&mut *tx).await?;
+    let row: PageRow = sqlx::query_as(SELECT_ONE)
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
     let detail = tables::detail(&mut tx, access, &row).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(detail)))

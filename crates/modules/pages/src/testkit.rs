@@ -359,6 +359,15 @@ impl Kit {
         made.json
     }
 
+    /// How many cells are stored in the workspace.
+    pub async fn row_cell_count(&self, workspace: WorkspaceId) -> i64 {
+        sqlx::query_scalar("SELECT count(*) FROM pages.row_values WHERE workspace_id = $1")
+            .bind(workspace.as_uuid())
+            .fetch_one(&self.db)
+            .await
+            .unwrap()
+    }
+
     /// The path of the module's tables.
     pub fn tables(workspace: WorkspaceId) -> String {
         format!("/api/v1/w/{workspace}/tables")
@@ -374,7 +383,12 @@ impl Kit {
                 Some(serde_json::json!({"title": "Clients", "place": "workspace"})),
             )
             .await;
-        assert_eq!(made.status, axum::http::StatusCode::CREATED, "{:?}", made.json);
+        assert_eq!(
+            made.status,
+            axum::http::StatusCode::CREATED,
+            "{:?}",
+            made.json
+        );
         made.json
     }
 
@@ -393,7 +407,12 @@ impl Kit {
                 Some(body),
             )
             .await;
-        assert_eq!(made.status, axum::http::StatusCode::CREATED, "{:?}", made.json);
+        assert_eq!(
+            made.status,
+            axum::http::StatusCode::CREATED,
+            "{:?}",
+            made.json
+        );
         made.json
     }
 
@@ -412,7 +431,12 @@ impl Kit {
                 Some(body),
             )
             .await;
-        assert_eq!(made.status, axum::http::StatusCode::CREATED, "{:?}", made.json);
+        assert_eq!(
+            made.status,
+            axum::http::StatusCode::CREATED,
+            "{:?}",
+            made.json
+        );
         made.json
     }
 
@@ -465,7 +489,12 @@ impl Kit {
                 serde_json::json!({"role": role}),
             )
             .await;
-        assert_eq!(shared.status, axum::http::StatusCode::OK, "{:?}", shared.json);
+        assert_eq!(
+            shared.status,
+            axum::http::StatusCode::OK,
+            "{:?}",
+            shared.json
+        );
     }
 
     /// `POST …/sync`: send `update` (if any) and what the client holds.

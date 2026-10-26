@@ -182,8 +182,15 @@ pub async fn handler(
     let next_cursor = (i64::try_from(seen).unwrap_or(i64::MAX) < answer.matching
         && !rows.is_empty())
     .then(|| format!("o{seen}"));
-    tracked::rows_queried(&state, &mut tx, access.workspace, table.id, view_type, rows.len())
-        .await?;
+    tracked::rows_queried(
+        &state,
+        &mut tx,
+        access.workspace,
+        table.id,
+        view_type,
+        rows.len(),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(TableRows {
         rows,

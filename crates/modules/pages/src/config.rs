@@ -96,7 +96,8 @@ mod tests {
             json!({"pages": {"enabled": true, "tables": {"enabled": "true"}}}),
         ));
         assert!(on.enabled && on.tables);
-        let only_tables = Deps::from_figment(&figment(json!({"pages": {"tables": {"enabled": 1}}})));
+        let only_tables =
+            Deps::from_figment(&figment(json!({"pages": {"tables": {"enabled": 1}}})));
         assert!(!only_tables.enabled && only_tables.tables);
     }
 

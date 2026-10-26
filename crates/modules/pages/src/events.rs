@@ -458,7 +458,8 @@ mod tests {
                     "parent",
                     "place",
                     "trashed",
-                    "kinds"
+                    "kinds",
+                    "row"
                 ]
                 .contains(&key)
             );

@@ -64,6 +64,10 @@ pub struct AddedProperty {
 }
 
 /// Add a property.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction: the property and its pair"
+)]
 #[utoipa::path(
     post,
     path = "/api/v1/w/{workspace_id}/tables/{table_id}/properties",
@@ -107,7 +111,10 @@ pub async fn handler(
         return Err(refused(PropertyError::RESERVED));
     }
     let name = clean_name(&request.name).map_err(refused)?;
-    let raw = request.config.clone().unwrap_or_else(|| config::default_config(ty));
+    let raw = request
+        .config
+        .clone()
+        .unwrap_or_else(|| config::default_config(ty));
     let mut config = config::normalise(ty, &raw).map_err(refused)?;
     if ty != PropertyType::Relation && request.paired_name.is_some() {
         return Err(refused(PropertyError::CONFIG));
@@ -146,11 +153,7 @@ pub async fn handler(
         if let Some(paired_name) = &request.paired_name {
             let pair = PropertyId::new();
             config["pair"] = json!(pair);
-            paired = Some((
-                target,
-                pair,
-                clean_name(paired_name).map_err(refused)?,
-            ));
+            paired = Some((target, pair, clean_name(paired_name).map_err(refused)?));
         }
     }
 
@@ -161,16 +164,32 @@ pub async fn handler(
     .bind(path.table_id)
     .fetch_one(&mut *tx)
     .await?;
-    let adding = 1 + i64::from(paired.as_ref().is_some_and(|(target, ..)| *target == path.table_id));
+    let adding = 1 + i64::from(
+        paired
+            .as_ref()
+            .is_some_and(|(target, ..)| *target == path.table_id),
+    );
     if live + adding > i64::try_from(MAX_PROPERTIES).unwrap_or(i64::MAX) {
-        return Err(Error::Conflict(crate::MESSAGES.reason("too_many_properties")));
+        return Err(Error::Conflict(
+            crate::MESSAGES.reason("too_many_properties"),
+        ));
     }
     let key = match request.position {
         Some(key) => key,
         None => next_position(&mut tx, path.table_id).await?,
     };
-    insert(&mut tx, access.workspace.as_uuid(), path.table_id, id, &name, ty, &config, &key, creator)
-        .await?;
+    insert(
+        &mut tx,
+        access.workspace.as_uuid(),
+        path.table_id,
+        id,
+        &name,
+        ty,
+        &config,
+        &key,
+        creator,
+    )
+    .await?;
     let mut paired_view = None;
     if let Some((target, pair, paired_name)) = paired {
         let reverse = json!({"table": path.table_id.to_string(), "pair": id.to_string()});
@@ -192,10 +211,23 @@ pub async fn handler(
         if target != path.table_id {
             tables::changed(&state, &mut tx, access, target, &[TableChangeKind::Schema]).await?;
         }
-        tracked::property_added(&state, &mut tx, access.workspace, target, PropertyType::Relation)
-            .await?;
+        tracked::property_added(
+            &state,
+            &mut tx,
+            access.workspace,
+            target,
+            PropertyType::Relation,
+        )
+        .await?;
     }
-    tables::changed(&state, &mut tx, access, path.table_id, &[TableChangeKind::Schema]).await?;
+    tables::changed(
+        &state,
+        &mut tx,
+        access,
+        path.table_id,
+        &[TableChangeKind::Schema],
+    )
+    .await?;
     tracked::property_added(&state, &mut tx, access.workspace, path.table_id, ty).await?;
     let row = tables::property(&mut tx, path.table_id, id, false).await?;
     let property = row.view()?;

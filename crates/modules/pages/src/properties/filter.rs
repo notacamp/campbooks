@@ -144,7 +144,10 @@ pub fn operators(spec: &Spec) -> &'static [Operator] {
         IsNotEmpty, Lt, Lte, OnOrAfter, OnOrBefore, StartsWith,
     };
     match spec.ty {
-        PropertyType::Title | PropertyType::Text | PropertyType::Url | PropertyType::Email
+        PropertyType::Title
+        | PropertyType::Text
+        | PropertyType::Url
+        | PropertyType::Email
         | PropertyType::Phone => &[
             Is,
             IsNot,
@@ -158,9 +161,7 @@ pub fn operators(spec: &Spec) -> &'static [Operator] {
         PropertyType::Number | PropertyType::UniqueId => {
             &[Is, IsNot, Gt, Gte, Lt, Lte, IsEmpty, IsNotEmpty]
         }
-        PropertyType::Select | PropertyType::Status => {
-            &[Is, IsNot, IsAnyOf, IsEmpty, IsNotEmpty]
-        }
+        PropertyType::Select | PropertyType::Status => &[Is, IsNot, IsAnyOf, IsEmpty, IsNotEmpty],
         PropertyType::MultiSelect | PropertyType::Person | PropertyType::Relation => {
             &[Contains, DoesNotContain, IsEmpty, IsNotEmpty]
         }
@@ -168,9 +169,7 @@ pub fn operators(spec: &Spec) -> &'static [Operator] {
             Is, Before, After, OnOrBefore, OnOrAfter, IsEmpty, IsNotEmpty,
         ],
         PropertyType::Created | PropertyType::Edited if shows_who(&spec.config) => &[Is, IsNot],
-        PropertyType::Created | PropertyType::Edited => {
-            &[Is, Before, After, OnOrBefore, OnOrAfter]
-        }
+        PropertyType::Created | PropertyType::Edited => &[Is, Before, After, OnOrBefore, OnOrAfter],
         PropertyType::Checkbox => &[Is],
         PropertyType::Files => &[IsEmpty, IsNotEmpty],
         PropertyType::CampbooksLink => &[Contains, DoesNotContain, IsEmpty, IsNotEmpty],
@@ -183,7 +182,9 @@ fn operand_of(spec: &Spec, operator: Operator, raw: Option<&Value>) -> Result<Op
     if matches!(operator, IsEmpty | IsNotEmpty) {
         return Ok(Operand::None);
     }
-    let raw = raw.filter(|raw| !raw.is_null()).ok_or(PropertyError::FILTER)?;
+    let raw = raw
+        .filter(|raw| !raw.is_null())
+        .ok_or(PropertyError::FILTER)?;
     let text = || {
         raw.as_str()
             .filter(|text| !text.is_empty() && text.len() <= MAX_OPERAND)
@@ -198,7 +199,10 @@ fn operand_of(spec: &Spec, operator: Operator, raw: Option<&Value>) -> Result<Op
                 .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
     };
     match spec.ty {
-        PropertyType::Title | PropertyType::Text | PropertyType::Url | PropertyType::Email
+        PropertyType::Title
+        | PropertyType::Text
+        | PropertyType::Url
+        | PropertyType::Email
         | PropertyType::Phone => Ok(Operand::Text(text()?)),
         PropertyType::Number | PropertyType::UniqueId => {
             let text = match raw {
@@ -379,7 +383,7 @@ pub fn parse_sorts(raw: &Value, specs: &HashMap<Uuid, Spec>) -> Result<Vec<Sort>
     let mut seen = std::collections::HashSet::new();
     for sort in &sorts {
         let spec = specs.get(&sort.property).ok_or(PropertyError::SORT)?;
-        if !spec.ty.sortable() || !seen.insert(sort.property) {
+        if !spec.sortable() || !seen.insert(sort.property) {
             return Err(PropertyError::SORT);
         }
     }

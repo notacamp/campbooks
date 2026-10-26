@@ -140,6 +140,10 @@ async fn touch(tx: &mut Transaction<'_, Postgres>, editor: UserId, row: PageId) 
     Ok(())
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "one pass over the cells of a write, in order"
+)]
 /// Write `inputs` to `row` of `table`, whose live `properties` are given.
 /// Returns what each cell was and became. `row` must be locked and live.
 pub async fn write(
@@ -157,8 +161,10 @@ pub async fn write(
     if inputs.len() > MAX_CELLS {
         return Err(invalid());
     }
-    let by_id: HashMap<PropertyId, &PropertyRow> =
-        properties.iter().map(|property| (property.id, property)).collect();
+    let by_id: HashMap<PropertyId, &PropertyRow> = properties
+        .iter()
+        .map(|property| (property.id, property))
+        .collect();
     let mut seen = HashSet::new();
     for input in inputs {
         if !by_id.contains_key(&input.property) {
@@ -187,11 +193,11 @@ pub async fn write(
                 .cloned()
                 .unwrap_or((Value::Null, 0))
         };
-        let stale = input.version.is_some_and(|seen| seen != before_version);
+        let behind = input.version.is_some_and(|read| read != before_version);
         let mut result = CellResult {
             property: input.property,
             version: before_version,
-            stale,
+            stale: behind,
             previous: before.clone(),
             previous_version: before_version,
         };
@@ -334,7 +340,11 @@ async fn relate(
                 state,
                 tx,
                 access,
-                if pair.is_some() { Action::Write } else { Action::Read },
+                if pair.is_some() {
+                    Action::Write
+                } else {
+                    Action::Read
+                },
                 target,
                 pair.is_some(),
             )

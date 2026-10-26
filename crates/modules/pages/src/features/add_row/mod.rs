@@ -134,15 +134,40 @@ pub async fn handler(
     .bind(number)
     .execute(&mut *tx)
     .await?;
-    let row: PageRow = sqlx::query_as(SELECT_ONE).bind(id).fetch_one(&mut *tx).await?;
+    let row: PageRow = sqlx::query_as(SELECT_ONE)
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
     announce(&state, &mut tx, access, id, vec![PageChangeKind::Meta]).await?;
-    tracked::simple(&state, &mut tx, access.workspace, id, tracked::Change::Created).await?;
+    tracked::simple(
+        &state,
+        &mut tx,
+        access.workspace,
+        id,
+        tracked::Change::Created,
+    )
+    .await?;
     if !request.cells.is_empty() {
         let properties = tables::properties(&mut tx, path.table_id).await?;
-        cells::write(&state, &mut tx, access, &row, path.table_id, &properties, &request.cells)
-            .await?;
+        cells::write(
+            &state,
+            &mut tx,
+            access,
+            &row,
+            path.table_id,
+            &properties,
+            &request.cells,
+        )
+        .await?;
     }
-    tables::changed(&state, &mut tx, access, path.table_id, &[TableChangeKind::Rows]).await?;
+    tables::changed(
+        &state,
+        &mut tx,
+        access,
+        path.table_id,
+        &[TableChangeKind::Rows],
+    )
+    .await?;
     let made = tables::rows(&mut tx, path.table_id, &[id])
         .await?
         .pop()
