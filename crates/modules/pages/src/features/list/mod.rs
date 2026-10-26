@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 
-use axum::{Json, extract::State};
+use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result,
     authz::{self, Action},
@@ -20,7 +20,13 @@ use crate::{
     scopes::PagesRead,
 };
 
-const SELECT_ALL: &str = concat!("SELECT ", columns!(), " FROM pages.pages");
+/// Every page but the rows of tables, which follow their table. While
+/// tables are off, the tables are left out too.
+const SELECT_ALL: &str = concat!(
+    "SELECT ",
+    columns!(),
+    " FROM pages.pages WHERE kind <> 'row' AND ($1 OR kind = 'page')"
+);
 
 /// What to list.
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
@@ -66,6 +72,7 @@ pub struct PageList {
 pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<PagesRead>,
+    Extension(tables): Extension<crate::config::TablesOn>,
     extract::Query(params): extract::Query<ListParams>,
 ) -> Result<Json<PageList>> {
     let access = &workspace.access;
@@ -73,7 +80,10 @@ pub async fn handler(
         Error::Forbidden
     })?;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let rows: Vec<PageRow> = sqlx::query_as(SELECT_ALL).fetch_all(&mut *tx).await?;
+    let rows: Vec<PageRow> = sqlx::query_as(SELECT_ALL)
+        .bind(tables.0)
+        .fetch_all(&mut *tx)
+        .await?;
     let readable = roles::readable(&mut tx, access).await?;
     tx.commit().await?;
     let with_children: HashSet<PageId> = rows

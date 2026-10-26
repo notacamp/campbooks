@@ -28,6 +28,7 @@ pub mod config;
 pub mod domain;
 pub mod events;
 mod features;
+pub mod properties;
 pub mod scopes;
 /// The module's tracked events, generated from the tracking plan (ADR 0020).
 #[path = "tracking.gen.rs"]
@@ -50,6 +51,7 @@ pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 pub fn module(deps: Deps) -> Module {
     let mut background = Background::new()
         .publishes::<events::PageChanged>()
+        .publishes::<events::TableChanged>()
         .publishes::<events::NotionLinkRequested>()
         .publishes::<events::NotionLinkEnded>()
         .publishes::<events::NotionChangesRequested>()
@@ -70,9 +72,12 @@ pub fn module(deps: Deps) -> Module {
     Module {
         name: NAME,
         scopes: scopes::ALL,
-        router: router().layer(middleware::from_fn(
-            move |request: Request, next: Next| async move {
+        router: router(deps).layer(middleware::from_fn(
+            move |mut request: Request, next: Next| async move {
                 if deps.enabled {
+                    request
+                        .extensions_mut()
+                        .insert(config::TablesOn(deps.tables));
                     next.run(request).await
                 } else {
                     Error::NotFound.into_response()
@@ -86,16 +91,41 @@ pub fn module(deps: Deps) -> Module {
 }
 
 /// Every route of the module, one per feature.
-fn router() -> OpenApiRouter<AppState> {
+fn router(deps: Deps) -> OpenApiRouter<AppState> {
     use features::{
-        backlinks, create, file, get, import_from_notion, list, list_notion_links, move_page,
-        resolve_conflict, share, stop_sync, sync, trash, undo_resolve_conflict, update, upload,
+        add_property, add_row, backlinks, create, create_table, create_view, file, get, get_table,
+        import_from_notion, list, list_notion_links, move_page, query_table, remove_property,
+        remove_view, resolve_conflict, restore_property, set_cells, set_options, share, stop_sync,
+        sync, trash, undo_resolve_conflict, update, update_property, update_view, upload,
     };
     // A file is up to 20 MiB; everything else is small.
     let uploads = OpenApiRouter::new()
         .routes(routes!(upload::handler))
         .layer(DefaultBodyLimit::max(upload::MAX_FILE_BYTES));
+    // Tables are a switch of their own: off, these routes are not there.
+    let tables = OpenApiRouter::new()
+        .routes(routes!(create_table::handler))
+        .routes(routes!(get_table::handler))
+        .routes(routes!(add_property::handler))
+        .routes(routes!(update_property::handler, remove_property::handler))
+        .routes(routes!(restore_property::handler))
+        .routes(routes!(set_options::handler))
+        .routes(routes!(add_row::handler))
+        .routes(routes!(set_cells::handler))
+        .routes(routes!(query_table::handler))
+        .routes(routes!(create_view::handler))
+        .routes(routes!(update_view::handler, remove_view::handler))
+        .layer(middleware::from_fn(
+            move |request: Request, next: Next| async move {
+                if deps.tables {
+                    next.run(request).await
+                } else {
+                    Error::NotFound.into_response()
+                }
+            },
+        ));
     OpenApiRouter::new()
+        .merge(tables)
         .routes(routes!(list::handler, create::handler))
         .routes(routes!(backlinks::handler))
         .routes(routes!(import_from_notion::handler))
@@ -159,7 +189,10 @@ mod tests {
 
     #[test]
     fn off_it_schedules_nothing() {
-        let off = Deps { enabled: false };
+        let off = Deps {
+            enabled: false,
+            tables: false,
+        };
         let registry = campbooks_kernel::jobs::Registry::build(&[module(off)]).unwrap();
         assert!(
             !registry

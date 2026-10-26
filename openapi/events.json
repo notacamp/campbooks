@@ -1664,9 +1664,51 @@
             "format": "int64",
             "description": "Grows with every change of this page."
           },
+          "row": {
+            "type": "boolean",
+            "description": "Whether the page is a row of a table (its parent): a row is followed\nthrough its table."
+          },
           "trashed": {
             "type": "boolean",
             "description": "Whether it is in the trash."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "pages.table_changed",
+      "module": "pages",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "`pages.table_changed` v1 (`contracts/pages.table_changed.v1.schema.json`):\na table's schema, views or set of rows changed, so a view that is open\nasks for the table again. A snapshot: `revision` grows with every change\nof the table, and a consumer applies only newer ones. Ids and enums only:\nnever a property's name, an option, a view's name or any value. (A cell\nedit is announced as `pages.page_changed` of its row, kind `values`.)",
+        "required": [
+          "workspace",
+          "table",
+          "revision",
+          "kinds"
+        ],
+        "properties": {
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableChangeKind"
+            },
+            "description": "What changed."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change of the table."
+          },
+          "table": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The table (a page)."
           },
           "workspace": {
             "type": "string",
@@ -3014,7 +3056,10 @@
           "share",
           "move",
           "trash",
-          "purge"
+          "purge",
+          "schema",
+          "values",
+          "views"
         ]
       },
       "PageId": {
@@ -3535,6 +3580,15 @@
           "updates",
           "receipts",
           "newsletters"
+        ]
+      },
+      "TableChangeKind": {
+        "type": "string",
+        "description": "What changed in a table.",
+        "enum": [
+          "schema",
+          "views",
+          "rows"
         ]
       },
       "TaskChange": {

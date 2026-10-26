@@ -29,6 +29,12 @@ pub enum PageChangeKind {
     Trash,
     /// It was deleted for good.
     Purge,
+    /// A table's properties or options changed.
+    Schema,
+    /// A row's values changed.
+    Values,
+    /// A table's views changed.
+    Views,
 }
 
 /// `pages.page_changed` v1 (`contracts/pages.page_changed.v1.schema.json`):
@@ -51,6 +57,10 @@ pub struct PageChanged {
     pub trashed: bool,
     /// What changed.
     pub kinds: Vec<PageChangeKind>,
+    /// Whether the page is a row of a table (its parent): a row is followed
+    /// through its table.
+    #[serde(default)]
+    pub row: bool,
 }
 
 impl PageChanged {
@@ -73,11 +83,64 @@ impl DomainEvent for PageChanged {
     /// (a page's readers follow its place, its ancestors and its grants).
     fn changes(&self) -> Vec<changes::Change> {
         let page = RecordRef::new(PAGE_RECORD, &self.page);
+        // A row has no container of its own: it lives in its table's, so a
+        // table of 20,000 rows is one container to the change feed.
+        let within = match self.parent.filter(|_| self.row) {
+            Some(table) => RecordRef::new(PAGE_RECORD, &table),
+            None => page.clone(),
+        };
         if self.purged() {
-            vec![changes::Change::delete(page.clone()).within(page)]
+            vec![changes::Change::delete(page).within(within)]
         } else {
-            vec![changes::Change::upsert(page.clone()).within(page)]
+            vec![changes::Change::upsert(page).within(within)]
         }
+    }
+}
+
+/// What changed in a table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TableChangeKind {
+    /// Its properties or options.
+    Schema,
+    /// Its views.
+    Views,
+    /// A row was added, trashed, restored or deleted for good.
+    Rows,
+}
+
+/// `pages.table_changed` v1 (`contracts/pages.table_changed.v1.schema.json`):
+/// a table's schema, views or set of rows changed, so a view that is open
+/// asks for the table again. A snapshot: `revision` grows with every change
+/// of the table, and a consumer applies only newer ones. Ids and enums only:
+/// never a property's name, an option, a view's name or any value. (A cell
+/// edit is announced as `pages.page_changed` of its row, kind `values`.)
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TableChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The table (a page).
+    pub table: PageId,
+    /// Grows with every change of the table.
+    pub revision: i64,
+    /// What changed.
+    pub kinds: Vec<TableChangeKind>,
+}
+
+impl DomainEvent for TableChanged {
+    const NAME: &'static str = "pages.table_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    /// The table changed, for whoever may read it: the same record and
+    /// container as the page itself, so a stream that follows the page
+    /// follows its table.
+    fn changes(&self) -> Vec<changes::Change> {
+        let page = RecordRef::new(PAGE_RECORD, &self.table);
+        vec![changes::Change::upsert(page.clone()).within(page)]
     }
 }
 
@@ -395,7 +458,8 @@ mod tests {
                     "parent",
                     "place",
                     "trashed",
-                    "kinds"
+                    "kinds",
+                    "row"
                 ]
                 .contains(&key)
             );

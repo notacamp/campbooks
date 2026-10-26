@@ -17,10 +17,14 @@
     "place": { "enum": ["private", "workspace"] },
     "trashed": { "type": "boolean" },
     "kinds": {
-      "description": "What changed: the title or icon (`meta`), the body, who it is shared with, its parent, place or position, the trash, or its deletion for good.",
+      "description": "What changed: the title or icon (`meta`), the body, who it is shared with, its parent, place or position, the trash, or its deletion for good; for a table, its properties (`schema`) or views (`views`); for a row, its values (`values`).",
       "type": "array",
       "minItems": 1,
-      "items": { "enum": ["meta", "body", "share", "move", "trash", "purge"] }
+      "items": { "enum": ["meta", "body", "share", "move", "trash", "purge", "schema", "values", "views"] }
+    },
+    "row": {
+      "description": "Whether the page is a row of a table (its `parent`): a row is followed through its table's container. Absent means false.",
+      "type": "boolean"
     }
   },
   "$defs": {

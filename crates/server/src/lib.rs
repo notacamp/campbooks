@@ -1069,7 +1069,7 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these twelve, on module tables.
+        // The maintenance scope: these thirteen, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
             // The chats' expiry (assistant, campbooks-cloud#305): which
@@ -1143,6 +1143,14 @@ mod tests {
             // The trash's 30 days (pages, campbooks-cloud#363): which
             // workspaces hold a trash root that old, read only.
             ("pages.pages", "maintenance_reads_trash", "SELECT"),
+            // The same sweep, for what a table keeps for an undo (pages,
+            // campbooks-cloud#365): which workspaces hold a property
+            // removed or retyped that long ago, read only.
+            (
+                "pages.table_properties",
+                "maintenance_reads_removed_properties",
+                "SELECT",
+            ),
             // Invitations stored before invitations were announced
             // (campbooks-cloud#360): which workspaces still have one to
             // announce, read only.

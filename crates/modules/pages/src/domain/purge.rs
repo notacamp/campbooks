@@ -48,9 +48,33 @@ pub async fn root(
             place: row.place()?,
             trashed: true,
             kinds: vec![PageChangeKind::Purge],
+            row: false,
         };
         state.events.publish(tx, &event).await?;
     }
+    // Rows deleted for good leave the relation cells of other rows that held
+    // them (a cell left empty reads as cleared); the rest goes with the
+    // pages, by their foreign keys.
+    let gone: Vec<String> = ids.iter().map(ToString::to_string).collect();
+    sqlx::query(
+        "UPDATE pages.row_values v
+            SET value = trimmed.value, version = v.version + 1, previous = NULL, updated_at = now()
+           FROM (
+               SELECT rv.row_id, rv.property_id, COALESCE(keep.items, 'null'::jsonb) AS value
+                 FROM pages.row_values rv
+                 JOIN pages.table_properties tp ON tp.id = rv.property_id AND tp.type = 'relation'
+                CROSS JOIN LATERAL (
+                    SELECT jsonb_agg(item) AS items
+                      FROM jsonb_array_elements(rv.value) item
+                     WHERE item #>> '{}' <> ALL($1::text[])
+                ) keep
+                WHERE jsonb_typeof(rv.value) = 'array' AND rv.value ?| $1::text[]
+           ) trimmed
+          WHERE v.row_id = trimmed.row_id AND v.property_id = trimmed.property_id",
+    )
+    .bind(&gone)
+    .execute(&mut **tx)
+    .await?;
     sqlx::query("DELETE FROM pages.pages WHERE trash_root = $1")
         .bind(row.id)
         .execute(&mut **tx)

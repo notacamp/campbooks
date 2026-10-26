@@ -66,6 +66,14 @@ resource = "tasks.task"
 call = "access::require_page("
 resource = "pages.page"
 
+[[access.helpers]]
+call = "tables::require_table("
+resource = "pages.page"
+
+[[access.helpers]]
+call = "tables::require_row("
+resource = "pages.page"
+
 # Functions that build the reference an `authorize` call is given: a handler
 # calling `authorize` with one names that resource type.
 [[access.references]]
@@ -250,6 +258,10 @@ reason = "The change feed: the draft shows why it failed; notifications to come.
 [[access.unconsumed_events]]
 name = "conversations.inbox_changed"
 reason = "The change feed: a membership ended or the inbox was kept read-only, so open streams ask again who sees it."
+
+[[access.unconsumed_events]]
+name = "pages.table_changed"
+reason = "The change feed: an open table asks again when its properties, views or set of rows change (pages-tables, campbooks-cloud#365)."
 
 [[access.unconsumed_events]]
 name = "identity.account_created"

@@ -46,6 +46,10 @@ impl Job for DispatchPurgeTrash {
         let workspaces: Vec<Uuid> = sqlx::query_scalar(
             "SELECT DISTINCT workspace_id FROM pages.pages
               WHERE trash_root = id AND trashed_at < now() - make_interval(days => $1)
+             UNION
+             SELECT DISTINCT workspace_id FROM pages.table_properties
+              WHERE (removed_at < now() - make_interval(days => $1)
+                     OR converted_at < now() - make_interval(days => $1))
               ORDER BY workspace_id LIMIT $2",
         )
         .bind(KEEP_DAYS)
@@ -104,6 +108,32 @@ impl Job for PurgeTrash {
                 purged += 1;
             }
         }
+        // Properties removed, and conversions, more than 30 days ago: what
+        // they kept for an undo goes.
+        sqlx::query(
+            "DELETE FROM pages.table_properties
+              WHERE removed_at < now() - make_interval(days => $1)",
+        )
+        .bind(KEEP_DAYS)
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query(
+            "UPDATE pages.row_values SET previous = NULL
+              WHERE previous IS NOT NULL AND property_id IN (
+                    SELECT id FROM pages.table_properties
+                     WHERE converted_at < now() - make_interval(days => $1))",
+        )
+        .bind(KEEP_DAYS)
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query(
+            "UPDATE pages.table_properties
+                SET previous_type = NULL, previous_config = NULL, converted_at = NULL
+              WHERE converted_at < now() - make_interval(days => $1)",
+        )
+        .bind(KEEP_DAYS)
+        .execute(&mut **tx)
+        .await?;
         tracing::info!(roots = purged, "pages purged from the trash");
         Ok(())
     }

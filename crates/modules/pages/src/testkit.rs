@@ -207,7 +207,23 @@ impl Kit {
     #[must_use]
     pub fn switched_off(mut self) -> Self {
         self.app = testing::app(
-            crate::module(crate::Deps { enabled: false }),
+            crate::module(crate::Deps {
+                enabled: false,
+                tables: false,
+            }),
+            self.state.clone(),
+        );
+        self
+    }
+
+    /// The same kit with tables switched on or off (pages stay on).
+    #[must_use]
+    pub fn with_tables(mut self, on: bool) -> Self {
+        self.app = testing::app(
+            crate::module(crate::Deps {
+                enabled: true,
+                tables: on,
+            }),
             self.state.clone(),
         );
         self
@@ -341,6 +357,144 @@ impl Kit {
             made.json
         );
         made.json
+    }
+
+    /// How many cells are stored in the workspace.
+    pub async fn row_cell_count(&self, workspace: WorkspaceId) -> i64 {
+        sqlx::query_scalar("SELECT count(*) FROM pages.row_values WHERE workspace_id = $1")
+            .bind(workspace.as_uuid())
+            .fetch_one(&self.db)
+            .await
+            .unwrap()
+    }
+
+    /// The path of the module's tables.
+    pub fn tables(workspace: WorkspaceId) -> String {
+        format!("/api/v1/w/{workspace}/tables")
+    }
+
+    /// Make a table as `token` (private, titled "Clients") and return its
+    /// JSON.
+    pub async fn table(&self, token: &str, workspace: WorkspaceId) -> serde_json::Value {
+        let made = self
+            .post(
+                token,
+                &Self::tables(workspace),
+                Some(serde_json::json!({"title": "Clients", "place": "workspace"})),
+            )
+            .await;
+        assert_eq!(
+            made.status,
+            axum::http::StatusCode::CREATED,
+            "{:?}",
+            made.json
+        );
+        made.json
+    }
+
+    /// Add a property to a table and return its JSON (`property`, `paired`).
+    pub async fn property(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        table: &str,
+        body: serde_json::Value,
+    ) -> serde_json::Value {
+        let made = self
+            .post(
+                token,
+                &format!("{}/{table}/properties", Self::tables(workspace)),
+                Some(body),
+            )
+            .await;
+        assert_eq!(
+            made.status,
+            axum::http::StatusCode::CREATED,
+            "{:?}",
+            made.json
+        );
+        made.json
+    }
+
+    /// Add a row and return its JSON.
+    pub async fn row(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        table: &str,
+        body: serde_json::Value,
+    ) -> serde_json::Value {
+        let made = self
+            .post(
+                token,
+                &format!("{}/{table}/rows", Self::tables(workspace)),
+                Some(body),
+            )
+            .await;
+        assert_eq!(
+            made.status,
+            axum::http::StatusCode::CREATED,
+            "{:?}",
+            made.json
+        );
+        made.json
+    }
+
+    /// `PATCH …/rows/{row}/cells`.
+    pub async fn cells(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        table: &str,
+        row: &str,
+        cells: serde_json::Value,
+    ) -> TestResponse {
+        self.patch(
+            token,
+            &format!("{}/{table}/rows/{row}/cells", Self::tables(workspace)),
+            serde_json::json!({"cells": cells}),
+        )
+        .await
+    }
+
+    /// `POST …/query`.
+    pub async fn query(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        table: &str,
+        body: serde_json::Value,
+    ) -> TestResponse {
+        self.post(
+            token,
+            &format!("{}/{table}/query", Self::tables(workspace)),
+            Some(body),
+        )
+        .await
+    }
+
+    /// Share a page with `member` as `role`.
+    pub async fn share(
+        &self,
+        token: &str,
+        workspace: WorkspaceId,
+        page: &str,
+        member: UserId,
+        role: &str,
+    ) {
+        let shared = self
+            .put(
+                token,
+                &format!("{}/{page}/grants/{member}", Self::pages(workspace)),
+                serde_json::json!({"role": role}),
+            )
+            .await;
+        assert_eq!(
+            shared.status,
+            axum::http::StatusCode::OK,
+            "{:?}",
+            shared.json
+        );
     }
 
     /// `POST …/sync`: send `update` (if any) and what the client holds.

@@ -630,6 +630,94 @@ impl World {
         (page, trashed, blob.hash.to_string())
     }
 
+    /// A workspace table `member` made (pages-tables, campbooks-cloud#365),
+    /// with a select property, a second view and a row. Returns the table,
+    /// the row, the property and the view.
+    async fn seed_table(&self, member: UserId) -> (Uuid, Uuid, Uuid, Uuid) {
+        let (table, row, property, view) = (
+            Uuid::now_v7(),
+            Uuid::now_v7(),
+            Uuid::now_v7(),
+            Uuid::now_v7(),
+        );
+        for (id, parent, kind) in [(table, None, "table"), (row, Some(table), "row")] {
+            sqlx::query(
+                "INSERT INTO pages.pages
+                     (id, workspace_id, parent_id, place, position, title, created_by, edited_by, kind)
+                 VALUES ($1, $2, $3, 'workspace', 'a0', 'Matrix table', $4, $4, $5)",
+            )
+            .bind(id)
+            .bind(self.a.as_uuid())
+            .bind(parent)
+            .bind(member.as_uuid())
+            .bind(kind)
+            .execute(&self.db)
+            .await
+            .unwrap();
+        }
+        sqlx::query(
+            "INSERT INTO pages.tables (table_id, workspace_id, next_number) VALUES ($1, $2, 2)",
+        )
+        .bind(table)
+        .bind(self.a.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO pages.table_rows (row_id, table_id, workspace_id, number)
+             VALUES ($1, $2, $3, 1)",
+        )
+        .bind(row)
+        .bind(table)
+        .bind(self.a.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        for (id, name, ty, config, position) in [
+            (Uuid::now_v7(), "Name", "title", json!({}), "a0"),
+            (
+                property,
+                "Stage",
+                "select",
+                json!({"options": [{"id": "opt1", "name": "Kickoff", "color": "default"}]}),
+                "a1",
+            ),
+        ] {
+            sqlx::query(
+                "INSERT INTO pages.table_properties
+                     (id, table_id, workspace_id, name, type, config, position, created_by)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            )
+            .bind(id)
+            .bind(table)
+            .bind(self.a.as_uuid())
+            .bind(name)
+            .bind(ty)
+            .bind(config)
+            .bind(position)
+            .bind(member.as_uuid())
+            .execute(&self.db)
+            .await
+            .unwrap();
+        }
+        for (id, position) in [(Uuid::now_v7(), "a0"), (view, "a1")] {
+            sqlx::query(
+                "INSERT INTO pages.table_views
+                     (id, table_id, workspace_id, name, type, position, created_by)
+                 VALUES ($1, $2, $3, 'Matrix view', 'table', $4, $5)",
+            )
+            .bind(id)
+            .bind(table)
+            .bind(self.a.as_uuid())
+            .bind(position)
+            .bind(member.as_uuid())
+            .execute(&self.db)
+            .await
+            .unwrap();
+        }
+        (table, row, property, view)
+    }
+
     /// `member`'s chat with Scout, about nothing (campbooks-cloud#305), with
     /// a question, and Scout's answer holding a pending proposal whose id is
     /// the chat's (so one instance fills both).
@@ -741,6 +829,7 @@ impl World {
         let chat = self.seed_chat(u(Who::Member)).await;
         let (calendar, calendar_event) = self.seed_calendar(u(Who::Member)).await;
         let (page, trashed_page, file) = self.seed_pages(u(Who::Member), u(Who::Reader)).await;
+        let (table, table_row, table_property, table_view) = self.seed_table(u(Who::Member)).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
@@ -802,6 +891,12 @@ impl World {
             ("pages.page", page.to_string()),
             ("pages.trashed", trashed_page.to_string()),
             ("pages.file", file),
+            // A table of the same member, with a row, a select property and
+            // a second view.
+            ("pages.table", table.to_string()),
+            ("pages.row", table_row.to_string()),
+            ("pages.property", table_property.to_string()),
+            ("pages.view", table_view.to_string()),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
             "SELECT id::text FROM conversations.conversations WHERE inbox_id = $1
@@ -1083,10 +1178,13 @@ async fn every_resource_answers_each_principal_as_its_catalogue_declares(db: PgP
 
 /// A request body for every operation that takes one; an operation missing
 /// here fails the matrix until it says how it is called.
+#[allow(clippy::too_many_lines)]
 fn body(world: &World, id: &str) -> Option<Value> {
     let inbox = &world.instances["conversations.inbox"];
     Some(match id {
-        "workspaces.update" => json!({"name": "Renamed"}),
+        "workspaces.update" | "pages.update_property" | "pages.update_view" => {
+            json!({"name": "Renamed"})
+        }
         "workspaces.invite_member" => json!({"email": "someone@example.com", "role": "member"}),
         "workspaces.change_role" => json!({"role": "admin"}),
         "workspaces.create" => json!({"name": "New", "kind": "business"}),
@@ -1148,7 +1246,8 @@ fn body(world: &World, id: &str) -> Option<Value> {
         | "conversations.suggest_replies"
         | "conversations.write_nudge"
         | "assistant.start_chat"
-        | "connectors.start_notion" => json!({}),
+        | "connectors.start_notion"
+        | "pages.query_table" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
@@ -1177,6 +1276,14 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "pages.resolve_conflict" => json!({"keep": "mine"}),
         // The bytes of a file: this text.
         "pages.upload_file" => json!({"file": "matrix"}),
+        // Tables: a table, its select property, a row and a view are seeded.
+        "pages.create_table" => json!({"title": "Matrix table"}),
+        "pages.add_property" => json!({"name": "Notes", "type": "text"}),
+        "pages.set_options" => json!({"options": [{"id": "opt1", "name": "Kickoff"}]}),
+        "pages.add_row" => json!({"title": "Matrix row"}),
+        "pages.set_cells" => json!({"cells": [
+            {"property": world.instances["pages.property"], "value": "opt1"}]}),
+        "pages.create_view" => json!({"name": "Matrix board", "type": "table"}),
         "assistant.ask_chat" | "assistant.stream_chat" => json!({"text": "Why is this here?"}),
         "assistant.settle_proposal" => json!({"state": "declined"}),
         "conversations.write_reply" | "conversations.stream_reply" => {
@@ -1190,6 +1297,15 @@ fn body(world: &World, id: &str) -> Option<Value> {
 /// declared resource type (or, for creating a draft, the inbox in its
 /// body); `None` for lists and creations.
 fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<String> {
+    // The tables operations name a table or a row by their own parameters;
+    // both are pages.
+    if resource == "pages.page" {
+        for (param, instance) in [("{row_id}", "pages.row"), ("{table_id}", "pages.table")] {
+            if path.contains(param) {
+                return world.instances.get(instance).cloned();
+            }
+        }
+    }
     let param = match resource {
         "workspaces.workspace" => "{workspace_id}",
         "workspaces.member" => "{user_id}",
@@ -1281,6 +1397,10 @@ fn fill(world: &World, path: &str, id: &str) -> String {
     path.replace("{workspace_id}", &world.a.to_string())
         .replace("{page_id}", page)
         .replace("{hash}", &world.instances["pages.file"])
+        .replace("{table_id}", &world.instances["pages.table"])
+        .replace("{row_id}", &world.instances["pages.row"])
+        .replace("{property_id}", &world.instances["pages.property"])
+        .replace("{view_id}", &world.instances["pages.view"])
         .replace("{block}", &Uuid::now_v7().to_string())
         .replace("{resolution}", &Uuid::now_v7().to_string())
         .replace("{member_id}", &world.users[&Who::Reader].to_string())

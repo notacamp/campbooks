@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/pages.table_changed.v1.schema.json",
+  "title": "pages.table_changed v1 (event payload)",
+  "description": "Published by the pages module when a table's properties, views or set of rows change (a row added, put in the trash, brought back or deleted for good), so a view that is open asks for the table again; the change feed announces it to the members who may open the table. A cell edit is announced as pages.page_changed of its row, kind `values`. Ids and enums only, never a property name, an option, a view name or any value. `revision` grows with every change of one table: apply only newer ones. Workspace-scoped; also listed in openapi/events.json.",
+  "type": "object",
+  "required": ["workspace", "table", "revision", "kinds"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "table": { "$ref": "#/$defs/uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "kinds": {
+      "description": "What changed: the properties or options (`schema`), the views, or the set of rows.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "enum": ["schema", "views", "rows"] }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

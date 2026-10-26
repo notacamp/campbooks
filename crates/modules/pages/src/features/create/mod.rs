@@ -105,6 +105,9 @@ pub async fn handler(
                 access::require_page(&state, &mut tx, access, Action::Write, parent_id, false)
                     .await?;
             expect_live(&parent)?;
+            if parent.kind()? != crate::domain::Kind::Page {
+                return Err(Error::Conflict(crate::MESSAGES.reason("table_parent")));
+            }
             let place = parent.place()?;
             if request.place.is_some_and(|asked| asked != place) {
                 return Err(Error::BadRequest(crate::MESSAGES.reason("place_mismatch")));

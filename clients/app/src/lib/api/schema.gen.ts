@@ -2228,6 +2228,195 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make a table. */
+        post: operations["pages.create_table"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a table: its properties, its views and how many rows it has. */
+        get: operations["pages.get_table"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/properties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a property. */
+        post: operations["pages.add_property"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/properties/{property_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a property. */
+        delete: operations["pages.remove_property"];
+        options?: never;
+        head?: never;
+        /** Change a property. */
+        patch: operations["pages.update_property"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/properties/{property_id}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the options of a property. */
+        put: operations["pages.set_options"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/properties/{property_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore a property. */
+        post: operations["pages.restore_property"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Query a table. */
+        post: operations["pages.query_table"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a row. */
+        post: operations["pages.add_row"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/rows/{row_id}/cells": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Write cells. */
+        patch: operations["pages.set_cells"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a view. */
+        post: operations["pages.create_view"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/views/{view_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a view. */
+        delete: operations["pages.remove_view"];
+        options?: never;
+        head?: never;
+        /** Change a view. */
+        patch: operations["pages.update_view"];
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/tasks": {
         parameters: {
             query?: never;
@@ -2976,6 +3165,15 @@ export interface components {
              */
             name: string;
         };
+        /**
+         * @description The property added, and for a paired relation the one it made on the
+         *     other table.
+         */
+        AddedProperty: {
+            paired?: components["schemas"]["PropertyView"] | null;
+            /** @description The property. */
+            property: components["schemas"]["PropertyView"];
+        };
         /** @description One way to reach someone on a channel: a display name and an address. */
         Address: {
             /**
@@ -3300,6 +3498,63 @@ export interface components {
          * @enum {string}
          */
         Capability: "messages" | "calendar" | "files" | "bank" | "pages";
+        /** @description One cell to write. */
+        CellInput: {
+            /** @description The property. */
+            property: components["schemas"]["PropertyId"];
+            /** @description The new value, in the form of the property's type; `null` clears it. */
+            value: unknown;
+            /**
+             * Format: int64
+             * @description The version of the cell you saw. A stale version still writes, and
+             *     the answer says so.
+             */
+            version?: number | null;
+        };
+        /** @description What a write did to one cell. */
+        CellResult: {
+            /** @description The value it held before: what an undo writes back. */
+            previous: unknown;
+            /**
+             * Format: int64
+             * @description The version it had before; 0 for a cell never set.
+             */
+            previous_version: number;
+            /** @description The property. */
+            property: components["schemas"]["PropertyId"];
+            /** @description Whether the cell had changed since the version you sent. */
+            stale: boolean;
+            /**
+             * Format: int64
+             * @description The cell's version now.
+             */
+            version: number;
+        };
+        /** @description One cell of a row. */
+        CellView: {
+            /** @description Its value, in the form of the property's type. */
+            value: unknown;
+            /**
+             * Format: int64
+             * @description Grows with every change of this cell: send the one you saw.
+             */
+            version: number;
+        };
+        /** @description The cells to write. */
+        CellsUpdate: {
+            /** @description Up to 100 cells, each property once. */
+            cells: components["schemas"]["CellInput"][];
+        };
+        /** @description What was written. */
+        CellsWritten: {
+            /**
+             * @description For each cell: its new version, whether it was stale, and what it
+             *     held before.
+             */
+            results: components["schemas"]["CellResult"][];
+            /** @description The row afterwards. */
+            row: components["schemas"]["RowView"];
+        };
         /** @description The new role. */
         ChangeRole: {
             /** @description The member's new role. */
@@ -4459,6 +4714,16 @@ export interface components {
             /** @description Their role on the page and its sub-pages. */
             role: components["schemas"]["PageRole"];
         };
+        /** @description How many rows a board column holds. */
+        GroupSize: {
+            /** @description The option; none for the rows with no value. */
+            option?: string | null;
+            /**
+             * Format: int64
+             * @description How many rows the filter keeps in it.
+             */
+            rows: number;
+        };
         /** @description Who to hand it to. */
         HandOffTo: {
             /**
@@ -5365,11 +5630,69 @@ export interface components {
             /** @description Its title: 0 to 200 characters. A page may be made before it has one. */
             title?: string | null;
         };
+        /** @description A new property. */
+        NewProperty: {
+            /**
+             * @description Its config, per type (see `PropertyView.config`). A relation needs
+             *     `table`; `pair` is made by the server.
+             */
+            config?: unknown;
+            /** @description Its name: 1 to 100 characters. */
+            name: string;
+            /**
+             * @description For a relation: the name of the property that shows it from the other
+             *     table's side, which makes it a paired relation.
+             */
+            paired_name?: string | null;
+            /**
+             * @description Where it sits among the table's properties: a fractional-indexing
+             *     key. Default: after the last one.
+             */
+            position?: string | null;
+            /** @description Its type. `title` and the types reserved for Notion cannot be made. */
+            type: components["schemas"]["PropertyType"];
+        };
+        /** @description A new row. */
+        NewRow: {
+            /** @description Its cells. */
+            cells?: components["schemas"]["CellInput"][];
+            /**
+             * @description Where it sits among the table's rows: a fractional-indexing key.
+             *     Default: after the last one.
+             */
+            position?: string | null;
+            /** @description Its title (the table's title property): 0 to 200 characters. */
+            title?: string | null;
+        };
         /**
          * @description Whether a new rule should act now or wait for a yes.
          * @enum {string}
          */
         NewRuleState: "active" | "proposed";
+        /** @description A new table. */
+        NewTable: {
+            /** @description Its icon, one of the page icons. */
+            icon?: string | null;
+            parent?: components["schemas"]["PageId"] | null;
+            place?: components["schemas"]["Place"] | null;
+            /**
+             * @description Where it sits among its siblings: a fractional-indexing key. Default:
+             *     after the last one.
+             */
+            position?: string | null;
+            /** @description Its title: 0 to 200 characters. */
+            title?: string | null;
+            /**
+             * @description The name of its title property, in the member's language. Default
+             *     `Name`.
+             */
+            title_property?: string | null;
+            /**
+             * @description The name of its first view, in the member's language. Default
+             *     `Table`.
+             */
+            view_name?: string | null;
+        };
         /** @description A new task. */
         NewTask: {
             /**
@@ -5391,6 +5714,21 @@ export interface components {
             /** @description What to do: 1 to 200 characters. */
             title: string;
             verb?: components["schemas"]["TaskVerb"] | null;
+        };
+        /** @description A new view. */
+        NewView: {
+            /** @description Its filter, sorts, summaries and columns; a board needs `group_by`. */
+            config?: unknown;
+            id?: components["schemas"]["ViewId"] | null;
+            /** @description Its name: 1 to 100 characters. */
+            name: string;
+            /**
+             * @description Where it sits among the views: a fractional-indexing key. Default:
+             *     after the last one.
+             */
+            position?: string | null;
+            /** @description `table` or `board`. */
+            type: components["schemas"]["TableViewType"];
         };
         /**
          * @description Why there is nothing to offer.
@@ -5561,6 +5899,15 @@ export interface components {
          * @enum {string}
          */
         NotionStopReason: "stopped_by_member" | "disconnected" | "trashed_here" | "trashed_in_notion" | "not_shared" | "member_left" | "notion_unavailable";
+        /** @description The options as they should become. */
+        OptionsUpdate: {
+            /**
+             * @description All the options, in order. An option with an `id` is that option
+             *     (renamed, recoloured, moved); one without is new. At most 100, with
+             *     distinct names.
+             */
+            options: components["schemas"]["SelectOption"][];
+        };
         /** @description Who organises an event. */
         OrganizerView: {
             /**
@@ -5908,6 +6255,48 @@ export interface components {
              * @description Grows by one on every change; 0 before the first.
              */
             revision: number;
+        };
+        /**
+         * Format: uuid
+         * @description PropertyId (UUIDv7)
+         */
+        PropertyId: string;
+        /**
+         * @description The type of a property. Every type has a Notion counterpart
+         *     (design.md, "Property types").
+         * @enum {string}
+         */
+        PropertyType: "title" | "text" | "number" | "select" | "multi_select" | "status" | "date" | "checkbox" | "person" | "files" | "url" | "email" | "phone" | "relation" | "campbooks_link" | "created" | "edited" | "unique_id" | "notion_formula" | "notion_rollup" | "notion_people" | "external";
+        /** @description What to change. What is absent stays. */
+        PropertyUpdate: {
+            /** @description Its new config. With a new type and no config, the type's default. */
+            config?: unknown;
+            /** @description Its new name: 1 to 100 characters. */
+            name?: string | null;
+            /** @description Its new place among the table's properties: a fractional-indexing key. */
+            position?: string | null;
+            type?: components["schemas"]["PropertyType"] | null;
+        };
+        /** @description A property of a table. */
+        PropertyView: {
+            /**
+             * @description Whether its last change of type can be taken back
+             *     (`pages.restore_property`).
+             */
+            can_revert: boolean;
+            /**
+             * @description Its config, per type: options for a select, the format of a number,
+             *     whether a date has a time, the table of a relation.
+             */
+            config: unknown;
+            /** @description The property. */
+            id: components["schemas"]["PropertyId"];
+            /** @description Its name. */
+            name: string;
+            /** @description Where it sits among the table's properties: sort by it. */
+            position: string;
+            /** @description Its type. */
+            type: components["schemas"]["PropertyType"];
         };
         /** @description One rule to check. */
         Proposal: {
@@ -6527,6 +6916,48 @@ export interface components {
          * @enum {string}
          */
         Role: "owner" | "admin" | "member";
+        /** @description A row with its cells. */
+        RowView: {
+            /** @description The cells that hold a value, by property id. */
+            cells: {
+                [key: string]: components["schemas"]["CellView"];
+            };
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            created_at: string;
+            /** @description Who made it. */
+            created_by: components["schemas"]["UserId"];
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            edited_at: string;
+            /** @description Who changed it last. */
+            edited_by: components["schemas"]["UserId"];
+            /** @description The row (a page). */
+            id: components["schemas"]["PageId"];
+            /**
+             * Format: int64
+             * @description Grows with a change of the title: the version of the title cell.
+             */
+            meta_revision: number;
+            /**
+             * Format: int64
+             * @description Its number in the table: what an ID property shows.
+             */
+            number: number;
+            /**
+             * Format: int64
+             * @description Grows with every change of the row, a cell included.
+             */
+            revision: number;
+            /** @description The table. */
+            table: components["schemas"]["PageId"];
+            /** @description Its title, the table's title property. */
+            title: string;
+        };
         /** @description What a rule does; at most one of each kind, labels excepted. */
         RuleAction: {
             /** @enum {string} */
@@ -6985,6 +7416,19 @@ export interface components {
             /** @description The text, verbatim. */
             text: string;
         };
+        /** @description One option of a select, multi-select or status property. */
+        SelectOption: {
+            /**
+             * @description One of `default`, `gray`, `brown`, `orange`, `yellow`, `green`,
+             *     `blue`, `purple`, `pink`, `red`.
+             */
+            color?: string | null;
+            group?: components["schemas"]["StatusGroup"] | null;
+            /** @description Its id: stable, what values hold. Made when missing. */
+            id?: string;
+            /** @description Its name, 1 to 100 characters, unique among the property's options. */
+            name: string;
+        };
         /** @description Which version of the draft to send: the one the member last saw saved. */
         SendDraft: {
             /**
@@ -7289,6 +7733,11 @@ export interface components {
             expires_at: string;
         };
         /**
+         * @description Where a status option sits in the flow.
+         * @enum {string}
+         */
+        StatusGroup: "todo" | "doing" | "done";
+        /**
          * @description The one place Campbooks sorts a conversation into. The built-in set; the
          *     workspace's own streams come later.
          * @enum {string}
@@ -7396,6 +7845,26 @@ export interface components {
             likelihood: number;
         };
         /**
+         * @description What a column's footer shows.
+         * @enum {string}
+         */
+        SummaryKind: "count" | "sum" | "average" | "min" | "max" | "percent_checked";
+        /** @description One summary, computed over every row the filter keeps. */
+        SummaryValue: {
+            /** @description What it shows. */
+            kind: components["schemas"]["SummaryKind"];
+            /**
+             * Format: uuid
+             * @description The property.
+             */
+            property: string;
+            /**
+             * @description The figure: a number, a date or a share (0 to 100) as text; none when
+             *     there is nothing to summarise.
+             */
+            value?: string | null;
+        };
+        /**
          * @description Always or never show.
          * @enum {string}
          */
@@ -7434,6 +7903,90 @@ export interface components {
              * @description How many streams will run now.
              */
             streams: number;
+        };
+        /** @description A table: its page, its properties and its views. */
+        TableDetail: {
+            /** @description The table as a page: title, icon, place, role. */
+            page: components["schemas"]["PageSummary"];
+            /** @description Its properties, in order. */
+            properties: components["schemas"]["PropertyView"][];
+            /**
+             * Format: int64
+             * @description Grows with every change of its properties, views or set of rows.
+             */
+            revision: number;
+            /**
+             * Format: int64
+             * @description How many rows it has (those in the trash excluded).
+             */
+            rows: number;
+            /** @description Its views, in order. */
+            views: components["schemas"]["TableViewView"][];
+        };
+        /**
+         * @description What to ask. Everything is optional: with nothing, all rows in the order
+         *     they were added.
+         */
+        TableQuery: {
+            /** @description The `next_cursor` of the previous answer. */
+            cursor?: string | null;
+            /**
+             * @description A filter of your own, in the form of a view's: a tree of
+             *     `{"and": [...]}` / `{"or": [...]}` groups (three levels) of
+             *     `{"property", "operator", "value"}` conditions. With a view, both
+             *     must hold.
+             */
+            filter?: unknown;
+            /** @description How many rows, 1 to 100. Default 100. */
+            limit?: number | null;
+            /**
+             * @description Sorts of your own (up to five `{"property", "direction"}`), in place
+             *     of the view's.
+             */
+            sorts?: unknown;
+            /**
+             * @description Summaries of your own (`{"property", "kind"}`), in place of the
+             *     view's.
+             */
+            summaries?: unknown;
+            view?: components["schemas"]["ViewId"] | null;
+        };
+        /** @description The rows asked for. */
+        TableRows: {
+            /** @description For a board: how many rows each column holds. */
+            groups?: components["schemas"]["GroupSize"][] | null;
+            /**
+             * Format: int64
+             * @description How many rows the filter keeps in all.
+             */
+            matching: number;
+            /** @description Pass it back as `cursor` for the next rows; none at the end. */
+            next_cursor?: string | null;
+            /** @description The rows of this page, in order. */
+            rows: components["schemas"]["RowView"][];
+            /** @description The summaries, over every row the filter keeps. */
+            summaries: components["schemas"]["SummaryValue"][];
+        };
+        /**
+         * @description What a view shows.
+         * @enum {string}
+         */
+        TableViewType: "table" | "board" | "list" | "calendar" | "gallery";
+        /** @description A view of a table. */
+        TableViewView: {
+            /**
+             * @description Its filter, sorts, summaries, visible properties and, for a board, its
+             *     groups and card properties.
+             */
+            config: unknown;
+            /** @description The view. */
+            id: components["schemas"]["ViewId"];
+            /** @description Its name. */
+            name: string;
+            /** @description Where it sits among the table's views. */
+            position: string;
+            /** @description `table` or `board`. */
+            type: components["schemas"]["TableViewType"];
         };
         /**
          * @description Who made a change.
@@ -7891,6 +8444,20 @@ export interface components {
              * @example 0.1.0
              */
             version: string;
+        };
+        /**
+         * Format: uuid
+         * @description ViewId (UUIDv7)
+         */
+        ViewId: string;
+        /** @description What to change. What is absent stays. */
+        ViewUpdate: {
+            /** @description Its new config, whole: what is sent is what the view becomes. */
+            config?: unknown;
+            /** @description Its new name: 1 to 100 characters. */
+            name?: string | null;
+            /** @description Its new place among the views. */
+            position?: string | null;
         };
         /** @description A provider account the caller signs in with. */
         WayIn: {
@@ -17295,6 +17862,928 @@ export interface operations {
             };
             /** @description No such workspace or inbox, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.create_table": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTable"];
+            };
+        };
+        responses: {
+            /** @description The table, with its title property and one table view. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableDetail"];
+                };
+            };
+            /** @description A title over 200 characters (`invalid_title`), an unknown icon, a bad position or a name that is empty or too long (`invalid_property_name`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the parent but not write in it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, tables are off, or a parent you cannot see. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The parent is in the trash (`page_trashed`), is a table or a row (`table_parent`), or pages would nest deeper than 12 levels (`page_too_deep`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.get_table": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The table. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableDetail"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table, tables are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is not a table (`not_a_table`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.add_property": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProperty"];
+            };
+        };
+        responses: {
+            /** @description The property. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddedProperty"];
+                };
+            };
+            /** @description A name that is empty or too long (`invalid_property_name`), a type that cannot be made (`property_type_reserved`), a config that does not fit the type (`invalid_config`) or a bad position. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table (or the table it is paired with) but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table, tables are off, or a table you cannot see. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`), in the trash (`page_trashed`), or it would have more than 200 properties (`too_many_properties`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.remove_property": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+                /** @description The property. */
+                property_id: components["schemas"]["PropertyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The property that was removed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertyView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table or property, tables are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`), in the trash (`page_trashed`), or the property is the title (`title_property`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.update_property": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+                /** @description The property. */
+                property_id: components["schemas"]["PropertyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PropertyUpdate"];
+            };
+        };
+        responses: {
+            /** @description The property afterwards. `can_revert` says whether `pages.restore_property` can take a change of type back. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertyView"];
+                };
+            };
+            /** @description A name that is empty or too long, a config that does not fit the type (`invalid_config`), a type that cannot be made (`property_type_reserved`), or a change the title or a relation does not take (`property_not_editable`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table or property, tables are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`) or in the trash (`page_trashed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.set_options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+                /** @description The property. */
+                property_id: components["schemas"]["PropertyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptionsUpdate"];
+            };
+        };
+        responses: {
+            /** @description The property with its options. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertyView"];
+                };
+            };
+            /** @description Options that do not fit (`invalid_config`): a repeated id or name, an unknown colour, more than 100, or a property that holds no options. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table or property, tables are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`) or in the trash (`page_trashed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.restore_property": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+                /** @description The property. */
+                property_id: components["schemas"]["PropertyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The property as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertyView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table or property, tables are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`), in the trash (`page_trashed`), there is nothing to take back (`nothing_to_restore`), or the table would have more than 200 properties (`too_many_properties`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.query_table": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TableQuery"];
+            };
+        };
+        responses: {
+            /** @description The rows. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableRows"];
+                };
+            };
+            /** @description A filter, sort or summary that does not fit the table's properties (`invalid_filter`, `invalid_sort`, `invalid_summary`), or a bad cursor (`invalid_cursor`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table or view, tables are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The page is not a table (`not_a_table`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.add_row": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewRow"];
+            };
+        };
+        responses: {
+            /** @description The row. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RowView"];
+                };
+            };
+            /** @description A title over 200 characters, a bad position, a cell that is not valid (`invalid_value`, `unknown_property`, `property_not_editable`, `not_a_member`, `foreign_blob`) or more than 100 cells. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table, tables are off, or you cannot see it (or a row a relation cell names). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`), in the trash (`page_trashed`), or it already has 20,000 rows (`table_full`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.set_cells": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+                /** @description The row. */
+                row_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CellsUpdate"];
+            };
+        };
+        responses: {
+            /** @description What each cell was and became, and the row. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CellsWritten"];
+                };
+            };
+            /** @description A value that does not fit its property (`invalid_value`; nothing is stored), an unknown property (`unknown_property`), a computed or reserved one (`property_not_editable`), someone who is not a member (`not_a_member`), a file not uploaded to the row (`foreign_blob`) or more than 100 cells. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the row (or a row a paired relation changes) but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such row, tables are off, or you cannot see it (or a row a relation cell names). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a row (`not_a_row`) or in the trash (`page_trashed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.create_view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewView"];
+            };
+        };
+        responses: {
+            /** @description The view. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableViewView"];
+                };
+            };
+            /** @description A name that is empty or too long, a reserved type (`view_type_reserved`), a config that does not fit the table (`invalid_view`, `invalid_filter`, `invalid_sort`, `invalid_summary`) or a bad position. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table, tables are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`), in the trash (`page_trashed`), the id is taken (`view_exists`) or the table has 50 views (`too_many_views`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.remove_view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+                /** @description The view. */
+                view_id: components["schemas"]["ViewId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The view that was removed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableViewView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table or view, tables are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`), in the trash (`page_trashed`), or the table's last view (`last_view`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.update_view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+                /** @description The view. */
+                view_id: components["schemas"]["ViewId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ViewUpdate"];
+            };
+        };
+        responses: {
+            /** @description The view afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableViewView"];
+                };
+            };
+            /** @description A name that is empty or too long, a config that does not fit the table (`invalid_view`, `invalid_filter`, `invalid_sort`, `invalid_summary`) or a bad position. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not write it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table or view, tables are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`) or in the trash (`page_trashed`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
