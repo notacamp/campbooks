@@ -34,7 +34,8 @@
     "imap_not_an_imap_server": "O servidor neste endereço e porta não é um servidor de correio IMAP. Verifique o servidor e a porta.",
     "host_refused": "O Campbooks não se pode ligar a este servidor: está numa rede privada ou a porta não é de correio (993, 143, 465 ou 587).",
     "starttls_missing": "O servidor não oferece uma ligação cifrada, por isso o Campbooks não enviou a sua palavra-passe. Use a porta cifrada do servidor (993 para IMAP, 465 para SMTP).",
-    "address_check_not_needed": "O endereço desta caixa de correio não precisa de verificação: já está verificado, ou não é uma caixa de correio IMAP."
+    "address_check_not_needed": "O endereço desta caixa de correio não precisa de verificação: já está verificado, ou não é uma caixa de correio IMAP.",
+    "invalid_return_to": "Esse endereço não é uma página desta aplicação."
   },
   "address_check": {
     "subject": "O Campbooks está a verificar o seu endereço",

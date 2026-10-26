@@ -54,6 +54,7 @@ pub mod imap;
 mod mail;
 mod metrics;
 mod microsoft;
+pub mod notion;
 mod provider;
 #[cfg(test)]
 mod rls_tests;
@@ -66,6 +67,9 @@ mod testkit_imap;
 mod testkit_imap_mailbox;
 #[cfg(test)]
 mod testkit_microsoft;
+#[cfg(test)]
+#[allow(dead_code, reason = "a fake with more levers than any one test pulls")]
+mod testkit_notion;
 #[cfg(test)]
 mod testkit_zoho;
 /// The module's tracked events, generated from the tracking plan (ADR 0020).
@@ -103,6 +107,17 @@ pub fn notifications_router(state: campbooks_kernel::AppState, deps: Deps) -> ax
     features::microsoft_notifications::router(state, deps)
 }
 
+/// The public routes of Notion (campbooks-cloud#376), over `state` and
+/// `deps`, ready for the server to merge beside the module's API: the
+/// browser's round trip to Notion and back (`/auth/start/notion`,
+/// `/auth/callback/notion`) and Notion's webhook (`POST /hooks/notion`).
+/// Outside the operation catalogue; empty unless Notion is offered (and,
+/// for the webhook, its secret is set).
+pub fn notion_router(state: campbooks_kernel::AppState, deps: Deps) -> axum::Router {
+    features::notion_connect::router(state.clone(), deps.clone())
+        .merge(features::notion_hook::router(state, deps))
+}
+
 /// The connectors module, composed with `deps`, ready for the server to
 /// mount.
 pub fn module(deps: Deps) -> Module {
@@ -112,6 +127,8 @@ pub fn module(deps: Deps) -> Module {
         router: OpenApiRouter::new()
             .routes(routes!(features::list_connections::handler))
             .routes(routes!(features::start_connection::handler))
+            .routes(routes!(features::start_notion::handler))
+            .routes(routes!(features::list_notion_pages::handler))
             .routes(routes!(features::discover_imap::handler))
             .routes(routes!(features::connect_imap::handler))
             .routes(routes!(
@@ -132,6 +149,9 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::MessagesChanged>()
             .publishes::<events::CalendarChanged>()
             .publishes::<events::CalendarChangeCompleted>()
+            .publishes::<events::NotionPageRead>()
+            .publishes::<events::NotionLinkStopped>()
+            .publishes::<events::NotionChangesCompleted>()
             .publishes::<events::SendCompleted>()
             .handler(features::sync_stream::SyncStream::new(deps.clone()))
             .handler(features::send_message::SendMessage::new(deps.clone()))
@@ -149,6 +169,13 @@ pub fn module(deps: Deps) -> Module {
                 deps.clone(),
             ))
             .consumer(features::apply_calendar_sync::ApplyCalendarSync::new(
+                deps.clone(),
+            ))
+            .consumer(features::link_notion_page::LinkNotionPage::new(
+                deps.clone(),
+            ))
+            .consumer(features::unlink_notion_page::UnlinkNotionPage)
+            .consumer(features::record_notion_changes::RecordNotionChanges::new(
                 deps.clone(),
             ))
             .consumer(features::workspace_deleting::RevokeWorkspaceGrants::new(

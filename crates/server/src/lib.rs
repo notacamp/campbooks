@@ -693,6 +693,13 @@ pub fn router_with(
         state.clone(),
         composition.connectors.clone(),
     ));
+    // Notion (connectors, campbooks-cloud#376): the browser's round trip to
+    // Notion and back, and Notion's webhook. Public, outside the operation
+    // catalogue, and empty unless Notion is offered.
+    let identity = identity.merge(campbooks_connectors::notion_router(
+        state.clone(),
+        composition.connectors.clone(),
+    ));
 
     // RFC 9728: every Bearer challenge of the API names its metadata, so an
     // agent that knows only the API's URL finds the issuer.
@@ -1058,7 +1065,7 @@ mod tests {
                 "ALL".to_owned()
             )]
         );
-        // The maintenance scope: these eleven, on module tables.
+        // The maintenance scope: these twelve, on module tables.
         let policies = mentioning(testing::maintenance_scope_setting());
         let expected = [
             // The chats' expiry (assistant, campbooks-cloud#305): which
@@ -1083,6 +1090,13 @@ mod tests {
             (
                 "connectors.microsoft_subscriptions",
                 "maintenance_reads_microsoft_subscriptions",
+                "SELECT",
+            ),
+            // The Notion webhook (connectors, campbooks-cloud#376): finds the
+            // streams of a Notion page across workspaces, read only.
+            (
+                "connectors.notion_links",
+                "maintenance_reads_notion_links",
                 "SELECT",
             ),
             // The stream dispatcher (connectors): reads and leases.

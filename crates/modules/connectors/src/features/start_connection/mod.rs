@@ -123,6 +123,8 @@ pub async fn execute(
         Provider::Zoho => deps.zoho.is_some(),
         // Offered only while its flag is on (`Deps::microsoft`).
         Provider::Microsoft => deps.microsoft.is_some(),
+        // Notion has its own consent (`notion_connect`): it is not a way in.
+        Provider::Notion => false,
         // An IMAP mailbox has no consent page: it is connected with its
         // password (`connect_imap`).
         Provider::Imap if deps.imap_enabled() => {
@@ -159,7 +161,7 @@ pub async fn execute(
             Provider::Google => !google::capability_scopes(capability).is_empty(),
             Provider::Zoho => matches!(capability, Capability::Messages | Capability::Calendar),
             Provider::Microsoft => capability == Capability::Messages,
-            Provider::Imap => false,
+            Provider::Imap | Provider::Notion => false,
         };
         if !offered {
             return Err(Error::BadRequest(

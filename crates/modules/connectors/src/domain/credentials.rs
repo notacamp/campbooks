@@ -244,6 +244,11 @@ async fn refresh_at_provider(
             let microsoft = deps.microsoft.as_ref().ok_or_else(not_configured)?;
             Ok(microsoft.refresh(refresh).await)
         }
+        // Notion rotates the refresh token: the answer's replaces it.
+        Provider::Notion => {
+            let notion = deps.notion.as_ref().ok_or_else(not_configured)?;
+            Ok(notion.refresh(refresh).await)
+        }
         Provider::Zoho => {
             let zoho = deps.zoho.as_ref().ok_or_else(not_configured)?;
             let centre = row

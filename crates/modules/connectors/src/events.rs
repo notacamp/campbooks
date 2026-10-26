@@ -351,6 +351,233 @@ impl DomainEvent for CalendarChangeCompleted {
     }
 }
 
+/// A Notion page's blocks were read
+/// (`contracts/connectors.notion_page_read.v1.schema.json`): the snapshot
+/// the pages module applies to the page linked to it. Published in the
+/// transaction that advances the stream's cursor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionPageRead {
+    /// The workspace.
+    pub workspace: String,
+    /// The Notion connection.
+    pub connection: ConnectionId,
+    /// The Notion page.
+    pub notion_page: uuid::Uuid,
+    /// The pages module's page it is linked to.
+    pub page: uuid::Uuid,
+    /// The `notion-page-snapshot` v1 document, a blob of the workspace.
+    #[schema(value_type = BlobSchema)]
+    pub snapshot: BlobRef,
+    /// When it was read: a later read of the page has a later time.
+    pub read_at: DateTime<Utc>,
+}
+
+impl DomainEvent for NotionPageRead {
+    const NAME: &'static str = "connectors.notion_page_read";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// Why a Notion page is no longer read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NotionStop {
+    /// Notion no longer shares the page with the integration.
+    NotShared,
+    /// The page went to the trash in Notion.
+    TrashedInNotion,
+    /// Notion is not offered on this instance any more.
+    NotionUnavailable,
+}
+
+/// A Notion page is no longer read
+/// (`contracts/connectors.notion_link_stopped.v1.schema.json`): its stream
+/// is gone and the pages module ends the link. Nothing is deleted at Notion.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionLinkStopped {
+    /// The workspace.
+    pub workspace: String,
+    /// The Notion connection.
+    pub connection: ConnectionId,
+    /// The Notion page.
+    pub notion_page: uuid::Uuid,
+    /// The pages module's page it was linked to.
+    pub page: uuid::Uuid,
+    /// Why.
+    pub reason: NotionStop,
+}
+
+impl DomainEvent for NotionLinkStopped {
+    const NAME: &'static str = "connectors.notion_link_stopped";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// How a block change asked for by `pages.notion_changes_requested` ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NotionOutcome {
+    /// Written at Notion.
+    Applied,
+    /// Nothing was written.
+    Skipped,
+    /// It failed.
+    Failed,
+}
+
+/// Why a block change did not apply: a closed set, never Notion's words.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NotionReason {
+    /// The block was edited at Notion since the last sync.
+    ChangedInNotion,
+    /// The pages module's records did not confirm the request.
+    Unverified,
+    /// The connection or the link is gone.
+    NotConnected,
+    /// The grant needs the member again.
+    NeedsReauth,
+    /// Notion refused it.
+    Rejected,
+    /// The block is not at Notion.
+    NotFound,
+    /// Notion could not be reached.
+    Unavailable,
+    /// It was tried the most times allowed.
+    TooManyAttempts,
+    /// A kind of block that is never written.
+    Unsupported,
+}
+
+/// How one block change of a request ended.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionItemResult {
+    /// The block (an id of the pages module).
+    pub block: uuid::Uuid,
+    /// How it ended.
+    pub outcome: NotionOutcome,
+    /// The block's id at Notion (applied; for an added block, the new one).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notion_block: Option<uuid::Uuid>,
+    /// When Notion last edited the block after the write (applied).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edited_at: Option<DateTime<Utc>>,
+    /// Why it did not apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<NotionReason>,
+}
+
+/// A request of block changes ended
+/// (`contracts/connectors.notion_changes_completed.v1.schema.json`): every
+/// item of the pages module's request has an end.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionChangesCompleted {
+    /// The workspace.
+    pub workspace: String,
+    /// The request (an id of the pages module).
+    pub request: uuid::Uuid,
+    /// The page (an id of the pages module).
+    pub page: uuid::Uuid,
+    /// How each item ended, in the request's order.
+    pub results: Vec<NotionItemResult>,
+}
+
+impl DomainEvent for NotionChangesCompleted {
+    const NAME: &'static str = "connectors.notion_changes_completed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `pages.notion_link_requested` v1, as this module reads it
+/// (`contracts/pages.notion_link_requested.v1.schema.json`): a page was
+/// linked to a Notion page, which now needs a stream. Not proof that anyone
+/// asked: the pages module is asked through the kernel's page-requests port
+/// whether the link stands.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionLinkRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The page (an id of the pages module).
+    pub page: uuid::Uuid,
+    /// The Notion connection it is read through.
+    pub connection: ConnectionId,
+    /// The Notion page.
+    pub notion_page: uuid::Uuid,
+}
+
+impl DomainEvent for NotionLinkRequested {
+    const NAME: &'static str = "pages.notion_link_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `pages.notion_link_ended` v1, as this module reads it
+/// (`contracts/pages.notion_link_ended.v1.schema.json`): a page stopped
+/// being kept in step with its Notion page, so its stream goes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionLinkEnded {
+    /// The workspace.
+    pub workspace: String,
+    /// The page (an id of the pages module).
+    pub page: uuid::Uuid,
+    /// The Notion connection.
+    pub connection: ConnectionId,
+    /// The Notion page.
+    pub notion_page: uuid::Uuid,
+}
+
+impl DomainEvent for NotionLinkEnded {
+    const NAME: &'static str = "pages.notion_link_ended";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `pages.notion_changes_requested` v1, as this module reads it
+/// (`contracts/pages.notion_changes_requested.v1.schema.json`): block
+/// changes a member's edits asked for. Not proof that anyone asked
+/// (campbooks-cloud#227): the pages module is asked through the kernel's
+/// page-requests port before anything is recorded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionChangesRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The request: recorded once.
+    pub request: uuid::Uuid,
+    /// The page (an id of the pages module).
+    pub page: uuid::Uuid,
+    /// The Notion connection whose grant makes the changes.
+    pub connection: ConnectionId,
+    /// The Notion page.
+    pub notion_page: uuid::Uuid,
+    /// The `notion-block-changes` v1 document. Not trusted: the connector
+    /// writes the document the pages module stored for the request.
+    pub body: BlobRef,
+}
+
+impl DomainEvent for NotionChangesRequested {
+    const NAME: &'static str = "pages.notion_changes_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 /// How a send ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]

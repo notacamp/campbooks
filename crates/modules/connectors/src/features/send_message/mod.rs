@@ -192,7 +192,7 @@ impl SendMessage {
             Some(Provider::Zoho) => self.deps.zoho.is_some(),
             Some(Provider::Imap) => self.deps.imap_enabled(),
             Some(Provider::Microsoft) => self.deps.microsoft.is_some(),
-            None => false,
+            Some(Provider::Notion) | None => false,
         };
         let (Some(stream), Some(connection), Some(provider), true) =
             (target.stream, target.connection, provider, configured)
@@ -212,7 +212,9 @@ impl SendMessage {
                 Provider::Imap => {
                     Duration::from_secs(u64::from(self.deps.imap.config.send_timeout_seconds))
                 }
-                Provider::Google | Provider::Zoho | Provider::Microsoft => HTTP_TIMEOUT,
+                Provider::Google | Provider::Zoho | Provider::Microsoft | Provider::Notion => {
+                    HTTP_TIMEOUT
+                }
             };
             let quiet = TimeDelta::from_std(call + UNCLEAR_WAIT).unwrap_or(TimeDelta::MAX);
             let wait = at + quiet - now;
@@ -272,7 +274,9 @@ impl SendMessage {
             Provider::Google => self.attempt_gmail(ctx, target, attempt).await,
             Provider::Zoho => self.attempt_zoho(ctx, target, attempt).await,
             Provider::Microsoft => Box::pin(self.attempt_microsoft(ctx, target, attempt)).await,
-            Provider::Imap => finish_failed(ctx, workspace, send, &target, "not_connected").await,
+            Provider::Imap | Provider::Notion => {
+                finish_failed(ctx, workspace, send, &target, "not_connected").await
+            }
         }
     }
 

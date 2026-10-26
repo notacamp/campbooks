@@ -49,6 +49,9 @@ pub enum Provider {
     /// Microsoft: Outlook.com, Hotmail, Live, MSN and Microsoft 365 mail
     /// (Microsoft Graph), while its flag is on.
     Microsoft,
+    /// Notion: pages imported and kept in step with Pages, while its flag is
+    /// on. Never a way to sign in.
+    Notion,
 }
 
 impl Provider {
@@ -59,6 +62,7 @@ impl Provider {
             Self::Zoho => "zoho",
             Self::Imap => "imap",
             Self::Microsoft => "microsoft",
+            Self::Notion => "notion",
         }
     }
 
@@ -69,6 +73,7 @@ impl Provider {
             "zoho" => Ok(Self::Zoho),
             "imap" => Ok(Self::Imap),
             "microsoft" => Ok(Self::Microsoft),
+            "notion" => Ok(Self::Notion),
             other => Err(Error::internal(format!("unknown provider `{other}`"))),
         }
     }
@@ -88,6 +93,8 @@ pub enum Capability {
     Files,
     /// Bank data (not offered yet).
     Bank,
+    /// Pages kept in step with an outside account's (Notion).
+    Pages,
 }
 
 impl Capability {
@@ -98,6 +105,7 @@ impl Capability {
             Self::Calendar => "calendar",
             Self::Files => "files",
             Self::Bank => "bank",
+            Self::Pages => "pages",
         }
     }
 
@@ -108,6 +116,7 @@ impl Capability {
             "calendar" => Ok(Self::Calendar),
             "files" => Ok(Self::Files),
             "bank" => Ok(Self::Bank),
+            "pages" => Ok(Self::Pages),
             other => Err(Error::internal(format!("unknown capability `{other}`"))),
         }
     }

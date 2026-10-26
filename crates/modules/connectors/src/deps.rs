@@ -15,11 +15,12 @@ use campbooks_kernel::{
 use figment::Figment;
 
 use crate::{
-    config::{ConnectorsConfig, OAuthClientConfig},
+    config::{ConnectorsConfig, NotionClientConfig, OAuthClientConfig},
     domain::model::{Capability, Provider},
     google::{Endpoints, Google},
     imap::Imap,
     microsoft::{self, Microsoft},
+    notion::{self, Notion},
     provider::ClientSecret,
     zoho::{Centres, Zoho},
 };
@@ -42,6 +43,15 @@ pub struct Deps {
     /// (`CAMPBOOKS_CONNECTORS__MICROSOFT__ENABLED`, `CAMPBOOKS_MICROSOFT__*`
     /// and the instance secret): `None` means not offered.
     pub microsoft: Option<Arc<Microsoft>>,
+    /// The Notion client, only while Notion is offered
+    /// (`CAMPBOOKS_CONNECTORS__NOTION__ENABLED`, `CAMPBOOKS_NOTION__*` and
+    /// the instance secret): `None` means not offered.
+    pub notion: Option<Arc<Notion>>,
+    /// Where the secret of Notion's webhook subscription comes from
+    /// (`CAMPBOOKS_NOTION__WEBHOOK_SECRET[_FILE]`), when it is set and Notion
+    /// is offered: without it Notion's pages are polled and the webhook is
+    /// not served.
+    pub notion_webhook: Option<ClientSecret>,
     /// The IMAP adapter (`CAMPBOOKS_CONNECTORS__IMAP__*`); offered only
     /// when enabled ([`imap_enabled`](Self::imap_enabled)).
     pub imap: Arc<Imap>,
@@ -58,6 +68,7 @@ impl std::fmt::Debug for Deps {
             .field("google", &self.google.is_some())
             .field("zoho", &self.zoho.is_some())
             .field("microsoft", &self.microsoft.is_some())
+            .field("notion", &self.notion.is_some())
             .field("imap", &self.imap_enabled())
             .finish_non_exhaustive()
     }
@@ -70,6 +81,8 @@ impl Default for Deps {
             google: None,
             zoho: None,
             microsoft: None,
+            notion: None,
+            notion_webhook: None,
             imap: Arc::new(Imap::default()),
             cipher: None,
             clock: Arc::new(SystemClock),
@@ -92,7 +105,7 @@ impl Deps {
         let calendar = match provider {
             Provider::Google => self.google.is_some(),
             Provider::Zoho => self.zoho.is_some() && self.config.zoho_calendar,
-            Provider::Microsoft | Provider::Imap => false,
+            Provider::Microsoft | Provider::Imap | Provider::Notion => false,
         };
         if calendar && !held.contains(&Capability::Calendar) {
             vec![Capability::Calendar]
@@ -146,6 +159,13 @@ impl Deps {
         }
         deps.microsoft = microsoft_client(figment, &deps.config, development, secret.is_some())?
             .map(|client| with_notifications(client, &deps.config, &config.public_url));
+        (deps.notion, deps.notion_webhook) = notion_client(
+            figment,
+            &deps.config,
+            &config.public_url,
+            development,
+            secret.is_some(),
+        )?;
         // IMAP is on by default (campbooks-cloud#314) but needs the instance
         // secret to seal passwords: without one it is simply not offered,
         // unless an operator asked for it by name.
@@ -247,6 +267,87 @@ fn microsoft_client(
         client_secret,
         endpoints,
     )?)))
+}
+
+/// The Notion client and its webhook secret, only while Notion is offered:
+/// the flag on, the Notion integration configured and the instance secret
+/// set (`has_secret`). With the flag off nothing of Notion's is read, so no
+/// setting of it can stop the server; with it on, a missing client, secret
+/// or unreadable section is a warning and Notion is not offered. Only a
+/// development base outside development, which the flag asked to use, is an
+/// error.
+fn notion_client(
+    figment: &Figment,
+    settings: &ConnectorsConfig,
+    public_url: &str,
+    development: bool,
+    has_secret: bool,
+) -> Result<(Option<Arc<Notion>>, Option<ClientSecret>), String> {
+    if !settings.notion.is_enabled() {
+        return Ok((None, None));
+    }
+    let Ok(client) = NotionClientConfig::from_figment(figment) else {
+        tracing::warn!(
+            "CAMPBOOKS_NOTION__* could not be read: Notion is not offered although \
+             CAMPBOOKS_CONNECTORS__NOTION__ENABLED is on"
+        );
+        return Ok((None, None));
+    };
+    let secret_of =
+        |file: Option<&std::path::PathBuf>, inline: Option<&secrecy::SecretString>| match (
+            file, inline,
+        ) {
+            (Some(path), _) => Some(ClientSecret::File(path.clone())),
+            (_, Some(secret)) => Some(ClientSecret::Inline(secret.clone())),
+            _ => None,
+        };
+    let (Some(client_id), Some(client_secret)) = (
+        client.client_id.clone(),
+        secret_of(
+            client.client_secret_file.as_ref(),
+            client.client_secret.as_ref(),
+        ),
+    ) else {
+        tracing::warn!(
+            "CAMPBOOKS_CONNECTORS__NOTION__ENABLED is on but CAMPBOOKS_NOTION__CLIENT_ID and a \
+             secret are not set: Notion is not offered"
+        );
+        return Ok((None, None));
+    };
+    if !has_secret {
+        tracing::warn!(
+            "CAMPBOOKS_SECRET_KEY is not set: Notion cannot be connected (its tokens are sealed \
+             with it); set it to offer Notion"
+        );
+        return Ok((None, None));
+    }
+    let endpoints = match client.base_url.as_deref() {
+        None => notion::Endpoints::notion()?,
+        Some(_) if !development => {
+            return Err(
+                "CAMPBOOKS_NOTION__BASE_URL points notion at another server: it is for \
+                 development only (CAMPBOOKS_ENV=development)"
+                    .to_owned(),
+            );
+        }
+        Some(base) => {
+            let base = url::Url::parse(&format!("{}/", base.trim_end_matches('/')))
+                .map_err(|e| format!("CAMPBOOKS_NOTION__BASE_URL={base}: {e}"))?;
+            notion::Endpoints::under(&base)?
+        }
+    };
+    let path = client
+        .redirect_path
+        .as_deref()
+        .filter(|path| path.starts_with('/') && !path.starts_with("//"))
+        .unwrap_or(notion::CALLBACK_PATH);
+    let redirect = format!("{}{path}", public_url.trim().trim_end_matches('/'));
+    let notion = Notion::new(client_id, client_secret, endpoints, redirect)?;
+    let webhook = secret_of(
+        client.webhook_secret_file.as_ref(),
+        client.webhook_secret.as_ref(),
+    );
+    Ok((Some(Arc::new(notion)), webhook))
 }
 
 /// `client` posting Graph's change notifications to this instance when
