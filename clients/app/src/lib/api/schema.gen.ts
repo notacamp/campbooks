@@ -6464,6 +6464,11 @@ export interface components {
              */
             wait_on?: string | null;
         };
+        /** @description The choice. */
+        ResolveNotionConflict: {
+            /** @description What to keep. */
+            keep: components["schemas"]["NotionKeep"];
+        };
         /** @description The conflict settled. */
         Resolved: {
             /**
@@ -14922,7 +14927,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Resolve"];
+                "application/json": components["schemas"]["ResolveNotionConflict"];
             };
         };
         responses: {
