@@ -1178,10 +1178,13 @@ async fn every_resource_answers_each_principal_as_its_catalogue_declares(db: PgP
 
 /// A request body for every operation that takes one; an operation missing
 /// here fails the matrix until it says how it is called.
+#[allow(clippy::too_many_lines)]
 fn body(world: &World, id: &str) -> Option<Value> {
     let inbox = &world.instances["conversations.inbox"];
     Some(match id {
-        "workspaces.update" => json!({"name": "Renamed"}),
+        "workspaces.update" | "pages.update_property" | "pages.update_view" => {
+            json!({"name": "Renamed"})
+        }
         "workspaces.invite_member" => json!({"email": "someone@example.com", "role": "member"}),
         "workspaces.change_role" => json!({"role": "admin"}),
         "workspaces.create" => json!({"name": "New", "kind": "business"}),
@@ -1243,7 +1246,8 @@ fn body(world: &World, id: &str) -> Option<Value> {
         | "conversations.suggest_replies"
         | "conversations.write_nudge"
         | "assistant.start_chat"
-        | "connectors.start_notion" => json!({}),
+        | "connectors.start_notion"
+        | "pages.query_table" => json!({}),
         "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         "conversations.answer_rule_notice" => json!({"answer": "not_now"}),
         "assistant.update_profile" => json!({"proactivity": "ask_first", "asked": true}),
@@ -1275,14 +1279,11 @@ fn body(world: &World, id: &str) -> Option<Value> {
         // Tables: a table, its select property, a row and a view are seeded.
         "pages.create_table" => json!({"title": "Matrix table"}),
         "pages.add_property" => json!({"name": "Notes", "type": "text"}),
-        "pages.update_property" => json!({"name": "Renamed"}),
         "pages.set_options" => json!({"options": [{"id": "opt1", "name": "Kickoff"}]}),
         "pages.add_row" => json!({"title": "Matrix row"}),
         "pages.set_cells" => json!({"cells": [
             {"property": world.instances["pages.property"], "value": "opt1"}]}),
-        "pages.query_table" => json!({}),
         "pages.create_view" => json!({"name": "Matrix board", "type": "table"}),
-        "pages.update_view" => json!({"name": "Renamed"}),
         "assistant.ask_chat" | "assistant.stream_chat" => json!({"text": "Why is this here?"}),
         "assistant.settle_proposal" => json!({"state": "declined"}),
         "conversations.write_reply" | "conversations.stream_reply" => {
