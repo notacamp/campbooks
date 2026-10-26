@@ -24,6 +24,9 @@ import {
 import { useAnswerConsent, useConsentRequest, type ConsentRequest } from "../../api/queries";
 import { leavePage } from "../../model";
 
+/** Who registered an app, as the issuer names it. */
+type ClientKind = "first_party" | "workspace" | "dynamic" | "metadata_document" | "instance";
+
 export interface ConsentScreenProps {
   /** The waiting request the issuer sent the browser here with. */
   request: string;
@@ -174,12 +177,7 @@ function Ask({
     return <Simple visor="unsure" title={t("consent.gone.title")} lead={t("consent.gone.lead")} />;
   }
 
-  const kind = client.kind as
-    | "first_party"
-    | "workspace"
-    | "dynamic"
-    | "metadata_document"
-    | "instance";
+  const kind = client.kind as ClientKind;
   const host = client.document_host ?? client.redirect_host ?? "";
   // Campbooks' own apps, and the apps this server's administrator added,
   // are vouched for; anyone can register any other app with any name.

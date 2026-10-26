@@ -67,7 +67,7 @@ pub enum AdminCommand {
         limit: i64,
     },
     /// Manage instance apps: the operator's own other apps that sign people
-    /// in with Campbooks (OpenID Connect, a confidential client). The only
+    /// in with Campbooks (`OpenID Connect`, a confidential client). The only
     /// way to register, rotate or remove one.
     Apps {
         #[command(subcommand)]
@@ -85,7 +85,7 @@ pub enum AppsCommand {
         #[arg(long)]
         name: String,
         /// Where codes may go (repeatable): https, matched exactly (loopback
-        /// http only when CAMPBOOKS_ENV=development).
+        /// http only when `CAMPBOOKS_ENV=development`).
         #[arg(long = "redirect-uri", required = true)]
         redirect_uris: Vec<String>,
         /// Where the browser may return after signing out (repeatable).
