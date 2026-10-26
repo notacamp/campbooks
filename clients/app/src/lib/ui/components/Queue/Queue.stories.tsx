@@ -1,11 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 
-import { Avatar } from "../Avatar/Avatar";
-import { Button } from "../Button/Button";
-import { Dot } from "../Dot/Dot";
-import { Item } from "../Item/Item";
-import { Visor } from "../Visor/Visor";
+import { Avatar, Button, Dot, Item, Visor } from "@notacamp/ui";
 
 import {
   AsideSection,

@@ -12,7 +12,7 @@ ARG RUST_IMAGE=rust:1.96-bookworm
 ARG NODE_IMAGE=node:22-bookworm-slim
 ARG CARGO_CHEF_VERSION=0.1.78
 
-# --- web: build the web client (clients/app) -----------------------------------
+# --- web: build the web client (clients/app, with clients/ui from source) -----
 FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS web
 # corepack installs the exact pnpm pinned in clients/package.json
 # `packageManager`; the supply-chain settings in pnpm-workspace.yaml apply as-is.
@@ -23,6 +23,7 @@ WORKDIR /src/clients
 # Manifests first so the install layer is cached until the lockfile changes.
 COPY clients/package.json clients/pnpm-lock.yaml clients/pnpm-workspace.yaml ./
 COPY clients/app/package.json app/package.json
+COPY clients/ui/package.json ui/package.json
 RUN pnpm install --frozen-lockfile
 COPY clients/ ./
 RUN pnpm --filter @campbooks/app build

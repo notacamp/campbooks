@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Skeleton } from "../Skeleton/Skeleton";
+import { Skeleton } from "@notacamp/ui";
 
 import styles from "./RulePreview.module.css";
 

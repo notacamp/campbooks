@@ -74,7 +74,9 @@
       "reader": "Puede leer",
       "writer": "Puede editar",
       "manager": "Puede gestionar"
-    }
+    },
+    "syncedNote": "Las ediciones hechas aquí van a Notion a través de la conexión de {{name}}.",
+    "syncedMentions": "Las menciones se envían a Notion como un simple “enlace de Campbooks”, nunca con su asunto."
   },
   "trash": {
     "label": "Páginas en la papelera",
@@ -199,5 +201,124 @@
     "dining": "Comida",
     "parcel": "Paquete",
     "ticket": "Entrada"
+  },
+  "notion": {
+    "import": {
+      "title": "Importar desde Notion",
+      "button": "Importar desde Notion",
+      "connectedAs": "Conectado como {{who}}",
+      "lead": "Estas son las páginas que compartiste con Campbooks en Notion. Las subpáginas van incluidas.",
+      "account": "Cuenta de Notion",
+      "listLabel": "Páginas de Notion",
+      "subPages_one": "{{count}} subpágina",
+      "subPages_other": "{{count}} subpáginas",
+      "linked": "Ya sincronizada",
+      "info": "Los bloques que Campbooks aún no tiene (bloques sincronizados, columnas, contenido incrustado, bases de datos) llegan como un cuadro “Se mantiene en Notion”: los ves, siguen intactos en Notion y se editan allí.",
+      "cancel": "Cancelar",
+      "submit_one": "Importar {{count}} página",
+      "submit_other": "Importar {{count}} páginas",
+      "submitNone": "Importar páginas",
+      "truncated": "Notion lista más páginas de las que se muestran aquí. Comparte menos páginas en Notion para ver el resto.",
+      "empty": {
+        "title": "Aún no hay páginas compartidas",
+        "lead": "En Notion, elige “Seleccionar páginas” para Campbooks y vuelve aquí."
+      },
+      "noConnection": {
+        "title": "Conecta primero Notion",
+        "lead": "Campbooks necesita tu conexión con Notion para listar tus páginas.",
+        "settings": "Abrir Ajustes"
+      },
+      "errors": {
+        "needs_reauth": {
+          "title": "Notion necesita que vuelvas a conectarte",
+          "lead": "Vuelve a conectar Notion en Ajustes y regresa para importar."
+        },
+        "rate_limited": {
+          "title": "Notion nos pidió ir más despacio",
+          "lead": "Espera un minuto y vuelve a intentarlo."
+        },
+        "not_connected": {
+          "title": "Esta conexión con Notion no es tuya",
+          "lead": "Solo el miembro que conectó Notion puede importar sus páginas."
+        },
+        "unavailable": {
+          "title": "No se pudo contactar con Notion",
+          "lead": "No se cambió nada. Inténtalo de nuevo en un momento."
+        }
+      },
+      "retry": "Intentarlo de nuevo",
+      "tooMany": "Elige como máximo {{max}} páginas cada vez.",
+      "failed": "No se pudo importar. No se cambió nada.",
+      "done_one": "{{count}} página importada desde Notion",
+      "done_other": "{{count}} páginas importadas desde Notion"
+    },
+    "sync": {
+      "label": "Sincronización con Notion",
+      "badge": "Sincronizada con Notion · {{ago}}",
+      "waiting": "Vinculada a Notion, esperando la primera sincronización",
+      "paused": "La sincronización con Notion está en pausa",
+      "reason": {
+        "stopped_by_member": "Sincronización con Notion detenida",
+        "disconnected": "No sincronizada: Notion se desconectó",
+        "trashed_here": "No sincronizada: la página se movió a la papelera",
+        "trashed_in_notion": "No sincronizada: la página está en la papelera de Notion",
+        "not_shared": "No sincronizada: la página ya no está compartida con Campbooks en Notion",
+        "member_left": "No sincronizada: el miembro que conectó Notion se fue",
+        "notion_unavailable": "No sincronizada: Notion no está disponible en esta instancia",
+        "other": "Ya no está sincronizada con Notion"
+      },
+      "open": "Abrir en Notion",
+      "stop": "Dejar de sincronizar",
+      "stopConfirm": "Dejar de sincronizar",
+      "stopCancel": "Seguir sincronizando",
+      "stopQuestion": "¿Dejar de mantener esta página al día con Notion? La página se queda aquí y la página de Notion no se toca. Para empezar de nuevo, impórtala otra vez.",
+      "stopped": "Sincronización con Notion detenida",
+      "stopFailed": "No se pudo dejar de sincronizar. No se cambió nada.",
+      "conflicts_one": "{{count}} cambio por revisar",
+      "conflicts_other": "{{count}} cambios por revisar",
+      "conflictsHint": "Ir al primero"
+    },
+    "conflict": {
+      "label": "Un cambio de Notion",
+      "changed": "Cambiado en Notion, mientras lo editabas aquí",
+      "removed": "Eliminado en Notion, mientras lo editabas aquí",
+      "removedBody": "Notion ya no tiene este bloque. Consérvalo aquí o elimínalo también.",
+      "theirs": "Versión de Notion",
+      "choices": "Elige una versión",
+      "mine": "Conservar la mía",
+      "notion": "Usar la de Notion",
+      "both": "Conservar ambas",
+      "footer": "Los cambios en párrafos distintos se combinan solos; solo el mismo párrafo necesita una elección.",
+      "resolved": {
+        "mine": "Conservaste tu versión",
+        "notion": "Usando la versión de Notion",
+        "both": "Conservaste ambas, una bajo la otra"
+      },
+      "done": "{{what}} — va a Notion en la próxima sincronización.",
+      "failed": "No se pudo aplicar esa elección. No se cambió nada.",
+      "undoFailed": "No se pudo deshacer esa elección. No se cambió nada."
+    },
+    "kept": {
+      "title": "Se mantiene en Notion · {{what}}",
+      "body": "Campbooks lo muestra pero aún no lo edita; se queda exactamente como está en Notion.",
+      "edit": "Editar en Notion",
+      "kind": {
+        "column_list": "Columnas",
+        "synced_block": "Bloque sincronizado",
+        "table": "Tabla",
+        "child_database": "Base de datos",
+        "bookmark": "Marcador",
+        "embed": "Contenido incrustado",
+        "link_preview": "Vista previa de enlace",
+        "equation": "Ecuación",
+        "video": "Vídeo",
+        "audio": "Audio",
+        "pdf": "PDF",
+        "table_of_contents": "Tabla de contenidos",
+        "breadcrumb": "Ruta de navegación",
+        "template": "Botón de plantilla",
+        "unsupported": "Bloque"
+      }
+    }
   }
 }

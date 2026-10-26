@@ -2,8 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
-import { Highlight } from "../Highlight/Highlight";
-import { NavItem } from "../NavItem/NavItem";
+import { Highlight, NavItem } from "@notacamp/ui";
 
 import { ConversationRow } from "./ConversationRow";
 

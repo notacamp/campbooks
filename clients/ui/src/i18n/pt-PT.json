@@ -1,0 +1,86 @@
+{
+  "close": "Fechar",
+  "undo": "Anular",
+  "redo": "Refazer",
+  "loading": "A carregar",
+  "kbd": {
+    "then": "depois",
+    "or": "ou",
+    "shortcut": "Atalho: {{keys}}"
+  },
+  "toast": {
+    "region": "Notificações",
+    "undone": "Anulado: {{label}}",
+    "redone": "Refeito: {{label}}",
+    "dismiss": "Fechar",
+    "retry": "Tentar de novo",
+    "cancelled": "Parado: {{label}}"
+  },
+  "note": {
+    "label": "Ponto da situação"
+  },
+  "search": {
+    "label": "Pesquise ou pergunte"
+  },
+  "commandMenu": {
+    "label": "Menu de comandos",
+    "placeholder": "Pesquise, pergunte ou execute",
+    "empty": "Nada corresponde a «{{query}}»",
+    "results": "Comandos",
+    "ask": "Perguntar ao Scout: {{query}}",
+    "askAlone": "Perguntar ao Scout",
+    "askGroup": "Perguntar",
+    "hintMove": "Mover",
+    "hintOpen": "Abrir",
+    "hintAll": "Todos os resultados",
+    "hintClose": "Fechar"
+  },
+  "shortcutSheet": {
+    "title": "Atalhos de teclado"
+  },
+  "workspace": {
+    "switch": "Mudar de espaço de trabalho",
+    "current": "Mudar de espaço de trabalho (atual: {{name}})",
+    "create": "Criar um espaço de trabalho"
+  },
+  "visor": {
+    "idle": "Campbooks",
+    "reading": "O Campbooks está a ler",
+    "thinking": "O Campbooks está a pensar",
+    "unsure": "O Campbooks não tem a certeza",
+    "happy": "O Campbooks está satisfeito",
+    "alert": "O Campbooks precisa da sua atenção",
+    "asleep": "O Campbooks está em pausa",
+    "dizzy": "O Campbooks tropeçou num problema",
+    "starry": "O Campbooks está radiante",
+    "hearts": "O Campbooks adorou"
+  },
+  "signal": {
+    "review": "Rever",
+    "reply": "Responder",
+    "decide": "Decidir",
+    "do": "Fazer",
+    "pay": "Pagar",
+    "nudge": "Relembrar",
+    "sort": "Organizar",
+    "look": "Vale a pena ver"
+  },
+  "navigation": {
+    "main": "Principal"
+  },
+  "searchField": {
+    "clear": "Limpar a pesquisa",
+    "filters": "Filtros da pesquisa",
+    "remove": "Remover o filtro: {{filter}}"
+  },
+  "datePicker": {
+    "choose": "Escolher uma data",
+    "previous": "Mês anterior",
+    "next": "Mês seguinte",
+    "today": "Hoje",
+    "clear": "Limpar"
+  },
+  "timePicker": {
+    "choose": "Escolher uma hora"
+  }
+}

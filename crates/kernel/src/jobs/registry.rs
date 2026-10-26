@@ -263,6 +263,14 @@ impl Background {
     /// never run ([`Job::INSTANCE_ONLY`]).
     #[must_use]
     pub fn schedule<J: Job + Default>(self, every: Duration) -> Self {
+        self.schedule_with(J::default(), every)
+    }
+
+    /// [`schedule`](Self::schedule) with the tick `job` carries instead of
+    /// `J::default()`: for a scheduled job whose module settings must reach
+    /// it (a switch the module was configured with).
+    #[must_use]
+    pub fn schedule_with<J: Job>(self, job: J, every: Duration) -> Self {
         let mut this = self.job::<J>();
         if let Some(kind) = this.kinds.last_mut() {
             kind.instance_only = true;
@@ -270,7 +278,7 @@ impl Background {
         this.schedules.push(ScheduleSpec {
             name: J::NAME,
             every,
-            payload: serde_json::to_value(J::default()).map_err(|e| e.to_string()),
+            payload: serde_json::to_value(job).map_err(|e| e.to_string()),
         });
         this
     }

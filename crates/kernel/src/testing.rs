@@ -378,6 +378,8 @@ pub struct TestResponse {
     pub content_type: Option<String>,
     /// Body parsed as JSON (`Null` when empty or not JSON).
     pub json: serde_json::Value,
+    /// Every response header (redirects and cookies are read from here).
+    pub headers: axum::http::HeaderMap,
 }
 
 /// `GET uri` against `app`.
@@ -395,6 +397,7 @@ pub async fn send(app: &Router, request: Request<Body>) -> TestResponse {
         Err(never) => match never {},
     };
     let status = response.status();
+    let headers = response.headers().clone();
     let content_type = response
         .headers()
         .get(header::CONTENT_TYPE)
@@ -411,5 +414,6 @@ pub async fn send(app: &Router, request: Request<Body>) -> TestResponse {
         status,
         content_type,
         json,
+        headers,
     }
 }

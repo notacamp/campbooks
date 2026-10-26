@@ -7,6 +7,7 @@ use std::str::FromStr;
 pub mod access;
 pub mod body;
 pub mod document;
+pub mod notion;
 pub mod position;
 pub mod purge;
 pub mod resources;

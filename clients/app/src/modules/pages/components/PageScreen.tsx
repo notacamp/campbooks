@@ -19,6 +19,7 @@ import {
   TitleField,
 } from "~/lib/ui";
 
+import { useNotionLink } from "../api/notion";
 import { useBacklinks, usePage } from "../api/queries";
 import { PageEditor } from "../editor/PageEditor";
 import type { SaveState } from "../editor/sync";
@@ -26,7 +27,9 @@ import { usePageDocument } from "../editor/use-page-document";
 import type { PageSummary, PageView } from "../types";
 
 import { IconPicker } from "./IconPicker";
+import { NotionSync } from "./NotionSync";
 import { ShareMenu } from "./ShareMenu";
+import { useNotionActions } from "./use-notion-actions";
 import type { usePageActions } from "./use-page-actions";
 
 /** How long typing in the title is gathered before it is saved, in ms. */
@@ -99,6 +102,15 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
     revision: page.revision,
     calls: actions.calls,
   });
+
+  const notionLink = useNotionLink(workspaceId, page.id);
+  const notion = useNotionActions(workspaceId);
+  const article = useRef<HTMLElement>(null);
+  const showConflict = () => {
+    article.current
+      ?.querySelector('[data-type="conflict"]')
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   const [title, setTitle] = useState(page.title);
   const [icon, setIcon] = useState<string | null>(page.icon ?? null);
@@ -196,7 +208,7 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
         </Popover>
       </div>
       <ReaderBody>
-        <article className="mx-auto flex w-full max-w-measure flex-col gap-3 p-4">
+        <article ref={article} className="mx-auto flex w-full max-w-measure flex-col gap-3 p-4">
           {trashed ? <Text tone="secondary">{t("screen.inTrash")}</Text> : null}
           <div className="flex items-start gap-2">
             {editable ? (
@@ -227,6 +239,14 @@ function OpenPage({ workspaceId, page, pages, actions, onBack }: OpenPageProps) 
               }).format(new Date(page.edited_at)),
             })}
           </Text>
+          {notionLink === undefined ? null : (
+            <NotionSync
+              link={notionLink}
+              canStop={editable}
+              onStop={() => notion.stop(page.id)}
+              onShowConflict={showConflict}
+            />
+          )}
           <PageEditor
             environment={{ workspaceId, pageId: page.id, open }}
             doc={doc}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -24,11 +24,13 @@ import {
   useCheckAddress,
   useConnections,
   useDisconnect,
+  useNotionConnections,
   type Connection,
   type MailChoice,
 } from "../../api/queries";
 import type { MailboxConsent, WayInFate } from "../../consent";
 import { ConnectMailbox, StepUp } from "../ConnectMailbox/ConnectMailbox";
+import { NotionCard } from "../NotionCard/NotionCard";
 import {
   firstChoice,
   healthTone,
@@ -45,6 +47,8 @@ export interface MailboxesPageProps {
   result?: MailboxResult | undefined;
   /** Open Add a mailbox at once (`?add=1`). */
   adding?: boolean | undefined;
+  /** Open Pages with the import from Notion (without a reload). */
+  onImport?: (() => void) | undefined;
 }
 
 /** A provider's name, in the user's language when it has one. */
@@ -63,9 +67,16 @@ function useProviderName() {
  * its address first). ⇧C adds a mailbox, J/K choose one, R reconnects it,
  * ⌫ asks to disconnect it.
  */
-export function MailboxesPage({ workspace, consent, result, adding = false }: MailboxesPageProps) {
+export function MailboxesPage({
+  workspace,
+  consent,
+  result,
+  adding = false,
+  onImport,
+}: MailboxesPageProps) {
   const { t } = useTranslation("connectors");
   const connections = useConnections(workspace.id);
+  const notion = useNotionConnections(workspace.id);
   const members = useMembers(workspace.id);
   const providerName = useProviderName();
   const [add, setAdd] = useState(adding);
@@ -145,7 +156,7 @@ export function MailboxesPage({ workspace, consent, result, adding = false }: Ma
     >
       {/* Said once: a disconnect afterwards replaces it. */}
       {disconnected === undefined ? (
-        <Outcome result={result} connections={connections.data} />
+        <Outcome result={result} connections={connections.data} notion={notion.data} />
       ) : null}
       {gone === undefined ? null : (
         <div ref={doneRef} tabIndex={-1}>
@@ -255,6 +266,19 @@ export function MailboxesPage({ workspace, consent, result, adding = false }: Ma
           </Button>
         </div>
       </SettingsSection>
+      <NotionCard
+        workspaceId={workspace.id}
+        connections={notion.data}
+        returnTo={`/w/${workspace.id}/settings/mailboxes`}
+        importHref={`/w/${workspace.id}/pages?import=notion`}
+        onImport={(event: MouseEvent<HTMLElement>) => {
+          if (onImport === undefined || event.metaKey || event.ctrlKey || event.button !== 0) {
+            return;
+          }
+          event.preventDefault();
+          onImport();
+        }}
+      />
       <ConnectMailbox
         workspaceId={workspace.id}
         consent={consent}
@@ -271,9 +295,11 @@ export function MailboxesPage({ workspace, consent, result, adding = false }: Ma
 function Outcome({
   result,
   connections,
+  notion,
 }: {
   result: MailboxResult | undefined;
   connections: readonly Connection[] | undefined;
+  notion: readonly Connection[] | undefined;
 }) {
   const { t } = useTranslation("connectors");
   const providerName = useProviderName();
@@ -284,6 +310,20 @@ function Outcome({
     return (
       <Banner tone="danger" role="alert" title={t(`errors.${result.error}.title`)}>
         {t(`errors.${result.error}.lead`)}
+      </Banner>
+    );
+  }
+  const connectedNotion = notion?.find((connection) => connection.id === result.connection);
+  if (connectedNotion !== undefined) {
+    return (
+      <Banner
+        role="status"
+        icon="check"
+        title={t("notion.connected.title", {
+          name: connectedNotion.display_name ?? t("provider.notion"),
+        })}
+      >
+        {t("notion.connected.lead")}
       </Banner>
     );
   }

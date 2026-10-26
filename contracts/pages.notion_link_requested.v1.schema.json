@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/pages.notion_link_requested.v1.schema.json",
+  "title": "pages.notion_link_requested v1 (event payload)",
+  "description": "Published by the pages module when a page is linked to a page in a member's Notion account (an import, or a sub-page found): the connectors module makes the stream that reads it, after asking this module through the kernel's page-requests port whether the link stands. Ids only. Workspace-scoped; also listed in openapi/events.json.",
+  "type": "object",
+  "required": [
+    "workspace",
+    "page",
+    "connection",
+    "notion_page"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": {
+      "type": "string"
+    },
+    "page": {
+      "$ref": "#/$defs/uuid"
+    },
+    "connection": {
+      "$ref": "#/$defs/uuid"
+    },
+    "notion_page": {
+      "$ref": "#/$defs/uuid"
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

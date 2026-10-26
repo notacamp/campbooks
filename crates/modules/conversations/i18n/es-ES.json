@@ -24,6 +24,7 @@
     "invalid_view": "Pide las conversaciones archivadas solo con view=archive: archived=true no se puede combinar con otra vista.",
     "no_open_need": "Aquí ya no hay nada que te necesite.",
     "not_a_payment": "Esto no es un pago pendiente.",
+    "not_a_party": "Esa persona no está en este correo, así que Scout no puede esperar a que responda.",
     "not_waiting": "Ya no estás esperando a nadie en esta conversación, así que no hay a quién insistir.",
     "nothing_to_reopen": "Aquí no hay nada que recuperar.",
     "need_changed": "Esto ha cambiado mientras lo mirabas. Vuelve a mirarlo.",

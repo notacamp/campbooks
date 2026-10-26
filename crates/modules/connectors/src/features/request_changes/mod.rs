@@ -170,7 +170,7 @@ async fn known_labels(
     Ok(match target.provider {
         Provider::Google => Some(user_labels(conn, target.stream).await?),
         Provider::Zoho => zoho_labels(conn, target.connection, target.stream).await?,
-        Provider::Imap | Provider::Microsoft => None,
+        Provider::Imap | Provider::Microsoft | Provider::Notion => None,
     })
 }
 
@@ -259,13 +259,15 @@ fn outcome(
         Provider::Zoho => zoho::state::writable(label),
         Provider::Imap => imap::write::writable(label),
         Provider::Microsoft => microsoft::write::writable(label),
+        // Notion has no labels: nothing here is ever written to it.
+        Provider::Notion => false,
     };
     let mapped = match provider {
         Provider::Google => outbound::map(change, known.unwrap_or(&HashSet::new())),
         Provider::Zoho => outbound::map_zoho(change, known),
         Provider::Imap => outbound::map_imap(change),
         Provider::Microsoft if offered => outbound::map_microsoft(change),
-        Provider::Microsoft => Mapped::Skip("unsupported"),
+        Provider::Microsoft | Provider::Notion => Mapped::Skip("unsupported"),
     };
     match mapped {
         Mapped::Labels { add, remove } if !add.iter().chain(&remove).all(|l| writable(l)) => {

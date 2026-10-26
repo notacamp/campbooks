@@ -1,18 +1,40 @@
 # Design system
 
-The client's look, feel and keyboard behaviour live in two business-agnostic
-libraries under `clients/app/src/lib/`:
+The client's look, feel and keyboard behaviour live in **`@notacamp/ui`**
+(`clients/ui`), a pnpm workspace package shared with the other Not A Camp
+apps and published to GitHub Packages (`clients/ui/README.md`). It holds the
+tokens and themes, the generic components with their stories and tests, the
+shortcut engine (`@notacamp/ui/shortcuts`) and their strings. It imports
+nothing from Campbooks.
 
-- `lib/ui`: tokens, themes, components (public surface: `lib/ui/index.ts`).
-- `lib/shortcuts`: the shortcut registry, the key listener and hooks.
+Campbooks uses it from source, with no package build, through two doors in
+`clients/app/src/lib/`:
 
-Modules build screens by composing `lib/ui` components and use Tailwind for
-layout only. The rules and how CI enforces them are in AGENTS.md → UI.
+- `lib/ui` (public surface: `lib/ui/index.ts`): everything in `@notacamp/ui`,
+  plus the components that name a Campbooks concept (ConversationRow,
+  Message, MessageComposer, Composer, ReplyDraft, RecipientField,
+  Attachments, Chat, Queue, TaskRow, Offer, HowDecided, RulePreview,
+  ThinkingTrace, ProviderMark, WorkspaceMenu, PageTree, RichDocument), which stay in
+  `lib/ui/components/` and are built from the package's. It also wires the
+  package to the app: the theme remembers through `lib/storage` (the prefix
+  `public/theme-boot.js` reads), and the app's strings join the package's
+  `ui` and `shortcuts` namespaces.
+- `lib/shortcuts`: Campbooks' catalogue of shortcuts (`catalog.ts`) and their
+  labels, on the package's engine.
+
+`tsconfig.app.json` (`paths`) and `vite.config.ts` (`resolve.alias`) point
+`@notacamp/ui` at `clients/ui/src`; the package's tests run in the app's
+Vitest (and count toward its coverage gate) and its stories in the app's
+Storybook. Modules build screens by composing `lib/ui` components and use
+Tailwind for layout only. The rules and how CI enforces them are in
+AGENTS.md → UI.
 
 ## Tokens: three layers
 
-`lib/ui/tokens/tokens.css` is the only file with colour, size and duration
-values.
+`clients/ui/src/tokens/tokens.css` is the only file with colour, size and
+duration values. Another app (or a workspace) gets its own look by
+overriding these custom properties: a theme is a token set, never a fork of a
+component.
 
 | Layer         | What                                                            | Examples                                                                                                           | Who reads it                   |
 | ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
@@ -59,7 +81,8 @@ Add a preset next to `[data-accent="personal"]` in `tokens.css` that sets
 Patterns/Themes story. Keep `--accent` against `--on-accent` at 6:1 or more.
 
 At runtime, `ThemeProvider` (from `~/lib/ui`) owns the three attributes and
-remembers them on the device; the accent is remembered per workspace
+remembers them on the device through a prefs adapter (`{ read, write }`; the
+app's is `lib/storage`); the accent is remembered per workspace
 (`workspaceId` prop). `useTheme()` returns the current values and
 `setTheme`, `setAccent`, `setDensity`. `public/theme-boot.js` applies the
 saved values before first paint; it is a file rather than an inline script
@@ -84,7 +107,8 @@ like `p-[13px]` are rejected by ESLint.
 
 ## Components
 
-One folder per component family in `lib/ui/components/<Name>/`: the
+One folder per component family in `clients/ui/src/components/<Name>/` (or,
+for a Campbooks-only one, `clients/app/src/lib/ui/components/<Name>/`): the
 component, a CSS Module that reads only tokens (variants are data
 attributes, e.g. `data-variant="primary"`), a story and a test. Fonts are
 Funnel Sans and Funnel Display, self-hosted from `@fontsource-variable/*`
@@ -114,7 +138,7 @@ Funnel Sans and Funnel Display, self-hosted from `@fontsource-variable/*`
 
 ## Keyboard shortcuts
 
-`lib/shortcuts` has one registry. A definition is
+One registry (the engine is `@notacamp/ui/shortcuts`). A definition is
 
 ```ts
 { id: "nav.inbox", keys: "g i", scope: "global", group: "navigation", label: "shortcuts:nav.inbox" }

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACME,
   ANA,
+  COPIED,
   JONAS,
   LUZ,
   MARTA,
@@ -25,6 +26,8 @@ import {
   needSentence,
   needSignal,
   quoteAttribution,
+  unsureNote,
+  unsureOf,
 } from "./needs";
 
 /** A `t` that shows the key and its options, to test what is asked for. */
@@ -197,4 +200,87 @@ describe("needs in words", () => {
     );
     expect(rows[2]?.source).toBe("needs.how.source.rules · 0.99 · needs.how.suggestion");
   });
+
+  // Scout isn't sure whose move it is (campbooks-cloud#372).
+  it("asks whose move it is when the email went to other people", () => {
+    const copied = need(COPIED);
+    const unsure = unsureOf(copied);
+    expect(unsure?.others).toHaveLength(1);
+    expect(needSentence(t, copied, "Ana Costa", { locale: "en" })).toBe(
+      'needs.unsure.lineCc{"name":"Ana Costa","others":"Águas do Ribatejo"}',
+    );
+    expect(needChip(t, copied)).toBe("needs.chip.unsure");
+    expect(needSignal(copied)).toBe("review");
+    // How long they have been quiet comes from the headers, then what Scout can't tell.
+    expect(unsureNote(t, unsure ?? never())).toBe(
+      'needs.unsure.unanswered{"count":9} needs.unsure.ask',
+    );
+    expect(unsureNote(t, { ...(unsure ?? never()), unanswered_days: null })).toBe(
+      "needs.unsure.ask",
+    );
+    // With the member in To, with others: "and you"; named by neither: says so.
+    expect(
+      needSentence(
+        t,
+        { ...copied, unsure: { ...(unsure ?? never()), in_to: true, in_cc: false } },
+        "Ana Costa",
+        { locale: "en" },
+      ),
+    ).toBe('needs.unsure.lineTo{"name":"Ana Costa","others":"Águas do Ribatejo"}');
+    expect(
+      needSentence(
+        t,
+        { ...copied, unsure: { ...(unsure ?? never()), in_cc: false } },
+        "Ana Costa",
+        { locale: "en" },
+      ),
+    ).toBe('needs.unsure.lineNamed{"name":"Ana Costa","others":"Águas do Ribatejo"}');
+  });
+
+  it("names two people and counts the rest", () => {
+    const people = [
+      { name: "Rui Matos", address: "rui@x.example" },
+      { name: "Inês Cardoso", address: "ines@x.example" },
+      { name: null, address: "tiago@x.example" },
+    ];
+    const copied = need(COPIED);
+    const sentence = needSentence(
+      t,
+      { ...copied, unsure: { ...(copied.unsure ?? never()), others: people } },
+      "Ana Costa",
+      { locale: "en" },
+    );
+    expect(sentence).toBe(
+      String.raw`needs.unsure.lineCc{"name":"Ana Costa","others":"needs.unsure.more{\"names\":\"Rui Matos, Inês Cardoso\",\"count\":1}"}`,
+    );
+  });
+
+  it("is only a question about a reply or an action, and only with other people", () => {
+    expect(unsureOf(need(MARTA))).toBeUndefined();
+    expect(unsureOf({ ...need(COPIED), trust: "sure" })).toBeUndefined();
+    expect(unsureOf({ ...need(COPIED), unsure: null })).toBeUndefined();
+    expect(unsureOf({ ...need(COPIED), question: "money" })).toBeUndefined();
+    // Without the locale it is today's question, never a wrong sentence.
+    expect(needSentence(t, need(COPIED), "Ana Costa")).toBe(
+      'needs.line.checkReply{"name":"Ana Costa"}',
+    );
+  });
+
+  it("adds how sure it was and where the member stands to How Scout decided", () => {
+    const copied = need(COPIED);
+    const rows = howRows(t, () => true, [], {
+      unsure: copied.unsure ?? never(),
+      question: copied.question,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.question).toBe("needs.unsure.howQuestion");
+    expect(rows[0]?.answer).toBe(
+      'needs.unsure.howReply{"confidence":85,"bar":90} needs.unsure.howCc',
+    );
+    expect(rows[0]?.source).toBe("needs.how.source.model");
+  });
 });
+
+function never(): never {
+  throw new Error("no people");
+}

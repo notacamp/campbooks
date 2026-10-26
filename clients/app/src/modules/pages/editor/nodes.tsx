@@ -17,7 +17,12 @@ import {
   type MentionKind,
 } from "~/lib/ui";
 
+import { useNotionLink } from "../api/notion";
 import { useRecordLabel, type RecordLabel } from "../api/records";
+import { ConflictBlock } from "../components/ConflictBlock";
+import { KeptInNotion } from "../components/KeptInNotion";
+import { useNotionActions } from "../components/use-notion-actions";
+import { notionUrl } from "../notion";
 import { isMentionType, type MentionType } from "../types";
 
 import { useEditorEnvironment } from "./environment";
@@ -370,5 +375,96 @@ export const Toggle = BlockNode.create({
   },
   addNodeView() {
     return ReactNodeViewRenderer(ToggleView);
+  },
+});
+
+const booleanAttribute = (name: string, fallback: boolean): Attributes[string] => ({
+  default: fallback,
+  parseHTML: (element) => element.getAttribute(`data-${name}`) === "true",
+  renderHTML: (attributes) => ({ [`data-${name}`]: String(attributes[name] === true) }),
+});
+
+function ExternalView({ node }: NodeViewProps) {
+  const environment = useEditorEnvironment();
+  const link = useNotionLink(environment.workspaceId, environment.pageId);
+  return (
+    <NodeViewWrapper>
+      <KeptInNotion
+        kind={text(node.attrs["kind"])}
+        href={link === undefined ? undefined : notionUrl(link.notion_page)}
+      />
+    </NodeViewWrapper>
+  );
+}
+
+/**
+ * A block Pages doesn't have yet (synced blocks, columns, embeds,
+ * databases), kept as Notion has it: shown, never edited from here.
+ */
+export const External = BlockNode.create({
+  name: "external",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: false,
+  addAttributes() {
+    return { kind: stringAttribute("kind", "unsupported") };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="external"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "external" })];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ExternalView);
+  },
+});
+
+function ConflictView({ node, editor }: NodeViewProps) {
+  const environment = useEditorEnvironment();
+  const actions = useNotionActions(environment.workspaceId);
+  const of = text(node.attrs["of"]);
+  return (
+    <NodeViewWrapper data-type="conflict">
+      <ConflictBlock
+        removed={node.attrs["removed"] === true}
+        readOnly={!editor.isEditable}
+        onChoose={(keep) => actions.resolve(environment.pageId, of, keep)}
+      >
+        <NodeViewContent />
+      </ConflictBlock>
+    </NodeViewWrapper>
+  );
+}
+
+/**
+ * Notion's version of a block that changed on both sides, beneath ours (the
+ * server writes it; the member settles it: Keep mine, Use Notion's, Keep
+ * both). Its content is Notion's block, not editable here.
+ */
+export const Conflict = BlockNode.create({
+  name: "conflict",
+  group: "block",
+  content: "block*",
+  isolating: true,
+  selectable: true,
+  draggable: false,
+  addAttributes() {
+    return {
+      of: stringAttribute("of", null),
+      hash: stringAttribute("hash", null),
+      edited: stringAttribute("edited", null),
+      removed: booleanAttribute("removed", false),
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="conflict"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "conflict" }), 0];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ConflictView);
   },
 });

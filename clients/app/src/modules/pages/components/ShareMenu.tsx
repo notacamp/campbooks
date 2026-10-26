@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Avatar, Button, Popover, PopoverSection, Select, Spacer, Text } from "~/lib/ui";
 import { useMembers, type Member } from "~/modules/workspaces";
 
+import { useNotionLink } from "../api/notion";
 import type { PageRole, PageView } from "../types";
 
 import type { usePageActions } from "./use-page-actions";
@@ -37,6 +38,14 @@ export function ShareMenu({ workspaceId, page, actions }: ShareMenuProps) {
   const chosen = candidates.find((member) => member.user_id === who) ?? candidates[0];
   const roleOptions = ROLES.map((value) => ({ value, label: t(`share.role.${value}`) }));
   const creator = members.find((member) => member.user_id === page.created_by);
+  // A page kept in step with Notion sends what is written here through its
+  // owner's connection, to everyone who can open the page.
+  const link = useNotionLink(workspaceId, page.id);
+  const linkOwner = members.find((member) => member.user_id === link?.owner);
+  const sendsToNotion =
+    link !== undefined &&
+    link.state !== "stopped" &&
+    (page.place === "workspace" || page.grants.length > 0);
 
   return (
     <Popover
@@ -55,6 +64,18 @@ export function ShareMenu({ workspaceId, page, actions }: ShareMenuProps) {
           {t(page.place === "workspace" ? "share.placeWorkspaceNote" : "share.placePrivateNote")}
         </Text>
       </PopoverSection>
+      {sendsToNotion ? (
+        <PopoverSection>
+          <Text tone="tertiary" size="sm">
+            {t("share.syncedNote", {
+              name: nameOf(linkOwner) === "" ? t("share.someone") : nameOf(linkOwner),
+            })}
+          </Text>
+          <Text tone="tertiary" size="sm">
+            {t("share.syncedMentions")}
+          </Text>
+        </PopoverSection>
+      ) : null}
       <PopoverSection title={t("share.people")}>
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">

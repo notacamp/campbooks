@@ -59,6 +59,10 @@ pub struct ConversationsConfig {
     /// catalogue (`CAMPBOOKS_CONVERSATIONS__ACTIONS__*`); off by default.
     #[serde(default)]
     pub actions: ActionSettings,
+    /// Whose move it is, asked with the triage questions and raised as waits
+    /// (`CAMPBOOKS_CONVERSATIONS__MOVES__*`); off by default.
+    #[serde(default)]
+    pub moves: MoveSettings,
     /// How long a wait on someone lasts before Scout nudges
     /// (`CAMPBOOKS_CONVERSATIONS__WAIT__*`).
     #[serde(default)]
@@ -111,6 +115,19 @@ impl Default for WaitSettings {
             working_days: DEFAULT_WAIT_WORKING_DAYS,
         }
     }
+}
+
+/// Whose move it is (campbooks-cloud#293, #372). Off by default. It has a
+/// switch of its own, apart from the action catalogue's, because the
+/// catalogue waits for the owner's labels and this does not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(default, deny_unknown_fields)]
+pub struct MoveSettings {
+    /// Ask `next_move` and `awaited` with the triage questions, raise waits
+    /// from the answers, and ask them of recent mail already stored
+    /// (`ENABLED`, default false). Off, none is asked, no wait is raised, and
+    /// a wait already open keeps its course.
+    pub enabled: bool,
 }
 
 /// The action catalogue (campbooks-cloud#166). Off by default: until the
@@ -233,6 +250,7 @@ impl Default for ConversationsConfig {
             needs_window_days: DEFAULT_NEEDS_WINDOW_DAYS,
             notices: NoticeSettings::default(),
             actions: ActionSettings::default(),
+            moves: MoveSettings::default(),
             wait: WaitSettings::default(),
             dated: DatedSettings::default(),
         }
@@ -290,6 +308,22 @@ mod tests {
         assert_eq!(config.undo_send_seconds, 10);
         assert_eq!(config.needs_window_days, 14);
         assert_eq!(config.wait.working_days, 3);
+    }
+
+    #[test]
+    fn whose_move_has_a_switch_of_its_own_and_is_off_by_default() {
+        let config = ConversationsConfig::from_figment(&Figment::new()).unwrap();
+        assert!(!config.moves.enabled);
+        let with = |moves: serde_json::Value| {
+            ConversationsConfig::from_figment(&Figment::from(Serialized::defaults(
+                serde_json::json!({"conversations": {"moves": moves}}),
+            )))
+            .unwrap()
+        };
+        let on = with(serde_json::json!({"enabled": true}));
+        assert!(on.moves.enabled);
+        assert!(!on.actions.enabled, "the catalogue keeps its own switch");
+        assert!(!with(serde_json::json!({})).moves.enabled);
     }
 
     #[test]

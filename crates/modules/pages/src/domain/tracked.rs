@@ -226,3 +226,174 @@ pub async fn unshared(
         .await?;
     Ok(())
 }
+
+/// Which way blocks crossed between a page and its Notion page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    /// From Notion into the page.
+    Inbound,
+    /// From the page to Notion.
+    Outbound,
+}
+
+/// What a member chose for a conflict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Choice {
+    /// Keep the block as it is here.
+    Mine,
+    /// Use Notion's version.
+    Notion,
+    /// Keep both.
+    Both,
+}
+
+const fn stop_reason_of(reason: super::notion::StopReason) -> tracking::SyncStopReason {
+    use super::notion::StopReason;
+    match reason {
+        StopReason::StoppedByMember => tracking::SyncStopReason::StoppedByMember,
+        StopReason::Disconnected => tracking::SyncStopReason::Disconnected,
+        StopReason::TrashedHere => tracking::SyncStopReason::TrashedHere,
+        StopReason::TrashedInNotion => tracking::SyncStopReason::TrashedInNotion,
+        StopReason::NotShared => tracking::SyncStopReason::NotShared,
+        StopReason::MemberLeft => tracking::SyncStopReason::MemberLeft,
+        StopReason::NotionUnavailable => tracking::SyncStopReason::NotionUnavailable,
+    }
+}
+
+/// `count` as the plan's whole number.
+fn counted(count: usize) -> i64 {
+    i64::try_from(count).unwrap_or(i64::MAX)
+}
+
+/// Pages were imported from Notion through `connection`.
+pub async fn notion_imported(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    connection: Uuid,
+    pages: usize,
+) -> Result<()> {
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionPagesImported {
+                workspace,
+                connection,
+                pages: counted(pages),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// `blocks` crossed between `page` and its Notion page.
+pub async fn notion_applied(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    direction: Direction,
+    blocks: usize,
+) -> Result<()> {
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    let direction = match direction {
+        Direction::Inbound => tracking::SyncDirection::Inbound,
+        Direction::Outbound => tracking::SyncDirection::Outbound,
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionSyncApplied {
+                workspace,
+                page,
+                direction,
+                blocks: counted(blocks),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// `blocks` of `page` are in conflict with Notion's version, newly.
+pub async fn notion_conflict_raised(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    blocks: usize,
+) -> Result<()> {
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionConflictRaised {
+                workspace,
+                page,
+                blocks: counted(blocks),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// A member settled a conflict of `page`.
+pub async fn notion_conflict_resolved(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    choice: Choice,
+) -> Result<()> {
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    let choice = match choice {
+        Choice::Mine => tracking::ConflictChoice::Mine,
+        Choice::Notion => tracking::ConflictChoice::Notion,
+        Choice::Both => tracking::ConflictChoice::Both,
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionConflictResolved {
+                workspace,
+                page,
+                choice,
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// `page` stopped being kept in step with its Notion page.
+pub async fn notion_stopped(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    reason: super::notion::StopReason,
+) -> Result<()> {
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionSyncStopped {
+                workspace,
+                page,
+                reason: stop_reason_of(reason),
+            },
+        )
+        .await?;
+    Ok(())
+}

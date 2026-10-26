@@ -48,6 +48,24 @@ const config: KnipConfig = {
         "test/fixtures/**",
       ],
     },
+    ui: {
+      // @notacamp/ui: a published library, so both entries are public API.
+      // Its tests run in the app's Vitest and its stories in the app's
+      // Storybook, so neither tool is configured here.
+      entry: [
+        "src/index.ts",
+        "src/shortcuts/index.ts",
+        "src/**/*.test.{ts,tsx}",
+        "src/**/*.stories.tsx",
+        "scripts/*.js",
+      ],
+      project: ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "scripts/*.js"],
+      // Imported from src/styles/fonts.css (`@import`), which knip does not read.
+      ignoreDependencies: [
+        "@fontsource-variable/funnel-sans",
+        "@fontsource-variable/funnel-display",
+      ],
+    },
   },
 };
 

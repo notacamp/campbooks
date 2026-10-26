@@ -1,73 +1,4 @@
 {
-  "close": "Close",
-  "undo": "Undo",
-  "redo": "Redo",
-  "loading": "Loading",
-  "kbd": {
-    "then": "then",
-    "or": "or",
-    "shortcut": "Shortcut: {{keys}}"
-  },
-  "toast": {
-    "region": "Notifications",
-    "undone": "Undone: {{label}}",
-    "redone": "Redone: {{label}}",
-    "dismiss": "Dismiss",
-    "retry": "Retry",
-    "cancelled": "Stopped: {{label}}"
-  },
-  "note": {
-    "label": "Where things stand"
-  },
-  "search": {
-    "label": "Search or ask"
-  },
-  "commandMenu": {
-    "label": "Command menu",
-    "placeholder": "Search, ask, or run a command",
-    "empty": "Nothing matches “{{query}}”",
-    "results": "Commands",
-    "ask": "Ask Scout: {{query}}",
-    "askAlone": "Ask Scout",
-    "askGroup": "Ask",
-    "hintMove": "Move",
-    "hintOpen": "Open",
-    "hintAll": "All results",
-    "hintClose": "Close"
-  },
-  "shortcutSheet": {
-    "title": "Keyboard shortcuts"
-  },
-  "workspace": {
-    "switch": "Switch workspace",
-    "current": "Switch workspace (current: {{name}})",
-    "create": "Create a workspace"
-  },
-  "visor": {
-    "idle": "Campbooks",
-    "reading": "Campbooks is reading",
-    "thinking": "Campbooks is thinking",
-    "unsure": "Campbooks is not sure",
-    "happy": "Campbooks is happy",
-    "alert": "Campbooks needs your attention",
-    "asleep": "Campbooks is paused",
-    "dizzy": "Campbooks hit a snag",
-    "starry": "Campbooks is delighted",
-    "hearts": "Campbooks loves this"
-  },
-  "signal": {
-    "review": "Review",
-    "reply": "Reply",
-    "decide": "Decide",
-    "do": "Do",
-    "pay": "Pay",
-    "nudge": "Nudge",
-    "sort": "Sort",
-    "look": "Worth a look"
-  },
-  "navigation": {
-    "main": "Main"
-  },
   "conversation": {
     "unread": "Unread",
     "starred": "Pinned",
@@ -117,20 +48,5 @@
   },
   "howDecided": {
     "title": "How Campbooks decided"
-  },
-  "searchField": {
-    "clear": "Clear search",
-    "filters": "Search filters",
-    "remove": "Remove filter: {{filter}}"
-  },
-  "datePicker": {
-    "choose": "Choose a date",
-    "previous": "Previous month",
-    "next": "Next month",
-    "today": "Today",
-    "clear": "Clear"
-  },
-  "timePicker": {
-    "choose": "Choose a time"
   }
 }

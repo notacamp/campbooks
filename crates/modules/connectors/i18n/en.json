@@ -34,7 +34,8 @@
     "imap_not_an_imap_server": "The server at this address and port is not an IMAP mail server. Check the server and port.",
     "host_refused": "Campbooks cannot connect to this server: it is on a private network, or the port is not a mail port (993, 143, 465 or 587).",
     "starttls_missing": "The server does not offer an encrypted connection, so Campbooks did not send your password. Use the server's encrypted port (993 for IMAP, 465 for SMTP).",
-    "address_check_not_needed": "This mailbox's address needs no check: it is verified, or it is not an IMAP mailbox."
+    "address_check_not_needed": "This mailbox's address needs no check: it is verified, or it is not an IMAP mailbox.",
+    "invalid_return_to": "That address is not a page of this app."
   },
   "address_check": {
     "subject": "Campbooks is checking your address",

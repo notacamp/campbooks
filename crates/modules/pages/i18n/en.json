@@ -20,6 +20,11 @@
     "not_a_member": "You can only share a page with a member of this workspace.",
     "share_yourself": "Choose someone else to share it with.",
     "invalid_ref": "A page can't link to that kind of record.",
-    "file_empty": "The file has no content."
+    "file_empty": "The file has no content.",
+    "invalid_import": "Choose between 1 and 100 pages to import.",
+    "no_conflict": "That block has no change waiting from Notion.",
+    "conflict_block_gone": "The block this change is about is not in the page any more.",
+    "cannot_undo": "That choice can't be taken back any more.",
+    "not_syncing": "This page is not kept in step with Notion any more."
   }
 }

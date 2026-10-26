@@ -10,7 +10,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 // Token-only styling (AGENTS.md → UI). Tailwind's default theme is wiped
-// (src/lib/ui/tokens/tailwind-theme.css), so palette classes generate nothing;
+// (@notacamp/ui's tokens/tailwind-theme.css), so palette classes generate nothing;
 // these selectors also reject arbitrary values (`p-[13px]`, `text-[#123]`),
 // palette names and static duration/z-index utilities wherever class names are
 // written: className, and calls to cx().
@@ -156,15 +156,11 @@ export default tseslint.config(
     rules: {
       ...react.configs.flat.recommended?.rules,
       ...react.configs.flat["jsx-runtime"]?.rules,
-      // Untrusted HTML is rendered only through lib/ui/safe-html (sandboxed iframe).
+      // Untrusted HTML is rendered only through @notacamp/ui's SafeHtml (sandboxed iframe).
       "react/no-danger": "error",
       "react/jsx-no-target-blank": "error",
       "react/no-unstable-nested-components": "error",
     },
-  },
-  {
-    files: ["src/lib/ui/safe-html/**"],
-    rules: { "react/no-danger": "off" },
   },
   reactHooks.configs.flat["recommended-latest"],
   jsxA11y.flatConfigs.strict,

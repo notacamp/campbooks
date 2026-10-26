@@ -3,9 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
 
-import { Button } from "../Button/Button";
-import { VisuallyHidden } from "../Typography/Typography";
-import { Visor } from "../Visor/Visor";
+import { Button, VisuallyHidden, Visor } from "@notacamp/ui";
 
 import styles from "./Composer.module.css";
 

@@ -543,3 +543,102 @@ export const TIAGO_DETAIL: Detail = {
   need_summary:
     "Tiago needs to know whether you want the oak or the walnut worktop, so he can order it this week.",
 };
+
+/**
+ * Scout isn't sure (campbooks-cloud#372). Ana Costa wrote to Águas do Ribatejo,
+ * copying Sam, nine days before; the model read a reply for Sam at 85%, below
+ * the 90% a reply needs to count as sure, so it asks whose move it is. Not
+ * among NEEDS.
+ */
+const COPIED_NEED: Need = {
+  reason: "review",
+  trust: "check",
+  basis: "model",
+  question: "needs_reply",
+  rule: "model.decide",
+  due_on: null,
+  overdue: false,
+  urgent: false,
+  message_id: `0192f1a0-0000-7000-8000-${hex(0x20_30)}`,
+  sent_at: "2026-10-04T09:40:00Z",
+  quote: null,
+  unsure: {
+    others: [{ name: "Águas do Ribatejo", address: "geral@aguas-ribatejo.example" }],
+    in_to: false,
+    in_cc: true,
+    party: { name: "Águas do Ribatejo", address: "geral@aguas-ribatejo.example" },
+    unanswered_days: 9,
+    confidence: 85,
+    sure_bar: 90,
+  },
+};
+
+export const COPIED: Summary = {
+  ...base,
+  id: `0192f1a0-0000-7000-8000-${hex(0x10_30)}`,
+  subject: "Meter reading for the studio",
+  last_message_at: "2026-10-04T09:40:00Z",
+  message_count: 1,
+  unread_count: 1,
+  latest_from: { name: "Ana Costa", address: "ana@costa-arquitetos.example" },
+  snippet: "Could you confirm the reading by Friday?",
+  need: COPIED_NEED,
+};
+
+export const COPIED_ITEM: Item = item(COPIED, {
+  band: "week",
+  band_reason: { rule: "no_date" },
+});
+
+/** What the model gave the copied email: a reply at 85%, only a suggestion. */
+export const COPIED_DETAIL: Detail = {
+  conversation: COPIED,
+  messages: [
+    {
+      id: COPIED.need?.message_id ?? "",
+      direction: "inbound",
+      from: { name: "Ana Costa", address: "ana@costa-arquitetos.example" },
+      to: [{ name: "Águas do Ribatejo", address: "geral@aguas-ribatejo.example" }],
+      cc: [{ name: "Sam Rivera", address: "sam.rivera@example.com" }],
+      reply_to: [],
+      subject: COPIED.subject,
+      sent_at: COPIED.last_message_at,
+      read: true,
+      starred: false,
+      text: {
+        content:
+          "Hello,\n\nCould you confirm the meter reading for the studio by Friday?\n\nAna Costa",
+        truncated: false,
+      },
+      has_html: false,
+      attachments: [],
+    },
+  ],
+  decisions: [
+    {
+      question: "needs_reply",
+      value: true,
+      source: "model",
+      confidence: 85,
+      acted: false,
+      threshold: 51,
+      reasons: [],
+    },
+  ],
+};
+
+/** The copied email's conversation once Sam said Águas do Ribatejo has the move. */
+export const COPIED_WAITING: Summary = {
+  ...COPIED,
+  need: {
+    ...COPIED_NEED,
+    reason: "waiting",
+    trust: "sure",
+    basis: "member",
+    question: "next_move",
+    due_on: "2026-10-09",
+    unsure: null,
+    waiting_on: { name: "Águas do Ribatejo", address: "geral@aguas-ribatejo.example" },
+    nudges: 0,
+  },
+};

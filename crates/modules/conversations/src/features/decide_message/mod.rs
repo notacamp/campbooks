@@ -61,7 +61,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::ActionSettings,
+    config::{ActionSettings, MoveSettings},
     domain::{
         actions,
         blobs::{cut, words},
@@ -161,27 +161,30 @@ struct Pass {
     needs: NeedSettings,
     /// The action catalogue (campbooks-cloud#166): off unless configured.
     actions: ActionSettings,
+    /// Whose move it is (campbooks-cloud#293): off unless configured, and
+    /// apart from the catalogue.
+    moves: MoveSettings,
 }
 
 impl Pass {
     /// The questions asked about `envelope`: the triage questions, then,
-    /// with the catalogue on, whose move it is ([`Self::moves`]) and the
-    /// catalogue's own (each in a slot of its own). With it off, exactly the
-    /// triage questions.
+    /// with whose move it is on, those ([`Self::moves`]), then, with the
+    /// catalogue on, the catalogue's own (each in a slot of its own). With
+    /// both off, exactly the triage questions.
     fn asked(&self, triage: &[Question], envelope: &Envelope) -> Vec<Question> {
         let mut asked = triage.to_vec();
+        asked.extend(self.moves(envelope));
         if self.actions.enabled {
-            asked.extend(move_questions(envelope));
             asked.extend(action_questions(envelope));
         }
         asked
     }
 
     /// The questions about whose move it is that `asked` adds to triage: the
-    /// ones recorded with the triage answers (same switch as the catalogue,
-    /// campbooks-cloud#293). None with it off.
+    /// ones recorded with the triage answers (their own switch,
+    /// campbooks-cloud#293, #372). None with it off.
     fn moves(&self, envelope: &Envelope) -> Vec<Question> {
-        if self.actions.enabled {
+        if self.moves.enabled {
             move_questions(envelope)
         } else {
             Vec::new()
@@ -268,7 +271,7 @@ impl Pass {
         let mut moves_only = false;
         let loaded = match load(ctx, workspace, message, &required, answered).await? {
             Some(loaded) => loaded,
-            None if answered == Answered::Every && self.actions.enabled => {
+            None if answered == Answered::Every && self.moves.enabled => {
                 let moves = [next_move_question()];
                 let Some(loaded) = load(ctx, workspace, message, &moves, answered).await? else {
                     return Ok(Passed::Done);
@@ -451,7 +454,15 @@ impl DecideMessage {
             policy,
             needs,
             actions: ActionSettings::default(),
+            moves: MoveSettings::default(),
         })
+    }
+
+    /// The same pass, asking whose move it is as `moves` says.
+    #[must_use]
+    pub fn with_moves(mut self, moves: MoveSettings) -> Self {
+        self.0.moves = moves;
+        self
     }
 
     /// The same pass, rating the action catalogue as `actions` says.
@@ -532,6 +543,13 @@ impl DecideBacklog {
     #[must_use]
     pub fn with_actions(mut self, actions: ActionSettings) -> Self {
         self.0.actions = actions;
+        self
+    }
+
+    /// The same pass, asking whose move it is as `moves` says.
+    #[must_use]
+    pub fn with_moves(mut self, moves: MoveSettings) -> Self {
+        self.0.moves = moves;
         self
     }
 }

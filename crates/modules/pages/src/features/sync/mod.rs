@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{PageId, access, announce, body, document, expect_live, store},
+    domain::{PageId, access, announce, body, document, expect_live, notion, store},
     events::PageChangeKind,
     features::get::PagePath,
     scopes::PagesWrite,
@@ -121,6 +121,10 @@ pub async fn handler(
                 &accepted.inspection,
             )
             .await?;
+            // A page kept in step with Notion sends its changes once the
+            // member stops typing.
+            notion::schedule_push(&mut tx, access.workspace, path.page_id, chrono::Utc::now())
+                .await?;
             // At most one announcement every few seconds per page.
             announce_body = sqlx::query_scalar::<_, bool>(
                 "UPDATE pages.pages SET last_body_event_at = now()

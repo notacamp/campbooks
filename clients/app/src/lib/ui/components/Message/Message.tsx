@@ -1,7 +1,6 @@
 import { Fragment, useId, useState, type ReactNode } from "react";
 
-import { Avatar, type AvatarProps } from "../Avatar/Avatar";
-import { Icon } from "../Icon/Icon";
+import { Avatar, type AvatarProps, Icon } from "@notacamp/ui";
 
 import styles from "./Message.module.css";
 
@@ -26,7 +25,7 @@ export interface MessageCardProps {
   /**
    * Plain text, shown as a paragraph. With `rich`, any block content (a
    * {@link SafeHtml} frame for an HTML body): untrusted HTML renders only
-   * through lib/ui/safe-html, never here.
+   * through the design system's SafeHtml, never here.
    */
   children: ReactNode;
   rich?: boolean | undefined;

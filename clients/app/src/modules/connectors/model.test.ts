@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CONNECTION } from "../../../test/demo/identity";
 
-import { firstChoice, healthTone, mailboxResult, stepChoice } from "./model";
+import { firstChoice, healthTone, knownMailProvider, mailboxResult, stepChoice } from "./model";
 
 const zoho = {
   ...CONNECTION,
@@ -26,6 +26,18 @@ describe("connectors model", () => {
     });
     expect(mailboxResult({ link_error: "made_up" })).toEqual({ kind: "error", error: "unknown" });
     expect(mailboxResult({})).toBeUndefined();
+  });
+
+  it("names Notion among the providers, and words the refusals Notion shares", () => {
+    expect(knownMailProvider("notion")).toBe(true);
+    expect(knownMailProvider("made-up")).toBe(false);
+    for (const code of [
+      "no_offline_access",
+      "account_connected_by_another_member",
+      "link_expired",
+    ]) {
+      expect(mailboxResult({ link_error: code })).toEqual({ kind: "error", error: code });
+    }
   });
 
   it("gives every health a tone", () => {

@@ -88,8 +88,9 @@ Recordings must show demo data only, never a real person's mail or documents.
 
 ## Design system and Storybook
 
-UI is built from `src/lib/ui` (tokens, themes, components) and `src/lib/shortcuts` (the
-keyboard shortcut registry); see `../docs/design-system.md` and AGENTS.md → UI.
+UI is built from `src/lib/ui` (the door to `@notacamp/ui`, the shared design system in `ui/`:
+tokens, themes, components) and `src/lib/shortcuts` (Campbooks' keyboard shortcut catalogue); see
+`../docs/design-system.md`, `ui/README.md` and AGENTS.md → UI.
 
 ```sh
 pnpm --dir clients --filter @campbooks/app exec playwright install chromium   # once
@@ -133,7 +134,7 @@ Rules worth knowing before you write code:
 
 - `eslint-disable` comments are ignored and reported. Fix the code, or change the rule in
   `eslint.config.js` where it gets reviewed.
-- `dangerouslySetInnerHTML` is banned outside `src/lib/ui/safe-html/`; `localStorage` /
+- `dangerouslySetInnerHTML` is banned outside `ui/src/safe-html/`; `localStorage` /
   `sessionStorage` outside `src/lib/storage/` (UI preferences only, never credentials).
 - Modules import each other only through `modules/<name>/index.ts`; `lib/` never imports
   `modules/` or `app/`; only `lib/api` may import the generated schema.

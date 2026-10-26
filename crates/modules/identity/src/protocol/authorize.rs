@@ -45,7 +45,7 @@ use crate::{
     MESSAGES,
     deps::Issuer,
     domain::{
-        clients::{Client, is_https_redirect},
+        clients::{Client, Kind, is_https_redirect},
         consents,
         sessions::{self, Session},
         step_up::STEP_UP_WINDOW,
@@ -361,7 +361,10 @@ fn checked(
 /// scopes and, for Campbooks' own clients, the API's catalogue; for anyone
 /// else what they registered, never `identity:*`), deduplicated, without
 /// `admin:access` unless `client` is first-party (ADR 0015); `None`
-/// otherwise. Missing means `openid`.
+/// otherwise. Missing means `openid`. An instance app gets the intersection
+/// of what it asks for and its ceiling (`None` when that is empty): a scope
+/// above the ceiling is not granted, and the token response's `scope` says
+/// what was.
 fn allowed_scope(issuer: &Issuer, client: &Client, requested: Option<&str>) -> Option<String> {
     let requested = requested.unwrap_or("openid");
     let mut scopes: Vec<&str> = Vec::new();
@@ -372,6 +375,9 @@ fn allowed_scope(issuer: &Issuer, client: &Client, requested: Option<&str>) -> O
             continue;
         }
         if !client.may_ask_for(scope, &issuer.api_scopes) {
+            if client.kind == Kind::Instance {
+                continue;
+            }
             return None;
         }
         if !scopes.contains(&scope) {

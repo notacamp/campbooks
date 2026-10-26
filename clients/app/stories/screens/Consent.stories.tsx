@@ -7,7 +7,13 @@ import { expect, userEvent, waitFor, within } from "storybook/test";
 import { UndoProvider } from "~/lib/ui";
 
 import { createAppRouter } from "../../src/app/router";
-import { AGENT_CONSENT, NATIVE_CONSENT, REQUEST, TEAM_APP_CONSENT } from "../../test/demo/identity";
+import {
+  AGENT_CONSENT,
+  INSTANCE_APP_CONSENT,
+  NATIVE_CONSENT,
+  REQUEST,
+  TEAM_APP_CONSENT,
+} from "../../test/demo/identity";
 
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
 
@@ -100,6 +106,21 @@ export const WorkspaceApp: Story = {
     await expect(await canvas.findByRole("radio", { name: "Duarte & Pessoa" })).not.toBeChecked();
     await expect(canvas.getByText("Duarte & Pessoa’s app")).toBeVisible();
     await expect(canvas.getByText("Next, you’ll go to dashboard.example.com.")).toBeVisible();
+  },
+};
+
+/** An app this server's administrator added (Applicamp): vouched for, one workspace to pick. */
+export const InstanceApp: Story = {
+  args: { path: PAGE, api: asking(INSTANCE_APP_CONSENT) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Added by this server")).toBeVisible();
+    await expect(
+      canvas.getByText("Added to this Campbooks by the people who run it."),
+    ).toBeVisible();
+    await expect(canvas.queryByText("Anyone can register an app with any name")).toBeNull();
+    await expect(canvas.getByText("See your calendars and events")).toBeVisible();
+    await expect(canvas.getByRole("radio", { name: "Household" })).not.toBeChecked();
   },
 };
 

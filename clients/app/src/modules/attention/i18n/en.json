@@ -20,7 +20,8 @@
     "worth_a_look": "Worth a look",
     "nudge": "Nudge",
     "doTask": "Do task",
-    "payTask": "Pay task"
+    "payTask": "Pay task",
+    "unsure": "Scout isn’t sure"
   },
   "bands": {
     "now": "Now",
@@ -111,7 +112,8 @@
     "seen": "Seen · {{name}}",
     "nudged": "Nudged {{name}}",
     "heardBack": "Heard from {{name}}",
-    "notWaiting": "Not waiting on {{name}}"
+    "notWaiting": "Not waiting on {{name}}",
+    "waiting": "Waiting on {{name}}"
   },
   "error": {
     "title": "Could not load what needs you",

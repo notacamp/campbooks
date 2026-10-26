@@ -254,6 +254,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "the page's id (a UUID), never its title or text",
     ),
     (
+        "pages.push_to_notion",
+        "page",
+        "the page's id (a UUID), never its title or text",
+    ),
+    (
         "search.backfill",
         "group_type",
         "a record type's name (`<module>.<record>`), from the code",
@@ -301,6 +306,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "conversations.apply_rule",
         "newest",
         "the conversation a Worth a look run raises, and when its mail was sent (an id and a timestamp)",
+    ),
+    (
+        "conversations.dispatch_needs_backfills",
+        "moves",
+        "a flag: whose move it is is switched on",
     ),
     ("conversations.backfill_needs", "inbox", INBOX_ID),
     ("conversations.backfill_needs", "after", CONVERSATION_CURSOR),

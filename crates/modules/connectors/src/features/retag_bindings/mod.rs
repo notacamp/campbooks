@@ -41,6 +41,10 @@ impl Job for RetagBindings {
         // The calendar changes members asked for are bound the same way.
         let (cal_retagged, cal_left) = changes::retag(tx, &key, workspace).await?;
         let (retagged, left) = (retagged + cal_retagged, left + cal_left);
+        // So are the block changes members asked of Notion pages.
+        let (notion_retagged, notion_left) =
+            crate::notion::changes::retag(tx, &key, workspace).await?;
+        let (retagged, left) = (retagged + notion_retagged, left + notion_left);
         if left == 0 {
             tracing::info!(
                 %workspace,

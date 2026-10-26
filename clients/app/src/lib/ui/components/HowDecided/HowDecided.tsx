@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { Disclosure } from "../Disclosure/Disclosure";
+import { Disclosure } from "@notacamp/ui";
 
 import styles from "./HowDecided.module.css";
 

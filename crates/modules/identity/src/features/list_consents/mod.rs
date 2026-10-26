@@ -24,7 +24,8 @@ pub struct ConnectedApp {
     pub client_id: String,
     /// Its name; `null` when the app is gone (its tokens no longer work).
     pub client_name: Option<String>,
-    /// `first_party`, `workspace`, `dynamic` or `metadata_document`.
+    /// `first_party`, `workspace`, `dynamic`, `metadata_document` or
+    /// `instance` (registered by this instance's administrator).
     pub client_kind: Option<String>,
     /// Whether it is Campbooks' own app (a workspace's app says so by its
     /// kind; every other name is its registrant's word).

@@ -355,7 +355,8 @@
       "expired": "Expired",
       "worth_a_look": "Worth a look",
       "waiting": "Waiting on {{name}}",
-      "nudge": "Nudge"
+      "nudge": "Nudge",
+      "unsure": "Scout isn’t sure"
     },
     "due": {
       "today": "Due today",
@@ -401,7 +402,10 @@
       "report": "Report and delete",
       "seen": "Seen",
       "heardBack": "Heard from them",
-      "notWaiting": "Not waiting"
+      "notWaiting": "Not waiting",
+      "nudgeParty": "Nudge {{name}}…",
+      "replyTo": "Reply to {{name}}…",
+      "nothingForMe": "Nothing for me"
     },
     "toast": {
       "done": "Done · {{name}}",
@@ -419,7 +423,8 @@
       "allPaidFailed_other": "Couldn’t mark {{count}} invoices paid. Try again.",
       "reported": "Reported · {{name}}. It’s in spam",
       "heardBack": "Heard from {{name}} · Scout stopped waiting",
-      "notWaiting": "Not waiting on {{name}}"
+      "notWaiting": "Not waiting on {{name}}",
+      "waiting": "Waiting on {{name}}"
     },
     "summary": {
       "heading": "Scout’s summary"
@@ -428,6 +433,21 @@
       "more": "Show the whole email",
       "less": "Show less",
       "linksOff": "Links are off in mail that may be phishing."
+    },
+    "unsure": {
+      "lineTo": "{{name}} wrote to {{others}} and you.",
+      "lineCc": "{{name}} wrote to {{others}}. You’re in Cc.",
+      "lineNamed": "{{name}} wrote to {{others}}. You’re not in To or Cc.",
+      "more_one": "{{names}} and {{count}} other",
+      "more_other": "{{names}} and {{count}} others",
+      "unanswered_one": "They haven’t answered in {{count}} day.",
+      "unanswered_other": "They haven’t answered in {{count}} days.",
+      "ask": "Scout can’t tell whose move this is. What’s next for you?",
+      "howQuestion": "How sure Scout was",
+      "howReply": "{{confidence}}% sure a reply is needed. It counts as sure from {{bar}}%.",
+      "howAction": "{{confidence}}% sure you were asked to do something. It counts as sure from {{bar}}%.",
+      "howCc": "You’re in Cc, not To.",
+      "howNotTo": "You’re not in To or Cc."
     }
   },
   "rules": {

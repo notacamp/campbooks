@@ -468,7 +468,8 @@
       "first_party": "Campbooks’ own app.",
       "workspace": "Registered by an admin of {{workspace}}.",
       "dynamic": "Registered itself. Nobody has checked who made it.",
-      "metadata_document": "Described by {{host}}. Nobody has checked who made it."
+      "metadata_document": "Described by {{host}}. Nobody has checked who made it.",
+      "instance": "Added to this Campbooks by the people who run it."
     },
     "can": "It will be able to",
     "workspace": "Which workspace may it use?",
@@ -519,6 +520,7 @@
     },
     "campbooks": "Campbooks",
     "workspaceApp": "{{workspace}}’s app",
+    "instanceApp": "Added by this server",
     "yourWorkspace": "your workspace"
   },
   "scopes": {
@@ -537,7 +539,9 @@
     "identity_read": "See your account and how you sign in",
     "identity_write": "Change how you sign in",
     "identity_clients": "Manage a workspace’s own apps",
-    "conversations_send": "Send mail from your mailboxes"
+    "conversations_send": "Send mail from your mailboxes",
+    "schedule_read": "See your calendars and events",
+    "schedule_write": "Add and change events in your calendars"
   },
   "apps": {
     "title": "Apps and integrations",

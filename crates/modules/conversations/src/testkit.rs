@@ -605,8 +605,7 @@ pub const ANA: (&str, &str) = ("Ana Costa", "ana@studio.example");
 /// The inbox of the waiting fixtures: Sam's.
 pub const SAM: (&str, &str) = ("Sam Rivers", "sam@example.com");
 
-/// [`sorting_deps`] with the action catalogue on, so whose move it is is
-/// asked (campbooks-cloud#293), and a model reading Joao's mail as asking
+/// [`sorting_deps`] with whose move it is switched on, so it is asked (campbooks-cloud#293), and a model reading Joao's mail as asking
 /// nothing of the recipient while someone else on it has the next move
 /// (`someone_else` at 0.91), the first person it may name (`p1`): Ana
 /// Costa in [`mail`]s Joao sends to Ana. Anyone else's mail is abstained
@@ -614,7 +613,7 @@ pub const SAM: (&str, &str) = ("Sam Rivers", "sam@example.com");
 pub fn waiting_deps() -> ConversationsDeps {
     let mut deps =
         sorting_deps().with_model(Arc::new(Scripted::model([(JOAO.1, someone_else_moves())])));
-    deps.config.actions.enabled = true;
+    deps.config.moves.enabled = true;
     deps
 }
 

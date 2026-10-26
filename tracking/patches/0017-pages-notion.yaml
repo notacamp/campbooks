@@ -1,0 +1,145 @@
+# Sync with Notion (campbooks-cloud#376, OpenSpec change pages-notion-sync):
+# pages imported from Notion and kept in step both ways. Connecting Notion is
+# tracked as connectors.connection_added (provider notion); the rest is five
+# events of the pages module, and Coverage for every operation, job and
+# handler this change adds. Never a title, a block's text, a Notion page's
+# name or id, a workspace's name or a token: ids, enums and counts only.
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0017-pages-notion.yaml`.
+changelog:
+  - date: "2026-10-26"
+    plan_version: 17
+    change: "Sync with Notion (campbooks-cloud#376): provider notion and capability pages for connections; 5 pages events for pages imported from Notion (how many), a sync applied in either direction (how many blocks), a conflict raised, a conflict resolved (the choice) and a sync stopped (why); Coverage for every operation, job and handler of the change."
+    pr: "#680"
+
+events:
+  - name: "pages.notion_pages_imported"
+    version: 1
+    module: "pages"
+    object: "notion_pages"
+    action: "imported"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member picked pages in their Notion account to bring into Pages: how many were made, linked to their Notion pages. Never their titles or ids at Notion."
+    fires_when: "pages.import_from_notion makes the pages and their links, in the transaction that stores them; pages already linked from this connection make none and track nothing."
+    added_in: 17
+    openspec_change: "pages-notion-sync"
+  - name: "pages.notion_sync_applied"
+    version: 1
+    module: "pages"
+    object: "notion_sync"
+    action: "applied"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, system]
+    description: "A change crossed between a page and its Notion page, in one direction: how many blocks it moved. Never their text."
+    fires_when: "A Notion snapshot is applied to the page (inbound), or the connector reports blocks written to Notion (outbound), in the transaction that stores the result; a run that moves no block tracks nothing."
+    added_in: 17
+    openspec_change: "pages-notion-sync"
+  - name: "pages.notion_conflict_raised"
+    version: 1
+    module: "pages"
+    object: "notion_conflict"
+    action: "raised"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, system]
+    description: "The same block changed in Campbooks and in Notion between two syncs: Campbooks kept its version and added Notion's beneath it as a conflict for the member to choose. How many blocks."
+    fires_when: "Applying a Notion snapshot, or undoing a resolution, adds conflict blocks to the page, in that transaction."
+    added_in: 17
+    openspec_change: "pages-notion-sync"
+  - name: "pages.notion_conflict_resolved"
+    version: 1
+    module: "pages"
+    object: "notion_conflict"
+    action: "resolved"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member chose what to do with a conflict between a block and Notion's version of it."
+    fires_when: "pages.resolve_conflict applies the choice, in the transaction that changes the page."
+    added_in: 17
+    openspec_change: "pages-notion-sync"
+  - name: "pages.notion_sync_stopped"
+    version: 1
+    module: "pages"
+    object: "notion_sync"
+    action: "stopped"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, system]
+    description: "A page stopped being kept in step with its Notion page, and why. Nothing is deleted on either side."
+    fires_when: "A member stops it, Notion is disconnected, either side trashes the page, Notion stops sharing it, or its member leaves, in the transaction that ends the link; a link already stopped tracks nothing."
+    added_in: 17
+    openspec_change: "pages-notion-sync"
+
+properties:
+  - { event: "pages.notion_pages_imported", version: 1, property: "pages", type: "int", required: true, classification: "operational", description: "How many pages were made." }
+  - { event: "pages.notion_pages_imported", version: 1, property: "connection", type: "id", required: true, classification: "id", description: "The Notion connection they were imported through." }
+  - { event: "pages.notion_sync_applied", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page afterwards." }
+  - { event: "pages.notion_sync_applied", version: 1, property: "direction", type: "enum", of: "pages.sync_direction", required: true, classification: "operational", description: "Which way the blocks moved." }
+  - { event: "pages.notion_sync_applied", version: 1, property: "blocks", type: "int", required: true, classification: "operational", description: "How many blocks moved." }
+  - { event: "pages.notion_conflict_raised", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page afterwards." }
+  - { event: "pages.notion_conflict_raised", version: 1, property: "blocks", type: "int", required: true, classification: "operational", description: "How many blocks are in conflict now that were not before." }
+  - { event: "pages.notion_conflict_resolved", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page afterwards." }
+  - { event: "pages.notion_conflict_resolved", version: 1, property: "choice", type: "enum", of: "pages.conflict_choice", required: true, classification: "operational", description: "What the member chose." }
+  - { event: "pages.notion_sync_stopped", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page." }
+  - { event: "pages.notion_sync_stopped", version: 1, property: "reason", type: "enum", of: "pages.sync_stop_reason", required: true, classification: "operational", description: "Why the link ended." }
+
+enums:
+  - { enum: "connectors.provider", value: "notion", description: "Notion: pages kept in step with Pages." }
+  - { enum: "connectors.capability", value: "pages", description: "Pages kept in step both ways (Notion)." }
+  - { enum: "pages.sync_direction", value: "inbound", description: "From Notion into the page." }
+  - { enum: "pages.sync_direction", value: "outbound", description: "From the page to Notion." }
+  - { enum: "pages.conflict_choice", value: "mine", description: "Keep the block as it is in Campbooks." }
+  - { enum: "pages.conflict_choice", value: "notion", description: "Use Notion's version." }
+  - { enum: "pages.conflict_choice", value: "both", description: "Keep both as ordinary blocks." }
+  - { enum: "pages.sync_stop_reason", value: "stopped_by_member", description: "A member stopped syncing." }
+  - { enum: "pages.sync_stop_reason", value: "disconnected", description: "The Notion connection was disconnected." }
+  - { enum: "pages.sync_stop_reason", value: "trashed_here", description: "The page was put in the trash in Campbooks." }
+  - { enum: "pages.sync_stop_reason", value: "trashed_in_notion", description: "The page was trashed in Notion." }
+  - { enum: "pages.sync_stop_reason", value: "not_shared", description: "Notion no longer shares the page with Campbooks." }
+  - { enum: "pages.sync_stop_reason", value: "member_left", description: "The member whose Notion account it was left the workspace." }
+  - { enum: "pages.sync_stop_reason", value: "notion_unavailable", description: "Notion is not offered on this instance any more." }
+
+coverage:
+  - kind: "operation"
+    name: "connectors.start_notion"
+    exemption: "only records a consent started and sends the browser to Notion; nothing of connectors changes until the member comes back, and the connection it becomes is tracked as connectors.connection_added or connectors.connection_reconnected"
+  - kind: "operation"
+    name: "pages.import_from_notion"
+    events: [pages.notion_pages_imported, pages.page_created]
+  - kind: "operation"
+    name: "pages.resolve_conflict"
+    events: [pages.notion_conflict_resolved]
+  - kind: "operation"
+    name: "pages.undo_resolve_conflict"
+    events: [pages.notion_conflict_raised]
+  - kind: "operation"
+    name: "pages.stop_sync"
+    events: [pages.notion_sync_stopped]
+  - kind: "handler"
+    name: "pages.apply_notion_snapshot"
+    events: [pages.notion_sync_applied, pages.notion_conflict_raised, pages.page_created]
+  - kind: "handler"
+    name: "pages.complete_notion_changes"
+    events: [pages.notion_sync_applied]
+  - kind: "handler"
+    name: "pages.stop_notion_link"
+    events: [pages.notion_sync_stopped]
+  - kind: "handler"
+    name: "pages.stop_notion_links_of_connection"
+    events: [pages.notion_sync_stopped]
+  - kind: "job"
+    name: "pages.push_to_notion"
+    exemption: "records the blocks a member changed as a request for the connector to write to Notion; the writes are tracked when the connector reports them (pages.notion_sync_applied)"
+  - kind: "handler"
+    name: "connectors.link_notion_page"
+    exemption: "a page's link to its Notion page, made when pages asked for it: the stream that reads it; the link is tracked by pages (pages.notion_pages_imported)"
+  - kind: "handler"
+    name: "connectors.unlink_notion_page"
+    exemption: "the stream of a Notion page that pages stopped syncing is deleted; the stop is tracked by pages (pages.notion_sync_stopped)"
+  - kind: "handler"
+    name: "connectors.record_notion_changes"
+    exemption: "records the block changes pages asked for, once pages confirms them, for the stream's next run, which reports how each ended; tracked there as pages.notion_sync_applied"

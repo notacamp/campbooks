@@ -890,6 +890,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
+ "boon",
  "campbooks-kernel",
  "chrono",
  "figment",
@@ -903,6 +904,7 @@ dependencies = [
  "tracing",
  "utoipa",
  "utoipa-axum",
+ "uuid",
  "yrs",
 ]
 

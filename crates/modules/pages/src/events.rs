@@ -5,10 +5,11 @@
 //! **No page content.** `pages.page_changed` holds ids and enums: never a
 //! title, never any text, never an address.
 
-use campbooks_kernel::{DomainEvent, RecordRef, changes};
+use campbooks_kernel::{DomainEvent, RecordRef, blobs::BlobRef, changes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::domain::{PageId, Place, resources::PAGE_RECORD};
 
@@ -77,6 +78,236 @@ impl DomainEvent for PageChanged {
         } else {
             vec![changes::Change::upsert(page.clone()).within(page)]
         }
+    }
+}
+
+/// How a [`BlobRef`] looks on the wire, for the events catalogue.
+#[derive(ToSchema)]
+#[schema(as = BlobRef)]
+#[allow(dead_code, reason = "a schema description only, never built")]
+pub struct BlobSchema {
+    /// SHA-256 of the bytes, 64 lower-case hex digits.
+    hash: String,
+    /// Length in bytes.
+    size: u64,
+    /// The media type given when it was stored.
+    content_type: String,
+}
+
+/// `pages.notion_link_requested` v1
+/// (`contracts/pages.notion_link_requested.v1.schema.json`): a page was
+/// linked to a page in a member's Notion account, which now needs reading.
+/// The connectors module asks this module, through the kernel's
+/// page-requests port, whether the link stands before it makes the stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionLinkRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The page.
+    pub page: PageId,
+    /// The Notion connection it is read through (a connectors id).
+    pub connection: Uuid,
+    /// The Notion page.
+    pub notion_page: Uuid,
+}
+
+impl DomainEvent for NotionLinkRequested {
+    const NAME: &'static str = "pages.notion_link_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `pages.notion_link_ended` v1
+/// (`contracts/pages.notion_link_ended.v1.schema.json`): a page stopped
+/// being kept in step with its Notion page, so nothing reads it any more.
+/// Nothing is deleted at Notion.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionLinkEnded {
+    /// The workspace.
+    pub workspace: String,
+    /// The page.
+    pub page: PageId,
+    /// The Notion connection it was read through.
+    pub connection: Uuid,
+    /// The Notion page.
+    pub notion_page: Uuid,
+}
+
+impl DomainEvent for NotionLinkEnded {
+    const NAME: &'static str = "pages.notion_link_ended";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `pages.notion_changes_requested` v1
+/// (`contracts/pages.notion_changes_requested.v1.schema.json`): block
+/// changes a member's edits asked for, to be made at Notion. Ids and a blob
+/// reference only: what to write is in the blob, which this module stored
+/// and which the connectors module reads through the page-requests port,
+/// never from the event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionChangesRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The request.
+    pub request: Uuid,
+    /// The page.
+    pub page: PageId,
+    /// The Notion connection whose grant makes the changes.
+    pub connection: Uuid,
+    /// The Notion page.
+    pub notion_page: Uuid,
+    /// The `notion-block-changes` v1 document, a blob of the workspace.
+    #[schema(value_type = BlobSchema)]
+    pub body: BlobRef,
+}
+
+impl DomainEvent for NotionChangesRequested {
+    const NAME: &'static str = "pages.notion_changes_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `connectors.notion_page_read` v1, as this module reads it
+/// (`contracts/connectors.notion_page_read.v1.schema.json`): a Notion page's
+/// blocks, read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionPageRead {
+    /// The workspace.
+    pub workspace: String,
+    /// The Notion connection.
+    pub connection: Uuid,
+    /// The Notion page.
+    pub notion_page: Uuid,
+    /// The page it is linked to.
+    pub page: PageId,
+    /// The `notion-page-snapshot` v1 document, a blob of the workspace.
+    pub snapshot: BlobRef,
+    /// When it was read.
+    pub read_at: DateTime<Utc>,
+}
+
+impl DomainEvent for NotionPageRead {
+    const NAME: &'static str = "connectors.notion_page_read";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// Why a Notion page is no longer read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NotionStop {
+    /// Notion no longer shares the page with the integration.
+    NotShared,
+    /// The page went to the trash in Notion.
+    TrashedInNotion,
+    /// Notion is not offered on this instance any more.
+    NotionUnavailable,
+}
+
+/// `connectors.notion_link_stopped` v1, as this module reads it
+/// (`contracts/connectors.notion_link_stopped.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionLinkStopped {
+    /// The workspace.
+    pub workspace: String,
+    /// The Notion connection.
+    pub connection: Uuid,
+    /// The Notion page.
+    pub notion_page: Uuid,
+    /// The page it was linked to.
+    pub page: PageId,
+    /// Why.
+    pub reason: NotionStop,
+}
+
+impl DomainEvent for NotionLinkStopped {
+    const NAME: &'static str = "connectors.notion_link_stopped";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// How one block change of a request ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NotionOutcome {
+    /// Written at Notion.
+    Applied,
+    /// Nothing was written.
+    Skipped,
+    /// It failed.
+    Failed,
+}
+
+/// How one block change of a request ended, as the connector tells it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionItemResult {
+    /// The block (an id of this module).
+    pub block: Uuid,
+    /// How it ended.
+    pub outcome: NotionOutcome,
+    /// The block's id at Notion (applied).
+    #[serde(default)]
+    pub notion_block: Option<Uuid>,
+    /// When Notion last edited it after the write (applied).
+    #[serde(default)]
+    pub edited_at: Option<DateTime<Utc>>,
+}
+
+/// `connectors.notion_changes_completed` v1, as this module reads it
+/// (`contracts/connectors.notion_changes_completed.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionChangesCompleted {
+    /// The workspace.
+    pub workspace: String,
+    /// The request.
+    pub request: Uuid,
+    /// The page.
+    pub page: PageId,
+    /// How each item ended, in the request's order.
+    pub results: Vec<NotionItemResult>,
+}
+
+impl DomainEvent for NotionChangesCompleted {
+    const NAME: &'static str = "connectors.notion_changes_completed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `connectors.connection_removed` v1, as this module reads it: a connection
+/// was disconnected, or its member left.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: Uuid,
+}
+
+impl DomainEvent for ConnectionRemoved {
+    const NAME: &'static str = "connectors.connection_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
     }
 }
 

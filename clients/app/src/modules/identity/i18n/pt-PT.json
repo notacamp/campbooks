@@ -468,7 +468,8 @@
       "first_party": "Aplicação do próprio Campbooks.",
       "workspace": "Registada por um administrador de {{workspace}}.",
       "dynamic": "Registou-se sozinha. Ninguém verificou quem a fez.",
-      "metadata_document": "Descrita por {{host}}. Ninguém verificou quem a fez."
+      "metadata_document": "Descrita por {{host}}. Ninguém verificou quem a fez.",
+      "instance": "Adicionada a este Campbooks por quem o gere."
     },
     "can": "Vai poder",
     "workspace": "Que espaço de trabalho pode usar?",
@@ -519,6 +520,7 @@
     },
     "campbooks": "Campbooks",
     "workspaceApp": "Aplicação de {{workspace}}",
+    "instanceApp": "Adicionada por este servidor",
     "yourWorkspace": "o seu espaço de trabalho"
   },
   "scopes": {
@@ -537,7 +539,9 @@
     "identity_read": "Ver a sua conta e como inicia sessão",
     "identity_write": "Alterar como inicia sessão",
     "identity_clients": "Gerir as aplicações de um espaço de trabalho",
-    "conversations_send": "Enviar correio a partir das suas caixas de correio"
+    "conversations_send": "Enviar correio a partir das suas caixas de correio",
+    "schedule_read": "Ver os seus calendários e eventos",
+    "schedule_write": "Adicionar e alterar eventos nos seus calendários"
   },
   "apps": {
     "title": "Aplicações e integrações",

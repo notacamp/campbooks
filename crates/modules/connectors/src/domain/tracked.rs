@@ -29,6 +29,7 @@ pub const fn provider(provider: Provider) -> tracking::Provider {
         Provider::Zoho => tracking::Provider::Zoho,
         Provider::Imap => tracking::Provider::Imap,
         Provider::Microsoft => tracking::Provider::Microsoft,
+        Provider::Notion => tracking::Provider::Notion,
     }
 }
 
@@ -39,6 +40,7 @@ pub const fn capability(capability: Capability) -> tracking::Capability {
         Capability::Calendar => tracking::Capability::Calendar,
         Capability::Files => tracking::Capability::Files,
         Capability::Bank => tracking::Capability::Bank,
+        Capability::Pages => tracking::Capability::Pages,
     }
 }
 

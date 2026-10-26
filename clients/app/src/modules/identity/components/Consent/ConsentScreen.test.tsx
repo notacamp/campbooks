@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   AGENT_CONSENT,
+  INSTANCE_APP_CONSENT,
   NATIVE_CONSENT,
   REQUEST,
   TEAM_APP_CONSENT,
@@ -98,6 +99,38 @@ describe("ConsentScreen", () => {
     expect(screen.getByText("Next, you’ll go to dashboard.example.com.")).toBeVisible();
     expect(screen.getByText(/You won’t be asked again for this app/u)).toBeVisible();
     expect(screen.queryByText("Only if you just started this")).toBeNull();
+  });
+
+  it("vouches for an app this server's admin added and asks for a workspace", async () => {
+    const api = mockApi({
+      [SHOWN]: { body: INSTANCE_APP_CONSENT },
+      [ANSWER]: { body: { redirect: "https://applicamp.example.com/auth/callback?code=c3" } },
+    });
+    const leave = renderScreen();
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Applicamp wants to use your Campbooks account",
+      }),
+    ).toBeVisible();
+    expect(screen.getByText("Added by this server")).toBeVisible();
+    expect(screen.getByText("Added to this Campbooks by the people who run it.")).toBeVisible();
+    expect(screen.queryByText("Unverified")).toBeNull();
+    expect(screen.queryByText("Anyone can register an app with any name")).toBeNull();
+    expect(screen.getByText("See your calendars and events")).toBeVisible();
+    expect(screen.getByText("Next, you’ll go to applicamp.example.com.")).toBeVisible();
+    expect(screen.getByText(/You won’t be asked again for this app/u)).toBeVisible();
+    expect(screen.getByRole("radio", { name: "Household" })).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Household" }));
+    fireEvent.click(await armedAllow());
+    await waitFor(() => {
+      expect(leave).toHaveBeenCalledWith("https://applicamp.example.com/auth/callback?code=c3");
+    });
+    expect(api.calls.find((call) => call.route === ANSWER)?.body).toEqual({
+      decision: "allow",
+      workspace_id: "0192f1a0-0000-7000-8000-000000000002",
+    });
   });
 
   it("denies with Esc, sending the app its answer", async () => {

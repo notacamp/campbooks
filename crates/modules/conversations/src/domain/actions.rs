@@ -330,6 +330,7 @@ mod tests {
             actions: None,
             waiting_on: None,
             nudges: None,
+            unsure: None,
         };
         let json = serde_json::to_value(&need).unwrap();
         let keys: std::collections::BTreeSet<&str> = json

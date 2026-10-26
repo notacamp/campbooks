@@ -3,11 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ShortcutId } from "~/lib/shortcuts";
 
-import { Overlay } from "../../internal/Overlay";
-import type { Accent } from "../../tokens/tokens";
-import { Icon } from "../Icon/Icon";
-import { Kbd, KbdHint } from "../Kbd/Kbd";
-import { WorkspaceMark } from "../Shell/Shell";
+import { Overlay, type Accent, Icon, Kbd, KbdHint, WorkspaceMark } from "@notacamp/ui";
 
 import styles from "./WorkspaceMenu.module.css";
 
