@@ -5,22 +5,28 @@
 //! and nothing else (no automation, no assistant) can reach it by an
 //! operation id. It does the least it can:
 //!
-//! - **Absent** unless this instance serves it: Notion is offered and
-//!   `CAMPBOOKS_NOTION__WEBHOOK_SECRET[_FILE]` is set. The path falls through
-//!   to the application's fallback otherwise, and pages are polled.
+//! - **Absent** unless Notion is on (`CAMPBOOKS_CONNECTORS__NOTION__ENABLED`)
+//!   and the instance secret is set: the path falls through to the
+//!   application's fallback otherwise, and pages are polled. It exists
+//!   **before** the webhook secret is configured, because Notion posts the
+//!   subscription's verification token to it first.
 //! - **Rate limited** first: [`PER_PROCESS_SECOND`] posts a second in each
 //!   process before the database is asked anything, then the shared
 //!   [`PER_ADDRESS`] and [`ALL`] limits (429 `rate_limited`).
-//! - **The verification post** Notion sends once when a subscription is
-//!   made carries a `verification_token` and no event. It is answered 200
-//!   and logged as having arrived, never with its value: the operator copies
-//!   the token from Notion's dashboard into the secret.
-//! - **An event** at most [`MAX_BODY`] bytes: its `X-Notion-Signature`
+//! - **No webhook secret configured**: the only body taken is exactly
+//!   `{"verification_token": "<up to 200 printable characters>"}`. It is
+//!   kept sealed as the instance's one token (a newer one replaces it; the
+//!   operator reads it with `campbooks-server admin notion-webhook-token`
+//!   and pastes it into Notion), answered 200, and logged as having arrived,
+//!   never with its value. Every other post is 404.
+//! - **A webhook secret configured** (`CAMPBOOKS_NOTION__WEBHOOK_SECRET[_FILE]`):
+//!   a verification-shaped body is 404 (a token cannot be armed again); an
+//!   event at most [`MAX_BODY`] bytes has its `X-Notion-Signature`
 //!   (`sha256=` and the hexadecimal HMAC-SHA256 of the **raw body** under the
-//!   secret) is checked in constant time before the body is read as
-//!   anything. A wrong or missing signature is 401 and nothing else happens.
-//!   For a page event, the streams linked to that Notion page are found
-//!   across workspaces in the maintenance scope (`FOR SELECT` on
+//!   secret) checked in constant time before the body is read as anything. A
+//!   wrong or missing signature is 401 and nothing else happens. For a page
+//!   event, the streams linked to that Notion page are found across
+//!   workspaces in the maintenance scope (`FOR SELECT` on
 //!   `connectors.notion_links` only: ids), and each is made due now in its own
 //!   workspace unless it is paused or waiting for the member. 202.
 //!
@@ -59,7 +65,7 @@ use crate::{
     deps::Deps,
     domain::{
         model::{ConnectionId, StreamId},
-        schedule,
+        notion_webhook, schedule,
     },
     notion::HOOK_PATH,
 };
@@ -109,9 +115,25 @@ pub fn router(state: AppState, deps: Deps) -> Router {
         })
 }
 
-/// Whether Notion is offered with a webhook secret.
+/// Whether the hook is served: Notion is on and the instance secret seals
+/// the verification token. The webhook secret is not needed (it is set from
+/// the token this keeps).
 fn serves(deps: &Deps) -> bool {
-    deps.notion.is_some() && deps.notion_webhook.is_some()
+    deps.config.notion.is_enabled() && deps.notion_cipher.is_some()
+}
+
+/// The longest body taken while no webhook secret is configured: a
+/// verification post is a few dozen bytes.
+const MAX_VERIFICATION_BODY: usize = 1024;
+
+/// The token a verification post carries: a body that is exactly
+/// `{"verification_token": "<text>"}` and nothing else.
+fn verification_token(body: &Value) -> Option<&str> {
+    let object = body.as_object()?;
+    if object.len() != 1 {
+        return None;
+    }
+    object.get("verification_token")?.as_str()
 }
 
 /// What the hook reaches.
@@ -156,6 +178,47 @@ impl Hook {
     }
 }
 
+impl Hook {
+    /// A post while no webhook secret is configured: only a verification
+    /// token is taken, kept sealed (it replaces the one before). Anything
+    /// else is 404.
+    async fn keep_verification(&self, body: &[u8]) -> Response {
+        if body.len() > MAX_VERIFICATION_BODY {
+            return StatusCode::NOT_FOUND.into_response();
+        }
+        let Ok(posted) = serde_json::from_slice::<Value>(body) else {
+            return StatusCode::NOT_FOUND.into_response();
+        };
+        let Some(token) = verification_token(&posted).filter(|t| notion_webhook::acceptable(t))
+        else {
+            return StatusCode::NOT_FOUND.into_response();
+        };
+        let Some(cipher) = self.deps.notion_cipher.as_ref() else {
+            return StatusCode::NOT_FOUND.into_response();
+        };
+        let kept = async {
+            let mut tx = campbooks_kernel::db::begin_maintenance(&self.state.db).await?;
+            notion_webhook::store(&mut tx, cipher, token, self.deps.clock.now()).await?;
+            tx.commit().await?;
+            Ok::<(), campbooks_kernel::Error>(())
+        }
+        .await;
+        match kept {
+            Ok(()) => {
+                tracing::info!("notion webhook verification token received");
+                StatusCode::OK.into_response()
+            }
+            Err(err) => {
+                tracing::warn!(
+                    error = %campbooks_kernel::redact::error(&err),
+                    "could not keep a Notion webhook verification token"
+                );
+                StatusCode::SERVICE_UNAVAILABLE.into_response()
+            }
+        }
+    }
+}
+
 /// The bytes `hex` spells, when it is whole hexadecimal.
 fn decode_hex(hex: &str) -> Option<Vec<u8>> {
     if hex.len() % 2 != 0 || !hex.is_ascii() {
@@ -197,7 +260,7 @@ async fn receive(
         return refused.into_response();
     }
     let Some(secret) = hook.deps.notion_webhook.as_ref() else {
-        return StatusCode::NOT_FOUND.into_response();
+        return hook.keep_verification(&body).await;
     };
     let Ok(secret) = secret.read("CAMPBOOKS_NOTION__WEBHOOK_SECRET_FILE") else {
         tracing::warn!("the Notion webhook secret could not be read");
@@ -209,13 +272,16 @@ async fn receive(
     let authentic = signature
         .is_some_and(|signature| signed(secret.expose_secret().as_bytes(), &body, signature));
     let Ok(posted) = serde_json::from_slice::<Value>(&body) else {
-        return StatusCode::BAD_REQUEST.into_response();
+        return if authentic {
+            StatusCode::BAD_REQUEST.into_response()
+        } else {
+            StatusCode::UNAUTHORIZED.into_response()
+        };
     };
-    // The verification post: no event, and the token is Notion's to show
-    // the operator, never ours to keep or log.
-    if !authentic && posted.get("verification_token").is_some() && posted.get("type").is_none() {
-        tracing::info!("a Notion webhook verification token arrived");
-        return StatusCode::OK.into_response();
+    // With the secret set, a verification post is none of ours: a token
+    // cannot be armed again.
+    if verification_token(&posted).is_some() {
+        return StatusCode::NOT_FOUND.into_response();
     }
     if !authentic {
         tracing::info!("a Notion webhook post with a wrong or missing signature was refused");

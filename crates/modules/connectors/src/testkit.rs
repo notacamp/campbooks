@@ -647,6 +647,24 @@ impl Kit {
         config: ConnectorsConfig,
         filter_limit: Option<u32>,
     ) -> Self {
+        Self::build(db, config, filter_limit, true).await
+    }
+
+    /// The module with Notion on and no webhook secret configured yet (the
+    /// state in which Notion's verification token is taken).
+    pub async fn with_notion_unsigned(db: PgPool) -> Self {
+        let mut config = ConnectorsConfig::default();
+        config.imap.enabled = false;
+        config.notion.enabled = Some("true".to_owned());
+        Self::build(db, config, None, false).await
+    }
+
+    async fn build(
+        db: PgPool,
+        config: ConnectorsConfig,
+        filter_limit: Option<u32>,
+        webhook_secret: bool,
+    ) -> Self {
         let imap_config = config.imap.clone();
         let google = FakeGoogle::start().await;
         let clock = Arc::new(FixedClock::new(
@@ -655,7 +673,8 @@ impl Kit {
         let zoho = FakeZoho::start(clock.clone()).await;
         let microsoft = FakeMicrosoft::start().await;
         let notion = FakeNotion::start().await;
-        let notion_client = config.notion.is_enabled().then(|| {
+        let notion_on = config.notion.is_enabled();
+        let notion_client = notion_on.then(|| {
             Arc::new(
                 crate::notion::Notion::new(
                     crate::testkit_notion::CLIENT_ID.into(),
@@ -707,9 +726,11 @@ impl Kit {
             )),
             microsoft: microsoft_client,
             notion: notion_client.clone(),
-            notion_webhook: notion_client
-                .is_some()
+            notion_webhook: (notion_client.is_some() && webhook_secret)
                 .then(|| ClientSecret::Inline(NOTION_HOOK_SECRET.into())),
+            notion_cipher: notion_on.then(|| {
+                Arc::new(crate::domain::notion_webhook::cipher(&SecretKey::from_bytes([3; 32])))
+            }),
             imap: Arc::new(crate::imap::Imap::new(imap_config)),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
@@ -739,6 +760,7 @@ impl Kit {
             microsoft: None,
             notion: None,
             notion_webhook: None,
+            notion_cipher: None,
             imap: Arc::new(imap),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),

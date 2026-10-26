@@ -133,23 +133,149 @@ async fn an_oversize_body_is_refused_before_anything_is_checked(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn the_verification_post_is_answered_and_wakes_nothing(db: PgPool) {
+async fn with_the_secret_set_a_verification_post_is_none_of_ours(db: PgPool) {
     let kit = Kit::with_notion(db).await;
     let (_, _, stream) = linked(&kit, "marta").await;
     let body = serde_json::to_vec(&json!({"verification_token": "secret_abc"})).unwrap();
-    let posted = kit.notion_hook(&body, None).await;
-    assert_eq!(posted.status, StatusCode::OK);
+    // Unsigned, and even signed: a token cannot be armed again.
+    assert_eq!(kit.notion_hook(&body, None).await.status, StatusCode::NOT_FOUND);
+    let signed = Kit::notion_signature(&body);
+    assert_eq!(
+        kit.notion_hook(&body, Some(&signed)).await.status,
+        StatusCode::NOT_FOUND
+    );
     assert!(!due(&kit, stream).await);
-    // A verification-shaped body that also names an event is not one.
-    let tricked = serde_json::to_vec(
-        &json!({"verification_token": "x", "type": "page.deleted",
-                "entity": {"id": Uuid::now_v7().to_string()}}),
-    )
+    assert_eq!(stored_tokens(&kit).await, 0, "nothing was kept");
+    // Signatures stay enforced for everything else.
+    let event = serde_json::to_vec(&json!({"type": "page.deleted",
+        "entity": {"id": Uuid::now_v7().to_string()}}))
     .unwrap();
     assert_eq!(
-        kit.notion_hook(&tricked, None).await.status,
+        kit.notion_hook(&event, None).await.status,
         StatusCode::UNAUTHORIZED
     );
+}
+
+async fn stored_tokens(kit: &Kit) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM connectors.notion_webhook_token")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap()
+}
+
+fn verification(token: &str) -> Vec<u8> {
+    serde_json::to_vec(&json!({"verification_token": token})).unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn before_the_secret_exists_the_verification_token_is_kept_sealed(db: PgPool) {
+    let kit = Kit::with_notion_unsigned(db).await;
+    let posted = kit.notion_hook(&verification("secret_first"), None).await;
+    assert_eq!(posted.status, StatusCode::OK);
+    assert_eq!(stored_tokens(&kit).await, 1);
+    let sealed: Vec<u8> = sqlx::query_scalar("SELECT token FROM connectors.notion_webhook_token")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&sealed).contains("secret_first"));
+    // It opens with the instance key and the token's own purpose only.
+    let key = campbooks_kernel::crypto::SecretKey::from_bytes([3; 32]);
+    let stored = crate::notion_webhook_token::read(
+        &mut *kit.db.acquire().await.unwrap(),
+        &crate::notion_webhook_token::cipher(&key),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(stored.token, "secret_first");
+    assert!(!format!("{stored:?}").contains("secret_first"));
+    let credentials_cipher = campbooks_kernel::crypto::Cipher::new(&key, crate::CREDENTIALS_PURPOSE);
+    assert!(credentials_cipher.open(&sealed, b"connectors.notion_webhook_token").is_err());
+    // The token appears in no event.
+    let events: Vec<String> = sqlx::query_scalar("SELECT payload::text FROM kernel.events")
+        .fetch_all(&kit.db)
+        .await
+        .unwrap();
+    assert!(events.iter().all(|p| !p.contains("secret_first")));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_second_verification_replaces_the_first(db: PgPool) {
+    let kit = Kit::with_notion_unsigned(db).await;
+    assert_eq!(
+        kit.notion_hook(&verification("secret_first"), None).await.status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        kit.notion_hook(&verification("secret_second"), None).await.status,
+        StatusCode::OK
+    );
+    assert_eq!(stored_tokens(&kit).await, 1);
+    let key = campbooks_kernel::crypto::SecretKey::from_bytes([3; 32]);
+    let stored = crate::notion_webhook_token::read(
+        &mut *kit.db.acquire().await.unwrap(),
+        &crate::notion_webhook_token::cipher(&key),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(stored.token, "secret_second");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn before_the_secret_exists_nothing_but_a_bare_verification_token_is_taken(db: PgPool) {
+    let kit = Kit::with_notion_unsigned(db).await;
+    let long = verification(&"t".repeat(201));
+    let padded = {
+        let mut body = verification("secret_x");
+        body.extend(std::iter::repeat_n(b' ', 2000));
+        body
+    };
+    for body in [
+        serde_json::to_vec(&json!({"type": "page.content_updated",
+            "entity": {"id": Uuid::now_v7().to_string()}}))
+        .unwrap(),
+        serde_json::to_vec(&json!({"verification_token": "x", "type": "page.deleted"})).unwrap(),
+        serde_json::to_vec(&json!({"verification_token": 7})).unwrap(),
+        serde_json::to_vec(&json!({"verification_token": ["x"]})).unwrap(),
+        verification(""),
+        verification("has a space"),
+        verification("new\nline"),
+        long,
+        padded,
+        b"not json".to_vec(),
+        b"{}".to_vec(),
+        b"[]".to_vec(),
+    ] {
+        let posted = kit
+            .notion_hook(&body, Some(&Kit::notion_signature(&body)))
+            .await;
+        assert_eq!(
+            posted.status,
+            StatusCode::NOT_FOUND,
+            "{}",
+            String::from_utf8_lossy(&body[..body.len().min(80)])
+        );
+    }
+    assert_eq!(stored_tokens(&kit).await, 0);
+    // The longest allowed one is kept.
+    let edge = verification(&"t".repeat(200));
+    assert_eq!(kit.notion_hook(&edge, None).await.status, StatusCode::OK);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_runtime_role_can_replace_the_token_but_never_read_it(db: PgPool) {
+    let kit = Kit::with_notion_unsigned(db).await;
+    kit.notion_hook(&verification("secret_first"), None).await;
+    let app = campbooks_kernel::testing::app_role_pool(&kit.db).await;
+    let read = sqlx::query("SELECT token FROM connectors.notion_webhook_token")
+        .fetch_all(&app)
+        .await;
+    assert!(read.is_err(), "the runtime role reads the token");
+    let count = sqlx::query("SELECT count(*) FROM connectors.notion_webhook_token")
+        .fetch_all(&app)
+        .await;
+    assert!(count.is_err());
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -215,7 +341,7 @@ async fn a_stream_waiting_for_the_member_is_not_woken(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn the_hook_is_absent_without_a_webhook_secret(db: PgPool) {
+async fn the_hook_is_absent_unless_notion_is_on(db: PgPool) {
     let kit = Kit::new(db).await;
     let body = event("page.content_updated", Uuid::now_v7());
     let posted = kit

@@ -269,6 +269,12 @@ impl Merge<'_> {
         let theirs_changed = theirs_hash != mapping.base_hash;
         // A block the member cannot edit here is never changed here.
         let ours_changed = editable && ours_hash != mapping.base_hash;
+        // A disagreement that no longer is one (Notion went back, the two
+        // sides came to the same words) is not shown any more.
+        let disagree = theirs_changed && ours_changed && theirs_hash != ours_hash;
+        if !disagree && self.ours.conflict_of(mapping.bid).is_some() {
+            self.drop_conflict(txn, mapping.bid);
+        }
         match (theirs_changed, ours_changed) {
             (false, false) => {
                 if edited != mapping.base_edited {

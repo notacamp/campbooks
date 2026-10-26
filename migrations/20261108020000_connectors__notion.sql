@@ -22,6 +22,14 @@
 --   database never holds, and made by the stream's next run before it reads.
 --   Ids, kinds, times and reason codes only: what is written travels in the
 --   request's blob, which the pages module stored.
+-- - `notion_webhook_token`: the verification token Notion posts once to
+--   `POST /hooks/notion` when the operator creates a webhook subscription,
+--   while no webhook secret is configured. One row for the instance, sealed
+--   with the instance key; the operator reads it with
+--   `campbooks-server admin notion-webhook-token` and pastes it into
+--   Notion, where it becomes the signing secret. The runtime role may
+--   replace it (delete and insert) but never read it back: no request, event
+--   or log ever carries it.
 --
 -- Written to run again safely: every object is created only when missing.
 --
@@ -158,6 +166,18 @@ CREATE POLICY maintenance_reads_notion_links ON connectors.notion_links
     FOR SELECT
     USING (current_setting('campbooks.maintenance_scope', true) = 'on');
 
+CREATE TABLE IF NOT EXISTS connectors.notion_webhook_token (
+    -- The one row of the instance.
+    only_row boolean PRIMARY KEY DEFAULT true CHECK (only_row),
+    -- The token, sealed with the instance key (bound to this table).
+    token bytea NOT NULL,
+    received_at timestamptz NOT NULL DEFAULT now()
+);
+
 GRANT SELECT, INSERT, UPDATE, DELETE ON connectors.notion_authorizations TO campbooks_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON connectors.notion_links TO campbooks_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON connectors.notion_changes TO campbooks_app;
+
+-- Instance-level, with no workspace data: the runtime role can only replace
+-- the row, never read it (the CLI, on the migration login, does).
+GRANT INSERT, DELETE ON connectors.notion_webhook_token TO campbooks_app;

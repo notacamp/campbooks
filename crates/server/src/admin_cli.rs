@@ -53,6 +53,16 @@ pub enum AdminCommand {
     },
     /// List the administrators.
     List,
+    /// Print the verification token Notion posted to the webhook while no
+    /// webhook secret was configured, to paste into Notion's subscription
+    /// screen (where it becomes the signing secret). It is kept sealed with
+    /// the instance key; no request ever returns it. `--clear` forgets it
+    /// instead: do that once it is pasted.
+    NotionWebhookToken {
+        /// Forget the stored token (prints nothing).
+        #[arg(long)]
+        clear: bool,
+    },
     /// Show the newest entries of the admin audit trail.
     Log {
         /// How many entries.
@@ -127,6 +137,7 @@ async fn execute(config: &Config, command: AdminCommand) -> Result<(), String> {
             yes,
         } => revoke(&mut conn, &tracker, &who, &permissions, yes).await,
         AdminCommand::List => list(&mut conn).await,
+        AdminCommand::NotionWebhookToken { clear } => notion_webhook_token(&mut conn, clear).await,
         AdminCommand::Log { limit } => log(&mut conn, limit).await,
     };
     let _ = conn.close().await;
@@ -223,6 +234,58 @@ async fn list(conn: &mut PgConnection) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+/// Print (or, with `clear`, forget) the Notion webhook's verification token.
+/// The token goes to stdout alone, so it can be piped; everything else goes
+/// to stderr.
+async fn notion_webhook_token(conn: &mut PgConnection, clear: bool) -> Result<(), String> {
+    if clear {
+        let gone = clear_notion_token(conn).await?;
+        note(if gone {
+            "cleared: the stored Notion webhook token is gone"
+        } else {
+            "nothing to clear: no Notion webhook token is stored"
+        });
+        return Ok(());
+    }
+    let secret = campbooks_kernel::crypto::SecretKey::from_env()?.ok_or_else(|| {
+        "CAMPBOOKS_SECRET_KEY_FILE or CAMPBOOKS_SECRET_KEY is not set: the token is sealed with it"
+            .to_owned()
+    })?;
+    let (token, received) = read_notion_token(conn, &secret).await?;
+    note(&format!(
+        "token received {}; paste it into Notion, then `admin notion-webhook-token --clear`",
+        received.format("%Y-%m-%d %H:%M:%S UTC")
+    ));
+    say(&token);
+    Ok(())
+}
+
+/// The stored token and when it arrived.
+async fn read_notion_token(
+    conn: &mut PgConnection,
+    secret: &campbooks_kernel::crypto::SecretKey,
+) -> Result<(String, chrono::DateTime<chrono::Utc>), String> {
+    use campbooks_connectors::notion_webhook_token as store;
+    let cipher = store::cipher(secret);
+    let stored = store::read(conn, &cipher)
+        .await
+        .map_err(|_| "could not read the token (is this the instance key it was sealed with?)")?;
+    stored.map(|s| (s.token, s.received_at)).ok_or_else(|| {
+        "no Notion webhook token is stored: create the subscription in Notion first, with the \
+         webhook secret not yet set"
+            .to_owned()
+    })
+}
+
+/// Forget the stored token; whether there was one.
+async fn clear_notion_token(conn: &mut PgConnection) -> Result<bool, String> {
+    use campbooks_connectors::notion_webhook_token as store;
+    store::clear(conn)
+        .await
+        .map(|gone| gone > 0)
+        .map_err(|e| format!("could not clear the token: {e}"))
 }
 
 async fn log(conn: &mut PgConnection, limit: i64) -> Result<(), String> {
@@ -357,6 +420,11 @@ fn warn(line: &str) {
     let _ = writeln!(std::io::stderr(), "warning: {line}");
 }
 
+/// A line for the operator on stderr, so stdout stays what a pipe takes.
+fn note(line: &str) {
+    let _ = writeln!(std::io::stderr(), "{line}");
+}
+
 fn say(line: &str) {
     let _ = writeln!(std::io::stdout(), "{line}");
 }
@@ -369,6 +437,37 @@ fn fail(message: &str) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_notion_webhook_token_is_read_back_sealed_and_cleared(db: sqlx::PgPool) {
+        use campbooks_connectors::notion_webhook_token as store;
+        use campbooks_kernel::crypto::SecretKey;
+        let secret = SecretKey::from_bytes([9; 32]);
+        let mut conn = db.acquire().await.unwrap();
+        // Nothing stored yet: said so, not an empty token.
+        let none = read_notion_token(&mut conn, &secret).await.unwrap_err();
+        assert!(none.contains("no Notion webhook token"), "{none}");
+        assert!(!clear_notion_token(&mut conn).await.unwrap());
+        let cipher = store::cipher(&secret);
+        store::store(&mut conn, &cipher, "secret_abc123", chrono::Utc::now())
+            .await
+            .unwrap();
+        let (token, _) = read_notion_token(&mut conn, &secret).await.unwrap();
+        assert_eq!(token, "secret_abc123");
+        // At rest it is sealed.
+        let sealed: Vec<u8> =
+            sqlx::query_scalar("SELECT token FROM connectors.notion_webhook_token")
+                .fetch_one(&mut *conn)
+                .await
+                .unwrap();
+        assert!(!String::from_utf8_lossy(&sealed).contains("secret_abc123"));
+        // Another instance key cannot open it, and says so without the token.
+        let wrong = SecretKey::from_bytes([8; 32]);
+        let refused = read_notion_token(&mut conn, &wrong).await.unwrap_err();
+        assert!(!refused.contains("secret_abc123"), "{refused}");
+        assert!(clear_notion_token(&mut conn).await.unwrap());
+        assert!(read_notion_token(&mut conn, &secret).await.is_err());
+    }
 
     #[test]
     fn permissions_parse_by_wire_name() {

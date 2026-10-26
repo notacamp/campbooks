@@ -82,6 +82,9 @@ mod zoho;
 pub use deps::{CREDENTIALS_PURPOSE, Deps};
 pub use domain::destinations::outbound_destinations;
 pub use domain::intake::grant_intake;
+/// The Notion webhook's verification token, kept sealed until the operator
+/// reads it with the admin CLI.
+pub use domain::notion_webhook as notion_webhook_token;
 pub use domain::model::{
     AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, MailChoice, Phase,
     Provider, StreamId, StreamView,

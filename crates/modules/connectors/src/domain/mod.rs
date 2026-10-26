@@ -12,6 +12,7 @@ pub mod intake;
 pub mod marks;
 pub mod model;
 pub mod notion;
+pub mod notion_webhook;
 pub mod outbound;
 pub mod push;
 pub mod removal;

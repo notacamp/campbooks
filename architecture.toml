@@ -200,7 +200,7 @@ reason = "Microsoft Graph's change notifications (campbooks-cloud#316): the publ
 
 [[access.maintenance_scope]]
 path = "crates/modules/connectors/src/features/notion_hook/mod.rs"
-reason = "Notion's webhook (campbooks-cloud#376): the public hook finds the streams of a Notion page across workspaces (`connectors.notion_links` maintenance policy: read only, ids) after checking the post's signature, and only makes them due; whatever it then does with a stream (its run) happens in that stream's workspace."
+reason = "Notion's webhook (campbooks-cloud#376): the public hook finds the streams of a Notion page across workspaces (`connectors.notion_links` maintenance policy: read only, ids) after checking the post's signature, and only makes them due; whatever it then does with a stream (its run) happens in that stream's workspace. While no webhook secret is configured it also keeps the subscription's verification token, sealed, as the instance's one row (`connectors.notion_webhook_token`, no workspace data: the runtime role may replace it and never read it)."
 
 [[access.maintenance_scope]]
 path = "crates/modules/conversations/src/features/backfill_needs/mod.rs"

@@ -91,12 +91,21 @@
     20 MiB with a content-type allowlist, stored as blobs, and referenced by
     hash.
 - **Webhook** `POST /hooks/notion`: public, outside the operation catalogue,
-  and absent unless `CAMPBOOKS_NOTION__WEBHOOK_SECRET[_FILE]` is set.
-  - It answers the one-time verification post and logs that a token arrived,
-    never its value. The operator copies the token from Notion's dashboard
-    into the secret.
-  - Every other post is checked in constant time against
-    `X-Notion-Signature`, an HMAC-SHA256 of the raw body.
+  and present whenever Notion is on (and the instance secret is set), before
+  the webhook secret exists, because Notion posts the subscription's
+  verification token to it first.
+  - **No webhook secret set**: the only body taken is exactly
+    `{"verification_token": <text up to 200 characters>}`. It is kept sealed
+    (a purpose of its own under the instance key) as the instance's one row,
+    answered 200 and logged as having arrived, never with its value. Every
+    other post is 404. The operator reads it with
+    `campbooks-server admin notion-webhook-token` (`--clear` forgets it) and
+    pastes it into Notion, then sets `CAMPBOOKS_NOTION__WEBHOOK_SECRET[_FILE]`.
+    No HTTP endpoint, event or log ever carries it, and the runtime database
+    role can replace the row but not read it.
+  - **A webhook secret set**: a verification-shaped body is 404 (a token
+    cannot be armed again). Every other post is checked in constant time
+    against `X-Notion-Signature`, an HMAC-SHA256 of the raw body.
   - Body cap 64 KiB, with the same per-address and instance limits as the
     Microsoft hook.
   - For `page.content_updated`, `page.deleted` and `page.moved`, it looks up
@@ -206,7 +215,11 @@
   3. Put the client id and secret in Infisical (`/campbooks-next`).
   4. Create the webhook subscription in Notion's dashboard for
      `https://app.campbooks.not-a-camp.com/hooks/notion` with the page
-     events, and put the verification token in Infisical.
+     events (with Notion on and no webhook secret set, the hook keeps the
+     verification token Notion posts). Read it with
+     `campbooks-server admin notion-webhook-token`, paste it into Notion's
+     verification screen, put the same value in Infisical as the webhook
+     secret, redeploy, and run the command with `--clear`.
 
 ## Risks
 
@@ -218,3 +231,50 @@
 - **Hash stability.** Content hashes are computed from the normalized
   snapshot (kinds, attributes and rich-text runs in a fixed order), never
   from raw JSON, so Notion re-serializing a block doesn't fake an edit.
+
+## Deviations while building
+
+Where the spec turned out to be wrong or short, the closest secure thing was
+built. Each is listed here.
+
+- **Webhook before its secret.** The spec had the hook absent until the secret
+  was set and answering the verification post with a log line. Notion posts
+  the token once and the operator must paste it back, so the hook now exists
+  whenever Notion is on, keeps the token sealed while no secret is set, and
+  the admin CLI `campbooks-server admin notion-webhook-token` is the one way
+  to read it (`--clear` forgets it). With the secret set a verification body
+  is 404. See the connectors spec delta.
+- **The consent start.** `POST .../connections/notion/authorizations` answers
+  this instance's `/auth/start/notion?ticket=...` rather than Notion's URL:
+  the ticket is the consent sealed with the instance key, and the state, the
+  PKCE verifier and a browser-binding cookie are made when the browser
+  arrives, so a ticket opens once and only for the browser that follows it.
+- **Snapshot hashes.** The snapshot carries no content hash: the pages module
+  computes it from the normalized block, so the connector cannot assert one.
+- **Polling.** Without a webhook a stream asks Notion for the page itself
+  (one call, its edit time) at least every five minutes, backing off as it
+  stays quiet, instead of a search per connection. With a webhook the longest
+  poll interval is the safety net.
+- **Order and moves.** Notion's API has no "insert first", so a new first
+  block under a parent lands at the end there, and a block moved inside a page
+  is not followed (it is the same block where it is).
+- **Files and images made here** go to Notion as a paragraph that names the
+  file and links to the page; their bytes stay in Campbooks.
+- **Titles** sync inbound only; a title changed here is not sent.
+- **Who edited.** The conflict banner cannot say who changed a block in
+  Notion (the API's editor is not read), so it says it changed in Notion.
+- **`connectors.notion_connected`** is covered by the existing
+  `connection_added` event with provider `notion`, not a new one.
+- **No offline access, no connection.** A Notion answer without a refresh
+  token is refused (`no_offline_access`).
+- **Disconnect** deletes the tokens; Notion has no revocation endpoint to
+  call, so access is withdrawn in Notion.
+- **Switching Notion off** does nothing destructive: the streams wait and no
+  link is stopped; `notion_unavailable` is only used when a link names a
+  connection that is not a Notion connection of the workspace.
+- **Where the card lives.** The Notion card sits on the existing connections
+  page (Settings, mailboxes), whose title the owner may want to rename.
+- **Answers to refused asks.** `stop_sync` and `undo_resolve_conflict` answer
+  409 (not 404) for "no link" and "no such choice", and `list_notion_pages`
+  answers 403 to an admin or client who may see the connection and 404 to
+  anyone who may not, to fit the access matrix.

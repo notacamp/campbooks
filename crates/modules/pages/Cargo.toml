@@ -25,6 +25,7 @@ uuid.workspace = true
 yrs.workspace = true
 
 [dev-dependencies]
+boon.workspace = true
 campbooks-kernel = { workspace = true, features = ["test-util"] }
 http-body-util.workspace = true
 tokio.workspace = true

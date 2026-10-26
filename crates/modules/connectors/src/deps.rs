@@ -52,6 +52,10 @@ pub struct Deps {
     /// is offered: without it Notion's pages are polled and the webhook is
     /// not served.
     pub notion_webhook: Option<ClientSecret>,
+    /// Seals the verification token Notion posts while no webhook secret is
+    /// configured; present whenever Notion is on and the instance secret is
+    /// set.
+    pub notion_cipher: Option<Arc<Cipher>>,
     /// The IMAP adapter (`CAMPBOOKS_CONNECTORS__IMAP__*`); offered only
     /// when enabled ([`imap_enabled`](Self::imap_enabled)).
     pub imap: Arc<Imap>,
@@ -83,6 +87,7 @@ impl Default for Deps {
             microsoft: None,
             notion: None,
             notion_webhook: None,
+            notion_cipher: None,
             imap: Arc::new(Imap::default()),
             cipher: None,
             clock: Arc::new(SystemClock),
@@ -166,6 +171,12 @@ impl Deps {
             development,
             secret.is_some(),
         )?;
+        // The webhook's verification token is sealed whenever Notion is on,
+        // before the integration's own settings are complete.
+        deps.notion_cipher = secret
+            .as_ref()
+            .filter(|_| deps.config.notion.is_enabled())
+            .map(|secret| Arc::new(crate::domain::notion_webhook::cipher(secret)));
         // IMAP is on by default (campbooks-cloud#314) but needs the instance
         // secret to seal passwords: without one it is simply not offered,
         // unless an operator asked for it by name.
@@ -449,6 +460,7 @@ mod tests {
         for secret in [None, key()] {
             let deps = Deps::from_figment(&off, &kernel_config(), secret).unwrap();
             assert!(deps.notion.is_none() && deps.notion_webhook.is_none());
+            assert!(deps.notion_cipher.is_none(), "off: no hook, no sealing");
         }
         // Production's settings: its poll bounds, no Notion variable.
         let production = Figment::from(Serialized::defaults(serde_json::json!({
@@ -465,6 +477,7 @@ mod tests {
         let mut public = kernel_config();
         public.public_url = "https://campbooks.example.com/".to_owned();
         let deps = Deps::from_figment(&notion_on(serde_json::json!({})), &public, key()).unwrap();
+        assert!(deps.notion_cipher.is_some());
         let notion = deps.notion.unwrap();
         assert_eq!(
             notion.redirect_uri(),
@@ -496,12 +509,10 @@ mod tests {
         let no_client = Figment::from(Serialized::defaults(serde_json::json!({
             "connectors": {"notion": {"enabled": true}}
         })));
-        assert!(
-            Deps::from_figment(&no_client, &kernel_config(), key())
-                .unwrap()
-                .notion
-                .is_none()
-        );
+        let deps = Deps::from_figment(&no_client, &kernel_config(), key()).unwrap();
+        assert!(deps.notion.is_none());
+        // The hook still takes Notion's verification token: it seals it.
+        assert!(deps.notion_cipher.is_some());
         let no_secret = Figment::from(Serialized::defaults(serde_json::json!({
             "notion": {"client_id": "n"},
             "connectors": {"notion": {"enabled": true}}
@@ -514,7 +525,7 @@ mod tests {
         );
         let deps = Deps::from_figment(&notion_on(serde_json::json!({})), &kernel_config(), None)
             .unwrap();
-        assert!(deps.notion.is_none());
+        assert!(deps.notion.is_none() && deps.notion_cipher.is_none());
     }
 
     #[test]
