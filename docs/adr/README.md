@@ -26,5 +26,6 @@ it superseded. Disagree? Write a new ADR that supersedes the old one.
 | [0019](0019-scout-streams-its-drafts.md) | Scout streams its drafts: SSE over POST, plain-text replies, per-route deadlines | Accepted |
 | [0020](0020-tracked-events-and-the-tracking-plan.md) | Tracked events: a tracking plan in a workbook, a transactional outbox, RabbitMQ streams | Accepted |
 | [0021](0021-machine-readable-dates-may-assert.md) | Machine-readable dates (iCalendar, schema.org) from authenticated senders may assert | Accepted |
+| [0022](0022-tables-live-in-pages.md) | Tables live in pages, with property types records can adopt | Proposed |
 
 Template: Context → Decision → Consequences → Alternatives considered.
