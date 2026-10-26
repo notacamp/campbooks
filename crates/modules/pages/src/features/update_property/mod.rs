@@ -87,9 +87,6 @@ pub async fn handler(
     extract::Json(request): extract::Json<PropertyUpdate>,
 ) -> Result<Json<PropertyView>> {
     let access = &workspace.access;
-    let Some(editor) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let name = request
         .name
         .as_deref()
@@ -103,6 +100,9 @@ pub async fn handler(
     let table =
         tables::require_table(&state, &mut tx, access, Action::Write, path.table_id, true).await?;
     expect_live(&table)?;
+    let Some(editor) = access.user else {
+        return Err(Error::Forbidden);
+    };
     let property = tables::property(&mut tx, path.table_id, path.property_id, true).await?;
     if property.removed_at.is_some() {
         return Err(Error::NotFound);

@@ -86,9 +86,6 @@ pub async fn handler(
     extract::Json(request): extract::Json<NewView>,
 ) -> Result<(StatusCode, Json<TableViewView>)> {
     let access = &workspace.access;
-    let Some(creator) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let name = clean_name(&request.name).map_err(refused)?;
     if let Some(key) = &request.position {
         position::check(key)?;
@@ -97,6 +94,9 @@ pub async fn handler(
     let table =
         tables::require_table(&state, &mut tx, access, Action::Write, path.table_id, true).await?;
     expect_live(&table)?;
+    let Some(creator) = access.user else {
+        return Err(Error::Forbidden);
+    };
     let props = tables::properties(&mut tx, path.table_id).await?;
     let specs = tables::specs(&props)?;
     let config = table_views::normalise(

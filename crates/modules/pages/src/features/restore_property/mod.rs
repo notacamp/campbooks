@@ -55,13 +55,13 @@ pub async fn handler(
     extract::Path(path): extract::Path<PropertyPath>,
 ) -> Result<Json<PropertyView>> {
     let access = &workspace.access;
-    let Some(editor) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     let table =
         tables::require_table(&state, &mut tx, access, Action::Write, path.table_id, true).await?;
     expect_live(&table)?;
+    let Some(editor) = access.user else {
+        return Err(Error::Forbidden);
+    };
     let property = tables::property(&mut tx, path.table_id, path.property_id, true).await?;
     if property.removed_at.is_some() {
         let live: i64 = sqlx::query_scalar(

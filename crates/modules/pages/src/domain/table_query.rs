@@ -250,6 +250,10 @@ mod tests {
         facts: Vec<eval::RowFacts>,
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "a fixture: every table the test reads"
+    )]
     async fn build(db: &PgPool, rows: i64, clean: bool) -> World {
         let mut rng = Rng(0xBEEF);
         let all = specs();

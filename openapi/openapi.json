@@ -15252,6 +15252,1561 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/tables": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Make a table.",
+        "operationId": "pages.create_table",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTable"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The table, with its title property and one table view.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A title over 200 characters (`invalid_title`), an unknown icon, a bad position or a name that is empty or too long (`invalid_property_name`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the parent but not write in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, tables are off, or a parent you cannot see.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The parent is in the trash (`page_trashed`), is a table or a row (`table_parent`), or pages would nest deeper than 12 levels (`page_too_deep`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.trash"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Read a table: its properties, its views and how many rows it has.",
+        "operationId": "pages.get_table",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The table.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table, tables are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is not a table (`not_a_table`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/properties": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Add a property.",
+        "operationId": "pages.add_property",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProperty"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The property.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedProperty"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A name that is empty or too long (`invalid_property_name`), a type that cannot be made (`property_type_reserved`), a config that does not fit the type (`invalid_config`) or a bad position.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table (or the table it is paired with) but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table, tables are off, or a table you cannot see.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`), in the trash (`page_trashed`), or it would have more than 200 properties (`too_many_properties`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.remove_property"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/properties/{property_id}": {
+      "delete": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Remove a property.",
+        "operationId": "pages.remove_property",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "property_id",
+            "in": "path",
+            "description": "The property.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PropertyId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The property that was removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table or property, tables are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`), in the trash (`page_trashed`), or the property is the title (`title_property`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.restore_property"
+        }
+      },
+      "patch": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Change a property.",
+        "operationId": "pages.update_property",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "property_id",
+            "in": "path",
+            "description": "The property.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PropertyId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The property afterwards. `can_revert` says whether `pages.restore_property` can take a change of type back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A name that is empty or too long, a config that does not fit the type (`invalid_config`), a type that cannot be made (`property_type_reserved`), or a change the title or a relation does not take (`property_not_editable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table or property, tables are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`) or in the trash (`page_trashed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.update_property"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/properties/{property_id}/options": {
+      "put": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Set the options of a property.",
+        "operationId": "pages.set_options",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "property_id",
+            "in": "path",
+            "description": "The property.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PropertyId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The property with its options.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Options that do not fit (`invalid_config`): a repeated id or name, an unknown colour, more than 100, or a property that holds no options.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table or property, tables are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`) or in the trash (`page_trashed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.set_options"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/properties/{property_id}/restore": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Restore a property.",
+        "operationId": "pages.restore_property",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "property_id",
+            "in": "path",
+            "description": "The property.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PropertyId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The property as it was.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table or property, tables are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`), in the trash (`page_trashed`), there is nothing to take back (`nothing_to_restore`), or the table would have more than 200 properties (`too_many_properties`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.remove_property"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/query": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Query a table.",
+        "operationId": "pages.query_table",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableRows"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A filter, sort or summary that does not fit the table's properties (`invalid_filter`, `invalid_sort`, `invalid_summary`), or a bad cursor (`invalid_cursor`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table or view, tables are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The page is not a table (`not_a_table`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "query_in": "body",
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/rows": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Add a row.",
+        "operationId": "pages.add_row",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewRow"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RowView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A title over 200 characters, a bad position, a cell that is not valid (`invalid_value`, `unknown_property`, `property_not_editable`, `not_a_member`, `foreign_blob`) or more than 100 cells.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table, tables are off, or you cannot see it (or a row a relation cell names).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`), in the trash (`page_trashed`), or it already has 20,000 rows (`table_full`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.trash"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/rows/{row_id}/cells": {
+      "patch": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Write cells.",
+        "operationId": "pages.set_cells",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "description": "The row.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CellsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What each cell was and became, and the row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CellsWritten"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A value that does not fit its property (`invalid_value`; nothing is stored), an unknown property (`unknown_property`), a computed or reserved one (`property_not_editable`), someone who is not a member (`not_a_member`), a file not uploaded to the row (`foreign_blob`) or more than 100 cells.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the row (or a row a paired relation changes) but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such row, tables are off, or you cannot see it (or a row a relation cell names).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a row (`not_a_row`) or in the trash (`page_trashed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.set_cells"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/views": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Add a view.",
+        "operationId": "pages.create_view",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewView"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The view.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableViewView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A name that is empty or too long, a reserved type (`view_type_reserved`), a config that does not fit the table (`invalid_view`, `invalid_filter`, `invalid_sort`, `invalid_summary`) or a bad position.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table, tables are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`), in the trash (`page_trashed`), the id is taken (`view_exists`) or the table has 50 views (`too_many_views`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.remove_view"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/views/{view_id}": {
+      "delete": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Remove a view.",
+        "operationId": "pages.remove_view",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "view_id",
+            "in": "path",
+            "description": "The view.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ViewId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The view that was removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableViewView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table or view, tables are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`), in the trash (`page_trashed`), or the table's last view (`last_view`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.create_view"
+        }
+      },
+      "patch": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Change a view.",
+        "operationId": "pages.update_view",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "view_id",
+            "in": "path",
+            "description": "The view.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ViewId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The view afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableViewView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A name that is empty or too long, a config that does not fit the table (`invalid_view`, `invalid_filter`, `invalid_sort`, `invalid_summary`) or a bad position.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not write it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table or view, tables are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`) or in the trash (`page_trashed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.update_view"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/tasks": {
       "get": {
         "tags": [
@@ -19726,6 +21281,30 @@
         },
         "additionalProperties": false
       },
+      "AddedProperty": {
+        "type": "object",
+        "description": "The property added, and for a paired relation the one it made on the\nother table.",
+        "required": [
+          "property"
+        ],
+        "properties": {
+          "paired": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PropertyView",
+                "description": "Its pair on the other table."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "property": {
+            "$ref": "#/components/schemas/PropertyView",
+            "description": "The property."
+          }
+        }
+      },
       "Address": {
         "type": "object",
         "description": "One way to reach someone on a channel: a display name and an address.",
@@ -20417,6 +21996,122 @@
           "bank",
           "pages"
         ]
+      },
+      "CellInput": {
+        "type": "object",
+        "description": "One cell to write.",
+        "required": [
+          "property",
+          "value"
+        ],
+        "properties": {
+          "property": {
+            "$ref": "#/components/schemas/PropertyId",
+            "description": "The property."
+          },
+          "value": {
+            "description": "The new value, in the form of the property's type; `null` clears it."
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The version of the cell you saw. A stale version still writes, and\nthe answer says so."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CellResult": {
+        "type": "object",
+        "description": "What a write did to one cell.",
+        "required": [
+          "property",
+          "version",
+          "stale",
+          "previous",
+          "previous_version"
+        ],
+        "properties": {
+          "previous": {
+            "description": "The value it held before: what an undo writes back."
+          },
+          "previous_version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The version it had before; 0 for a cell never set."
+          },
+          "property": {
+            "$ref": "#/components/schemas/PropertyId",
+            "description": "The property."
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "Whether the cell had changed since the version you sent."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The cell's version now."
+          }
+        }
+      },
+      "CellView": {
+        "type": "object",
+        "description": "One cell of a row.",
+        "required": [
+          "value",
+          "version"
+        ],
+        "properties": {
+          "value": {
+            "description": "Its value, in the form of the property's type."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change of this cell: send the one you saw."
+          }
+        }
+      },
+      "CellsUpdate": {
+        "type": "object",
+        "description": "The cells to write.",
+        "required": [
+          "cells"
+        ],
+        "properties": {
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellInput"
+            },
+            "description": "Up to 100 cells, each property once."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CellsWritten": {
+        "type": "object",
+        "description": "What was written.",
+        "required": [
+          "results",
+          "row"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellResult"
+            },
+            "description": "For each cell: its new version, whether it was stale, and what it\nheld before."
+          },
+          "row": {
+            "$ref": "#/components/schemas/RowView",
+            "description": "The row afterwards."
+          }
+        }
       },
       "ChangeRole": {
         "type": "object",
@@ -23141,6 +24836,27 @@
           }
         }
       },
+      "GroupSize": {
+        "type": "object",
+        "description": "How many rows a board column holds.",
+        "required": [
+          "rows"
+        ],
+        "properties": {
+          "option": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The option; none for the rows with no value."
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many rows the filter keeps in it."
+          }
+        }
+      },
       "HandOffTo": {
         "type": "object",
         "description": "Who to hand it to.",
@@ -25165,6 +26881,70 @@
         },
         "additionalProperties": false
       },
+      "NewProperty": {
+        "type": "object",
+        "description": "A new property.",
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "config": {
+            "description": "Its config, per type (see `PropertyView.config`). A relation needs\n`table`; `pair` is made by the server."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name: 1 to 100 characters."
+          },
+          "paired_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a relation: the name of the property that shows it from the other\ntable's side, which makes it a paired relation."
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it sits among the table's properties: a fractional-indexing\nkey. Default: after the last one."
+          },
+          "type": {
+            "$ref": "#/components/schemas/PropertyType",
+            "description": "Its type. `title` and the types reserved for Notion cannot be made."
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewRow": {
+        "type": "object",
+        "description": "A new row.",
+        "properties": {
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellInput"
+            },
+            "description": "Its cells."
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it sits among the table's rows: a fractional-indexing key.\nDefault: after the last one."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its title (the table's title property): 0 to 200 characters."
+          }
+        },
+        "additionalProperties": false
+      },
       "NewRuleState": {
         "type": "string",
         "description": "Whether a new rule should act now or wait for a yes.",
@@ -25172,6 +26952,70 @@
           "active",
           "proposed"
         ]
+      },
+      "NewTable": {
+        "type": "object",
+        "description": "A new table.",
+        "properties": {
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its icon, one of the page icons."
+          },
+          "parent": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PageId",
+                "description": "The page it goes under; none for the top level of `place`. A table\ngoes under an ordinary page, never under a table or a row."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "place": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place",
+                "description": "`private` (the default) or `workspace`, for a top-level table. A table\nunder a page is always in its parent's place."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it sits among its siblings: a fractional-indexing key. Default:\nafter the last one."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its title: 0 to 200 characters."
+          },
+          "title_property": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of its title property, in the member's language. Default\n`Name`."
+          },
+          "view_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of its first view, in the member's language. Default\n`Table`."
+          }
+        },
+        "additionalProperties": false
       },
       "NewTask": {
         "type": "object",
@@ -25228,6 +27072,46 @@
                 "type": "null"
               }
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewView": {
+        "type": "object",
+        "description": "A new view.",
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "config": {
+            "description": "Its filter, sorts, summaries and columns; a board needs `group_by`."
+          },
+          "id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ViewId",
+                "description": "A view that was removed, to put back with the same id."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name: 1 to 100 characters."
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it sits among the views: a fractional-indexing key. Default:\nafter the last one."
+          },
+          "type": {
+            "$ref": "#/components/schemas/TableViewType",
+            "description": "`table` or `board`."
           }
         },
         "additionalProperties": false
@@ -25553,6 +27437,23 @@
           "member_left",
           "notion_unavailable"
         ]
+      },
+      "OptionsUpdate": {
+        "type": "object",
+        "description": "The options as they should become.",
+        "required": [
+          "options"
+        ],
+        "properties": {
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelectOption"
+            },
+            "description": "All the options, in order. An option with an `id` is that option\n(renamed, recoloured, moved); one without is new. At most 100, with\ndistinct names."
+          }
+        },
+        "additionalProperties": false
       },
       "OrganizerView": {
         "type": "object",
@@ -26255,6 +28156,111 @@
             "format": "int32",
             "description": "Grows by one on every change; 0 before the first.",
             "minimum": 0
+          }
+        }
+      },
+      "PropertyId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "PropertyId (UUIDv7)"
+      },
+      "PropertyType": {
+        "type": "string",
+        "description": "The type of a property. Every type has a Notion counterpart\n(design.md, \"Property types\").",
+        "enum": [
+          "title",
+          "text",
+          "number",
+          "select",
+          "multi_select",
+          "status",
+          "date",
+          "checkbox",
+          "person",
+          "files",
+          "url",
+          "email",
+          "phone",
+          "relation",
+          "campbooks_link",
+          "created",
+          "edited",
+          "unique_id",
+          "notion_formula",
+          "notion_rollup",
+          "notion_people",
+          "external"
+        ]
+      },
+      "PropertyUpdate": {
+        "type": "object",
+        "description": "What to change. What is absent stays.",
+        "properties": {
+          "config": {
+            "description": "Its new config. With a new type and no config, the type's default."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its new name: 1 to 100 characters."
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its new place among the table's properties: a fractional-indexing key."
+          },
+          "type": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PropertyType",
+                "description": "Its new type. The values that fit stay (as text, numbers, options),\nthe rest are cleared and kept for 30 days."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PropertyView": {
+        "type": "object",
+        "description": "A property of a table.",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "config",
+          "position",
+          "can_revert"
+        ],
+        "properties": {
+          "can_revert": {
+            "type": "boolean",
+            "description": "Whether its last change of type can be taken back\n(`pages.restore_property`)."
+          },
+          "config": {
+            "description": "Its config, per type: options for a select, the format of a number,\nwhether a date has a time, the table of a relation."
+          },
+          "id": {
+            "$ref": "#/components/schemas/PropertyId",
+            "description": "The property."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "position": {
+            "type": "string",
+            "description": "Where it sits among the table's properties: sort by it."
+          },
+          "type": {
+            "$ref": "#/components/schemas/PropertyType",
+            "description": "Its type."
           }
         }
       },
@@ -27696,6 +29702,80 @@
           "member"
         ]
       },
+      "RowView": {
+        "type": "object",
+        "description": "A row with its cells.",
+        "required": [
+          "id",
+          "table",
+          "number",
+          "title",
+          "cells",
+          "created_by",
+          "created_at",
+          "edited_by",
+          "edited_at",
+          "revision",
+          "meta_revision"
+        ],
+        "properties": {
+          "cells": {
+            "type": "object",
+            "description": "The cells that hold a value, by property id.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CellView"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "Who made it."
+          },
+          "edited_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "edited_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "Who changed it last."
+          },
+          "id": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The row (a page)."
+          },
+          "meta_revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with a change of the title: the version of the title cell."
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Its number in the table: what an ID property shows."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change of the row, a cell included."
+          },
+          "table": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The table."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title, the table's title property."
+          }
+        }
+      },
       "RuleAction": {
         "oneOf": [
           {
@@ -28885,6 +30965,41 @@
           }
         }
       },
+      "SelectOption": {
+        "type": "object",
+        "description": "One option of a select, multi-select or status property.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One of `default`, `gray`, `brown`, `orange`, `yellow`, `green`,\n`blue`, `purple`, `pink`, `red`."
+          },
+          "group": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StatusGroup",
+                "description": "For a status: `todo`, `doing` or `done`. None for a select."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "Its id: stable, what values hold. Made when missing."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name, 1 to 100 characters, unique among the property's options."
+          }
+        }
+      },
       "SendDraft": {
         "type": "object",
         "description": "Which version of the draft to send: the one the member last saw saved.",
@@ -29554,6 +31669,15 @@
           }
         }
       },
+      "StatusGroup": {
+        "type": "string",
+        "description": "Where a status option sits in the flow.",
+        "enum": [
+          "todo",
+          "doing",
+          "done"
+        ]
+      },
       "Stream": {
         "type": "string",
         "description": "The one place Campbooks sorts a conversation into. The built-in set; the\nworkspace's own streams come later.",
@@ -29776,6 +31900,44 @@
           }
         }
       },
+      "SummaryKind": {
+        "type": "string",
+        "description": "What a column's footer shows.",
+        "enum": [
+          "count",
+          "sum",
+          "average",
+          "min",
+          "max",
+          "percent_checked"
+        ]
+      },
+      "SummaryValue": {
+        "type": "object",
+        "description": "One summary, computed over every row the filter keeps.",
+        "required": [
+          "property",
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SummaryKind",
+            "description": "What it shows."
+          },
+          "property": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The property."
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The figure: a number, a date or a share (0 to 100) as text; none when\nthere is nothing to summarise."
+          }
+        }
+      },
       "SurfaceKey": {
         "type": "string",
         "description": "Always or never show.",
@@ -29849,6 +32011,179 @@
             "format": "int32",
             "description": "How many streams will run now.",
             "minimum": 0
+          }
+        }
+      },
+      "TableDetail": {
+        "type": "object",
+        "description": "A table: its page, its properties and its views.",
+        "required": [
+          "page",
+          "revision",
+          "properties",
+          "views",
+          "rows"
+        ],
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/PageSummary",
+            "description": "The table as a page: title, icon, place, role."
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertyView"
+            },
+            "description": "Its properties, in order."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change of its properties, views or set of rows."
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many rows it has (those in the trash excluded)."
+          },
+          "views": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableViewView"
+            },
+            "description": "Its views, in order."
+          }
+        }
+      },
+      "TableQuery": {
+        "type": "object",
+        "description": "What to ask. Everything is optional: with nothing, all rows in the order\nthey were added.",
+        "properties": {
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `next_cursor` of the previous answer."
+          },
+          "filter": {
+            "description": "A filter of your own, in the form of a view's: a tree of\n`{\"and\": [...]}` / `{\"or\": [...]}` groups (three levels) of\n`{\"property\", \"operator\", \"value\"}` conditions. With a view, both\nmust hold."
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "How many rows, 1 to 100. Default 100.",
+            "minimum": 0
+          },
+          "sorts": {
+            "description": "Sorts of your own (up to five `{\"property\", \"direction\"}`), in place\nof the view's."
+          },
+          "summaries": {
+            "description": "Summaries of your own (`{\"property\", \"kind\"}`), in place of the\nview's."
+          },
+          "view": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ViewId",
+                "description": "A view to ask for: its filter, sorts, summaries and (for a board) its\ngroups."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "TableRows": {
+        "type": "object",
+        "description": "The rows asked for.",
+        "required": [
+          "rows",
+          "matching",
+          "summaries"
+        ],
+        "properties": {
+          "groups": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/GroupSize"
+            },
+            "description": "For a board: how many rows each column holds."
+          },
+          "matching": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many rows the filter keeps in all."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass it back as `cursor` for the next rows; none at the end."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RowView"
+            },
+            "description": "The rows of this page, in order."
+          },
+          "summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SummaryValue"
+            },
+            "description": "The summaries, over every row the filter keeps."
+          }
+        }
+      },
+      "TableViewType": {
+        "type": "string",
+        "description": "What a view shows.",
+        "enum": [
+          "table",
+          "board",
+          "list",
+          "calendar",
+          "gallery"
+        ]
+      },
+      "TableViewView": {
+        "type": "object",
+        "description": "A view of a table.",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "position",
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "description": "Its filter, sorts, summaries, visible properties and, for a board, its\ngroups and card properties."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ViewId",
+            "description": "The view."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "position": {
+            "type": "string",
+            "description": "Where it sits among the table's views."
+          },
+          "type": {
+            "$ref": "#/components/schemas/TableViewType",
+            "description": "`table` or `board`."
           }
         }
       },
@@ -30801,6 +33136,35 @@
             "example": "0.1.0"
           }
         }
+      },
+      "ViewId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ViewId (UUIDv7)"
+      },
+      "ViewUpdate": {
+        "type": "object",
+        "description": "What to change. What is absent stays.",
+        "properties": {
+          "config": {
+            "description": "Its new config, whole: what is sent is what the view becomes."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its new name: 1 to 100 characters."
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its new place among the views."
+          }
+        },
+        "additionalProperties": false
       },
       "WayIn": {
         "type": "object",

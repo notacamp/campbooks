@@ -77,9 +77,6 @@ pub async fn handler(
     extract::Json(request): extract::Json<NewRow>,
 ) -> Result<(StatusCode, Json<RowView>)> {
     let access = &workspace.access;
-    let Some(creator) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let title = clean_title(request.title.as_deref().unwrap_or_default())?;
     if let Some(key) = &request.position {
         position::check(key)?;
@@ -89,6 +86,9 @@ pub async fn handler(
     let table =
         tables::require_table(&state, &mut tx, access, Action::Write, path.table_id, true).await?;
     expect_live(&table)?;
+    let Some(creator) = access.user else {
+        return Err(Error::Forbidden);
+    };
     let held: i64 = sqlx::query_scalar("SELECT count(*) FROM pages.table_rows WHERE table_id = $1")
         .bind(path.table_id)
         .fetch_one(&mut *tx)

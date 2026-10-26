@@ -103,9 +103,6 @@ pub async fn handler(
     extract::Json(request): extract::Json<NewProperty>,
 ) -> Result<(StatusCode, Json<AddedProperty>)> {
     let access = &workspace.access;
-    let Some(creator) = access.user else {
-        return Err(Error::Forbidden);
-    };
     let ty = request.property_type;
     if !ty.creatable() {
         return Err(refused(PropertyError::RESERVED));
@@ -130,6 +127,9 @@ pub async fn handler(
     let table =
         tables::require_table(&state, &mut tx, access, Action::Write, path.table_id, true).await?;
     expect_live(&table)?;
+    let Some(creator) = access.user else {
+        return Err(Error::Forbidden);
+    };
 
     let id = PropertyId::new();
     let mut paired: Option<(PageId, PropertyId, String)> = None;

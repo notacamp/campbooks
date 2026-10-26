@@ -137,3 +137,36 @@ Rows are moved, trashed and restored with the existing page operations.
 `CAMPBOOKS_PAGES__TABLES__ENABLED` is off by default. When off, there are no
 table routes, no slash items, and no table page kind in lists. Stray settings
 never stop the server.
+
+## Deviations while building
+
+- **Property-based tests use a seeded generator**, not the `proptest` crate: no new
+  dependency (lockfile, `cargo deny`) for what a 20-line xorshift does, and a failure replays.
+  The SQL is held to an in-memory oracle (`properties::eval`) on random tables in a real database.
+- **Status groups are a field of each option** (`group`: `todo`, `doing`, `done`), not a
+  separate `groups` list in the config.
+- **`kind` is not on `PageSummary`/`PageView`** in part 1: it would be a required field and
+  change every client fixture. Part 2 adds it. Until then tables are listed as ordinary pages
+  (and only while the flag is on); rows are never listed.
+- **Operations beyond the table:** `pages.get_table` (schema and views) and
+  `pages.restore_property` (undo of a removal or of the last change of type). The undo of
+  `pages.update_property` is itself for a rename; a change of type is taken back with
+  `restore_property` (`can_revert` says when).
+- **Type change** clears the cells that do not convert and keeps what every changed cell held
+  (`row_values.previous`, 30 days) instead of "keeping the rest as text".
+- **The cursor** of `query_table` is an offset (`o200`), not a keyset: with sorts on any type and
+  20,000 rows it is exact and cheap, and a row added between pages can shift one. Rows past it
+  are not skipped when sorts are stable.
+- **No sub-pages under a row or a table** in part 1 (`table_parent`), so a row's access is its
+  table's and the page-access walk skips the 20,000 rows. Rows are left out of `pages.list`,
+  `roles::readable` and backlinks.
+- **A row's container is its table** for search and the change feed (`PageChanged.row`), so the
+  index and the feed see one container per table.
+- **`pages.table_changed`** is published for schema, views and the set of rows; a cell edit is
+  `pages.page_changed` of its row (kind `values`), so editing cells never locks the table.
+- **A paired relation** is kept in step while both properties are live; a removed pair makes the
+  relation one-way until it is restored. Removing a property never edits another table.
+- **Retention:** removed properties and type-change backups are swept after 30 days by the daily
+  `pages.purge_trash` (its dispatcher reads them through a maintenance policy).
+- **Not done in part 1:** reindexing rows whose property was converted to or from text in bulk
+  (they reindex at their next edit), and scrubbing a left member's id from person cells.

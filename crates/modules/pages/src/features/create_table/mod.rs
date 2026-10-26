@@ -61,6 +61,10 @@ pub struct NewTable {
 }
 
 /// Make a table.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one transaction: the page, its title property and its view"
+)]
 #[utoipa::path(
     post,
     path = "/api/v1/w/{workspace_id}/tables",
