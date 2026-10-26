@@ -1,6 +1,6 @@
 # 0022 — Tables live in pages, with property types records can adopt
 
-**Status:** Proposed · 2026-10-26 · amends [0008](0008-platform-ready-typed-core.md)
+**Status:** Accepted · 2026-10-26 · amends [0008](0008-platform-ready-typed-core.md)
 · Tracking: notacamp/campbooks-cloud#365 · Change: `openspec/changes/pages-tables`
 
 ## Context

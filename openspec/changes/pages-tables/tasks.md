@@ -1,7 +1,7 @@
 ## 0. Design gate
 
 - [x] 0.1 Owner decisions (Table + Board; computed columns later, read-only from Notion); proposal, design with alternatives, spec deltas; prototype board "Tables"
-- [ ] 0.2 Owner sign-off on the prototype and design
+- [x] 0.2 Owner sign-off on the prototype and design ("go for it", 2026-10-26)
 - [x] 0.3 ADR 0022 "Tables live in pages; their property types are a library records can adopt" (amends ADR 0008)
 
 ## 1. Model
