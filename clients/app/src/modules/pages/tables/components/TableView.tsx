@@ -13,7 +13,6 @@ import {
   SkeletonList,
   TableToolbar,
   ToolbarButton,
-  TableTabs,
   type CellPos,
 } from "~/lib/ui";
 import { useShortcut } from "~/lib/shortcuts";
@@ -353,74 +352,70 @@ function LoadedTable({
   const panelId = `table-${tableId}-panel`;
   const toolbar = (
     <TableToolbar
-      tabs={
-        <TableTabs
-          label={t("tables.view.label")}
-          panelId={panelId}
-          tabs={detail.views.map((candidate) => ({
-            id: candidate.id,
-            label: candidate.name,
-            icon: candidate.type === "board" ? "board" : "table",
-            current: candidate.id === view.id,
-            onSelect: () => {
-              setChosen(candidate.id);
-              setEditing(null);
-            },
-          }))}
-          trailing={
-            <>
-              <ViewOptions
-                view={view}
-                columns={columns}
-                properties={detail.properties}
-                groupBy={config.groupBy}
-                canWrite={canWrite}
-                canRemove={detail.views.length > 1}
-                onRename={(name) => {
-                  void actions.updateView(view, { name });
-                }}
-                onToggle={(property, visible) => {
-                  save({
-                    properties: specsOf(
-                      columns.map((column) =>
-                        column.property.id === property ? { ...column, visible } : column,
-                      ),
-                    ),
-                  });
-                }}
-                onGroupBy={(property) => {
-                  save({ groupBy: property });
-                }}
-                onRemove={() => {
-                  void actions.removeView(view).then((removed) => {
-                    if (removed) {
-                      setChosen(undefined);
+      tabsLabel={t("tables.view.label")}
+      moreViewsLabel={t("tables.view.more")}
+      panelId={panelId}
+      tabs={detail.views.map((candidate) => ({
+        id: candidate.id,
+        label: candidate.name,
+        icon: candidate.type === "board" ? "board" : "table",
+        current: candidate.id === view.id,
+        onSelect: () => {
+          setChosen(candidate.id);
+          setEditing(null);
+        },
+      }))}
+      trailing={
+        <>
+          <ViewOptions
+            view={view}
+            columns={columns}
+            properties={detail.properties}
+            groupBy={config.groupBy}
+            canWrite={canWrite}
+            canRemove={detail.views.length > 1}
+            onRename={(name) => {
+              void actions.updateView(view, { name });
+            }}
+            onToggle={(property, visible) => {
+              save({
+                properties: specsOf(
+                  columns.map((column) =>
+                    column.property.id === property ? { ...column, visible } : column,
+                  ),
+                ),
+              });
+            }}
+            onGroupBy={(property) => {
+              save({ groupBy: property });
+            }}
+            onRemove={() => {
+              void actions.removeView(view).then((removed) => {
+                if (removed) {
+                  setChosen(undefined);
+                }
+              });
+            }}
+          />
+          {canWrite ? (
+            <NewView
+              properties={detail.properties}
+              onCreate={(name, type: TableViewType, groupBy) => {
+                void actions
+                  .createView({
+                    name,
+                    type,
+                    config: type === "board" && groupBy !== undefined ? { group_by: groupBy } : {},
+                  })
+                  .then((made) => {
+                    if (made !== undefined) {
+                      setChosen(made.id);
                     }
                   });
-                }}
-              />
-              {canWrite ? (
-                <NewView
-                  properties={detail.properties}
-                  onCreate={(name, type: TableViewType, groupBy) => {
-                    void actions
-                      .createView({
-                        name,
-                        type,
-                        config:
-                          type === "board" && groupBy !== undefined ? { group_by: groupBy } : {},
-                      })
-                      .then((made) => {
-                        if (made !== undefined) {
-                          setChosen(made.id);
-                        }
-                      });
-                  }}
-                />
-              ) : null}
-            </>
-          }
-        />
+              }}
+            />
+          ) : null}
+        </>
       }
       chips={chips.length === 0 ? undefined : chips}
       actions={

@@ -1,18 +1,22 @@
-.tabs {
-  display: flex;
-  flex: 1 1 0;
-  align-items: stretch;
-  min-width: 0;
-}
-
 .tablist {
   display: flex;
+  flex: 0 1 auto;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
   outline: none;
 }
 
+.more,
+.rest {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+/* Tabs keep their own width; only the current one gives way, when even it cannot fit. */
 .tabWrap {
   display: inline-flex;
   flex: none;
@@ -21,11 +25,14 @@
 }
 
 .tabWrap[data-current] {
+  flex: 0 1 auto;
+  min-width: 0;
   border-bottom-color: var(--text-primary);
 }
 
 .tab {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: var(--space-1-5);
   max-width: var(--popover-width);

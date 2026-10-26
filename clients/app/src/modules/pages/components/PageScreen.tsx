@@ -252,7 +252,7 @@ function OpenPage({
           )}
         </Popover>
       </div>
-      <ReaderBody>
+      <ReaderBody wide={isTable}>
         <article
           ref={article}
           className={

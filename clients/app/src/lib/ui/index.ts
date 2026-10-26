@@ -70,12 +70,10 @@ export {
   FilterChip,
   TableToolbar,
   ToolbarButton,
-  TableTabs,
   type FilterChipProps,
   type TableToolbarProps,
   type ToolbarButtonProps,
   type TableTab,
-  type TableTabsProps,
 } from "./components/Table/Toolbar";
 // The Pages editor's own pieces (cloud#363).
 export {

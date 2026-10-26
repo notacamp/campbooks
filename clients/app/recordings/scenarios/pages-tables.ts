@@ -55,7 +55,7 @@ async function pickStage(page: Page) {
 async function addColumn(page: Page) {
   await page.getByRole("button", { name: "Add a column" }).click();
   await settle();
-  await page.getByLabel("Column name").fill("Region");
+  await page.getByRole("textbox", { name: "Column name" }).fill("Region");
   await caption(page, "A new column: Basic, Links, and Filled in for you", 2400);
   await page.getByRole("menuitem", { name: /^Select/u }).click();
   await page.getByRole("columnheader", { name: "Region" }).waitFor();
@@ -69,9 +69,9 @@ async function filterRows(page: Page) {
   await page.getByRole("button", { name: "Add condition" }).click();
   await settle();
   const condition = page.getByRole("group", { name: "Condition 2" });
-  await condition.getByLabel("Property").selectOption({ label: "Value" });
-  await condition.getByLabel("Condition").selectOption({ label: "is greater than" });
-  await condition.getByLabel("Value").fill("3000");
+  await condition.getByLabel("Property", { exact: true }).selectOption({ label: "Value" });
+  await condition.getByLabel("Condition", { exact: true }).selectOption({ label: "is greater than" });
+  await condition.getByLabel("Value", { exact: true }).fill("3000");
   await caption(page, "Filter by any column: the operators come from its type", 2400);
   await page.getByRole("button", { name: "Apply" }).click();
   await page.getByRole("row", { name: "Harbour Physio" }).waitFor({ state: "detached" });

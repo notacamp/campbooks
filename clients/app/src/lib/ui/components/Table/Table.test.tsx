@@ -20,7 +20,7 @@ import { DataGrid, type CellPos, type GridColumn } from "./DataGrid";
 import { CheckGroup, MenuHeading, MenuItem, MenuList, MenuSeparator } from "./Menu";
 import { Picker } from "./Picker";
 import { PropertyLine, PropertyList, RowPeek } from "./Peek";
-import { FilterChip, TableTabs, TableToolbar, ToolbarButton } from "./Toolbar";
+import { FilterChip, TableToolbar, ToolbarButton } from "./Toolbar";
 import { must } from "../../../../../test/must";
 
 describe("the menu", () => {
@@ -231,39 +231,60 @@ describe("the small parts of a cell", () => {
 });
 
 describe("the toolbar", () => {
-  function Tabs({ onSelect }: { onSelect: (id: string) => void }) {
+  const view = (id: string, label: string, current: boolean, onSelect: (id: string) => void) => ({
+    id,
+    label,
+    icon: "table" as const,
+    current,
+    onSelect: () => {
+      onSelect(id);
+    },
+  });
+
+  function Toolbar({
+    onSelect,
+    chips = true,
+  }: {
+    onSelect: (id: string) => void;
+    chips?: boolean;
+  }) {
     return (
-      <TableTabs
-        label="Views"
+      <TableToolbar
+        tabsLabel="Views"
         panelId="panel"
+        moreViewsLabel="More views"
         tabs={[
-          {
-            id: "a",
-            label: "All",
-            icon: "table",
-            current: true,
-            onSelect: () => {
-              onSelect("a");
-            },
-          },
-          {
-            id: "b",
-            label: "Board",
-            icon: "board",
-            current: false,
-            onSelect: () => {
-              onSelect("b");
-            },
-          },
+          view("a", "All", true, onSelect),
+          view("b", "Board", false, onSelect),
+          view("c", "Mine", false, onSelect),
         ]}
         trailing={<button type="button">+</button>}
+        chips={
+          chips ? (
+            <>
+              <FilterChip removeLabel="Remove one" onRemove={vi.fn()} onOpen={vi.fn()}>
+                Stage is not Paused
+              </FilterChip>
+              <FilterChip removeLabel="Remove two" onRemove={vi.fn()}>
+                Plain chip
+              </FilterChip>
+            </>
+          ) : undefined
+        }
+        actions={
+          <>
+            <ToolbarButton icon="filter" label="Filter" count={2} />
+            <ToolbarButton icon="sort" label="Sort" count={0} />
+            <ToolbarButton icon="plus" label="New" primary shortcut="undo" />
+          </>
+        }
       />
     );
   }
 
   it("moves between tabs with the arrows and selects them", () => {
     const onSelect = vi.fn();
-    renderUi(<Tabs onSelect={onSelect} />);
+    renderUi(<Toolbar onSelect={onSelect} />);
     const all = screen.getByRole("tab", { name: "All" });
     expect(all).toHaveAttribute("aria-controls", "panel");
     all.focus();
@@ -278,36 +299,71 @@ describe("the toolbar", () => {
   });
 
   it("shows the buttons with a count, and a chip that opens or goes", () => {
-    const open = vi.fn();
-    const remove = vi.fn();
-    renderUi(
-      <TableToolbar
-        tabs={<Tabs onSelect={vi.fn()} />}
-        chips={
-          <>
-            <FilterChip removeLabel="Remove one" onRemove={remove} onOpen={open}>
-              Stage is not Paused
-            </FilterChip>
-            <FilterChip removeLabel="Remove two" onRemove={remove}>
-              Plain chip
-            </FilterChip>
-          </>
-        }
-        actions={
-          <>
-            <ToolbarButton icon="filter" label="Filter" count={2} />
-            <ToolbarButton icon="sort" label="Sort" count={0} />
-            <ToolbarButton icon="plus" label="New" primary shortcut="undo" />
-          </>
-        }
-      />,
-    );
+    renderUi(<Toolbar onSelect={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Filter (2)" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sort" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Stage is not Paused", hidden: true }));
-    expect(open).toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Remove two", hidden: true }));
-    expect(remove).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Stage is not Paused", hidden: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove two", hidden: true })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "More views" })).toBeNull();
+  });
+
+  /** Lays the row out at a width: tabs 120, the "+" box 80, the chips 200, "More views" 40. */
+  function atWidth(width: number) {
+    const parts = vi
+      .spyOn(HTMLElement.prototype, "offsetWidth", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.dataset["tab"] !== undefined) {
+          return 120;
+        }
+        const part = this.dataset["part"];
+        return part === "rest" ? 80 : part === "chips" ? 200 : part === "more" ? 40 : 0;
+      });
+    const scroll = vi
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        return this.dataset["part"] === "chips" ? 200 : this.offsetWidth;
+      });
+    const client = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(width);
+    return () => {
+      parts.mockRestore();
+      scroll.mockRestore();
+      client.mockRestore();
+    };
+  }
+
+  it("drops the chips first when the row is tight, and the Filter button keeps the count", () => {
+    const restore = atWidth(500);
+    const { unmount } = renderUi(<Toolbar onSelect={vi.fn()} />);
+    expect(screen.queryByText("Stage is not Paused")).toBeNull();
+    expect(screen.getByRole("button", { name: "Filter (2)" })).toBeTruthy();
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    unmount();
+    restore();
+  });
+
+  it("then folds the tabs that do not fit into a More views menu, keeping the current one", async () => {
+    const restore = atWidth(300);
+    const onSelect = vi.fn();
+    renderUi(<Toolbar onSelect={onSelect} />);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["All"]);
+    fireEvent.click(screen.getByRole("button", { name: "More views" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Board" }));
+    expect(onSelect).toHaveBeenCalledWith("b");
+    expect(screen.getByRole("button", { name: "+" })).toBeTruthy();
+    restore();
+  });
+
+  it("keeps the tabs it can and shows everything again when there is room", () => {
+    const restore = atWidth(420);
+    const { unmount } = renderUi(<Toolbar onSelect={vi.fn()} chips={false} />);
+    // 80 + 40 for the menu leaves room for two tabs.
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
+    unmount();
+    restore();
+    const again = atWidth(2000);
+    renderUi(<Toolbar onSelect={vi.fn()} />);
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    again();
   });
 });
 

@@ -387,7 +387,7 @@
       "name": "Column name",
       "namePlaceholder": "Name (optional)",
       "type": "Column type",
-      "menu": "Column {{property}}",
+      "menu": "Options for column {{property}}",
       "rename": "Rename",
       "changeType": "Change type",
       "format": "Format",
@@ -443,7 +443,8 @@
       "default": {
         "table": "Table",
         "board": "Board"
-      }
+      },
+      "more": "More views"
     },
     "filter": {
       "label": "Filter",

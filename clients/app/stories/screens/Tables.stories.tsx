@@ -52,11 +52,12 @@ function hostDoc(): Y.Doc {
 }
 
 /** The workspace around the tables: members, the records a link points at, the tree. */
-function api(): Record<string, Handler> {
+function api(prepare?: (server: TablesServer) => void): Record<string, Handler> {
   const shell: Record<string, Handler> = {
     // The app loading starts the server over.
     "GET /bff/session": () => {
       server.reset();
+      prepare?.(server);
       return { body: SESSION };
     },
     "GET /bff/api/v1/workspaces": () => ({ body: { workspaces: [DUARTE] } }),
@@ -102,14 +103,16 @@ function AppAt({ path }: { path: string }) {
 
 interface ScreenArgs {
   path: string;
+  /** Changes what the server holds after it starts over (long view names, more filters). */
+  prepare?: (server: TablesServer) => void;
 }
 
 const meta = {
   title: "Screens/Tables",
   parameters: { layout: "fullscreen" },
-  beforeEach: ({ globals }) => {
+  beforeEach: ({ args, globals }) => {
     saveThemeFromGlobals(globals);
-    return mockFetch(api());
+    return mockFetch(api(args.prepare));
   },
   render: ({ path }) => <AppAt path={path} />,
 } satisfies Meta<ScreenArgs>;
@@ -207,6 +210,86 @@ function at(name: string, width: number, height: number) {
     globals: { viewport: { value: name } },
   };
 }
+
+/** Views with long names and a filter of two chips: the toolbar's hardest row. */
+function longViews(held: TablesServer) {
+  const table = held.table(CLIENTS_ID);
+  const [first, second] = table?.views ?? [];
+  if (first !== undefined && second !== undefined) {
+    first.name = "All clients with a signed contract this quarter";
+    second.name = "By stage, with every owner and amount";
+    first.config = {
+      ...first.config,
+      filter: {
+        and: [
+          { property: P.stage, operator: "is_not", value: "o-paused" },
+          { property: P.signed, operator: "is", value: true },
+        ],
+      },
+    };
+  }
+}
+
+/** Whether a click on the element would land on it: nothing sits over its middle. */
+function clickable(element: HTMLElement) {
+  element.scrollIntoView({ block: "nearest", inline: "nearest" });
+  const box = element.getBoundingClientRect();
+  const hit = element.ownerDocument.elementFromPoint(
+    box.left + box.width / 2,
+    box.top + box.height / 2,
+  );
+  return hit !== null && element.contains(hit);
+}
+
+/** The toolbar of the table fits its row: nothing overlaps, so what is in it can be clicked. */
+async function toolbarFits(canvasElement: HTMLElement, wide: boolean) {
+  const canvas = within(canvasElement);
+  await canvas.findByRole("grid");
+  const add = await canvas.findByRole("button", { name: "Add a view" });
+  await expect(clickable(add)).toBe(true);
+  await expect(clickable(canvas.getByRole("button", { name: /^Filter/u }))).toBe(true);
+  if (wide) {
+    const board = canvas.getByRole("tab", { name: /By stage/u });
+    await expect(board).toBeVisible();
+    await expect(clickable(board)).toBe(true);
+    await expect(clickable(canvas.getByRole("tab", { name: /All clients/u }))).toBe(true);
+  } else {
+    // On a phone the view that does not fit is one tap away, in the More views menu.
+    const more = canvas.getByRole("button", { name: "More views" });
+    await expect(clickable(more)).toBe(true);
+    await userEvent.click(more);
+    await expect(
+      await within(canvasElement.ownerDocument.body).findByRole("menuitem", { name: /By stage/u }),
+    ).toBeVisible();
+  }
+}
+
+/** Long view names and two filter chips at 1280: the tabs and the "+" are clear of the chips. */
+export const ToolbarFitsAt1280: Story = {
+  args: { path: TABLE, prepare: longViews },
+  ...at("desktop", 1280, 800),
+  play: async ({ canvasElement }) => {
+    await toolbarFits(canvasElement, true);
+  },
+};
+
+/** The same at 1440. */
+export const ToolbarFitsAt1440: Story = {
+  args: { path: TABLE, prepare: longViews },
+  ...at("wide", 1440, 900),
+  play: async ({ canvasElement }) => {
+    await toolbarFits(canvasElement, true);
+  },
+};
+
+/** The same on a phone. */
+export const ToolbarFitsOnAPhone: Story = {
+  args: { path: TABLE, prepare: longViews },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    await toolbarFits(canvasElement, false);
+  },
+};
 
 // The same screens with nothing done yet: the recording does the typing,
 // picking, filtering and moving (no `play`).

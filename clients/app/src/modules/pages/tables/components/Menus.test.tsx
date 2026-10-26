@@ -78,7 +78,7 @@ describe("a column's menu", () => {
 
   it("keeps the title from being retyped, hidden or deleted", async () => {
     column({ type: "title", name: "Name" });
-    await screen.findByRole("menu", { name: "Column Name" });
+    await screen.findByRole("menu", { name: "Options for column Name" });
     expect(screen.queryByRole("menuitem", { name: /Change type/u })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "Hide column" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "Delete column" })).toBeNull();

@@ -387,7 +387,7 @@
       "name": "Nombre de la columna",
       "namePlaceholder": "Nombre (opcional)",
       "type": "Tipo de columna",
-      "menu": "Columna {{property}}",
+      "menu": "Opciones de la columna {{property}}",
       "rename": "Cambiar el nombre",
       "changeType": "Cambiar el tipo",
       "format": "Formato",
@@ -443,7 +443,8 @@
       "default": {
         "table": "Tabla",
         "board": "Tablero"
-      }
+      },
+      "more": "Más vistas"
     },
     "filter": {
       "label": "Filtrar",

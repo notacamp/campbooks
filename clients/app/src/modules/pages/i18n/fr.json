@@ -387,7 +387,7 @@
       "name": "Nom de la colonne",
       "namePlaceholder": "Nom (facultatif)",
       "type": "Type de colonne",
-      "menu": "Colonne {{property}}",
+      "menu": "Options de la colonne {{property}}",
       "rename": "Renommer",
       "changeType": "Changer le type",
       "format": "Format",
@@ -443,7 +443,8 @@
       "default": {
         "table": "Tableau",
         "board": "Tableau kanban"
-      }
+      },
+      "more": "Plus de vues"
     },
     "filter": {
       "label": "Filtrer",
