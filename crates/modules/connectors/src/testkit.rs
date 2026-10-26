@@ -492,6 +492,8 @@ impl Kit {
                 .unwrap(),
             )),
             microsoft: microsoft_client,
+            notion: None,
+            notion_webhook: None,
             imap: Arc::new(crate::imap::Imap::new(imap_config)),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
@@ -518,6 +520,8 @@ impl Kit {
             google: None,
             zoho: None,
             microsoft: None,
+            notion: None,
+            notion_webhook: None,
             imap: Arc::new(imap),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
