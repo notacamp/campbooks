@@ -156,6 +156,10 @@ pub async fn handler(
     if !request.data_sources.is_empty() && !databases.0 {
         return Err(Error::NotFound);
     }
+    // Each list is bounded on its own before anything is allocated from it.
+    if request.pages.len() > MAX_IMPORT || request.data_sources.len() > MAX_IMPORT {
+        return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_import")));
+    }
     let asked = request.pages.len() + request.data_sources.len();
     if asked == 0 || asked > MAX_IMPORT {
         return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_import")));
