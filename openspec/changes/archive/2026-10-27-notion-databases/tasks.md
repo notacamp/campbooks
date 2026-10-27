@@ -25,5 +25,5 @@
 - [x] 3.2 OpenAPI/events/client types regenerated (locally)
 - [x] 3.3 Changelog entry `changelog/unreleased/added/377-notion-databases.md`
 - [ ] 3.4 Gates green in CI
-- [ ] 3.5 Recording: vhs clip of the CI tests (server-only part)
-- [ ] 3.6 `openspec archive notion-databases --yes` before merge
+- [x] 3.5 Recording: vhs clip of the CI tests (server-only part)
+- [x] 3.6 `openspec archive notion-databases --yes` before merge
