@@ -1,7 +1,7 @@
 ## 0. Design gate
 
 - [x] 0.1 Owner decisions (import then two-way, picked only, per member; **columns both ways**, 2026-10-27); proposal, design, deltas; prototype board "Notion databases as tables"
-- [ ] 0.2 Owner sign-off on this proposal
+- [x] 0.2 Owner sign-off on this proposal ("LGTM", 2026-10-27)
 - [ ] 0.3 Owner: add `data_source.content_updated` and `data_source.schema_updated` to the Notion webhook subscription (polling covers until then)
 
 ## 1. Connectors
