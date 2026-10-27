@@ -7,8 +7,9 @@
 //! return the browser to one of their registered
 //! `post_logout_redirect_uris`, matched exactly. An expired hint is
 //! fine (OIDC RP-Initiated Logout §2) for 30 days after it expired; its
-//! signature, issuer and client are checked. The web BFF calls it server-side, in-process, with the ID
-//! token it keeps; browsers never see one.
+//! signature, issuer and client are checked. The web BFF calls it
+//! server-side, in-process, with the ID token it keeps; browsers never see
+//! one.
 
 use axum::{
     Form,
@@ -231,9 +232,11 @@ async fn verify_hint(ctx: &Ctx, issuer: &Issuer, token: &str) -> Result<Option<H
         return Ok(None);
     };
     let claims = data.claims;
-    // Expired is fine, long expired is not.
-    let expired_for = issuer.now().timestamp() - claims.exp.unwrap_or(i64::MIN);
-    if expired_for > HINT_MAX_AGE_AFTER_EXPIRY {
+    // Expired is fine, long expired is not (and no `exp` is no hint).
+    let Some(exp) = claims.exp else {
+        return Ok(None);
+    };
+    if issuer.now().timestamp().saturating_sub(exp) > HINT_MAX_AGE_AFTER_EXPIRY {
         return Ok(None);
     }
     let Ok(account) = claims.sub.parse() else {
