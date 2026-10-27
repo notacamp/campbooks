@@ -17,7 +17,7 @@ use crate::{
         model::{Phase, StreamId},
         schedule,
     },
-    events::{NotionLinkRequested, NotionLinkStopped, NotionStop},
+    events::{LinkKind, NotionLinkRequested, NotionLinkStopped, NotionStop},
 };
 
 /// Makes the stream of a linked Notion page.
@@ -55,16 +55,35 @@ impl EventConsumer for LinkNotionPage {
         let now = self.deps.clock.now();
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
-        let stands = state
-            .page_requests
-            .link_standing(
-                tx,
-                workspace,
-                asked.page,
-                asked.connection.into(),
-                asked.notion_page,
-            )
-            .await?;
+        let data_source = asked.kind == LinkKind::DataSource;
+        if data_source && !self.deps.notion_databases {
+            // Databases are not offered: nothing reads one.
+            tracing::warn!(%workspace, "a Notion database link is ignored: databases are off");
+            return Ok(());
+        }
+        let stands = if data_source {
+            state
+                .page_requests
+                .table_link_standing(
+                    tx,
+                    workspace,
+                    asked.page,
+                    asked.connection.into(),
+                    asked.notion_page,
+                )
+                .await?
+        } else {
+            state
+                .page_requests
+                .link_standing(
+                    tx,
+                    workspace,
+                    asked.page,
+                    asked.connection.into(),
+                    asked.notion_page,
+                )
+                .await?
+        };
         if !stands {
             tracing::warn!(%workspace, "a Notion link that does not stand is not made");
             return Ok(());
@@ -129,14 +148,15 @@ impl EventConsumer for LinkNotionPage {
         .await?;
         sqlx::query(
             "INSERT INTO connectors.notion_links
-                 (stream_id, workspace_id, connection_id, notion_page_id, page_id)
-             VALUES ($1, $2, $3, $4, $5)",
+                 (stream_id, workspace_id, connection_id, notion_page_id, page_id, kind)
+             VALUES ($1, $2, $3, $4, $5, $6)",
         )
         .bind(stream)
         .bind(workspace)
         .bind(asked.connection)
         .bind(asked.notion_page)
         .bind(asked.page)
+        .bind(if data_source { "data_source" } else { "page" })
         .execute(&mut **tx)
         .await?;
         // A connection waiting for the member holds its streams paused: they

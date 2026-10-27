@@ -41,6 +41,11 @@ produce or accept against the file.
 | `connectors.notion_changes_completed.v1.schema.json` | `connectors` | `pages` | The event telling how each change of a request ended: applied (with the block's id and edit time at Notion), skipped or failed (with a reason code) |
 | `pages.notion_link_requested.v1.schema.json` | `pages` | `connectors` | A page was linked to a Notion page, which now needs a stream (ids only; the link is confirmed through the page-requests port) |
 | `pages.notion_link_ended.v1.schema.json` | `pages` | `connectors` | A page stopped being kept in step with its Notion page, so its stream goes (ids only) |
+| `notion-data-source-snapshot.v1.schema.json` | `connectors` | `pages` | A Notion database (data source) as the connector read it: its properties, the entries edited since the last read with each cell's neutral value and hash, and on a sweep the ids of every live entry, as a blob (`application/vnd.campbooks.notion-data-source-snapshot+json; version=1`) |
+| `connectors.notion_data_source_read.v1.schema.json` | `connectors` | `pages` | The event announcing a database snapshot (ids, a blob reference and a time only) |
+| `notion-table-changes.v1.schema.json` | `pages` | `connectors` | The columns, rows and cells to write to a Notion database, as a blob (`application/vnd.campbooks.notion-table-changes+json; version=1`) |
+| `pages.notion_table_changes_requested.v1.schema.json` | `pages` | `connectors` | A member's table edits asked for at Notion, once the pages module stored and bound them (ids and a blob reference only; confirmed back through the page-requests port; a column removal only with the member's confirmation) |
+| `connectors.notion_table_changes_completed.v1.schema.json` | `connectors` | `pages` | The event telling how each table change of a request ended: applied (with the column's or row's id, edit time and a hash), skipped or failed (with a reason code) |
 
 Rules:
 

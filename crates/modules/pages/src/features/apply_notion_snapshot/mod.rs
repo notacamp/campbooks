@@ -313,6 +313,7 @@ async fn make_sub_page(
                 page: id,
                 connection: link.connection_id,
                 notion_page,
+                kind: crate::events::LinkKind::Page,
             },
         )
         .await?;

@@ -23,9 +23,14 @@
 
 pub mod blocks;
 pub mod changes;
+pub mod data_source;
+pub mod databases;
 pub mod pace;
 pub mod read;
+pub mod read_tables;
+pub mod table_changes;
 pub mod write;
+pub mod write_tables;
 
 use std::time::Duration;
 

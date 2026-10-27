@@ -259,6 +259,32 @@ type Row = (
 );
 
 impl PageRequests for StoredRequests {
+    fn table_link_standing<'a>(
+        &'a self,
+        conn: &'a mut PgConnection,
+        _workspace: WorkspaceId,
+        table: Uuid,
+        connection: Uuid,
+        external: Uuid,
+    ) -> LinkStandingFuture<'a> {
+        Box::pin(async move {
+            super::tables::requests::standing(conn, PageId::from_uuid(table), connection, external)
+                .await
+        })
+    }
+
+    fn stored_table_changes<'a>(
+        &'a self,
+        state: &'a AppState,
+        conn: &'a mut PgConnection,
+        workspace: WorkspaceId,
+        request: Uuid,
+    ) -> campbooks_kernel::outbound::StoredTableChangesFuture<'a> {
+        Box::pin(
+            async move { super::tables::requests::stored(state, conn, workspace, request).await },
+        )
+    }
+
     fn stored_changes<'a>(
         &'a self,
         state: &'a AppState,

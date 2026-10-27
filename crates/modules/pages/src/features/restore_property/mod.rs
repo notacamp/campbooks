@@ -80,6 +80,15 @@ pub async fn handler(
             .bind(path.property_id)
             .execute(&mut *tx)
             .await?;
+        // Not removed at Notion yet: it never will be. Removed there: the
+        // column has no base any more, so the sync makes it again at Notion
+        // and writes its values back.
+        sqlx::query(
+            "UPDATE pages.external_properties SET remove_confirmed = false WHERE property_id = $1",
+        )
+        .bind(path.property_id)
+        .execute(&mut *tx)
+        .await?;
     } else if let (Some(ty), Some(config)) = (&property.previous_type, &property.previous_config) {
         sqlx::query(
             "UPDATE pages.table_properties

@@ -106,6 +106,11 @@ impl SyncStream {
         let Some(link) = link else {
             return Ok(());
         };
+        if link.data_source {
+            return self
+                .run_notion_table(ctx, workspace, target, link, now)
+                .await;
+        }
         let token =
             match credentials::access_token(ctx.pool(), &self.deps, workspace, target.connection)
                 .await
@@ -331,7 +336,7 @@ impl SyncStream {
 
     /// What a run that stopped is: Notion's trouble, a wait for the
     /// budget, or the database failing.
-    async fn notion_stopped(
+    pub(super) async fn notion_stopped(
         &self,
         ctx: &mut JobContext,
         workspace: WorkspaceId,

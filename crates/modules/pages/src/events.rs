@@ -170,8 +170,22 @@ pub struct NotionLinkRequested {
     pub page: PageId,
     /// The Notion connection it is read through (a connectors id).
     pub connection: Uuid,
-    /// The Notion page.
+    /// The Notion page, or the Notion database (data source) for a table.
     pub notion_page: Uuid,
+    /// What is linked: a page (the default) or a table.
+    #[serde(default)]
+    pub kind: LinkKind,
+}
+
+/// What a Notion link links.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkKind {
+    /// A page, kept in step block by block.
+    #[default]
+    Page,
+    /// A table, kept in step with a Notion database (a data source).
+    DataSource,
 }
 
 impl DomainEvent for NotionLinkRequested {
@@ -233,6 +247,110 @@ pub struct NotionChangesRequested {
 
 impl DomainEvent for NotionChangesRequested {
     const NAME: &'static str = "pages.notion_changes_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `pages.notion_table_changes_requested` v1
+/// (`contracts/pages.notion_table_changes_requested.v1.schema.json`): table
+/// changes a member's edits asked for, to be made at Notion. Ids and a blob
+/// reference only: what to write is in the blob, which this module stored and
+/// which the connectors module reads through the page-requests port, never
+/// from the event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionTableChangesRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The request.
+    pub request: Uuid,
+    /// The table.
+    pub table: PageId,
+    /// The Notion connection whose grant makes the changes.
+    pub connection: Uuid,
+    /// The database (data source) at Notion.
+    pub data_source: Uuid,
+    /// The `notion-table-changes` v1 document, a blob of the workspace.
+    #[schema(value_type = BlobSchema)]
+    pub body: BlobRef,
+}
+
+impl DomainEvent for NotionTableChangesRequested {
+    const NAME: &'static str = "pages.notion_table_changes_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `connectors.notion_data_source_read` v1, as this module reads it
+/// (`contracts/connectors.notion_data_source_read.v1.schema.json`): a Notion
+/// database was read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionDataSourceRead {
+    /// The workspace.
+    pub workspace: String,
+    /// The Notion connection.
+    pub connection: Uuid,
+    /// The data source.
+    pub data_source: Uuid,
+    /// The table it is linked to.
+    pub table: PageId,
+    /// The `notion-data-source-snapshot` v1 document, a blob of the
+    /// workspace.
+    pub snapshot: BlobRef,
+    /// When it was read.
+    pub read_at: DateTime<Utc>,
+}
+
+impl DomainEvent for NotionDataSourceRead {
+    const NAME: &'static str = "connectors.notion_data_source_read";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// How one table change of a request ended, as the connector tells it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionTableItemResult {
+    /// The column or row (an id of this module).
+    pub subject: Uuid,
+    /// The kind of change.
+    pub kind: String,
+    /// How it ended.
+    pub outcome: NotionOutcome,
+    /// The column's or row's id at Notion (applied).
+    #[serde(default)]
+    pub external: Option<String>,
+    /// When Notion last edited it after the write (applied).
+    #[serde(default)]
+    pub edited_at: Option<DateTime<Utc>>,
+    /// A hash of what Notion holds now (applied).
+    #[serde(default)]
+    pub hash: Option<String>,
+}
+
+/// `connectors.notion_table_changes_completed` v1, as this module reads it
+/// (`contracts/connectors.notion_table_changes_completed.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionTableChangesCompleted {
+    /// The workspace.
+    pub workspace: String,
+    /// The request.
+    pub request: Uuid,
+    /// The table.
+    pub table: PageId,
+    /// How each item ended, in the request's order.
+    pub results: Vec<NotionTableItemResult>,
+}
+
+impl DomainEvent for NotionTableChangesCompleted {
+    const NAME: &'static str = "connectors.notion_table_changes_completed";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

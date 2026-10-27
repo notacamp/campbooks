@@ -88,11 +88,12 @@ pub const fn reason_name(reason: NotionReason) -> &'static str {
         NotionReason::Unavailable => "unavailable",
         NotionReason::TooManyAttempts => "too_many_attempts",
         NotionReason::Unsupported => "unsupported",
+        NotionReason::ConfirmationRequired => "confirmation_required",
     }
 }
 
 /// The reason kept as `name`, when it is one.
-fn reason_of(name: &str) -> Option<NotionReason> {
+pub fn reason_of(name: &str) -> Option<NotionReason> {
     Some(match name {
         "changed_in_notion" => NotionReason::ChangedInNotion,
         "unverified" => NotionReason::Unverified,
@@ -103,6 +104,7 @@ fn reason_of(name: &str) -> Option<NotionReason> {
         "unavailable" => NotionReason::Unavailable,
         "too_many_attempts" => NotionReason::TooManyAttempts,
         "unsupported" => NotionReason::Unsupported,
+        "confirmation_required" => NotionReason::ConfirmationRequired,
         _ => return None,
     })
 }

@@ -39,6 +39,21 @@ pub async fn root(
             &requests,
         )
         .await?;
+    // And of the table changes asked of Notion databases.
+    let table_requests: Vec<sqlx::types::Uuid> =
+        sqlx::query_scalar("SELECT id FROM pages.notion_table_requests WHERE table_id = ANY($1)")
+            .bind(&uuids)
+            .fetch_all(&mut **tx)
+            .await?;
+    state
+        .blobs
+        .detach_owners(
+            tx,
+            &workspace.to_string(),
+            super::notion::tables::REQUEST_OWNER,
+            &table_requests,
+        )
+        .await?;
     for id in &ids {
         let event = PageChanged {
             workspace: workspace.to_string(),

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/notion-table-changes.v1.schema.json",
+  "title": "notion-table-changes v1 (blob)",
+  "description": "What the pages module asks the connectors module to write to a Notion database (`application/vnd.campbooks.notion-table-changes+json; version=1`): one item per change, in the order the request lists them (`seq`). A column add or change carries the name, Notion kind, number format and the options to add; a cell update carries the Notion kind and the neutral value; a row add carries its cells (Notion property id, kind, value); a column removal and a row trash carry nothing. The connector writes this document only after the pages module confirmed the request through the kernel's page-requests port.",
+  "type": "object",
+  "required": [
+    "version",
+    "items"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "seq"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "group": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "value": {},
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "property",
+                "kind"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "property": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "value": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

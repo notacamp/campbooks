@@ -304,6 +304,18 @@ pub async fn properties(conn: &mut PgConnection, table: PageId) -> Result<Vec<Pr
     .await?)
 }
 
+/// Every property of a table, live or removed, in order.
+pub async fn all_properties(conn: &mut PgConnection, table: PageId) -> Result<Vec<PropertyRow>> {
+    Ok(sqlx::query_as(concat!(
+        "SELECT ",
+        property_columns!(),
+        " FROM pages.table_properties WHERE table_id = $1 ORDER BY position, id"
+    ))
+    .bind(table)
+    .fetch_all(conn)
+    .await?)
+}
+
 /// Property `id` of `table`, live or removed, locked when `lock`.
 pub async fn property(
     conn: &mut PgConnection,

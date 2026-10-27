@@ -289,6 +289,75 @@ pub struct StoredPageChanges {
     pub body: BlobRef,
 }
 
+/// What a table change asked for in a table kept in step with an outside
+/// database does there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableItemKind {
+    /// Add a column.
+    SchemaAdd,
+    /// Rename a column, change its type or its options.
+    SchemaUpdate,
+    /// Remove a column the member removed here and confirmed.
+    SchemaRemove,
+    /// Add a row.
+    RowCreate,
+    /// Set one cell of a row.
+    CellUpdate,
+    /// Move a row the member deleted here to the outside trash.
+    RowTrash,
+}
+
+/// One change of a [`StoredTableChanges`], as the pages module stored it:
+/// ids, kinds, times and hashes. Never a name, an option or a value (those
+/// are in the request's document).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredTableItem {
+    /// The change's place in the request.
+    pub seq: u32,
+    /// What to do.
+    pub kind: TableItemKind,
+    /// The column (a schema or cell change) or the row (row create or trash)
+    /// in the pages module.
+    pub subject: Uuid,
+    /// The column in the pages module a cell change is in.
+    pub property: Option<Uuid>,
+    /// The column at the outside database (schema update and remove, cell
+    /// update): an id the outside service gave it.
+    pub external_property: Option<String>,
+    /// The row at the outside database (cell update, row trash).
+    pub external_page: Option<Uuid>,
+    /// A hash of what the outside service held for the column or the cell
+    /// as of the last sync: one that moved is not written over.
+    pub base_hash: Option<String>,
+    /// A hash of the outside database's whole schema as of the last sync.
+    pub schema_hash: Option<String>,
+    /// When the outside service last edited the row as of the last sync (row
+    /// trash): a row edited since is not trashed.
+    pub base_edited_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// The member confirmed this removal here and at the outside database.
+    pub confirmed: bool,
+}
+
+/// A table's changes as the pages module stored them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredTableChanges {
+    /// The table (an id of the pages module).
+    pub table: Uuid,
+    /// The connection whose grant makes the changes.
+    pub connection: Uuid,
+    /// The database at the outside account.
+    pub external: Uuid,
+    /// The changes, in the order they are made.
+    pub items: Vec<StoredTableItem>,
+    /// The document holding what to write, as the pages module wrote it.
+    /// The connector writes this, never a document an event names.
+    pub body: BlobRef,
+}
+
+/// A future returned by [`PageRequests::stored_table_changes`].
+pub type StoredTableChangesFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Option<StoredTableChanges>, Error>> + Send + 'a>>;
+
 /// A future returned by [`PageRequests::stored_changes`].
 pub type StoredPageChangesFuture<'a> =
     Pin<Box<dyn Future<Output = Result<Option<StoredPageChanges>, Error>> + Send + 'a>>;
@@ -326,6 +395,32 @@ pub trait PageRequests: std::fmt::Debug + Send + Sync + 'static {
         connection: Uuid,
         external_page: Uuid,
     ) -> LinkStandingFuture<'a>;
+
+    /// Whether `table` of `workspace` is linked to the outside database
+    /// (data source) `external` through `connection` and the link is
+    /// syncing, read in `conn`.
+    fn table_link_standing<'a>(
+        &'a self,
+        conn: &'a mut PgConnection,
+        workspace: WorkspaceId,
+        table: Uuid,
+        connection: Uuid,
+        external: Uuid,
+    ) -> LinkStandingFuture<'a>;
+
+    /// The table changes of request `request` in `workspace`, read in
+    /// `conn` (a transaction working in that workspace): `Some` only while
+    /// they wait for the connector, their stored binding verifies
+    /// ([`state.binding`](crate::binding)), and the table's link to the
+    /// outside database is syncing. `None` otherwise, or when there is no
+    /// such request.
+    fn stored_table_changes<'a>(
+        &'a self,
+        state: &'a AppState,
+        conn: &'a mut PgConnection,
+        workspace: WorkspaceId,
+        request: Uuid,
+    ) -> StoredTableChangesFuture<'a>;
 }
 
 /// The port before a module provides one: no page change was asked for and
@@ -353,6 +448,27 @@ impl PageRequests for NoPageRequests {
         _external_page: Uuid,
     ) -> LinkStandingFuture<'a> {
         Box::pin(async { Ok(false) })
+    }
+
+    fn table_link_standing<'a>(
+        &'a self,
+        _conn: &'a mut PgConnection,
+        _workspace: WorkspaceId,
+        _table: Uuid,
+        _connection: Uuid,
+        _external: Uuid,
+    ) -> LinkStandingFuture<'a> {
+        Box::pin(async { Ok(false) })
+    }
+
+    fn stored_table_changes<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _conn: &'a mut PgConnection,
+        _workspace: WorkspaceId,
+        _request: Uuid,
+    ) -> StoredTableChangesFuture<'a> {
+        Box::pin(async { Ok(None) })
     }
 }
 

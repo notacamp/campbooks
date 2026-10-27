@@ -2262,6 +2262,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/notion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How a table is kept in step with Notion. */
+        get: operations["pages.get_table_sync"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/notion/conflicts/{conflict}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Settle a conflict with Notion. */
+        post: operations["pages.resolve_table_conflict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/notion/conflicts/{conflict}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back a choice for a conflict with Notion. */
+        post: operations["pages.undo_resolve_table_conflict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tables/{table_id}/notion/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop syncing a table with Notion. */
+        post: operations["pages.stop_table_sync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/tables/{table_id}/properties": {
         parameters: {
             query?: never;
@@ -5042,8 +5110,15 @@ export interface components {
              * @description Your Notion connection.
              */
             connection: string;
-            /** @description The Notion pages, 1 to 100. */
-            pages: components["schemas"]["NotionPageToImport"][];
+            /**
+             * @description The Notion databases (data sources) to bring in as tables, kept in
+             *     step both ways. Only while Notion databases are on (otherwise the
+             *     answer is 404). At most 100 pages and databases together, at least
+             *     one.
+             */
+            data_sources?: components["schemas"]["NotionDatabaseToImport"][];
+            /** @description The Notion pages. */
+            pages?: components["schemas"]["NotionPageToImport"][];
             parent?: components["schemas"]["PageId"] | null;
         };
         /** @description What was imported. */
@@ -5056,6 +5131,8 @@ export interface components {
              *     named twice.
              */
             skipped: number;
+            /** @description The tables made from databases, in the order asked. */
+            tables?: components["schemas"]["ImportedTable"][];
         };
         /** @description A page made. */
         ImportedPage: {
@@ -5066,6 +5143,16 @@ export interface components {
             notion_page: string;
             /** @description The new page. */
             page: components["schemas"]["PageId"];
+        };
+        /** @description A table made. */
+        ImportedTable: {
+            /**
+             * Format: uuid
+             * @description Its database at Notion.
+             */
+            data_source: string;
+            /** @description The new table. */
+            table: components["schemas"]["PageId"];
         };
         /**
          * Format: uuid
@@ -5795,6 +5882,16 @@ export interface components {
          * @enum {string}
          */
         NoticePatternSource: "template" | "phrase";
+        /** @description One Notion database to bring in as a table. */
+        NotionDatabaseToImport: {
+            /**
+             * Format: uuid
+             * @description The database at Notion (its data source).
+             */
+            data_source: string;
+            /** @description The title to show until Notion's is read (0 to 200 characters). */
+            title?: string | null;
+        };
         /**
          * @description What to keep.
          * @enum {string}
@@ -5899,6 +5996,45 @@ export interface components {
          * @enum {string}
          */
         NotionStopReason: "stopped_by_member" | "disconnected" | "trashed_here" | "trashed_in_notion" | "not_shared" | "member_left" | "notion_unavailable";
+        /** @description A table's link to its Notion database. */
+        NotionTableLink: {
+            /**
+             * Format: int32
+             * @description How many conflicts wait for a choice.
+             */
+            conflicts: number;
+            /**
+             * Format: uuid
+             * @description The Notion connection it is read through.
+             */
+            connection: string;
+            /**
+             * Format: uuid
+             * @description The database at Notion (its data source).
+             */
+            data_source: string;
+            /**
+             * Format: date-time
+             * @description When a change from Notion was last applied.
+             */
+            last_inbound_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When a change here was last written to Notion.
+             */
+            last_outbound_at?: string | null;
+            /** @description The member whose Notion account it is. */
+            owner: components["schemas"]["UserId"];
+            /** @description Where the link is. */
+            state: components["schemas"]["NotionLinkState"];
+            stopped_reason?: components["schemas"]["NotionStopReason"] | null;
+        };
+        /** @description A table's sync with Notion. */
+        NotionTableSync: {
+            /** @description The conflicts waiting for a choice, oldest first. */
+            conflicts: components["schemas"]["TableConflict"][];
+            link?: components["schemas"]["NotionTableLink"] | null;
+        };
         /** @description The options as they should become. */
         OptionsUpdate: {
             /**
@@ -6878,6 +7014,11 @@ export interface components {
             /** @description What to keep. */
             keep: components["schemas"]["NotionKeep"];
         };
+        /** @description The choice. */
+        ResolveNotionTableConflict: {
+            /** @description What to keep. */
+            keep: components["schemas"]["TableConflictKeep"];
+        };
         /** @description The conflict settled. */
         Resolved: {
             /**
@@ -6895,6 +7036,19 @@ export interface components {
              * @description The page's revision afterwards.
              */
             revision: number;
+        };
+        /** @description The conflict settled. */
+        ResolvedNotionTableConflict: {
+            /**
+             * Format: uuid
+             * @description The conflict, which `pages.undo_resolve_table_conflict` takes back.
+             */
+            conflict: string;
+            /**
+             * Format: int32
+             * @description How many conflicts still wait.
+             */
+            conflicts: number;
         };
         /**
          * @description The member's answer to an invitation.
@@ -7918,6 +8072,47 @@ export interface components {
              */
             streams: number;
         };
+        /** @description A conflict, as the API shows it. */
+        TableConflict: {
+            choice?: components["schemas"]["TableConflictKeep"] | null;
+            /**
+             * Format: uuid
+             * @description The conflict.
+             */
+            id: string;
+            /** @description Column or cell. */
+            kind: components["schemas"]["TableConflictKind"];
+            /**
+             * @description Campbooks' version: a cell's value, or a column's name, type and
+             *     config.
+             */
+            ours: unknown;
+            /**
+             * Format: date-time
+             * @description When Campbooks' version was made.
+             */
+            ours_at: string;
+            /** @description The column. */
+            property: components["schemas"]["PropertyId"];
+            row?: components["schemas"]["PageId"] | null;
+            /** @description Notion's version. */
+            theirs: unknown;
+            /**
+             * Format: date-time
+             * @description When Notion's was.
+             */
+            theirs_at: string;
+        };
+        /**
+         * @description Which side a member keeps.
+         * @enum {string}
+         */
+        TableConflictKeep: "ours" | "theirs";
+        /**
+         * @description What a conflict is about.
+         * @enum {string}
+         */
+        TableConflictKind: "column" | "cell";
         /** @description A table: its page, its properties and its views. */
         TableDetail: {
             /** @description The table as a page: title, icon, place, role. */
@@ -8302,6 +8497,14 @@ export interface components {
              * @description The page's revision afterwards.
              */
             revision: number;
+        };
+        /** @description The choice taken back. */
+        UndoneNotionTableConflict: {
+            /**
+             * Format: int32
+             * @description How many conflicts wait now.
+             */
+            conflicts: number;
         };
         /** @description The event, back on the Campbooks calendar, and where it was removed from. */
         Unpushed: {
@@ -18023,6 +18226,258 @@ export interface operations {
             };
         };
     };
+    "pages.get_table_sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sync and its conflicts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotionTableSync"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table, Notion databases are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.resolve_table_conflict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+                /** @description The conflict. */
+                conflict: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveNotionTableConflict"];
+            };
+        };
+        responses: {
+            /** @description The conflict is settled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvedNotionTableConflict"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not change it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table, Notion databases are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`), in the trash (`page_trashed`), no such conflict (`no_table_conflict`), or the conflict was settled already (`conflict_settled`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.undo_resolve_table_conflict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+                /** @description The conflict. */
+                conflict: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conflict waits again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UndoneNotionTableConflict"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not change it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table, Notion databases are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`), in the trash (`page_trashed`), no such conflict (`no_table_conflict`), or there is no choice to take back (`nothing_to_undo`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.stop_table_sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The table. */
+                table_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, stopped. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotionTableLink"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may read the table but not change it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such table, Notion databases are off, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a table (`not_a_table`), not linked to Notion, or the link has ended already (`not_syncing`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "pages.add_property": {
         parameters: {
             query?: never;
@@ -18099,7 +18554,15 @@ export interface operations {
     };
     "pages.remove_property": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description For a table kept in step with a Notion database: the member confirms
+                 *     that the column is removed in Notion too. Without it, removing a
+                 *     column of such a table is refused (`confirmation_required`) and
+                 *     nothing changes anywhere.
+                 */
+                confirm_remote_delete?: boolean;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -18120,6 +18583,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PropertyView"];
+                };
+            };
+            /** @description The table is kept in step with a Notion database, the column is Notion's too, and the removal was not confirmed with `confirm_remote_delete` (`confirmation_required`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description No valid access token. */

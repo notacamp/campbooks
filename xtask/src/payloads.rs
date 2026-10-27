@@ -50,6 +50,16 @@ pub const EVENT_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
         "a workspace's event routing field: the workspace's id as text (`DomainEvent::workspace`)",
     ),
     (
+        "connectors.notion_table_changes_completed",
+        "results[].external",
+        "an id Notion gave a column or a row (a short opaque token or a UUID), never its name",
+    ),
+    (
+        "connectors.notion_table_changes_completed",
+        "results[].hash",
+        "a SHA-256 of a value or a column, in hexadecimal: not the value",
+    ),
+    (
         "attention.item_changed",
         "container.type",
         "a record type, from the code (`<module>.<record>`)",
@@ -252,6 +262,11 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "pages.compact",
         "page",
         "the page's id (a UUID), never its title or text",
+    ),
+    (
+        "pages.push_table_to_notion",
+        "table",
+        "the table's id (a UUID), never its title or values",
     ),
     (
         "pages.push_to_notion",

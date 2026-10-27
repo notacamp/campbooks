@@ -60,7 +60,8 @@
               "not_found",
               "unavailable",
               "too_many_attempts",
-              "unsupported"
+              "unsupported",
+              "confirmation_required"
             ],
             "description": "Why it did not apply."
           }

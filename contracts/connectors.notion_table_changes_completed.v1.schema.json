@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/connectors.notion_table_changes_completed.v1.schema.json",
+  "title": "connectors.notion_table_changes_completed v1 (event payload)",
+  "description": "Published by the connectors module when every change of a table request the pages module asked for has an end: written at Notion (`applied`, with the column's or row's id there, its edit time and a hash of what it holds now), not written (`skipped`: Notion changed it since the last sync, it is gone, it is never written, the removal was not confirmed, the request did not stand) or `failed`. One item per change, in the request's order. Ids, closed codes, times and hashes; never a name or a value. Workspace-scoped.",
+  "type": "object",
+  "required": [
+    "workspace",
+    "request",
+    "table",
+    "results"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": {
+      "type": "string"
+    },
+    "request": {
+      "$ref": "#/$defs/uuid"
+    },
+    "table": {
+      "$ref": "#/$defs/uuid"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "subject",
+          "kind",
+          "outcome"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "subject": {
+            "$ref": "#/$defs/uuid"
+          },
+          "kind": {
+            "enum": [
+              "schema_add",
+              "schema_update",
+              "schema_remove",
+              "row_create",
+              "cell_update",
+              "row_trash"
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "applied",
+              "skipped",
+              "failed"
+            ]
+          },
+          "external": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "The column's or the row's id at Notion (applied)."
+          },
+          "edited_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "reason": {
+            "enum": [
+              "changed_in_notion",
+              "unverified",
+              "not_connected",
+              "needs_reauth",
+              "rejected",
+              "not_found",
+              "unavailable",
+              "too_many_attempts",
+              "unsupported",
+              "confirmation_required"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

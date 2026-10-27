@@ -10,7 +10,7 @@
 //! is answered as one that does not exist (404). A Notion page already linked
 //! through the connection is left as it is.
 
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, RecordRef, Result, Risk,
     authz::{self, Action},
@@ -57,8 +57,35 @@ pub struct ImportFromNotion {
     /// The page they go under; none for the top level of your private place.
     #[serde(default)]
     pub parent: Option<PageId>,
-    /// The Notion pages, 1 to 100.
+    /// The Notion pages.
+    #[serde(default)]
     pub pages: Vec<NotionPageToImport>,
+    /// The Notion databases (data sources) to bring in as tables, kept in
+    /// step both ways. Only while Notion databases are on (otherwise the
+    /// answer is 404). At most 100 pages and databases together, at least
+    /// one.
+    #[serde(default)]
+    pub data_sources: Vec<NotionDatabaseToImport>,
+}
+
+/// One Notion database to bring in as a table.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NotionDatabaseToImport {
+    /// The database at Notion (its data source).
+    pub data_source: Uuid,
+    /// The title to show until Notion's is read (0 to 200 characters).
+    #[serde(default)]
+    pub title: Option<String>,
+}
+
+/// A table made.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ImportedTable {
+    /// The new table.
+    pub table: PageId,
+    /// Its database at Notion.
+    pub data_source: Uuid,
 }
 
 /// A page made.
@@ -75,6 +102,9 @@ pub struct ImportedPage {
 pub struct Imported {
     /// The pages made, in the order asked.
     pub pages: Vec<ImportedPage>,
+    /// The tables made from databases, in the order asked.
+    #[serde(default)]
+    pub tables: Vec<ImportedTable>,
     /// How many were left alone: already linked through the connection, or
     /// named twice.
     pub skipped: u32,
@@ -112,6 +142,7 @@ pub struct Imported {
 pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<PagesWrite>,
+    Extension(databases): Extension<crate::config::DatabasesOn>,
     extract::Json(request): extract::Json<ImportFromNotion>,
 ) -> Result<(StatusCode, Json<Imported>)> {
     let access = &workspace.access;
@@ -121,8 +152,17 @@ pub async fn handler(
     let Some(creator) = access.user else {
         return Err(Error::Forbidden);
     };
-    if request.pages.is_empty() || request.pages.len() > MAX_IMPORT {
+    // Databases are a switch of their own: off, they are not there to import.
+    if !request.data_sources.is_empty() && !databases.0 {
+        return Err(Error::NotFound);
+    }
+    let asked = request.pages.len() + request.data_sources.len();
+    if asked == 0 || asked > MAX_IMPORT {
         return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_import")));
+    }
+    let mut table_titles = Vec::with_capacity(request.data_sources.len());
+    for database in &request.data_sources {
+        table_titles.push(clean_title(database.title.as_deref().unwrap_or_default())?);
     }
     let mut titles = Vec::with_capacity(request.pages.len());
     for page in &request.pages {
@@ -211,6 +251,7 @@ pub async fn handler(
                     page: id,
                     connection: request.connection,
                     notion_page: asked.notion_page,
+                    kind: crate::events::LinkKind::Page,
                 },
             )
             .await?;
@@ -228,6 +269,42 @@ pub async fn handler(
             notion_page: asked.notion_page,
         });
     }
+    let mut tables_made = Vec::new();
+    for (asked, title) in request.data_sources.iter().zip(&table_titles) {
+        if let Some(table) = import_database(
+            &state,
+            &mut tx,
+            access,
+            creator,
+            request.connection,
+            request.parent,
+            parent,
+            place,
+            asked.data_source,
+            title,
+            &seen,
+        )
+        .await?
+        {
+            seen.push(asked.data_source);
+            tables_made.push(ImportedTable {
+                table,
+                data_source: asked.data_source,
+            });
+        } else {
+            skipped += 1;
+        }
+    }
+    if !tables_made.is_empty() {
+        tracked::notion_databases_imported(
+            &state,
+            &mut tx,
+            access.workspace,
+            request.connection,
+            tables_made.len(),
+        )
+        .await?;
+    }
     if !made.is_empty() {
         tracked::notion_imported(
             &state,
@@ -243,9 +320,128 @@ pub async fn handler(
         StatusCode::CREATED,
         Json(Imported {
             pages: made,
+            tables: tables_made,
             skipped,
         }),
     ))
+}
+
+/// One database as a private table of the caller, linked to its data source:
+/// a table page with its title property and a default table view, filled by
+/// the first read. `None` when the database is linked through the connection
+/// already, or named twice.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one call site; the values are distinct"
+)]
+async fn import_database(
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    access: &campbooks_kernel::tenancy::Access,
+    creator: campbooks_kernel::tenancy::UserId,
+    connection: Uuid,
+    _asked_parent: Option<PageId>,
+    parent: Option<PageId>,
+    place: Place,
+    data_source: Uuid,
+    title: &str,
+    seen: &[Uuid],
+) -> Result<Option<PageId>> {
+    let linked: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pages.external_tables
+                         WHERE connection_id = $1 AND notion_data_source_id = $2
+                           AND state <> 'stopped')",
+    )
+    .bind(connection)
+    .bind(data_source)
+    .fetch_one(&mut **tx)
+    .await?;
+    if linked || seen.contains(&data_source) {
+        return Ok(None);
+    }
+    let id = PageId::new();
+    let key = position::next(tx, parent, place, creator).await?;
+    crate::domain::tables::insert_page(
+        tx,
+        crate::domain::tables::NewPageRow {
+            id,
+            workspace: access.workspace,
+            parent,
+            place,
+            position: &key,
+            title,
+            icon: None,
+            creator,
+            kind: crate::domain::Kind::Table,
+        },
+    )
+    .await?;
+    sqlx::query("INSERT INTO pages.tables (table_id, workspace_id) VALUES ($1, $2)")
+        .bind(id)
+        .bind(access.workspace.as_uuid())
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query(
+        "INSERT INTO pages.table_properties
+             (id, table_id, workspace_id, name, type, config, position, created_by)
+         VALUES ($1, $2, $3, 'Name', 'title', '{}', $4, $5)",
+    )
+    .bind(crate::domain::PropertyId::new())
+    .bind(id)
+    .bind(access.workspace.as_uuid())
+    .bind(position::after(None))
+    .bind(creator)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query(
+        "INSERT INTO pages.table_views
+             (id, table_id, workspace_id, name, type, position, config, created_by)
+         VALUES ($1, $2, $3, 'Table', 'table', $4, '{}', $5)",
+    )
+    .bind(crate::domain::ViewId::new())
+    .bind(id)
+    .bind(access.workspace.as_uuid())
+    .bind(position::after(None))
+    .bind(creator)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query(
+        "INSERT INTO pages.external_tables
+             (table_id, workspace_id, connection_id, notion_data_source_id, state, created_by,
+              last_title)
+         VALUES ($1, $2, $3, $4, 'syncing', $5, $6)",
+    )
+    .bind(id)
+    .bind(access.workspace.as_uuid())
+    .bind(connection)
+    .bind(data_source)
+    .bind(creator)
+    .bind(title)
+    .execute(&mut **tx)
+    .await?;
+    state
+        .events
+        .publish(
+            tx,
+            &NotionLinkRequested {
+                workspace: access.workspace.to_string(),
+                page: id,
+                connection,
+                notion_page: data_source,
+                kind: crate::events::LinkKind::DataSource,
+            },
+        )
+        .await?;
+    announce(
+        state,
+        tx,
+        access,
+        id,
+        vec![PageChangeKind::Meta, PageChangeKind::Schema],
+    )
+    .await?;
+    tracked::simple(state, tx, access.workspace, id, tracked::Change::Created).await?;
+    Ok(Some(id))
 }
 
 #[cfg(test)]

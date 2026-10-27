@@ -39,6 +39,17 @@ impl EventHandler for StopNotionLinksOfConnection {
         for page in pages {
             notion::stop(&state, tx, workspace, page, StopReason::Disconnected).await?;
         }
+        // The tables kept in step with a database of that account.
+        let tables: Vec<PageId> = sqlx::query_scalar(
+            "SELECT table_id FROM pages.external_tables
+              WHERE connection_id = $1 AND state <> 'stopped' ORDER BY table_id",
+        )
+        .bind(removed.connection)
+        .fetch_all(&mut **tx)
+        .await?;
+        for table in tables {
+            notion::stop(&state, tx, workspace, table, StopReason::Disconnected).await?;
+        }
         Ok(())
     }
 }

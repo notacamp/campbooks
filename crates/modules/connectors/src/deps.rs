@@ -56,6 +56,11 @@ pub struct Deps {
     /// configured; present whenever Notion is on and the instance secret is
     /// set.
     pub notion_cipher: Option<Arc<Cipher>>,
+    /// Whether Notion databases are read and written as tables
+    /// (`CAMPBOOKS_CONNECTORS__NOTION__DATABASES__ENABLED`, effective only
+    /// with Notion offered and pages and tables on): off, no stream of a
+    /// data source runs and the webhook ignores data source events.
+    pub notion_databases: bool,
     /// The IMAP adapter (`CAMPBOOKS_CONNECTORS__IMAP__*`); offered only
     /// when enabled ([`imap_enabled`](Self::imap_enabled)).
     pub imap: Arc<Imap>,
@@ -88,6 +93,7 @@ impl Default for Deps {
             notion: None,
             notion_webhook: None,
             notion_cipher: None,
+            notion_databases: false,
             imap: Arc::new(Imap::default()),
             cipher: None,
             clock: Arc::new(SystemClock),
@@ -171,6 +177,9 @@ impl Deps {
             development,
             secret.is_some(),
         )?;
+        deps.notion_databases = deps.notion.is_some()
+            && deps.config.notion.databases_asked()
+            && pages_tables_on(figment);
         // The webhook's verification token is sealed whenever Notion is on,
         // before the integration's own settings are complete.
         deps.notion_cipher = secret
@@ -278,6 +287,25 @@ fn microsoft_client(
         client_secret,
         endpoints,
     )?)))
+}
+
+/// Whether pages and tables are both on (`CAMPBOOKS_PAGES__ENABLED` and
+/// `CAMPBOOKS_PAGES__TABLES__ENABLED`), read tolerantly: a missing,
+/// misspelled or oddly shaped value is off and never stops the server.
+fn pages_tables_on(figment: &Figment) -> bool {
+    let on = |key: &str| {
+        let value: Option<serde_json::Value> = figment.extract_inner(key).ok();
+        match value {
+            Some(serde_json::Value::Bool(on)) => on,
+            Some(serde_json::Value::String(text)) => matches!(
+                text.trim().to_ascii_lowercase().as_str(),
+                "true" | "1" | "yes" | "on"
+            ),
+            Some(serde_json::Value::Number(number)) => number.as_i64() == Some(1),
+            _ => false,
+        }
+    };
+    on("pages.enabled") && on("pages.tables.enabled")
 }
 
 /// The Notion client and its webhook secret, only while Notion is offered:

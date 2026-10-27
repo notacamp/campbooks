@@ -273,6 +273,33 @@ pub struct NotionConfig {
     /// gives the page up until later, in seconds (default 300).
     #[serde(deserialize_with = "any_text")]
     pub patience_seconds: Option<String>,
+    /// `CAMPBOOKS_CONNECTORS__NOTION__DATABASES__*`: Notion databases as
+    /// tables (campbooks-cloud#377), a switch of its own, off by default.
+    #[serde(deserialize_with = "tolerant_databases")]
+    pub databases: NotionDatabases,
+}
+
+/// `CAMPBOOKS_CONNECTORS__NOTION__DATABASES__*`. Read tolerantly: whatever
+/// shape the setting has, a server that does not ask for it starts.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NotionDatabases {
+    /// `…__ENABLED` as written (default off: `true`, `1`, `yes` or `on`).
+    pub enabled: Option<String>,
+}
+
+/// [`NotionDatabases`] from a value of any shape: only an object with an
+/// `enabled` scalar says anything.
+fn tolerant_databases<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<NotionDatabases, D::Error> {
+    let raw = serde_json::Value::deserialize(deserializer)?;
+    let enabled = raw.get("enabled").and_then(|value| match value {
+        serde_json::Value::String(text) => Some(text.clone()),
+        serde_json::Value::Bool(on) => Some(on.to_string()),
+        serde_json::Value::Number(number) => Some(number.to_string()),
+        _ => None,
+    });
+    Ok(NotionDatabases { enabled })
 }
 
 /// The Notion adapter's settings, read (defaults for what is unset).
@@ -307,6 +334,19 @@ impl NotionConfig {
                 "true" | "1" | "yes" | "on"
             )
         })
+    }
+
+    /// Whether Notion databases are asked for: Notion is on and
+    /// `…__NOTION__DATABASES__ENABLED` says `true`, `1`, `yes` or `on`. The
+    /// server also needs tables on to offer them (`Deps::notion_databases`).
+    pub fn databases_asked(&self) -> bool {
+        self.is_enabled()
+            && self.databases.enabled.as_deref().is_some_and(|text| {
+                matches!(
+                    text.trim().to_ascii_lowercase().as_str(),
+                    "true" | "1" | "yes" | "on"
+                )
+            })
     }
 
     /// The adapter's settings, each checked: the first one that is not
@@ -1033,6 +1073,42 @@ mod tests {
             })))
             .unwrap();
             assert!(!config.notion.is_enabled());
+        }
+    }
+
+    #[test]
+    fn notion_databases_are_off_by_default_and_never_stop_a_server_that_does_not_ask() {
+        let none = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
+        assert!(!none.notion.databases_asked());
+        // Production's settings, and whatever shape a stray setting has.
+        for stray in [
+            serde_json::json!({"enabled": true, "databases": "nope"}),
+            serde_json::json!({"enabled": true, "databases": 7}),
+            serde_json::json!({"enabled": true, "databases": ["enabled"]}),
+            serde_json::json!({"enabled": true, "databases": {"enabled": ["yes"]}}),
+            serde_json::json!({"enabled": true, "databases": {"enabled": {"a": 1}}}),
+            serde_json::json!({"enabled": true, "databases": {"enabled": "maybe", "x": 1}}),
+            serde_json::json!({"enabled": true, "databases": {"enabled": null}}),
+            serde_json::json!({"enabled": false, "databases": {"enabled": true}}),
+            serde_json::json!({"databases": {"enabled": true}}),
+        ] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}, "notion": stray}
+            })))
+            .unwrap();
+            assert!(!config.notion.databases_asked(), "{config:?}");
+        }
+        for spelling in [
+            serde_json::json!("true"),
+            serde_json::json!(true),
+            serde_json::json!(1),
+            serde_json::json!("On"),
+        ] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"notion": {"enabled": true, "databases": {"enabled": spelling}}}
+            })))
+            .unwrap();
+            assert!(config.notion.databases_asked());
         }
     }
 

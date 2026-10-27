@@ -413,6 +413,53 @@
       }
     },
     {
+      "name": "connectors.notion_data_source_read",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "`connectors.notion_data_source_read` v1\n(`contracts/connectors.notion_data_source_read.v1.schema.json`): a Notion\ndatabase was read, and the pages module applies the snapshot to the table\nlinked to it. Ids, a blob reference and a time; never a name or a value.",
+        "required": [
+          "workspace",
+          "connection",
+          "data_source",
+          "table",
+          "snapshot",
+          "read_at"
+        ],
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The Notion connection."
+          },
+          "data_source": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The data source at Notion."
+          },
+          "read_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was read: a later read has a later time."
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/BlobRef",
+            "description": "The `notion-data-source-snapshot` v1 document, a blob of the\nworkspace."
+          },
+          "table": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The pages module's table it is linked to."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "connectors.notion_link_stopped",
       "module": "connectors",
       "version": 1,
@@ -492,6 +539,45 @@
           "snapshot": {
             "$ref": "#/components/schemas/BlobRef",
             "description": "The `notion-page-snapshot` v1 document, a blob of the workspace."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "connectors.notion_table_changes_completed",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A request of table changes ended\n(`contracts/connectors.notion_table_changes_completed.v1.schema.json`):\nevery item of the pages module's request has an end.",
+        "required": [
+          "workspace",
+          "request",
+          "table",
+          "results"
+        ],
+        "properties": {
+          "request": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The request (an id of the pages module)."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotionTableItemResult"
+            },
+            "description": "How each item ended, in the request's order."
+          },
+          "table": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The table (an id of the pages module)."
           },
           "workspace": {
             "type": "string",
@@ -1600,14 +1686,65 @@
             "format": "uuid",
             "description": "The Notion connection it is read through (a connectors id)."
           },
+          "kind": {
+            "$ref": "#/components/schemas/LinkKind",
+            "description": "What is linked: a page (the default) or a table."
+          },
           "notion_page": {
             "type": "string",
             "format": "uuid",
-            "description": "The Notion page."
+            "description": "The Notion page, or the Notion database (data source) for a table."
           },
           "page": {
             "$ref": "#/components/schemas/PageId",
             "description": "The page."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "pages.notion_table_changes_requested",
+      "module": "pages",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "`pages.notion_table_changes_requested` v1\n(`contracts/pages.notion_table_changes_requested.v1.schema.json`): table\nchanges a member's edits asked for, to be made at Notion. Ids and a blob\nreference only: what to write is in the blob, which this module stored and\nwhich the connectors module reads through the page-requests port, never\nfrom the event.",
+        "required": [
+          "workspace",
+          "request",
+          "table",
+          "connection",
+          "data_source",
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "$ref": "#/components/schemas/BlobRef",
+            "description": "The `notion-table-changes` v1 document, a blob of the workspace."
+          },
+          "connection": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion connection whose grant makes the changes."
+          },
+          "data_source": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The database (data source) at Notion."
+          },
+          "request": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The request."
+          },
+          "table": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The table."
           },
           "workspace": {
             "type": "string",
@@ -2804,6 +2941,14 @@
         "format": "uuid",
         "description": "LabelId (UUIDv7)"
       },
+      "LinkKind": {
+        "type": "string",
+        "description": "What a Notion link links.",
+        "enum": [
+          "page",
+          "data_source"
+        ]
+      },
       "MailChoice": {
         "type": "string",
         "description": "What becomes of the mail a connection brought in when it is removed\n(the owner's decision, campbooks-cloud#117): deleted with it (the\ndefault), or kept as read-only history. Only the member who connected\nit chooses when disconnecting; an owner or admin chooses when removing\nthat member.",
@@ -3027,7 +3172,8 @@
           "not_found",
           "unavailable",
           "too_many_attempts",
-          "unsupported"
+          "unsupported",
+          "confirmation_required"
         ]
       },
       "NotionStop": {
@@ -3038,6 +3184,75 @@
           "trashed_in_notion",
           "notion_unavailable"
         ]
+      },
+      "NotionTableChange": {
+        "type": "string",
+        "description": "What a table change of a request did.",
+        "enum": [
+          "schema_add",
+          "schema_update",
+          "schema_remove",
+          "row_create",
+          "cell_update",
+          "row_trash"
+        ]
+      },
+      "NotionTableItemResult": {
+        "type": "object",
+        "description": "How one table change of a request ended.",
+        "required": [
+          "subject",
+          "kind",
+          "outcome"
+        ],
+        "properties": {
+          "edited_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When Notion last edited it after the write (applied)."
+          },
+          "external": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The column's or the row's id at Notion (applied)."
+          },
+          "hash": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A hash of what Notion holds now (applied)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NotionTableChange",
+            "description": "The kind of change."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/NotionOutcome",
+            "description": "How it ended."
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NotionReason",
+                "description": "Why it did not apply."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The column or row (an id of the pages module)."
+          }
+        }
       },
       "Origin": {
         "type": "string",

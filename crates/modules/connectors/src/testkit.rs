@@ -31,6 +31,7 @@ use campbooks_kernel::{
         CalendarRequests, Destination, LinkStandingFuture, OutboundRequests, PageRequests,
         Resolved, StandingFuture, StoredCalendarChange, StoredCalendarChangeFuture,
         StoredPageChanges, StoredPageChangesFuture, StoredSend, StoredSendFuture,
+        StoredTableChanges,
     },
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
@@ -330,6 +331,8 @@ impl OutboundRequests for FakeOutbound {
 pub struct FakePages {
     stored: Mutex<HashMap<uuid::Uuid, StoredPageChanges>>,
     links: Mutex<HashSet<(uuid::Uuid, uuid::Uuid, uuid::Uuid)>>,
+    tables: Mutex<HashSet<(uuid::Uuid, uuid::Uuid, uuid::Uuid)>>,
+    stored_tables: Mutex<HashMap<uuid::Uuid, StoredTableChanges>>,
 }
 
 impl FakePages {
@@ -347,6 +350,23 @@ impl FakePages {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert((page, connection, external_page));
+    }
+
+    /// `table` is linked to the database `external` through `connection`,
+    /// syncing.
+    pub fn link_table(&self, table: uuid::Uuid, connection: uuid::Uuid, external: uuid::Uuid) {
+        self.tables
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert((table, connection, external));
+    }
+
+    /// Request `request` stands as `changes` (table changes).
+    pub fn release_table(&self, request: uuid::Uuid, changes: StoredTableChanges) {
+        self.stored_tables
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(request, changes);
     }
 
     /// The link of `page` no longer stands.
@@ -389,6 +409,38 @@ impl PageRequests for FakePages {
             .unwrap_or_else(PoisonError::into_inner)
             .contains(&(page, connection, external_page));
         Box::pin(async move { Ok(stands) })
+    }
+
+    fn table_link_standing<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        _workspace: WorkspaceId,
+        table: uuid::Uuid,
+        connection: uuid::Uuid,
+        external: uuid::Uuid,
+    ) -> LinkStandingFuture<'a> {
+        let stands = self
+            .tables
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&(table, connection, external));
+        Box::pin(async move { Ok(stands) })
+    }
+
+    fn stored_table_changes<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _conn: &'a mut sqlx::PgConnection,
+        _workspace: WorkspaceId,
+        request: uuid::Uuid,
+    ) -> campbooks_kernel::outbound::StoredTableChangesFuture<'a> {
+        let stored = self
+            .stored_tables
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&request)
+            .cloned();
+        Box::pin(async move { Ok(stored) })
     }
 }
 
@@ -518,6 +570,16 @@ impl Kit {
         let mut config = ConnectorsConfig::default();
         config.imap.enabled = false;
         config.notion.enabled = Some("true".to_owned());
+        Self::with_config(db, config).await
+    }
+
+    /// The module with Notion on and Notion databases as tables on (the
+    /// pages and tables switches are the server's), against the fake.
+    pub async fn with_notion_databases(db: PgPool) -> Self {
+        let mut config = ConnectorsConfig::default();
+        config.imap.enabled = false;
+        config.notion.enabled = Some("true".to_owned());
+        config.notion.databases.enabled = Some("true".to_owned());
         Self::with_config(db, config).await
     }
 
@@ -674,6 +736,7 @@ impl Kit {
         let microsoft = FakeMicrosoft::start().await;
         let notion = FakeNotion::start().await;
         let notion_on = config.notion.is_enabled();
+        let databases = config.notion.databases_asked();
         let notion_client = notion_on.then(|| {
             Arc::new(
                 crate::notion::Notion::new(
@@ -733,6 +796,7 @@ impl Kit {
                     &SecretKey::from_bytes([3; 32]),
                 ))
             }),
+            notion_databases: notion_on && databases,
             imap: Arc::new(crate::imap::Imap::new(imap_config)),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
@@ -763,6 +827,7 @@ impl Kit {
             notion: None,
             notion_webhook: None,
             notion_cipher: None,
+            notion_databases: false,
             imap: Arc::new(imap),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),

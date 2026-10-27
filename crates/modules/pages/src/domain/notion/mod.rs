@@ -24,6 +24,7 @@ pub mod model;
 pub mod push;
 pub mod requests;
 pub mod resolve;
+pub mod tables;
 pub mod tree;
 
 use campbooks_kernel::{
@@ -314,7 +315,7 @@ pub async fn resolver(
 /// still waiting for the connector end, the connector is told to stop
 /// reading, and nothing is deleted at Notion. `false` when there was no
 /// link, or it had ended already.
-pub async fn stop(
+pub async fn stop_link(
     state: &AppState,
     tx: &mut Transaction<'_, Postgres>,
     workspace: WorkspaceId,
@@ -368,6 +369,22 @@ pub async fn stop(
     announce(state, tx, &access, page, vec![PageChangeKind::Meta]).await?;
     tracked::notion_stopped(state, tx, workspace, page, reason).await?;
     Ok(true)
+}
+
+/// End the link of `page`, a page or a table kept in step with a Notion
+/// database, for `reason` (see [`stop_link`]). `false` when there was no
+/// link, or it had ended already.
+pub async fn stop(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    reason: StopReason,
+) -> Result<bool> {
+    if stop_link(state, tx, workspace, page, reason).await? {
+        return Ok(true);
+    }
+    tables::stop_table(state, tx, workspace, page, reason).await
 }
 
 /// Ask for `page`'s changes to be looked at, [`DEBOUNCE_SECONDS`] after the

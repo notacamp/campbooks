@@ -129,13 +129,16 @@ pub struct Link {
     pub notion_page_id: Uuid,
     /// The pages module's page.
     pub page_id: Uuid,
+    /// The link is of a Notion database (a data source) and the table it
+    /// feeds, not of a page: `notion_page_id` is then the data source.
+    pub data_source: bool,
 }
 
 /// The link of `stream`, when it has one.
 pub async fn link_of(conn: &mut PgConnection, stream: StreamId) -> Result<Option<Link>> {
     Ok(sqlx::query_as(
-        "SELECT notion_page_id, page_id FROM connectors.notion_links
-          WHERE stream_id = $1",
+        "SELECT notion_page_id, page_id, kind = 'data_source' AS data_source
+           FROM connectors.notion_links WHERE stream_id = $1",
     )
     .bind(stream)
     .fetch_optional(conn)

@@ -210,6 +210,7 @@ impl Kit {
             crate::module(crate::Deps {
                 enabled: false,
                 tables: false,
+                databases: false,
             }),
             self.state.clone(),
         );
@@ -223,6 +224,22 @@ impl Kit {
             crate::module(crate::Deps {
                 enabled: true,
                 tables: on,
+                databases: on,
+            }),
+            self.state.clone(),
+        );
+        self
+    }
+
+    /// The same kit with Notion databases switched on or off (pages and
+    /// tables stay on).
+    #[must_use]
+    pub fn with_databases(mut self, on: bool) -> Self {
+        self.app = testing::app(
+            crate::module(crate::Deps {
+                enabled: true,
+                tables: true,
+                databases: on,
             }),
             self.state.clone(),
         );

@@ -97,7 +97,7 @@ async fn current(
         .collect())
 }
 
-async fn store(
+pub(crate) async fn store(
     tx: &mut Transaction<'_, Postgres>,
     access: &Access,
     editor: UserId,
@@ -128,7 +128,11 @@ async fn store(
 
 /// Mark `row` as edited now by `editor`, so its revision, its "edited"
 /// property and its search entry follow.
-async fn touch(tx: &mut Transaction<'_, Postgres>, editor: UserId, row: PageId) -> Result<()> {
+pub(crate) async fn touch(
+    tx: &mut Transaction<'_, Postgres>,
+    editor: UserId,
+    row: PageId,
+) -> Result<()> {
     sqlx::query(
         "UPDATE pages.pages SET revision = revision + 1, edited_by = $2, edited_at = now()
           WHERE id = $1",
