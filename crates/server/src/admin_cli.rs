@@ -95,10 +95,13 @@ pub enum AppsCommand {
         #[arg(long)]
         name: String,
         /// Where codes may go (repeatable): https, matched exactly (loopback
-        /// http only when `CAMPBOOKS_ENV=development`).
+        /// http only when `CAMPBOOKS_ENV=development`; a production server
+        /// ignores a stored loopback URI).
         #[arg(long = "redirect-uri", required = true)]
         redirect_uris: Vec<String>,
         /// Where the browser may return after signing out (repeatable).
+        /// Signing out of the app also ends the person's Campbooks browser
+        /// session, which every app on this instance shares.
         #[arg(long = "post-logout-redirect-uri")]
         post_logout_redirect_uris: Vec<String>,
         /// The scope ceiling: every scope it may ever be granted. Any of

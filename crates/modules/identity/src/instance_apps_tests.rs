@@ -46,6 +46,38 @@ async fn applicamp(kit: &Kit) -> (InstanceApp, String) {
         .unwrap()
 }
 
+const LOOPBACK_CALLBACK: &str = "http://127.0.0.1:4000/auth/callback";
+const LOOPBACK_AFTER_LOGOUT: &str = "http://127.0.0.1:4000/";
+
+/// Like [`applicamp`], and with loopback `http` redirects too, as the CLI
+/// stores them when it runs in development.
+async fn applicamp_with_loopback(kit: &Kit) -> (InstanceApp, String) {
+    let asked = NewInstanceApp {
+        name: "Applicamp".to_owned(),
+        redirect_uris: vec![CALLBACK.to_owned(), LOOPBACK_CALLBACK.to_owned()],
+        post_logout_redirect_uris: vec![AFTER_LOGOUT.to_owned(), LOOPBACK_AFTER_LOGOUT.to_owned()],
+        scopes: CEILING.iter().map(|s| (*s).to_owned()).collect(),
+    };
+    let issuer = kit.deps.issuer.as_ref().unwrap();
+    let app = instance_apps::validate(&asked, &issuer.api_scopes, true).unwrap();
+    let mut conn = kit.owner.acquire().await.unwrap();
+    instance_apps::register(&mut conn, &kit.state.tracker, &app, chrono::Utc::now())
+        .await
+        .unwrap()
+}
+
+/// `id_token` with its `exp` set `ago` in the past, signed by the issuer.
+async fn expired_hint(kit: &Kit, id_token: &str, ago: chrono::TimeDelta) -> String {
+    let (_, mut claims) = Kit::decode(id_token);
+    claims["exp"] = (chrono::Utc::now() - ago).timestamp().into();
+    let issuer = kit.deps.issuer.as_ref().unwrap();
+    let signer = issuer.keys.signer(&kit.state.db).await.unwrap();
+    let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::EdDSA);
+    header.typ = Some("JWT".to_owned());
+    header.kid = Some(signer.kid.clone());
+    jsonwebtoken::encode(&header, &claims, &signer.key).unwrap()
+}
+
 /// Follow `url` (an authorization) to the consent screen; the request id.
 async fn to_consent(kit: &Kit, url: &str) -> String {
     let response = kit.get(url).await;
@@ -557,4 +589,153 @@ async fn the_runtime_role_cannot_register_change_or_remove_one(db: PgPool) {
     assert!(listed[0].last_used_at.is_some());
     assert_eq!(listed[0].allowed_scopes, CEILING);
     assert_eq!(listed[0].redirect_uris, [CALLBACK]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_runtime_role_cannot_make_another_client_an_instance_app(db: PgPool) {
+    let kit = Kit::new(db).await;
+    // A dynamic client, as the authorization server stores one.
+    let mut tx = kit.owner.begin().await.unwrap();
+    clients::as_server(&mut tx).await.unwrap();
+    sqlx::query(
+        "INSERT INTO identity.clients
+             (client_id, kind, name, redirect_uris, grant_types, auth_method, allowed_scopes,
+              created_at)
+         VALUES ('dyn_AAAAAAAAAAAAAAAAAAAAAA', 'dynamic', 'Agent',
+                 '{https://agent.example.com/cb}', '{authorization_code}', 'none',
+                 '{openid}', now())",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let mut tx = clients::begin_as_server(&kit.state.db).await.unwrap();
+    let error = sqlx::query(
+        "UPDATE identity.clients
+            SET kind = 'instance', auth_method = 'client_secret_basic',
+                secret_hash = '\\x00'::bytea
+          WHERE client_id = 'dyn_AAAAAAAAAAAAAAAAAAAAAA'",
+    )
+    .execute(&mut *tx)
+    .await
+    .expect_err("made an instance app");
+    assert!(
+        error
+            .to_string()
+            .contains("only with campbooks-server admin apps"),
+        "{error}"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_runtime_role_may_change_nothing_of_an_instance_app_but_when_it_was_used(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (app, _) = applicamp(&kit).await;
+    // Any other column, however innocent, is refused: the guard compares
+    // whole rows, not a list of columns.
+    for (what, sql) in [
+        (
+            "rename",
+            "UPDATE identity.clients SET name = 'Renamed' WHERE kind = 'instance'",
+        ),
+        (
+            "set a logo",
+            "UPDATE identity.clients SET logo_uri = 'https://evil.example.com/l.png'
+              WHERE kind = 'instance'",
+        ),
+        (
+            "backdate it",
+            "UPDATE identity.clients SET created_at = created_at - interval '1 day'
+              WHERE kind = 'instance'",
+        ),
+    ] {
+        let mut tx = clients::begin_as_server(&kit.state.db).await.unwrap();
+        let error = sqlx::query(sql).execute(&mut *tx).await.expect_err(what);
+        assert!(
+            error
+                .to_string()
+                .contains("only with campbooks-server admin apps"),
+            "{what}: {error}"
+        );
+    }
+    let mut tx = clients::begin_as_server(&kit.state.db).await.unwrap();
+    sqlx::query("UPDATE identity.clients SET last_used_at = now() WHERE kind = 'instance'")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let mut conn = kit.owner.acquire().await.unwrap();
+    let listed = instance_apps::list(&mut conn).await.unwrap();
+    assert!(listed[0].last_used_at.is_some());
+    assert_eq!(listed[0].name, app.name);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_expired_hint_ends_the_session_for_thirty_days_after_it_expired(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.signed_up().await;
+    let (app, secret) = applicamp(&kit).await;
+    let tokens = signed_in(&kit, &app, &secret, HOME).await;
+    let id_token = text(&tokens, "id_token");
+    let refresh = text(&tokens, "refresh_token");
+    let logout = |hint: String| {
+        format!(
+            "/oauth2/end_session?id_token_hint={hint}&client_id={}&post_logout_redirect_uri={AFTER_LOGOUT}",
+            app.client_id
+        )
+    };
+
+    let too_old = expired_hint(&kit, &id_token, chrono::TimeDelta::days(31)).await;
+    let refused = kit.get(&logout(too_old)).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{refused:?}");
+    assert_eq!(refused.json["code"], "invalid_id_token_hint");
+    let still = refresh_post(&kit, &app.client_id, &secret, &refresh).await;
+    assert_eq!(still.status, StatusCode::OK, "nothing was ended: {still:?}");
+
+    let recent = expired_hint(&kit, &id_token, chrono::TimeDelta::days(29)).await;
+    let out = kit.get(&logout(recent)).await;
+    assert_eq!(out.status, StatusCode::SEE_OTHER, "{out:?}");
+    assert_eq!(out.location(), AFTER_LOGOUT);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_stored_loopback_redirect_works_in_development_only(db: PgPool) {
+    // Development: the stored loopback redirects are honoured.
+    let dev = Kit::new(db).await;
+    dev.signed_up().await;
+    let (app, secret) = applicamp_with_loopback(&dev).await;
+    let (url, _) = Kit::authorize_url(&app.client_id, LOOPBACK_CALLBACK, "openid");
+    to_consent(&dev, &url).await;
+    let tokens = signed_in(&dev, &app, &secret, HOME).await;
+    let back = dev
+        .get(&format!(
+            "/oauth2/end_session?id_token_hint={}&post_logout_redirect_uri={LOOPBACK_AFTER_LOGOUT}",
+            text(&tokens, "id_token")
+        ))
+        .await;
+    assert_eq!(back.status, StatusCode::SEE_OTHER, "{back:?}");
+    assert_eq!(back.location(), LOOPBACK_AFTER_LOGOUT);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_stored_loopback_redirect_is_not_registered_in_production(db: PgPool) {
+    // The same row, as a CLI run with `CAMPBOOKS_ENV=development` against
+    // this database would have stored it.
+    let kit = Kit::in_production(db).await;
+    kit.signed_up().await;
+    let (app, secret) = applicamp_with_loopback(&kit).await;
+    let (url, _) = Kit::authorize_url(&app.client_id, LOOPBACK_CALLBACK, "openid");
+    let refused = kit.get(&url).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{refused:?}");
+    assert_eq!(refused.json["code"], "invalid_redirect_uri");
+    // Its https redirects still work, and logout does not go to loopback.
+    let tokens = signed_in(&kit, &app, &secret, HOME).await;
+    let out = kit
+        .get(&format!(
+            "/oauth2/end_session?id_token_hint={}&post_logout_redirect_uri={LOOPBACK_AFTER_LOGOUT}",
+            text(&tokens, "id_token")
+        ))
+        .await;
+    assert_eq!(out.status, StatusCode::NO_CONTENT, "{out:?}");
 }

@@ -215,12 +215,15 @@ impl Deps {
         };
         let cipher = Cipher::new(&secret, SEALING_PURPOSE);
         let resource = format!("{url}{API_RESOURCE_PATH}");
-        let issuer = Issuer {
-            clients: Clients::first_party(&url, derive_secret(&secret, WEB_CLIENT_SECRET_PURPOSE))
+        let mut clients =
+            Clients::first_party(&url, derive_secret(&secret, WEB_CLIENT_SECRET_PURPOSE))
                 .with_self_registration(
                     oauth.dynamic_registration.0,
                     oauth.client_metadata_documents.0,
-                ),
+                );
+        clients.allow_instance_loopback(config.env == Environment::Development);
+        let issuer = Issuer {
+            clients,
             url,
             cookies: Cookies::new(secure),
             keys: Arc::new(Keys::new(

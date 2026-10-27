@@ -6,8 +6,8 @@
 //! and instance apps (campbooks-cloud#369) may end a session this way, and
 //! return the browser to one of their registered
 //! `post_logout_redirect_uris`, matched exactly. An expired hint is
-//! fine (OIDC RP-Initiated Logout §2), but its signature, issuer and client
-//! are checked. The web BFF calls it server-side, in-process, with the ID
+//! fine (OIDC RP-Initiated Logout §2) for 30 days after it expired; its
+//! signature, issuer and client are checked. The web BFF calls it server-side, in-process, with the ID
 //! token it keeps; browsers never see one.
 
 use axum::{
@@ -43,6 +43,11 @@ use crate::{
 /// Sign-outs one address may ask for (each verifies a signature). The web
 /// BFF's, in-process, have no address and are not counted.
 const END_SESSION_LIMIT: Limit = Limit::new("identity.end_session", 30, Duration::from_mins(1));
+
+/// How long after its `exp` an ID token still works as a hint. An expired
+/// hint is fine (the person may have been signed in for days), but one that
+/// leaked from a sibling app's storage must not end sessions forever.
+const HINT_MAX_AGE_AFTER_EXPIRY: i64 = 30 * 24 * 60 * 60;
 
 /// `/oauth2/end_session` parameters (query for GET, form for POST).
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
@@ -193,6 +198,7 @@ struct HintClaims {
     sub: String,
     aud: String,
     sid: Option<String>,
+    exp: Option<i64>,
 }
 
 /// The hint's account, session and client when it is an ID token this
@@ -220,11 +226,16 @@ async fn verify_hint(ctx: &Ctx, issuer: &Issuer, token: &str) -> Result<Option<H
     validation.validate_aud = false;
     // An expired hint still names the sign-in to end.
     validation.validate_exp = false;
-    validation.set_required_spec_claims(&["iss", "sub", "aud"]);
+    validation.set_required_spec_claims(&["iss", "sub", "aud", "exp"]);
     let Ok(data) = jsonwebtoken::decode::<HintClaims>(token, &key, &validation) else {
         return Ok(None);
     };
     let claims = data.claims;
+    // Expired is fine, long expired is not.
+    let expired_for = issuer.now().timestamp() - claims.exp.unwrap_or(i64::MIN);
+    if expired_for > HINT_MAX_AGE_AFTER_EXPIRY {
+        return Ok(None);
+    }
     let Ok(account) = claims.sub.parse() else {
         return Ok(None);
     };
