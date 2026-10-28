@@ -144,6 +144,12 @@
       "date": "2026-10-27",
       "plan_version": 19,
       "pr": "#685"
+    },
+    {
+      "change": "Calendar roles (campbooks-cloud#399): schedule.calendar_role_changed for a calendar a member set to mine or following (which); schedule.update_calendar's Coverage names it.",
+      "date": "2026-10-28",
+      "plan_version": 20,
+      "pr": "#700"
     }
   ],
   "coverage": [
@@ -1886,7 +1892,8 @@
       "events": [
         "schedule.calendar_enabled",
         "schedule.calendar_disabled",
-        "schedule.calendar_recoloured"
+        "schedule.calendar_recoloured",
+        "schedule.calendar_role_changed"
       ],
       "exemption": "",
       "kind": "operation",
@@ -4133,6 +4140,16 @@
       "description": "Change one occurrence of a series there.",
       "enum": "schedule.calendar_change",
       "value": "update_occurrence"
+    },
+    {
+      "description": "Shown only: it counts for nothing else.",
+      "enum": "schedule.calendar_role",
+      "value": "following"
+    },
+    {
+      "description": "The member's own calendar: it makes them busy, holds go on it, its invitations await them.",
+      "enum": "schedule.calendar_role",
+      "value": "mine"
     },
     {
       "description": "The member's own Campbooks calendar: no provider sees it.",
@@ -20666,6 +20683,121 @@
       "version": 1
     },
     {
+      "action": "role_changed",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 20,
+      "description": "A member made a provider calendar their own (mine) or one they only follow. Never its name.",
+      "fires_when": "schedule.update_calendar stores another following than the calendar had, in that transaction.",
+      "module": "schedule",
+      "name": "schedule.calendar_role_changed",
+      "object": "calendar",
+      "openspec_change": "calendar-roles",
+      "rust_type": "CalendarRoleChanged",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_role_changed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member made a provider calendar their own (mine) or one they only follow. Never its name.",
+        "properties": {
+          "calendar": {
+            "additionalProperties": false,
+            "description": "The calendar afterwards.",
+            "properties": {
+              "connection_id": {
+                "description": "The connection it comes through (a connectors id), when it is a provider calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was added.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The calendar's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "primary": {
+                "description": "Whether it is its account's primary calendar.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "source": {
+                "description": "Where it lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "syncing": {
+                "description": "Whether it is on: its events sync and show.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "writable": {
+                "description": "Whether events may be made on it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "member_id",
+              "primary",
+              "source",
+              "syncing",
+              "writable"
+            ],
+            "title": "schedule.calendar",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "role": {
+            "description": "The role it has now: mine or following.",
+            "enum": [
+              "following",
+              "mine"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar",
+          "role"
+        ],
+        "title": "schedule.calendar_role_changed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "applied",
       "actor_types": [
         "system"
@@ -24540,8 +24672,8 @@
     }
   ],
   "generated_by": "campbooks-tracking-plan",
-  "plan_date": "2026-10-27",
-  "plan_version": 19,
+  "plan_date": "2026-10-28",
+  "plan_version": 20,
   "properties": [
     {
       "classification": "operational",
@@ -28389,6 +28521,32 @@
       "property": "calendar_events",
       "required": true,
       "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The calendar afterwards.",
+      "event": "schedule.calendar_role_changed",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar",
+      "pattern": "",
+      "property": "calendar",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The role it has now: mine or following.",
+      "event": "schedule.calendar_role_changed",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_role",
+      "pattern": "",
+      "property": "role",
+      "required": true,
+      "type": "enum",
       "version": 1
     },
     {

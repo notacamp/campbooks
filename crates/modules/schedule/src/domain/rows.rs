@@ -8,9 +8,11 @@ use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{FromRow, PgConnection, types::Uuid};
 
 use super::moment::{Moment, Span};
-use crate::model::{CalendarId, ConnectionId, EVENT_RECORD, EventId};
+use crate::model::{CalendarId, CalendarRole, ConnectionId, EVENT_RECORD, EventId};
 
 /// A calendar, as stored.
+// The table's columns: independent facts, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, FromRow)]
 pub struct CalendarRow {
     pub id: CalendarId,
@@ -25,16 +27,36 @@ pub struct CalendarRow {
     pub writable: bool,
     pub is_primary: bool,
     pub provider: Option<String>,
+    pub following: bool,
+    pub owned: Option<bool>,
 }
 
 /// The columns of [`CalendarRow`], for `SELECT`.
 pub const CALENDAR_COLUMNS: &str = "id, member_id, source, connection_id, provider_calendar_id, \
-     name, color, time_zone, syncing, writable, is_primary, provider";
+     name, color, time_zone, syncing, writable, is_primary, provider, \
+     following, owned";
 
 impl CalendarRow {
     /// Whether it is the member's Campbooks calendar.
     pub fn is_campbooks(&self) -> bool {
         self.source == "campbooks"
+    }
+
+    /// What the calendar is to the member.
+    pub fn role(&self) -> CalendarRole {
+        if !self.is_campbooks() && !self.syncing {
+            CalendarRole::Off
+        } else if self.following {
+            CalendarRole::Following
+        } else {
+            CalendarRole::Mine
+        }
+    }
+
+    /// Whether it is the member's own and on: the Campbooks calendar, or a
+    /// provider calendar that syncs and is not just followed.
+    pub fn is_mine(&self) -> bool {
+        self.role() == CalendarRole::Mine
     }
 }
 

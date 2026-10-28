@@ -26,6 +26,7 @@ export const CAMPBOOKS: Calendar = {
   primary: false,
   syncing: true,
   writable: true,
+  role: "mine",
   color: null,
   time_zone: SCHEDULE_ZONE,
 };
@@ -37,6 +38,7 @@ const PERSONAL: Calendar = {
   primary: true,
   syncing: true,
   writable: true,
+  role: "mine",
   color: "#2b7fb8",
   time_zone: SCHEDULE_ZONE,
 };
@@ -48,6 +50,7 @@ const WORK: Calendar = {
   primary: false,
   syncing: true,
   writable: true,
+  role: "mine",
   color: "#2f9e6b",
   time_zone: SCHEDULE_ZONE,
 };
@@ -59,6 +62,7 @@ export const HOLIDAYS: Calendar = {
   primary: false,
   syncing: false,
   writable: false,
+  role: "off",
   color: "#b88a2b",
   time_zone: SCHEDULE_ZONE,
 };

@@ -13474,7 +13474,7 @@
         "tags": [
           "schedule"
         ],
-        "summary": "Turn a calendar on or off, or colour it.",
+        "summary": "Set a calendar's role, turn it on or off, or colour it.",
         "operationId": "schedule.update_calendar",
         "parameters": [
           {
@@ -13518,7 +13518,7 @@
             }
           },
           "400": {
-            "description": "A colour that is not `#rrggbb` (`invalid_color`), or your Campbooks calendar turned off (`invalid_calendar`).",
+            "description": "A colour that is not `#rrggbb` (`invalid_color`), a role and `syncing` that disagree, or your Campbooks calendar turned off or made anything but `mine` (`invalid_calendar`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22450,6 +22450,17 @@
             ],
             "description": "Its colour as `#rrggbb`; empty goes back to the provider's."
           },
+          "role": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CalendarRole",
+                "description": "What it is to you: `mine`, `following` or `off`. Off is the same as\n`syncing: false`; the other two turn it on. Your Campbooks calendar is\nalways `mine`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "syncing": {
             "type": [
               "boolean",
@@ -22459,6 +22470,15 @@
           }
         },
         "additionalProperties": false
+      },
+      "CalendarRole": {
+        "type": "string",
+        "description": "What a calendar is to the member: their own, one they only follow, or\nhidden. Derived from `syncing` and `following`.",
+        "enum": [
+          "mine",
+          "following",
+          "off"
+        ]
       },
       "CalendarSource": {
         "type": "string",
@@ -22477,7 +22497,8 @@
           "name",
           "syncing",
           "writable",
-          "primary"
+          "primary",
+          "role"
         ],
         "properties": {
           "color": {
@@ -22496,6 +22517,13 @@
             "description": "Its name.",
             "example": "Family"
           },
+          "owned": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the provider says the account owns it; none when it does not say."
+          },
           "primary": {
             "type": "boolean",
             "description": "Whether it is the account's primary calendar."
@@ -22506,6 +22534,10 @@
               "null"
             ],
             "description": "Whose calendar it is, `google` or `zoho`, when known (none for your\nCampbooks calendar)."
+          },
+          "role": {
+            "$ref": "#/components/schemas/CalendarRole",
+            "description": "What it is to you: `mine`, `following` or `off`."
           },
           "source": {
             "$ref": "#/components/schemas/CalendarSource",

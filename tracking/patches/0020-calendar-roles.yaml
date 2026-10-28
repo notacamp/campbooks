@@ -1,0 +1,38 @@
+# Calendar roles (campbooks-cloud#399, OpenSpec change calendar-roles, part 1:
+# the server side): one event of the schedule module for a calendar moved
+# between mine and following. Turning a calendar on or off stays
+# schedule.calendar_enabled / schedule.calendar_disabled. Never a name.
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0020-calendar-roles.yaml`.
+changelog:
+  - date: "2026-10-28"
+    plan_version: 20
+    change: "Calendar roles (campbooks-cloud#399): schedule.calendar_role_changed for a calendar a member set to mine or following (which); schedule.update_calendar's Coverage names it."
+    pr: "#700"
+
+events:
+  - name: "schedule.calendar_role_changed"
+    version: 1
+    module: "schedule"
+    object: "calendar"
+    action: "role_changed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member made a provider calendar their own (mine) or one they only follow. Never its name."
+    fires_when: "schedule.update_calendar stores another following than the calendar had, in that transaction."
+    added_in: 20
+    openspec_change: "calendar-roles"
+
+properties:
+  - { event: "schedule.calendar_role_changed", version: 1, property: "calendar", type: "record", of: "schedule.calendar", required: true, classification: "operational", description: "The calendar afterwards." }
+  - { event: "schedule.calendar_role_changed", version: 1, property: "role", type: "enum", of: "schedule.calendar_role", required: true, classification: "operational", description: "The role it has now: mine or following." }
+
+enums:
+  - { enum: "schedule.calendar_role", value: "mine", description: "The member's own calendar: it makes them busy, holds go on it, its invitations await them." }
+  - { enum: "schedule.calendar_role", value: "following", description: "Shown only: it counts for nothing else." }
+
+coverage:
+  - kind: "operation"
+    name: "schedule.update_calendar"
+    events: [schedule.calendar_enabled, schedule.calendar_disabled, schedule.calendar_recoloured, schedule.calendar_role_changed]
