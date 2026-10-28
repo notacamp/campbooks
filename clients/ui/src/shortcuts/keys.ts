@@ -66,7 +66,15 @@ export function normalizeBinding(binding: string): string {
 
 /** The chord a keyboard event represents, or null for a lone modifier key. */
 export function chordFromEvent(event: KeyboardEvent, platform: Platform): Chord | null {
-  const key = event.key.toLowerCase();
+  let key = event.key.toLowerCase();
+  let byDigit = false;
+  // ⌘⇧8 types "*" on a US keyboard: with a modifier held, a digit key is
+  // the digit it is labelled with, whatever Shift types.
+  const digit = /^Digit(\d)$/u.exec(event.code);
+  if (digit?.[1] !== undefined && event.shiftKey && (event.metaKey || event.ctrlKey)) {
+    key = digit[1];
+    byDigit = true;
+  }
   if (
     ["shift", "meta", "control", "alt", "altgraph", "capslock", "dead", "unidentified"].includes(
       key,
@@ -78,7 +86,7 @@ export function chordFromEvent(event: KeyboardEvent, platform: Platform): Chord 
     key,
     mod: platform === "apple" ? event.metaKey : event.ctrlKey,
     // A symbol like "?" already encodes Shift in the character itself.
-    shift: isPrintableSymbol(key) ? false : event.shiftKey,
+    shift: byDigit || !isPrintableSymbol(key) ? event.shiftKey : false,
     alt: event.altKey,
   };
 }
