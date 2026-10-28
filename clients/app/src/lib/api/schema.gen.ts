@@ -725,6 +725,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/connections/{connection_id}/notion/data-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The databases a Notion connection can see. */
+        get: operations["connectors.list_notion_data_sources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/connections/{connection_id}/notion/pages": {
         parameters: {
             query?: never;
@@ -5882,6 +5899,40 @@ export interface components {
          * @enum {string}
          */
         NoticePatternSource: "template" | "phrase";
+        /** @description A database the connection can see. */
+        NotionDataSource: {
+            /**
+             * Format: int32
+             * @description How many columns it has. Notion does not say how many entries.
+             */
+            columns: number;
+            /**
+             * Format: uuid
+             * @description The database's (data source's) id at Notion.
+             */
+            data_source: string;
+            /**
+             * Format: date-time
+             * @description When Notion last edited it.
+             */
+            edited_at: string;
+            /** @description It is linked to a table already, through this connection. */
+            linked: boolean;
+            /** @description Its title; empty when it has none. */
+            title: string;
+        };
+        /** @description The databases of a Notion connection. */
+        NotionDataSources: {
+            /** @description The databases, newest edit first. */
+            data_sources: components["schemas"]["NotionDataSource"][];
+            /**
+             * Format: int32
+             * @description How many requests the listing took of the connection's budget.
+             */
+            requests: number;
+            /** @description There are more than were read. */
+            truncated: boolean;
+        };
         /** @description One Notion database to bring in as a table. */
         NotionDatabaseToImport: {
             /**
@@ -11500,6 +11551,85 @@ export interface operations {
             };
             /** @description Its address was checked 5 times today (`rate_limited`). */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.list_notion_data_sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The Notion connection. */
+                connection_id: components["schemas"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The databases the connection can see; none while Notion databases are off. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotionDataSources"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a connection you may see but that is not yours (an admin, a client token). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such Notion connection, or you may not see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Notion needs you to connect again (`needs_reauth`), or is not set up on this instance (`provider_not_configured`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The connection's request budget with Notion is spent for now. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Notion could not be reached (`provider_unavailable`). */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

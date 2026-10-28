@@ -712,6 +712,21 @@ fn listing(state: &State, results: &[Value], start: usize, size: usize) -> Value
 }
 
 fn search(state: &State, body: &Value) -> ResponseTemplate {
+    let size = body["page_size"]
+        .as_u64()
+        .and_then(|n| usize::try_from(n).ok())
+        .unwrap_or(100);
+    if body.pointer("/filter/value").and_then(Value::as_str) == Some("data_source") {
+        return json_response(
+            200,
+            &listing(
+                state,
+                &tables::searched_sources(state),
+                start_of(body["start_cursor"].as_str()),
+                size,
+            ),
+        );
+    }
     let mut pages: Vec<(&Uuid, &FakePage)> = state
         .pages
         .iter()
@@ -719,10 +734,6 @@ fn search(state: &State, body: &Value) -> ResponseTemplate {
         .collect();
     pages.sort_by(|a, b| b.1.edited.cmp(&a.1.edited).then_with(|| a.0.cmp(b.0)));
     let results: Vec<Value> = pages.iter().map(|(id, _)| page_json(state, **id)).collect();
-    let size = body["page_size"]
-        .as_u64()
-        .and_then(|n| usize::try_from(n).ok())
-        .unwrap_or(100);
     json_response(
         200,
         &listing(

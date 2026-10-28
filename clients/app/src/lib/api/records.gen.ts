@@ -8,7 +8,7 @@ export const recordReaders: Readonly<Record<string, readonly string[]>> = {
   "assistant.chat": ["assistant.get_chat", "assistant.list_chats"],
   "assistant.profile": ["assistant.get_profile"],
   "attention.item": ["attention.list"],
-  "connectors.connection": ["connectors.discover_imap", "connectors.get_connection", "connectors.list_connections", "connectors.list_notion_pages"],
+  "connectors.connection": ["connectors.discover_imap", "connectors.get_connection", "connectors.list_connections", "connectors.list_notion_data_sources", "connectors.list_notion_pages"],
   "conversations.conversation": ["conversations.get", "conversations.get_history", "conversations.list", "conversations.list_streams", "conversations.suggest_rules"],
   "conversations.draft": ["conversations.get_draft", "conversations.list_drafts"],
   "conversations.inbox": ["conversations.list_correspondents", "conversations.list_inboxes", "conversations.list_labels", "conversations.list_senders"],

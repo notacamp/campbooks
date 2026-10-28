@@ -841,3 +841,19 @@ fn property_item(state: &State, id: &str, prop: &str) -> ResponseTemplate {
                 "type": "property_item"}),
     )
 }
+
+/// The databases a search for data sources lists: shared, not in the trash,
+/// newest edit first.
+pub(super) fn searched_sources(state: &State) -> Vec<Value> {
+    let mut sources: Vec<(&Uuid, &FakeDs)> = state
+        .tables
+        .sources
+        .iter()
+        .filter(|(_, source)| source.shared && !source.trashed)
+        .collect();
+    sources.sort_by(|a, b| b.1.edited.cmp(&a.1.edited).then_with(|| a.0.cmp(b.0)));
+    sources
+        .into_iter()
+        .map(|(id, source)| ds_json(*id, source))
+        .collect()
+}

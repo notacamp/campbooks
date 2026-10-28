@@ -17,6 +17,7 @@ export type PageMoveBody = Schema<"PageMove">;
 // generated document is a one-line fix.
 export type NotionLink = Schema<"NotionLink">;
 export type NotionLinks = Schema<"NotionLinks">;
+export type NotionTableLink = Schema<"NotionTableLink">;
 export type NotionStopReason = Schema<"NotionStopReason">;
 export type ImportFromNotionBody = Schema<"ImportFromNotion">;
 export type Imported = Schema<"Imported">;

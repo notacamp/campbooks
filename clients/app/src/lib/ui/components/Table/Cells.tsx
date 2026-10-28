@@ -1,6 +1,6 @@
 import type { ComponentPropsWithRef, ReactNode } from "react";
 
-import { Icon, IconButton } from "@notacamp/ui";
+import { Icon, IconButton, type IconName } from "@notacamp/ui";
 
 import styles from "./Cells.module.css";
 
@@ -113,6 +113,21 @@ export function HeaderButton({
       <span className={styles["headerName"]}>{children}</span>
       {trailing}
     </button>
+  );
+}
+
+export interface ColumnMarkProps {
+  icon: IconName;
+  /** Why the mark is there ("Read-only: computed in Notion"): its accessible name and tooltip. */
+  label: string;
+}
+
+/** A small mark beside a column's name: a lock for what only Notion changes, a link for what stays here. */
+export function ColumnMark({ icon, label }: ColumnMarkProps) {
+  return (
+    <span role="img" aria-label={label} title={label} className={styles["mark"]}>
+      <Icon name={icon} />
+    </span>
   );
 }
 

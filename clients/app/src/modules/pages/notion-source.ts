@@ -13,6 +13,13 @@ interface NotionSourcePage {
   linked: boolean;
 }
 
+interface NotionSourceDatabase {
+  data_source: string;
+  title: string;
+  columns: number;
+  linked: boolean;
+}
+
 export interface NotionSource {
   /** The caller's Notion connections (undefined until known). */
   connections: readonly { id: string; name: string; needsReauth: boolean }[] | undefined;
@@ -21,6 +28,16 @@ export interface NotionSource {
     pages: readonly NotionSourcePage[];
     truncated: boolean;
     error: "needs_reauth" | "rate_limited" | "not_connected" | "unavailable" | undefined;
+    retry: () => void;
+  };
+  /**
+   * The databases the connection can see. `off` (or no `databases` at all)
+   * means this instance has none to offer: the import lists pages only.
+   */
+  databases?: {
+    status: "idle" | "loading" | "ready" | "error" | "off";
+    items: readonly NotionSourceDatabase[];
+    truncated: boolean;
     retry: () => void;
   };
 }

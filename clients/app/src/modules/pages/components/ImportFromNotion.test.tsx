@@ -137,7 +137,7 @@ describe("ImportFromNotion", () => {
       fireEvent.click(box);
     }
     expect(within(dialog).getByRole("alert")).toHaveTextContent(
-      "Pick at most 100 pages at a time.",
+      "Pick at most 100 pages and databases at a time.",
     );
     expect(within(dialog).getByRole("button", { name: /^Import \d+ pages/u })).toBeDisabled();
   });

@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { api, errorStatus, operationKey, problemCode, unwrap } from "~/lib/api";
 
-import type { NotionPages, StartNotion } from "../types";
+import type { NotionDataSources, NotionPages, StartNotion } from "../types";
 
 const path = (workspaceId: string) => ({ path: { workspace_id: workspaceId } });
 
@@ -60,5 +60,41 @@ export function useNotionPages(workspaceId: string, connectionId: string | undef
           signal,
         }),
       ),
+  });
+}
+
+/**
+ * `connectors.list_notion_data_sources`: the databases a Notion connection
+ * can see, asked when the import opens. A server with Notion databases off
+ * (or a connection that is not the caller's) answers 404: that is `null`, no
+ * databases to offer, not a failure.
+ */
+export function useNotionDataSources(workspaceId: string, connectionId: string | undefined) {
+  return useQuery({
+    queryKey: operationKey("connectors.list_notion_data_sources", {
+      workspace_id: workspaceId,
+      connection_id: connectionId ?? "",
+    }),
+    enabled: connectionId !== undefined,
+    retry: false,
+    gcTime: 0,
+    queryFn: async ({ signal }): Promise<NotionDataSources | null> => {
+      try {
+        return unwrap(
+          await api.GET(
+            "/api/v1/w/{workspace_id}/connections/{connection_id}/notion/data-sources",
+            {
+              params: { path: { workspace_id: workspaceId, connection_id: connectionId ?? "" } },
+              signal,
+            },
+          ),
+        );
+      } catch (error) {
+        if (errorStatus(error) === 404) {
+          return null;
+        }
+        throw error;
+      }
+    },
   });
 }

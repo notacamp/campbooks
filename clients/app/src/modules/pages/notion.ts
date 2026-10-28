@@ -1,4 +1,4 @@
-import type { NotionLink, NotionStopReason } from "./types";
+import type { NotionStopReason } from "./types";
 
 /** The address of a Notion page: its id without dashes. */
 export function notionUrl(notionPage: string): string {
@@ -26,7 +26,10 @@ export function agoLabel(when: string | Date, now: Date, locale: string): string
 }
 
 /** When the link last moved either way (the newer of the two), if it ever did. */
-export function lastSyncAt(link: NotionLink): string | undefined {
+export function lastSyncAt(link: {
+  last_inbound_at?: string | null | undefined;
+  last_outbound_at?: string | null | undefined;
+}): string | undefined {
   const times = [link.last_inbound_at, link.last_outbound_at].filter(
     (time): time is string => typeof time === "string",
   );
