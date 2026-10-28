@@ -39,10 +39,10 @@ export default async function attachFiles({ page }: ScenarioContext): Promise<vo
   await body.waitFor();
   await caption(page, "A reply draft, with a way to attach files in its footer", 2200);
 
-  // The picker: the button (or ⇧⌘A) opens it; here the files are chosen for it.
+  // The picker: the button (or ⇧⌘U) opens it; here the files are chosen for it.
   const input = composer.getByTestId("composer-files");
   await composer.getByRole("button", { name: /^Attach files/u }).hover();
-  await caption(page, "Attach (⇧⌘A) opens the file picker", 1800);
+  await caption(page, "Attach (⇧⌘U) opens the file picker", 1800);
   await input.setInputFiles([PDF, SHEET]);
   await composer.getByText("lease-4b-signed.pdf").waitFor();
   await composer.getByText(/ of 25 MB/u).waitFor();
@@ -51,7 +51,11 @@ export default async function attachFiles({ page }: ScenarioContext): Promise<vo
   // A type that mail providers block is refused, naming the file.
   await input.setInputFiles([BLOCKED]);
   await page.getByText(/setup\.exe wasn.t attached/u).waitFor();
-  await caption(page, "A file Gmail would refuse is turned down before it uploads", 2400);
+  await caption(
+    page,
+    "A file Gmail would refuse is turned down before it uploads, and the composer says why",
+    2600,
+  );
 
   // Remove one.
   await composer.getByRole("button", { name: `Remove ${SHEET.name}` }).click();
@@ -63,19 +67,17 @@ export default async function attachFiles({ page }: ScenarioContext): Promise<vo
     return;
   }
 
-  // Dragging files over the composer: the drop zone (dispatched as the browser would).
-  await composer.evaluate(`(section) => {
+  // Dragging a file over the composer, then dropping it (as the browser
+  // dispatches them; a script string, as recordings type-check without DOM).
+  const dragged = await page.evaluateHandle(`(() => {
     const data = new DataTransfer();
-    data.items.add(new File(['x'], 'photo.png', { type: 'image/png' }));
-    section.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer: data }));
-  }`);
+    data.items.add(new File([new Uint8Array(182000)], "parking-photo.png", { type: "image/png" }));
+    return data;
+  })()`);
+  await composer.dispatchEvent("dragenter", { dataTransfer: dragged });
   await composer.getByText("Drop to attach").waitFor();
   await caption(page, "Drag files over the composer to drop them in", 2200);
-  await composer.evaluate(`(section) => {
-    const data = new DataTransfer();
-    data.items.add(new File(['x'], 'photo.png', { type: 'image/png' }));
-    section.dispatchEvent(new DragEvent('dragleave', { bubbles: true, dataTransfer: data }));
-  }`);
-  await composer.getByText("Drop to attach").waitFor({ state: "detached" });
-  await pause(600);
+  await composer.dispatchEvent("drop", { dataTransfer: dragged });
+  await composer.getByText("parking-photo.png").waitFor();
+  await pause(1200);
 }

@@ -549,6 +549,31 @@ export function MessageComposer({
     }
   }, [editor]);
 
+  // Not every engine scrolls an element into view (jsdom, in tests).
+  const bringIntoView = (
+    element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null,
+  ) => {
+    element?.scrollIntoView?.({ block: "nearest" });
+  };
+  // Files added, or why one was not, come into view: below a long text (a
+  // phone's pinned composer) they would otherwise be out of sight.
+  const filesRef = useRef<HTMLUListElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const fileCount = attachments.length + uploading.length;
+  const seenFiles = useRef(fileCount);
+  useEffect(() => {
+    const added = fileCount > seenFiles.current;
+    seenFiles.current = fileCount;
+    if (added) {
+      bringIntoView(filesRef.current);
+    }
+  }, [fileCount]);
+  useEffect(() => {
+    if (error !== undefined && error !== null) {
+      bringIntoView(errorRef.current);
+    }
+  }, [error]);
+
   const carriesFiles = (event: React.DragEvent) => event.dataTransfer.types.includes("Files");
   const drag =
     onAttach === undefined
@@ -752,7 +777,11 @@ export function MessageComposer({
 
       {attachments.length === 0 && uploading.length === 0 ? null : (
         <>
-          <ul className={styles["attachments"]} aria-label={t("composer.attachments")}>
+          <ul
+            ref={filesRef}
+            className={styles["attachments"]}
+            aria-label={t("composer.attachments")}
+          >
             {attachments.map((attachment) => (
               <li key={attachment.id} className={styles["attachment"]}>
                 <FileTile filename={attachment.filename} />
@@ -799,7 +828,7 @@ export function MessageComposer({
       )}
 
       {error === undefined || error === null ? null : (
-        <p className={styles["error"]} role="alert">
+        <p ref={errorRef} className={styles["error"]} role="alert">
           <Icon name="warning" />
           <span>{error}</span>
         </p>

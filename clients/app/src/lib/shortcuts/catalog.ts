@@ -192,7 +192,7 @@ export const DEFAULT_SHORTCUTS = [
   },
   {
     id: "compose.attach",
-    keys: "mod+shift+a",
+    keys: "mod+shift+u",
     scope: "compose",
     group: "compose",
     label: "shortcuts:compose.attach",

@@ -8,7 +8,7 @@
 ## 2. Client
 
 - [x] 2.1 `uploadAttachment` in `api/drafts.ts`; `useDraftEditor.attach(files)` queued with saves, 409 handled as a save's
-- [x] 2.2 Composer: Attach button + `compose.attach` (⇧⌘A), hidden file input, drop zone, paste of files, chips (uploading / done / remove), total line
+- [x] 2.2 Composer: Attach button + `compose.attach` (⇧⌘U), hidden file input, drop zone, paste of files, chips (uploading / done / remove), total line
 - [x] 2.3 Client-side refusals (empty, total, blocked) with toasts; server refusal codes mapped to the same toasts
 - [x] 2.4 i18n en / pt-PT / es-ES / fr; `pnpm test:fit`; stories (idle, uploading, full, refused) + component tests; recording scenario
 

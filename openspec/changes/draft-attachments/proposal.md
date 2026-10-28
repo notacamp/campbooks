@@ -22,7 +22,7 @@ No new module and no cross-module dependency. Blob storage is the kernel's.
 
 ## What Changes
 
-- **Attach (⇧⌘A)** opens the device's file picker. Files can also be dragged
+- **Attach (⇧⌘U)** opens the device's file picker. Files can also be dragged
   onto the composer or pasted into it, including a pasted screenshot.
 - Each file shows while it uploads, then shows its name and size, and can be
   removed.

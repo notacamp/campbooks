@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MessageComposer, useUndoToast } from "~/lib/ui";
@@ -74,19 +75,23 @@ export function DraftComposer({
 
   const kept = editor.shown.attachments.filter((a) => fields.attachments.includes(a.id));
 
+  // Why the files last added were not attached, said in the composer beside
+  // them (a toast is one line and would cut the reason at 375px).
+  const [refusals, setRefusals] = useState<string[]>([]);
+
   /** Say, naming the file, why it was not attached. */
   function refuse(file: File, reason: RefusalReason) {
-    undoToast.notify(
-      t(`compose.attach.refused.${reason}`, {
-        name: file.name,
-        max: Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024)),
-        files: MAX_ATTACHMENTS,
-      }),
-    );
+    const said = t(`compose.attach.refused.${reason}`, {
+      name: file.name,
+      max: Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024)),
+      files: MAX_ATTACHMENTS,
+    });
+    setRefusals((so) => [...so, said]);
   }
 
   /** Files from the picker, a drop or a paste: refuse what cannot go, upload the rest. */
   function attach(files: File[]) {
+    setRefusals([]);
     const { accepted, refused } = screen(files, {
       bytes:
         kept.reduce((sum, a) => sum + a.size, 0) +
@@ -152,7 +157,9 @@ export function DraftComposer({
 
   const error =
     editor.error === undefined
-      ? undefined
+      ? refusals.length === 0
+        ? undefined
+        : refusals.join(" ")
       : t(`compose.errors.${KNOWN_ERRORS.has(editor.error) ? editor.error : "unknown"}`);
 
   return (

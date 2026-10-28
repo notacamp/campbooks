@@ -423,12 +423,12 @@ describe("MessageComposer", () => {
       const click = vi.spyOn(input, "click");
       fireEvent.click(screen.getByRole("button", { name: /Attach files/u }));
       expect(click).toHaveBeenCalledTimes(1);
-      // Focus is in the text: Ctrl+Shift+A reaches the registry from there too.
+      // Focus is in the text: Ctrl+Shift+U reaches the registry from there too.
       const box = screen.getByRole("textbox", { name: "Message" });
       act(() => {
         box.focus();
       });
-      fireEvent.keyDown(box, { key: "A", keyCode: 65, ctrlKey: true, shiftKey: true });
+      fireEvent.keyDown(box, { key: "U", keyCode: 85, ctrlKey: true, shiftKey: true });
       expect(click).toHaveBeenCalledTimes(2);
       fireEvent.change(input, { target: { files: [pdf] } });
       expect(onAttach).toHaveBeenCalledWith([pdf]);

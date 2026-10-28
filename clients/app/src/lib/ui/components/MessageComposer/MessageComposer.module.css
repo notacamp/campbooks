@@ -350,3 +350,10 @@
   color: var(--text-primary);
   pointer-events: none;
 }
+
+/* Brought into view above the sticky footer, never under it. */
+.attachments,
+.total,
+.error {
+  scroll-margin-block-end: calc(var(--btn-height) + var(--space-6));
+}

@@ -101,8 +101,9 @@ nothing.
     and "Uploading…" while pending;
   - a total line, "3.2 MB of 25 MB", shown once anything is attached.
 - **Before uploading,** the client refuses a file that would pass 25 MB in
-  total, an empty file, or a blocked extension, with a toast naming the file
-  and why. The server checks again.
+  total, an empty file, or a blocked extension. A line in the composer names
+  the file and says why; a toast is one line and would cut the reason short
+  at 375px. The server checks again.
 
 ## Data, events, scopes, AI
 
