@@ -144,18 +144,23 @@ export function TaskStory({ workspaceId, task, me, source }: TaskStoryProps) {
                 ) : null}
                 <div className="flex items-baseline gap-2">
                   <Dot signal={DOT[entry.actor]} />
-                  <Text tone="tertiary" size="sm" as="span">
-                    {historyStamp(entry.at, locale)}
-                  </Text>
-                  <Text as="span">
-                    {historyLine(entry, task.verb, {
-                      t,
-                      locale,
-                      me,
-                      memberName: named,
-                      sourceName: source?.name,
-                    })}
-                  </Text>
+                  {/* The time stays on one line, so every sentence starts where the others do. */}
+                  <span className="shrink-0 whitespace-nowrap">
+                    <Text tone="tertiary" size="sm" as="span">
+                      {historyStamp(entry.at, locale)}
+                    </Text>
+                  </span>
+                  <span className="min-w-0">
+                    <Text as="span">
+                      {historyLine(entry, task.verb, {
+                        t,
+                        locale,
+                        me,
+                        memberName: named,
+                        sourceName: source?.name,
+                      })}
+                    </Text>
+                  </span>
                 </div>
               </li>
             ))}
