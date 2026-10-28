@@ -23,6 +23,7 @@ import {
   ReaderFooter,
   SkeletonList,
   Text,
+  useUndoToast,
   Visor,
   type OverflowAction,
 } from "~/lib/ui";
@@ -270,6 +271,7 @@ export function ConversationReader({
   }, [mailScout, i18n]);
   const [savingThread, setSavingThread] = useState<SaveThread | undefined>();
   const queryClient = useQueryClient();
+  const undoToast = useUndoToast();
   const [reply, setReply] = useState<ReplyRequest | null>(null);
   // Reply first asks Scout (the reply dialog).
   const [replying, setReplying] = useState<{ opened: number } | undefined>();
@@ -446,7 +448,7 @@ export function ConversationReader({
         setSavingThread(saveThreadOf(conversation.id, conversation.subject, whole));
       },
       () => {
-        setSavingThread(undefined);
+        undoToast.fail({ label: t("reader.saveToPageFailed") });
       },
     );
   };

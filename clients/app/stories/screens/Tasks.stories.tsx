@@ -349,6 +349,8 @@ export const MakeItATask: Story = {
     const canvas = within(canvasElement);
     // N T makes a task from the email on screen.
     await canvas.findByRole("heading", { level: 2 });
+    // The reader binds N T once its email is in: wait for its actions.
+    await canvas.findByRole("button", { name: /Make it a task/u });
     await userEvent.keyboard("nt");
     await expect(await canvas.findByRole("textbox", { name: "Title" })).toBeVisible();
   },
