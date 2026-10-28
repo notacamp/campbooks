@@ -76,3 +76,20 @@ export function quotePreview(
     note,
   };
 }
+
+/**
+ * Text the member did not type as marks (Scout's draft, shown and edited as
+ * plain text in a dialog) as a draft's body: its `[` and `]` kept as text, so
+ * no `[words](url)` in it becomes a link whose words hide where it goes
+ * (campbooks-cloud#390). Escapes already there stay.
+ */
+export function literalLinks(text: string): string {
+  return text.replaceAll(/\\[\s\S]|[[\]]/gu, (found) =>
+    found.length === 2 ? found : `\\${found}`,
+  );
+}
+
+/** A body saved by {@link literalLinks}, as the dialog shows it again. */
+export function shownLinks(body: string): string {
+  return body.replaceAll(/\\([[\]])/gu, "$1");
+}

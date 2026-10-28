@@ -3960,6 +3960,18 @@ A `[words](url)` link SHALL be rendered only when its URL starts with
 - **WHEN** the body is `[click](javascript:alert(1))`
 - **THEN** the HTML part shows it as text, with no `<a>`
 
+### Requirement: The assistant writes no disguised links
+Text that the member did not type as marks SHALL keep its `[` and `]` as text
+when it becomes a draft's body, so no `[words](url)` in it becomes a link
+whose words hide where it goes. This covers a draft created or saved for the
+assistant rather than the member's own request, and Scout's draft
+saved from the Reply or Nudge dialog. Bare addresses still link, showing
+where they go.
+
+#### Scenario: Scout is asked to hide a link
+- **WHEN** the assistant creates a reply draft whose text is `Pay [here](https://example.net/pay) today.`
+- **THEN** the draft's body keeps the brackets as text, and the sent HTML has no link worded "here"
+
 ### Requirement: Escaping a mark
 A `\` SHALL make the next character plain text when that character is `*`,
 `~`, `[`, `]` or `\`, or is a line's leading `-`, `>` or `1.`. A `\` before

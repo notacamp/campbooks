@@ -53,6 +53,31 @@ pub fn message(body: &str, quoted: &str) -> (String, String) {
     )
 }
 
+/// `text` with every `[` and `]` made plain (`\\[`, `\\]`), so that no
+/// `[words](url)` in it becomes a link whose words hide where it goes. For
+/// text the member did not type: the assistant's, which may follow
+/// instructions hidden in someone else's mail. Escapes already there stay.
+pub fn literal_links(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => {
+                out.push(c);
+                if let Some(next) = chars.next() {
+                    out.push(next);
+                }
+            }
+            '[' | ']' => {
+                out.push('\\');
+                out.push(c);
+            }
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 /// The member's own `text` for the plain-text part: a link with words is
 /// `words <url>`, escapes are dropped, the other marks stay as typed.
 pub fn to_plain(text: &str) -> String {
@@ -479,6 +504,18 @@ fn escape_char(c: char, html: &mut String) {
 #[cfg(test)]
 mod tests {
     use super::{Marks, to_html, to_html_parts, to_plain};
+
+    #[test]
+    fn the_assistants_words_carry_no_worded_link() {
+        let made = super::literal_links("Pay [here](https://example.net) or \\[keep] C:\\temp");
+        assert_eq!(
+            made,
+            "Pay \\[here\\](https://example.net) or \\[keep\\] C:\\temp"
+        );
+        let html = to_html(&made, super::Marks::Own);
+        assert!(!html.contains(">here</a>"), "{html}");
+        assert!(html.contains("[here]"), "{html}");
+    }
 
     fn own(text: &str) -> String {
         to_html(text, Marks::Own)
