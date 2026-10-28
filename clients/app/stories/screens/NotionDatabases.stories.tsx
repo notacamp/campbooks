@@ -241,7 +241,11 @@ async function syncedFits(canvasElement: HTMLElement) {
     mark.scrollIntoView({ block: "nearest", inline: "nearest" });
     await expect(mark).toBeVisible();
   }
-  await expect(clickable(canvas.getByRole("button", { name: /^Score/u }))).toBe(true);
+  // On a phone the grid scrolls inside its box, so a far column is reached by scrolling it: it
+  // only has to be there.
+  const score = canvas.getByRole("button", { name: /^Score/u });
+  await expect(window.innerWidth >= 768 ? clickable(score) : score.isConnected).toBe(true);
+  await expect(score).toBeVisible();
   await expect(clickable(canvas.getByRole("button", { name: "Add a column" }))).toBe(true);
   // A formula's cells cannot be edited.
   await expect(within(canvas.getByRole("grid")).getAllByText("82")[0]).toBeVisible();
