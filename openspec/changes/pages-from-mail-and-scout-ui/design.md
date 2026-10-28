@@ -46,8 +46,14 @@ client.
   files it returns, in the same sync as the rest.
 - **Undo toast** ("Saved to *page*", with "Open page" and "Undo"): the client
   removes the blocks it inserted (Yjs). Files it attached are detached with
-  `pages.detach_files`. A 404 from `attach_from_message` (the thread changed,
-  or the file is gone) is a plain sentence, and nothing is half-added.
+  `pages.detach_files`. `attach_from_message`'s own refusals are each said
+  by name, and nothing is half-added:
+  - 403 `insufficient_scope`: this sign-in may not read mail;
+  - 404: the thread changed, or a file is gone;
+  - 413 `file_too_large`: a file is over 20 MiB.
+
+  This is not the composer's draft upload, so its per-mailbox limits (#699)
+  do not apply.
 
 ## The page change card (Scout)
 
@@ -68,6 +74,10 @@ client.
     Markdown in a plain editor inside the card; the edited text is sent.
     After adding, the card shows "Added", with "Open page" and "Undo"
     (`pages.unappend` or `pages.trash`).
+- "Add to page" is enabled only once the card shows everything the member
+  is confirming: the full Markdown (unfolded, or reachable through "Show
+  all"), who will read it, and the Notion line when it applies. A proposal
+  missing `detail.markdown` or the page's readers shows no "Add to page".
 - `RUNNABLE` gains exactly `pages.append` and `pages.create`.
 
 ## Ask Scout on a page

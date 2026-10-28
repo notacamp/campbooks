@@ -25,3 +25,7 @@ included. Every save SHALL show an Undo toast.
 #### Scenario: Off while the server does not offer it
 - **WHEN** mail and Scout in pages is off on the server
 - **THEN** the reader has no "Save to page" entry and its shortcut does nothing
+
+#### Scenario: An attachment over the cap
+- **WHEN** Ana includes attachments and one is over 20 MiB
+- **THEN** the dialog says which file is too large and nothing is added
