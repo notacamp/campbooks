@@ -36,9 +36,11 @@ import { streamReply, useReplySuggestions } from "../../api/replies";
 import {
   addressLine,
   firstName,
+  literalLinks,
   MAX_ASK_CHARS,
   quotePreview,
   quoteWords,
+  shownLinks,
   undoWindow,
 } from "../../compose/dialog";
 import { displayName, replyQuote } from "../../compose/quote";
@@ -172,7 +174,7 @@ export function ReplyDialog({
 
   const [stage, setStage] = useState<Stage>(resume === undefined ? "choose" : "draft");
   const [intent, setIntent] = useState(resume?.intent ?? "");
-  const [text, setText] = useState(resume?.draft.body ?? "");
+  const [text, setText] = useState(shownLinks(resume?.draft.body ?? ""));
   // The draft this dialog created and saved: the only one it saves again.
   const [saved, setSaved] = useState<Draft | undefined>();
   // A draft the next one replaces (the one an Undo handed back, or one that
@@ -401,7 +403,7 @@ export function ReplyDialog({
     }
     // The recipients shown, and no copies: what is saved is what is seen.
     const content = {
-      body: text,
+      body: literalLinks(text),
       quoted: replyQuote(answered, i18n.language, words),
       to: recipients,
       cc: [],
@@ -553,7 +555,7 @@ export function ReplyDialog({
     working.current = true;
     setBusy(true);
     try {
-      await deleteWithUndo({ ...deletable, body: text });
+      await deleteWithUndo({ ...deletable, body: literalLinks(text) });
       onClose();
     } catch {
       setProblem("errors.delete");

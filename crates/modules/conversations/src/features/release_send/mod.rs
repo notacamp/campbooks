@@ -357,11 +357,7 @@ fn outgoing(row: &drafts::DraftRow, send_id: SendId) -> Result<OutgoingMessage, 
         .map_or("campbooks.invalid", |(_, d)| d);
     let rfc_message_id = format!("{send_id}@{domain}");
     let (to, cc, bcc) = row.recipients()?;
-    let text = if row.quoted.trim().is_empty() {
-        row.body.clone()
-    } else {
-        format!("{}\n\n{}", row.body.trim_end(), row.quoted)
-    };
+    let (html, text) = format::message(&row.body, &row.quoted);
     Ok(OutgoingMessage {
         version: OUTGOING_VERSION,
         inbox: row.inbox_id,
@@ -376,7 +372,7 @@ fn outgoing(row: &drafts::DraftRow, send_id: SendId) -> Result<OutgoingMessage, 
         in_reply_to: row.in_reply_to.clone(),
         references: row.reference_ids.clone(),
         thread_key: row.thread_key.clone(),
-        html: Some(format::to_html(&text)),
+        html: Some(html),
         text,
         attachments: row
             .stored_attachments()?

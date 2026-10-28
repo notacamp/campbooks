@@ -26,6 +26,12 @@
     "send": "Send",
     "bold": "Bold",
     "italic": "Italic",
+    "strike": "Strikethrough",
+    "link": "Link",
+    "bullets": "Bulleted list",
+    "numbers": "Numbered list",
+    "quote": "Quote",
+    "expand": "Expand or shrink the composer",
     "ask": "Ask"
   },
   "workspace": {

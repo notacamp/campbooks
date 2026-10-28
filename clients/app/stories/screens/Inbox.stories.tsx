@@ -33,7 +33,7 @@ import {
   W,
 } from "../../test/demo/conversations";
 import type { Draft } from "../../src/modules/conversations/api/drafts";
-import { DRAFT_LIST, NEW } from "../../test/demo/drafts";
+import { DRAFT_LIST, NEW, REPLY_WRITTEN } from "../../test/demo/drafts";
 import { DUARTE, SESSION } from "../../test/demo/workspaces";
 
 import { mockFetch, type MockRoute } from "./mock-fetch";
@@ -657,6 +657,28 @@ export const DraftsView: Story = drafts;
 
 /** Drafts on a phone. */
 export const DraftsViewPhone: Story = { ...drafts, ...at("phone", 375, 812) };
+
+/**
+ * A reply draft open in its thread, saved as you type (a draft held in
+ * memory): the roomier composer in place, for recordings (campbooks-cloud#390).
+ */
+function replyDraftOpen(): Record<string, MockRoute> {
+  let draft: Draft = {
+    ...REPLY_WRITTEN,
+    body: "Thanks, Maya. I will go through **the plan on Thursday** and send you my notes.",
+  };
+  return inbox({
+    [`GET ${W}/drafts`]: () => ({ body: { drafts: [draft] } }),
+    [`GET ${W}/drafts/${draft.id}`]: () => ({ body: draft }),
+    [`PATCH ${W}/drafts/${draft.id}`]: (changes) => {
+      draft = { ...draft, ...(changes as Partial<Draft>), version: draft.version + 1 };
+      return { body: draft };
+    },
+  });
+}
+export const ReplyDraftOpen: Story = {
+  args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
+};
 
 /** No drafts: one plain line. */
 export const EmptyDrafts: Story = {

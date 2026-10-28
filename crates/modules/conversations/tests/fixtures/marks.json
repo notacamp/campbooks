@@ -1,0 +1,791 @@
+[
+ {
+  "name": "paragraphs",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Hi Ana,"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Thanks."
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "Hi Ana,\n\nThanks.",
+  "html": "<div><p>Hi Ana,</p><p>Thanks.</p></div>",
+  "plain": "Hi Ana,\n\nThanks."
+ },
+ {
+  "name": "line break",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "one"
+      },
+      {
+       "type": "hardBreak"
+      },
+      {
+       "type": "text",
+       "text": "two"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "one\ntwo",
+  "html": "<div><p>one<br>two</p></div>",
+  "plain": "one\ntwo"
+ },
+ {
+  "name": "bold",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "renew for a "
+      },
+      {
+       "type": "text",
+       "text": "year",
+       "marks": [
+        {
+         "type": "bold"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "renew for a **year**",
+  "html": "<div><p>renew for a <strong>year</strong></p></div>",
+  "plain": "renew for a **year**"
+ },
+ {
+  "name": "italic",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "mostly "
+      },
+      {
+       "type": "text",
+       "text": "done",
+       "marks": [
+        {
+         "type": "italic"
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": "."
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "mostly *done*.",
+  "html": "<div><p>mostly <em>done</em>.</p></div>",
+  "plain": "mostly *done*."
+ },
+ {
+  "name": "strikethrough",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "rent on the "
+      },
+      {
+       "type": "text",
+       "text": "5th",
+       "marks": [
+        {
+         "type": "strike"
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": " 1st"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "rent on the ~~5th~~ 1st",
+  "html": "<div><p>rent on the <s>5th</s> 1st</p></div>",
+  "plain": "rent on the ~~5th~~ 1st"
+ },
+ {
+  "name": "bold and italic together",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "both",
+       "marks": [
+        {
+         "type": "bold"
+        },
+        {
+         "type": "italic"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "***both***",
+  "html": "<div><p><strong><em>both</em></strong></p></div>",
+  "plain": "***both***"
+ },
+ {
+  "name": "italic inside bold",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "all of ",
+       "marks": [
+        {
+         "type": "bold"
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": "this",
+       "marks": [
+        {
+         "type": "bold"
+        },
+        {
+         "type": "italic"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "**all of *this***",
+  "html": "<div><p><strong>all of <em>this</em></strong></p></div>",
+  "plain": "**all of *this***"
+ },
+ {
+  "name": "spaces stay outside a mark",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "a "
+      },
+      {
+       "type": "text",
+       "text": "b",
+       "marks": [
+        {
+         "type": "bold"
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": " c"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "a **b** c",
+  "html": "<div><p>a <strong>b</strong> c</p></div>",
+  "plain": "a **b** c"
+ },
+ {
+  "name": "link with words",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "See "
+      },
+      {
+       "type": "text",
+       "text": "the lease",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.com/4b"
+         }
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": "."
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "See [the lease](https://example.com/4b).",
+  "html": "<div><p>See <a href=\"https://example.com/4b\">the lease</a>.</p></div>",
+  "plain": "See the lease <https://example.com/4b>."
+ },
+ {
+  "name": "mail link",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Write "
+      },
+      {
+       "type": "text",
+       "text": "me",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "mailto:ana@example.com"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "Write [me](mailto:ana@example.com)",
+  "html": "<div><p>Write <a href=\"mailto:ana@example.com\">me</a></p></div>",
+  "plain": "Write me <mailto:ana@example.com>"
+ },
+ {
+  "name": "link with emphasis",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "the",
+       "marks": [
+        {
+         "type": "bold"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.com/4b"
+         }
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": " lease",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.com/4b"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "[**the** lease](https://example.com/4b)",
+  "html": "<div><p><a href=\"https://example.com/4b\"><strong>the</strong> lease</a></p></div>",
+  "plain": "**the** lease <https://example.com/4b>"
+ },
+ {
+  "name": "bare address",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Visit https://example.com/a?b=1&c=2 now"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "Visit https://example.com/a?b=1&c=2 now",
+  "html": "<div><p>Visit <a href=\"https://example.com/a?b=1&amp;c=2\">https://example.com/a?b=1&amp;c=2</a> now</p></div>",
+  "plain": "Visit https://example.com/a?b=1&c=2 now"
+ },
+ {
+  "name": "a link that is not allowed stays text",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "[click](javascript:alert(1))"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "\\[click\\](javascript:alert(1))",
+  "html": "<div><p>[click](javascript:alert(1))</p></div>",
+  "plain": "[click](javascript:alert(1))"
+ },
+ {
+  "name": "an asterisk",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "2 * 3 = 6"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "2 \\* 3 = 6",
+  "html": "<div><p>2 * 3 = 6</p></div>",
+  "plain": "2 * 3 = 6"
+ },
+ {
+  "name": "a tilde",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "about ~5 or ~~6"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "about \\~5 or \\~\\~6",
+  "html": "<div><p>about ~5 or ~~6</p></div>",
+  "plain": "about ~5 or ~~6"
+ },
+ {
+  "name": "brackets",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "[note] and [x](y)"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "\\[note\\] and \\[x\\](y)",
+  "html": "<div><p>[note] and [x](y)</p></div>",
+  "plain": "[note] and [x](y)"
+ },
+ {
+  "name": "a backslash",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "C:\\temp"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "C:\\\\temp",
+  "html": "<div><p>C:\\temp</p></div>",
+  "plain": "C:\\temp"
+ },
+ {
+  "name": "a line that looks like a mark",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "- not a list"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "> not a quote"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "1. not a list"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "\\- not a list\n\n\\> not a quote\n\n1\\. not a list",
+  "html": "<div><p>- not a list</p><p>&gt; not a quote</p><p>1. not a list</p></div>",
+  "plain": "- not a list\n\n> not a quote\n\n1. not a list"
+ },
+ {
+  "name": "bullets",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "parking P2-14"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "rent on the "
+          },
+          {
+           "type": "text",
+           "text": "5th",
+           "marks": [
+            {
+             "type": "strike"
+            }
+           ]
+          },
+          {
+           "type": "text",
+           "text": " 1st"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "- parking P2-14\n- rent on the ~~5th~~ 1st",
+  "html": "<div><ul><li>parking P2-14</li><li>rent on the <s>5th</s> 1st</li></ul></div>",
+  "plain": "- parking P2-14\n- rent on the ~~5th~~ 1st"
+ },
+ {
+  "name": "numbers",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "first"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "second"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "1. first\n2. second",
+  "html": "<div><ol><li>first</li><li>second</li></ol></div>",
+  "plain": "1. first\n2. second"
+ },
+ {
+  "name": "a list then a paragraph",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "a"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "b"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Then we sign."
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "- a\n- b\n\nThen we sign.",
+  "html": "<div><ul><li>a</li><li>b</li></ul><p>Then we sign.</p></div>",
+  "plain": "- a\n- b\n\nThen we sign."
+ },
+ {
+  "name": "a quote",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Can we?"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "> Can we?",
+  "html": "<div><blockquote><p>Can we?</p></blockquote></div>",
+  "plain": "> Can we?"
+ },
+ {
+  "name": "a quote holding a list",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Intro"
+        }
+       ]
+      },
+      {
+       "type": "bulletList",
+       "content": [
+        {
+         "type": "listItem",
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "listItem",
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "b"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Reply"
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "> Intro\n>\n> - a\n> - b\n\nReply",
+  "html": "<div><blockquote><p>Intro</p><ul><li>a</li><li>b</li></ul></blockquote><p>Reply</p></div>",
+  "plain": "> Intro\n>\n> - a\n> - b\n\nReply"
+ },
+ {
+  "name": "a quote with a line that looks like a mark",
+  "doc": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "- x"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "marks": "> \\- x",
+  "html": "<div><blockquote><p>- x</p></blockquote></div>",
+  "plain": "> - x"
+ }
+]

@@ -26,6 +26,12 @@
     "send": "Envoyer",
     "bold": "Gras",
     "italic": "Italique",
+    "strike": "Barré",
+    "link": "Lien",
+    "bullets": "Liste à puces",
+    "numbers": "Liste numérotée",
+    "quote": "Citation",
+    "expand": "Agrandir ou réduire l'éditeur",
     "ask": "Demander"
   },
   "workspace": {

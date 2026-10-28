@@ -1,7 +1,8 @@
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { editorOf, typeInto } from "../../../../../test/composer";
 import { renderUi } from "../../../../../test/render";
 
 import type { Recipient } from "../RecipientField/RecipientField";
@@ -31,7 +32,7 @@ function props(overrides: Partial<MessageComposerProps> = {}): MessageComposerPr
 }
 
 describe("MessageComposer", () => {
-  it("shows who it is from and to, and opens Cc and Bcc on demand", () => {
+  it("shows who it is from and to, and opens Cc and Bcc on demand", async () => {
     renderUi(<MessageComposer {...props()} />);
     expect(screen.getByRole("region", { name: "Reply to Maya" })).toBeInTheDocument();
     expect(screen.getByText("Sam Rivers <sam@example.com>")).toBeInTheDocument();
@@ -42,7 +43,9 @@ describe("MessageComposer", () => {
     expect(screen.getByRole("textbox", { name: "Bcc" })).toBeInTheDocument();
     // A reply keeps its subject: no field.
     expect(screen.queryByRole("textbox", { name: "Subject" })).not.toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Message" })).toHaveFocus();
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "Message" })).toHaveFocus();
+    });
   });
 
   it("never hides copies, also ones that arrive after it opened", () => {
@@ -75,17 +78,24 @@ describe("MessageComposer", () => {
     const onClose = vi.fn();
     const onBodyChange = vi.fn();
     renderUi(<MessageComposer {...props({ onSend, onClose, onBodyChange, body: "see you" })} />);
-    const box = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
+    const box = screen.getByRole("textbox", { name: "Message" });
     fireEvent.blur(box);
     fireEvent.keyDown(document.body, { key: "Enter", ctrlKey: true });
     expect(onSend).not.toHaveBeenCalled();
 
-    fireEvent.focus(box);
-    box.setSelectionRange(4, 7);
+    act(() => {
+      box.focus();
+      editorOf(box).commands.setTextSelection({ from: 5, to: 8 });
+    });
     fireEvent.keyDown(box, { key: "b", ctrlKey: true });
-    expect(onBodyChange).toHaveBeenCalledWith("see **you**");
+    expect(onBodyChange).toHaveBeenLastCalledWith("see **you**");
+    expect(box.querySelector("strong")).toHaveTextContent("you");
+    fireEvent.keyDown(box, { key: "b", ctrlKey: true });
+    expect(onBodyChange).toHaveBeenLastCalledWith("see you");
     fireEvent.keyDown(box, { key: "i", ctrlKey: true });
-    expect(onBodyChange).toHaveBeenCalledWith("see *you*");
+    expect(onBodyChange).toHaveBeenLastCalledWith("see *you*");
+    fireEvent.keyDown(box, { key: "x", ctrlKey: true, shiftKey: true });
+    expect(onBodyChange).toHaveBeenLastCalledWith("see ~~*you*~~");
     fireEvent.keyDown(box, { key: "Enter", ctrlKey: true });
     expect(onSend).toHaveBeenCalledOnce();
     fireEvent.keyDown(box, { key: "Escape" });
@@ -130,22 +140,210 @@ describe("MessageComposer", () => {
     expect(onQueryChange).toHaveBeenLastCalledWith("cc", "");
   });
 
-  it("formats from the toolbar, and offers its shortcuts", () => {
+  it("formats from the toolbar, shows it as formatting, and offers its shortcuts", () => {
     const onBodyChange = vi.fn();
     renderUi(<MessageComposer {...props({ onBodyChange, body: "budget" })} />);
-    expect(screen.getByRole("button", { name: "Bold" })).toHaveAttribute(
+    const toolbar = screen.getByRole("toolbar", { name: "Formatting" });
+    expect(within(toolbar).getByRole("button", { name: "Bold" })).toHaveAttribute(
       "aria-keyshortcuts",
       "Control+B",
     );
-    fireEvent.mouseDown(screen.getByRole("button", { name: "Bulleted list" }));
-    fireEvent.click(screen.getByRole("button", { name: "Bulleted list" }));
-    expect(onBodyChange).toHaveBeenCalledWith("- budget");
-    fireEvent.click(screen.getByRole("button", { name: "Numbered list" }));
-    expect(onBodyChange).toHaveBeenCalledWith("1. budget");
+    for (const [name, keys] of [
+      ["Strikethrough", "Control+Shift+X"],
+      ["Link", "Control+Shift+K"],
+      ["Bulleted list", "Control+Shift+8"],
+      ["Numbered list", "Control+Shift+7"],
+      ["Quote", "Control+Shift+9"],
+    ] as const) {
+      expect(within(toolbar).getByRole("button", { name })).toHaveAttribute(
+        "aria-keyshortcuts",
+        keys,
+      );
+    }
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Bulleted list" }));
+    expect(onBodyChange).toHaveBeenLastCalledWith("- budget");
+    expect(
+      screen.getByRole("textbox", { name: "Message" }).querySelector("ul li"),
+    ).toHaveTextContent("budget");
+    expect(within(toolbar).getByRole("button", { name: "Bulleted list" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Numbered list" }));
+    expect(onBodyChange).toHaveBeenLastCalledWith("1. budget");
     expect(screen.getByRole("button", { name: /Send/u })).toHaveAttribute(
       "aria-keyshortcuts",
       "Control+Enter",
     );
+  });
+
+  it("quotes a paragraph from the toolbar", () => {
+    const onBodyChange = vi.fn();
+    renderUi(<MessageComposer {...props({ onBodyChange, body: "budget" })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Quote" }));
+    expect(onBodyChange).toHaveBeenLastCalledWith("> budget");
+  });
+
+  it("opens a draft's marks as formatting, and types a literal asterisk as one", () => {
+    const onBodyChange = vi.fn();
+    renderUi(
+      <MessageComposer
+        {...props({
+          onBodyChange,
+          body: "- parking P2-14\n- rent on the ~~5th~~ 1st",
+        })}
+      />,
+    );
+    const box = screen.getByRole("textbox", { name: "Message" });
+    expect(box.querySelectorAll("ul > li")).toHaveLength(2);
+    expect(box.querySelector("s")).toHaveTextContent("5th");
+    act(() => {
+      editorOf(box).commands.setContent("<p></p>", { emitUpdate: false });
+    });
+    typeInto(box, "2 * 3 = 6");
+    expect(onBodyChange).toHaveBeenLastCalledWith(String.raw`2 \* 3 = 6`);
+  });
+
+  it("keeps only what the schema holds when content is pasted", () => {
+    const onBodyChange = vi.fn();
+    renderUi(<MessageComposer {...props({ onBodyChange })} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => {
+      editorOf(box).commands.insertContent(
+        '<h2>Heading</h2><img src="https://example.com/a.png"><p>A <b>bold</b> sentence</p>',
+      );
+    });
+    expect(box.querySelector("h2, img")).toBeNull();
+    expect(onBodyChange).toHaveBeenLastCalledWith("Heading\n\nA **bold** sentence");
+  });
+
+  it("links words to an address, and refuses any that is not web or mail", () => {
+    const onBodyChange = vi.fn();
+    renderUi(<MessageComposer {...props({ onBodyChange, body: "See the lease." })} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => {
+      box.focus();
+      editorOf(box).commands.setTextSelection({ from: 5, to: 14 });
+    });
+    fireEvent.keyDown(box, { key: "k", ctrlKey: true, shiftKey: true });
+    const address = screen.getByRole("textbox", { name: "Address" });
+    expect(screen.getByRole("textbox", { name: "Words" })).toHaveValue("the lease");
+    fireEvent.change(address, { target: { value: "javascript:alert(1)" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add link" }));
+    expect(screen.getByText("Only web and email addresses can be linked.")).toBeVisible();
+    expect(onBodyChange).not.toHaveBeenCalled();
+    fireEvent.change(address, { target: { value: "https://example.com/4b" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add link" }));
+    expect(onBodyChange).toHaveBeenLastCalledWith("See [the lease](https://example.com/4b).");
+    expect(box.querySelector("a")).toHaveAttribute("href", "https://example.com/4b");
+    expect(screen.queryByRole("textbox", { name: "Address" })).not.toBeInTheDocument();
+  });
+
+  it("closes the link form with Escape before it closes the composer", () => {
+    const onClose = vi.fn();
+    renderUi(<MessageComposer {...props({ onClose })} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => {
+      box.focus();
+    });
+    fireEvent.keyDown(box, { key: "k", ctrlKey: true, shiftKey: true });
+    const words = screen.getByRole("textbox", { name: "Words" });
+    act(() => {
+      words.focus();
+    });
+    fireEvent.keyDown(words, { key: "Escape" });
+    expect(screen.queryByRole("textbox", { name: "Words" })).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("takes the server's echo only when it differs, so a save never moves the cursor", () => {
+    function Echo({ body }: { body: string }) {
+      return <MessageComposer {...props({ body })} />;
+    }
+    const { rerender } = renderUi(<Echo body="Thursday works." />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => {
+      editorOf(box).commands.setTextSelection(4);
+    });
+    // The echo of what is on screen changes nothing.
+    rerender(<Echo body="Thursday works." />);
+    expect(editorOf(box).state.selection.from).toBe(4);
+    // A different body (the draft shown again as the server holds it) does.
+    rerender(<Echo body="Friday instead." />);
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent("Friday instead.");
+  });
+
+  it("expands into a sheet and back without losing the cursor or the undo history", () => {
+    renderUi(<MessageComposer {...props({ body: "Thursday works." })} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => {
+      box.focus();
+      editorOf(box).commands.setTextSelection(9);
+    });
+    typeInto(box, "!");
+    // Inline it is no dialog: nothing announces one that is not there.
+    expect(box.closest("dialog")).toBeNull();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.keyDown(box, { key: "e", ctrlKey: true, shiftKey: true });
+    expect(box.closest("dialog")).toHaveAttribute("data-expanded");
+    expect(screen.getByRole("button", { name: "Shrink" })).toBeVisible();
+    // The same element, text and cursor.
+    expect(screen.getByRole("textbox", { name: "Message" })).toBe(box);
+    expect(editorOf(box).state.selection.from).toBe(10);
+    typeInto(box, "?");
+    // Esc shrinks it (it does not close the composer).
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(box.closest("dialog")).toBeNull();
+    expect(box).toHaveTextContent("Thursday!? works.");
+    expect(editorOf(box).can().undo()).toBe(true);
+    act(() => {
+      editorOf(box).commands.undo();
+    });
+    expect(box).not.toHaveTextContent("?");
+  });
+
+  // ProseMirror prevents the default of ⌘B and ⌘I in the text (a real key
+  // event carries its keyCode), so the editor formats them itself.
+  it("formats with the keys as a real key event sends them", () => {
+    renderUi(<MessageComposer {...props({ body: "Thursday works." })} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => {
+      editorOf(box).chain().focus().setTextSelection({ from: 1, to: 9 }).run();
+    });
+    fireEvent.keyDown(box, { key: "b", keyCode: 66, ctrlKey: true });
+    expect(editorOf(box).isActive("bold")).toBe(true);
+    fireEvent.keyDown(box, { key: "i", keyCode: 73, ctrlKey: true });
+    expect(editorOf(box).isActive("italic")).toBe(true);
+  });
+
+  // ProseMirror prevents Esc's default in the text, so the shortcut registry
+  // never sees it there: the editor hands it to the composer itself.
+  it("Esc in the text shrinks the sheet, then closes the composer", () => {
+    const onClose = vi.fn();
+    renderUi(<MessageComposer {...props({ onClose, body: "Thursday works." })} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => {
+      box.focus();
+    });
+    fireEvent.keyDown(box, { key: "e", ctrlKey: true, shiftKey: true });
+    expect(box.closest("dialog")).not.toBeNull();
+    fireEvent.keyDown(box, { key: "Escape", keyCode: 27 });
+    expect(box.closest("dialog")).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(box, { key: "Escape", keyCode: 27 });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("hides Expand on a phone", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    renderUi(<MessageComposer {...props()} />);
+    expect(screen.queryByRole("button", { name: "Expand" })).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 
   it("edits the subject, the folded quote and the attachments of a forward", () => {
