@@ -149,7 +149,7 @@
       "change": "You replied. Done? (campbooks-cloud#396): tasks.task_reply_noticed (a reply of the member in the conversation an open Do task came from) and tasks.task_reply_answered (the member answered Not yet); Coverage for tasks.notice_replies, tasks.answer_reply and tasks.unanswer_reply.",
       "date": "2026-10-28",
       "plan_version": 20,
-      "pr": "#693"
+      "pr": "#697"
     }
   ],
   "coverage": [
