@@ -3,6 +3,7 @@
 pub mod apply_changes;
 pub mod apply_rule;
 pub mod archive;
+pub mod attachment_blobs;
 pub mod backfill_needs;
 pub mod check_send;
 pub mod create_draft;
