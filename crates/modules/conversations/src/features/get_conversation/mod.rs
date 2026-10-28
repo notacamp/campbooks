@@ -141,6 +141,13 @@ pub struct ConversationDetail {
     /// not written yet (it arrives with a change to this conversation), or no
     /// model may read mail on this server.
     pub need_summary: Option<String>,
+    /// Scout's read of the email behind the open need failed for good (the
+    /// model gave no usable answer on every try), so there is no summary and
+    /// there will not be one: the reader says so instead of staying blank
+    /// (campbooks-cloud#375). False when there is no open need, the read is
+    /// pending or done, or the need is a phishing warning.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub need_read_failed: bool,
 }
 
 /// The summary of the email behind the conversation's open need; none for
@@ -150,6 +157,14 @@ const NEED_SUMMARY: &str = "SELECT s.texts FROM conversations.needs n \
         AND s.layer = 'model' \
       WHERE n.conversation_id = $1 AND n.state = 'open' AND s.state = 'read' \
         AND s.texts <> '{}' AND n.question <> 'suspicious'";
+
+/// Whether the model's read of the email behind the conversation's open need
+/// failed on every call it gets (campbooks-cloud#375).
+const NEED_READ_FAILED: &str = "SELECT EXISTS (SELECT 1 FROM conversations.needs n \
+       JOIN conversations.message_reads s ON s.message_id = n.message_id \
+        AND s.layer = 'model' \
+      WHERE n.conversation_id = $1 AND n.state = 'open' AND s.state = 'failed' \
+        AND s.attempts >= $2 AND n.question <> 'suspicious')";
 
 /// The summary of the email behind the conversation's open need, in
 /// `locale`, else in English.
@@ -274,6 +289,11 @@ pub async fn handler(
         view.threshold = suggestions::threshold(&policy, view);
     }
     let need_summary = need_summary(&mut tx, id, locale).await?;
+    let need_read_failed: bool = sqlx::query_scalar(NEED_READ_FAILED)
+        .bind(id)
+        .bind(crate::features::read_message::MAX_CALLS)
+        .fetch_one(&mut *tx)
+        .await?;
     let ids: Vec<MessageId> = rows.iter().map(|r| r.id).collect();
     let mut attachments = attachments_of(&mut tx, &ids).await?;
     tx.commit().await?;
@@ -312,6 +332,7 @@ pub async fn handler(
         messages,
         decisions,
         need_summary,
+        need_read_failed,
     }))
 }
 

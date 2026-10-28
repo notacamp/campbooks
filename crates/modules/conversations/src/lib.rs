@@ -218,6 +218,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
         background: Background::new()
             .publishes::<events::MessageReceived>()
             .publishes::<events::MessageSent>()
+            .publishes::<events::MemberReplied>()
             .publishes::<events::ConversationChanged>()
             .publishes::<events::ChangesRequested>()
             .publishes::<events::SendRequested>()

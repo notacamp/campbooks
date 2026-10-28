@@ -27,6 +27,7 @@ const task = (n: number, over: Partial<Task>): Task => ({
   created_by: ANA.user_id,
   handed_by: null,
   source: null,
+  asks_done: false,
   revision: 1,
   created_at: "2026-10-10T09:00:00Z",
   updated_at: "2026-10-10T09:00:00Z",
@@ -83,6 +84,21 @@ export const ASK_LEASE = task(8, {
   origin: "ask",
   due_on: "2026-10-16",
   source: { type: "conversations.conversation", id: MARTA.id },
+});
+
+/**
+ * The lease task after Ana replied to Marta's email (campbooks-cloud#396):
+ * Scout asks whether it is done. Not yet is the same task with `asks_done`
+ * off.
+ */
+export const ASK_REPLIED = task(10, {
+  title: "Send the signed lease",
+  origin: "ask",
+  due_on: "2026-10-16",
+  source: { type: "conversations.conversation", id: MARTA.id },
+  asks_done: true,
+  replied: { at: "2026-10-13T14:20:00Z", message: "0192f1a0-0000-7000-8000-00000000aa01" },
+  revision: 2,
 });
 
 /** Scout found it in the energy company's invoice, late. */

@@ -2674,6 +2674,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/reply_answered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer "Is this done?" with Not yet: the task stays open and the
+         *     question is not asked again until the member replies again.
+         */
+        post: operations["tasks.answer_reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/reply_unanswered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back a Not yet: the question is asked again. */
+        post: operations["tasks.unanswer_reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/tasks/{task_id}/take_back": {
         parameters: {
             query?: never;
@@ -4190,6 +4227,14 @@ export interface components {
             decisions: components["schemas"]["DecisionView"][];
             /** @description Up to the 100 newest messages, oldest first. */
             messages: components["schemas"]["MessageView"][];
+            /**
+             * @description Scout's read of the email behind the open need failed for good (the
+             *     model gave no usable answer on every try), so there is no summary and
+             *     there will not be one: the reader says so instead of staying blank
+             *     (campbooks-cloud#375). False when there is no open need, the read is
+             *     pending or done, or the need is a phishing warning.
+             */
+            need_read_failed?: boolean;
             /**
              * @description Scout's summary of the email behind the conversation's open need, in
              *     your language (English when it has none in yours), written once when
@@ -8357,7 +8402,7 @@ export interface components {
          *     plan that held or released time on the calendar, which of the two.
          * @enum {string}
          */
-        TaskHistoryWhat: "created" | "edited" | "due_changed" | "planned" | "done" | "not_needed" | "reopened" | "handed_off" | "taken_back" | "held" | "released";
+        TaskHistoryWhat: "created" | "edited" | "due_changed" | "planned" | "done" | "not_needed" | "reopened" | "handed_off" | "taken_back" | "held" | "released" | "replied" | "reply_answered" | "reply_unanswered";
         /** @description Time held for a task on the member's calendar. */
         TaskHold: {
             /**
@@ -8401,6 +8446,22 @@ export interface components {
          * @enum {string}
          */
         TaskPlan: "none" | "date" | "later";
+        /**
+         * @description The member's reply in the conversation a task came from, noticed after
+         *     the task was made (campbooks-cloud#396).
+         */
+        TaskReply: {
+            /**
+             * Format: date-time
+             * @description When the reply was sent.
+             */
+            at: string;
+            /**
+             * Format: uuid
+             * @description The reply (the conversations module's message id).
+             */
+            message: string;
+        };
         /**
          * @description The revision of a task the caller saw, for a change that needs nothing
          *     else.
@@ -8446,6 +8507,12 @@ export interface components {
         TaskVerb: "do" | "pay";
         /** @description A task, as the caller sees it. */
         TaskView: {
+            /**
+             * @description Whether to ask the member "You replied. Is this done?": the task is
+             *     open, a Do, replied to, and the question was not answered (Not yet)
+             *     since the newest reply.
+             */
+            asks_done: boolean;
             /** @description The member it is with. */
             assignee: components["schemas"]["UserId"];
             /**
@@ -8490,6 +8557,7 @@ export interface components {
              * @description The planned day, for `date`.
              */
             plan_on?: string | null;
+            replied?: components["schemas"]["TaskReply"] | null;
             /**
              * Format: int64
              * @description Grows with every change: send the one you saw with a change.
@@ -20352,6 +20420,148 @@ export interface operations {
                 };
             };
             /** @description The task changed since you saw it (`task_changed`), or it is still open (`task_open`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.answer_reply": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), it is closed (`task_closed`) or it asks nothing (`no_reply_question`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "tasks.unanswer_reply": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0):
+                 *     where their day starts, for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The task. */
+                task_id: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRevision"];
+            };
+        };
+        responses: {
+            /** @description The task afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or the task is with someone else now (`task_not_yours`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such task, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The task changed since you saw it (`task_changed`), it is closed (`task_closed`) or no Not yet was given (`no_reply_question`). */
             409: {
                 headers: {
                     [name: string]: unknown;

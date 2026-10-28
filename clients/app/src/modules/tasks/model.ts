@@ -182,3 +182,15 @@ export function whenLabel(when: string | Date, locale: string): string {
     month: "short",
   }).format(new Date(when));
 }
+
+/**
+ * When the member replied, for "You replied at {{time}}": the time of day,
+ * with the day first when it was not today.
+ */
+export function replyWhen(when: string | Date, locale: string, now: Date): string {
+  const date = new Date(when);
+  const clock = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(
+    date,
+  );
+  return isoDay(date) === isoDay(now) ? clock : `${whenLabel(date, locale)}, ${clock}`;
+}

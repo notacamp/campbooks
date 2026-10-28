@@ -12,6 +12,13 @@ Tasks are what the member has to do or pay. The Tasks place lists them, and Home
 - Scout can add a task itself from what it read in an email in the member's own inbox (an ask). Its detail then says Scout found it in the email; the member can edit, plan, hand off or close it like any other.
 - It is personal: it belongs to one member, its assignee.
 
+### Done? after a reply
+
+- When the member replies in the email thread a Do task came from, the task asks them "Done?" on Home, in the Tasks list and in the thread. They answer Done, or Not yet.
+- Scout does not close the task itself. It never reads the reply to decide: it only knows that the member replied, and the member says whether that finished the job.
+- Not yet leaves the task open and Scout does not ask again until the member replies again. A bill (Pay) is never asked this: a reply does not pay it.
+- If the member asks why Scout asked, say that they replied in the same thread after the task was made, and that Scout did not read the reply.
+
 ### Plan and Later
 
 - The member can plan a task for a day. That is when they mean to do it, and it can differ from the due day.

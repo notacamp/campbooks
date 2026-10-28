@@ -162,6 +162,7 @@
   },
   "scout": {
     "label": "Ponto da situação",
+    "readFailed": "O Scout não conseguiu ler esta.",
     "suggestion": "Sugere {{stream}}",
     "suggestionNote": "O Campbooks acha que isto pertence a {{stream}}. É uma sugestão: nada sai do sítio sem a sua decisão.",
     "prompt": "Mover?",
@@ -186,7 +187,11 @@
     "whyUrgent": "Urgente",
     "whySuspicious": "Suspeita",
     "whyMoney": "Pagamento",
-    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra"
+    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra",
+    "taskOpen": "A sua tarefa «{{title}}» continua aberta.",
+    "taskPrompt": "Está feita?",
+    "taskDone": "Feita",
+    "taskNotYet": "Ainda não"
   },
   "reasons": {
     "signals": {

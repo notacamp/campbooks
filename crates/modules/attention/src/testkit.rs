@@ -146,6 +146,8 @@ pub struct Task {
     pub assignee: UserId,
     /// The conversation it came from.
     pub source: Option<String>,
+    /// Whether it asks the member "You replied. Is this done?".
+    pub asks_done: bool,
 }
 
 impl Task {
@@ -161,6 +163,7 @@ impl Task {
             later_until: None,
             assignee,
             source: None,
+            asks_done: false,
         }
     }
 }
@@ -252,6 +255,7 @@ impl Kit {
                 .source
                 .as_ref()
                 .map(|id| RecordRef::new("conversations.conversation", id)),
+            asks_done: task.asks_done,
         };
         let mut tx = self.state.db.begin_for(workspace).await.unwrap();
         self.state.events.publish(&mut tx, &event).await.unwrap();

@@ -231,6 +231,58 @@ export const ThreadReplied: Story = {
   },
 };
 
+/**
+ * Scout's read of the message behind the open need failed for good: the note
+ * says so in one muted line instead of staying blank (campbooks-cloud#375).
+ */
+const Q4_NEEDING = {
+  ...Q4,
+  need: {
+    reason: "reply",
+    trust: "sure",
+    basis: "rules",
+    question: "needs_reply",
+    rule: "signals.question",
+    due_on: null,
+    overdue: false,
+    lapses_at: null,
+    urgent: false,
+    message_id: q4Body,
+    sent_at: "2026-10-13T12:00:00Z",
+  },
+} satisfies typeof Q4;
+
+const readFailed = {
+  args: {
+    path: `${PATH}/primary/${Q4.id}`,
+    api: inbox({
+      // The list, the thread and its read mark all carry the open need: the
+      // reader shows the need's note from the conversation it lists.
+      [`GET ${W}/conversations`]: {
+        body: {
+          conversations: PRIMARY.map((c) => (c.id === Q4.id ? Q4_NEEDING : c)),
+          next_cursor: null,
+        },
+      },
+      [`GET ${W}/conversations/${Q4.id}`]: {
+        body: { ...Q4_DETAIL, conversation: Q4_NEEDING, need_read_failed: true },
+      },
+      [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4_NEEDING, unread_count: 0 } },
+    }),
+  },
+} satisfies Story;
+
+export const ThreadReadFailed: Story = {
+  ...readFailed,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Scout couldn\u2019t read this one.")).toBeVisible();
+  },
+};
+
+/** The same, without a play, for recordings. */
+export const ThreadReadFailedRecording: Story = readFailed;
+
 /** A mailbox disconnected with its mail kept: history, read-only, nothing to act on. */
 export const KeptHistory: Story = {
   args: {
