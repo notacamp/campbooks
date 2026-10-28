@@ -1,8 +1,8 @@
 ## 1. Server: marks
 
-- [ ] 1.1 Shared fixture `crates/modules/conversations/tests/fixtures/marks.json` (doc, marks, html, plain per case); cases listed in design §4
-- [ ] 1.2 `format.rs`: `[words](url)` (http/https/mailto only), `~~strike~~`, `\` escapes, `Marks::Own` / `Marks::Quoted`, `to_plain`; unit tests + fixture test
-- [ ] 1.3 `release_send`: render body (`Own`) and quoted history (`Quoted`) separately inside the one `<div>`; plain text via `to_plain(body)`; tests incl. the quoted `[your bank](…)` scenario
+- [x] 1.1 Shared fixture `crates/modules/conversations/tests/fixtures/marks.json` (doc, marks, html, plain per case); cases listed in design §4
+- [x] 1.2 `format.rs`: `[words](url)` (http/https/mailto only), `~~strike~~`, `\` escapes, `Marks::Own` / `Marks::Quoted`, `to_plain`; unit tests + fixture test
+- [x] 1.3 `release_send`: render body (`Own`) and quoted history (`Quoted`) separately inside the one `<div>`; plain text via `to_plain(body)`; tests incl. the quoted `[your bank](…)` scenario
 
 ## 2. Client: the editor
 
