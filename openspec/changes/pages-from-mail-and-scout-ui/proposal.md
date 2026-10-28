@@ -42,7 +42,7 @@ Scout's page proposals.
 - Client only: `clients/app` (reader, pages module, Scout chat) and, where a
   shared piece is needed, `@notacamp/ui`. No server, migration or OpenAPI
   change is expected. If tracked client events are needed, they go in
-  tracking patch 0024 (migrations, if any, from 20261117010000).
+  tracking patch 0024 (migrations, if any, from 20261120010000).
 - Prototype: the "Save a thread to a page" board and the Scout card on the
   "Pages" board of the Pages canvas, approved with change 1.
 
