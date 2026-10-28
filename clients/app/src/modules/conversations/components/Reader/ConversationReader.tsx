@@ -262,7 +262,7 @@ export function ConversationReader({
   // "Make it a task": the inline form under the subject.
   const [makingTask, setMakingTask] = useState(false);
   // Save to page (campbooks-cloud#364): only while the server offers it.
-  const mailScout = useMailScoutAvailable(workspaceId) === true;
+  const mailScout = false as boolean;
   // The dialog's words load before it opens, so it never waits for them.
   useEffect(() => {
     if (mailScout) {
