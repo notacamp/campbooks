@@ -35,6 +35,8 @@ $$;
 -- What the function's statement reads, and nothing more.
 GRANT USAGE ON SCHEMA conversations TO campbooks_definer;
 GRANT SELECT (workspace_id, state, send_at) ON conversations.drafts TO campbooks_definer;
+-- Re-runnable: the policy is made again, never twice.
+DROP POLICY IF EXISTS definer_overdue_sends ON conversations.drafts;
 CREATE POLICY definer_overdue_sends ON conversations.drafts FOR SELECT TO campbooks_definer
     USING (true);
 
