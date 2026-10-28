@@ -19906,7 +19906,7 @@ export interface operations {
                     "application/json": components["schemas"]["TaskView"];
                 };
             };
-            /** @description A start in the past or a length outside 15 to 240 minutes (`invalid_hold`), a bill (`pay_not_held`), or a calendar that cannot be written (`calendar_read_only`). */
+            /** @description A start in the past or a length outside 15 to 240 minutes (`invalid_hold`), a bill (`pay_not_held`), a calendar you only follow (`calendar_followed`), or a calendar that cannot be written (`calendar_read_only`). */
             400: {
                 headers: {
                     [name: string]: unknown;

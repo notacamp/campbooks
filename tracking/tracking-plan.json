@@ -149,7 +149,7 @@
       "change": "Calendar roles (campbooks-cloud#399): schedule.calendar_role_changed for a calendar a member set to mine or following (which); schedule.update_calendar's Coverage names it.",
       "date": "2026-10-28",
       "plan_version": 20,
-      "pr": "#700"
+      "pr": "#696"
     }
   ],
   "coverage": [

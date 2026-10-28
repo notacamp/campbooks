@@ -20,5 +20,5 @@
 ## 3. Before merge
 
 - [x] 3.1 Changelog entry files (`changelog/unreleased/added/399-calendar-roles.md`, `changelog/unreleased/fixed/399-followed-invitations.md`)
-- [ ] 3.2 `openspec validate calendar-roles --strict`; CI green
+- [x] 3.2 `openspec validate calendar-roles --strict`; CI green
 - [ ] 3.3 Terminal recording (vhs) of the API: a calendar's role, a PATCH to following, free slots without it; then archive this change
