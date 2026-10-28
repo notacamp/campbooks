@@ -171,11 +171,13 @@ give the browser no logout URL to visit.
 client that holds it, and SHALL answer 200 for unknown tokens (RFC 7009).
 `/oauth2/end_session` (GET or form POST) SHALL require an `id_token_hint`
 this issuer signed for one of Campbooks' own clients or an instance app
-(expired is fine); without one it SHALL answer 400 `invalid_id_token_hint`
+(expired is fine, up to 30 days after its `exp`); without one it SHALL answer 400 `invalid_id_token_hint`
 and end nothing. With one it SHALL end the issuer session the hint names and
 that sign-in's refresh tokens, and redirect only to a
 `post_logout_redirect_uri` the hint's client registered, matched exactly,
-with `state` appended.
+with `state` appended. An ID token expired for longer than that SHALL be
+an invalid hint. Signing out of an instance app SHALL end the person's
+Campbooks browser session as well, which every app of the instance shares.
 
 #### Scenario: Revoked refresh token
 - **WHEN** a client revokes its refresh token and then uses it
@@ -185,9 +187,13 @@ with `state` appended.
 - **WHEN** another site sends a browser to `/oauth2/end_session` without a valid `id_token_hint`
 - **THEN** the response is 400 with `code` = `invalid_id_token_hint` and the person's tokens keep working
 
+#### Scenario: A long-expired hint
+- **WHEN** the hint is an ID token that expired 31 days ago
+- **THEN** the answer is 400 `invalid_id_token_hint` and nothing is ended, while one that expired 29 days ago ends the session
+
 #### Scenario: An instance app signs out
 - **WHEN** Applicamp sends the browser to `/oauth2/end_session` with its ID token as the hint and its registered post-logout URI
-- **THEN** the browser goes back to that URI with `state`, the sign-in's refresh tokens stop working, and another post-logout URI ends the session without a redirect
+- **THEN** the browser goes back to that URI with `state`, the sign-in's refresh tokens stop working, and another post-logout URI ends the session without a redirect; the person's Campbooks browser session ends too
 
 ### Requirement: First-party clients, the native one always asked
 The web client `campbooks-web` (confidential, its secret derived from the
@@ -586,7 +592,8 @@ listed, given a new secret and removed only by `campbooks-server admin apps
 add|list|rotate-secret|remove`, on the migration login; no HTTP endpoint
 SHALL do any of these, and the runtime role SHALL be refused any insert,
 update or delete of an instance app except recording when it last got a
-token. Registering SHALL print its client id (`app_` followed by 16 random
+token: any update that changes a column other than `last_used_at` SHALL be
+refused, whatever columns the table has. Registering SHALL print its client id (`app_` followed by 16 random
 bytes in unpadded base64url) and a 256-bit random secret, shown this once
 and stored as its SHA-256 only; rotating SHALL print a new secret once and
 stop the old one at once; removing SHALL revoke every consent people gave
@@ -619,7 +626,7 @@ party may hold. Each change SHALL be recorded in the identity audit log
 - **THEN** the command refuses it
 
 #### Scenario: The runtime role cannot change one
-- **WHEN** a statement on the runtime role inserts an instance app, widens one's ceiling, adds a redirect URI, sets its secret, changes its kind or deletes it
+- **WHEN** a statement on the runtime role inserts an instance app, widens one's ceiling, adds a redirect URI, sets its secret, renames it, changes its kind, turns a workspace or dynamic client into one or deletes it
 - **THEN** the database refuses it, while recording its last use succeeds
 
 ### Requirement: Instance apps sign people in
@@ -627,7 +634,9 @@ An instance app SHALL use the authorization code with PKCE (S256, required
 as for every client) and authenticate at the token endpoint with its secret
 (`client_secret_basic` or `client_secret_post`); without it or with another
 the answer SHALL be 401 `invalid_client`. Its redirect URIs SHALL match
-exactly, with no loopback port leeway. An authorization SHALL be granted the
+exactly, with no loopback port leeway, and a server not running in
+development SHALL treat a stored non-`https` redirect or post-logout URI as
+not registered, at authorization, at the token exchange and at logout. An authorization SHALL be granted the
 scopes it asks for that are in the app's ceiling and that a third party may
 hold, and no other; when none is left the answer SHALL be `invalid_scope`.
 Its tokens SHALL be workspace-bound and stand on a consent like any other
@@ -651,6 +660,10 @@ as Campbooks' own (`verified` false).
 #### Scenario: A redirect URI it did not register
 - **WHEN** an authorization names Applicamp's callback with a trailing slash, a query, another port, another host, or a loopback URI
 - **THEN** the answer is 400 `invalid_redirect_uri` and nothing is redirected
+
+#### Scenario: A stored loopback redirect in production
+- **WHEN** a loopback `http` redirect URI is stored for an instance app (by a CLI run in development against this database) and the server runs in production
+- **THEN** an authorization naming it answers 400 `invalid_redirect_uri` and logout does not redirect to a loopback post-logout URI, while the app's `https` URIs keep working; in development both work
 
 #### Scenario: Asking above the ceiling
 - **WHEN** Applicamp, whose ceiling lacks `system:read`, asks for `openid … system:read`
