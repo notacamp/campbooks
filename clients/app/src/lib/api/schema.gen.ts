@@ -1324,6 +1324,23 @@ export interface paths {
         patch: operations["conversations.update_draft"];
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attach a file to a draft. */
+        post: operations["conversations.upload_draft_attachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/drafts/{draft_id}/cancel_send": {
         parameters: {
             query?: never;
@@ -3359,6 +3376,11 @@ export interface components {
          * @description AttachmentId (UUIDv7)
          */
         AttachmentId: string;
+        /**
+         * @description Where a draft's attachment came from.
+         * @enum {string}
+         */
+        AttachmentSource: "forwarded" | "uploaded";
         /** @description An attachment of a message. */
         AttachmentView: {
             /** @description Its media type, as sent (not trusted). */
@@ -4518,23 +4540,25 @@ export interface components {
          * @description A file's bytes, as the OpenAPI document describes them.
          */
         DownloadBytes: string;
-        /** @description A forwarded attachment, as the draft shows it. */
+        /** @description An attachment, as the draft shows it. */
         DraftAttachment: {
             /** @description Its media type, as sent (not trusted). */
             content_type: string;
             /** @description Its file name. */
             filename: string;
-            /** @description The original message's attachment. */
+            /** @description The original message's attachment, or the uploaded file's own id. */
             id: components["schemas"]["AttachmentId"];
             /**
              * Format: int64
              * @description Its size in bytes.
              */
             size: number;
+            /** @description Whether it was forwarded or uploaded. */
+            source?: components["schemas"]["AttachmentSource"];
         };
         /** @description The fields to change; the others stay. */
         DraftChanges: {
-            /** @description The forwarded attachments to keep (the others are dropped). */
+            /** @description The attachments to keep, forwarded or uploaded (the others are dropped). */
             attachments?: components["schemas"]["AttachmentId"][] | null;
             /** @description Blind-copied recipients. */
             bcc?: components["schemas"]["Address"][] | null;
@@ -4585,7 +4609,7 @@ export interface components {
         DraftState: "draft" | "scheduled" | "sending" | "failed";
         /** @description A draft. */
         DraftView: {
-            /** @description The forwarded attachments. */
+            /** @description The attachments, forwarded and uploaded. */
             attachments: components["schemas"]["DraftAttachment"][];
             /** @description Blind-copied recipients. */
             bcc: components["schemas"]["Address"][];
@@ -13963,6 +13987,100 @@ export interface operations {
             };
             /** @description Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then save. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.upload_draft_attachment": {
+        parameters: {
+            query: {
+                /** @description The draft's version as last read (a save's answer, or the draft). */
+                version: number;
+                /**
+                 * @description The file's name. Cleaned before it is stored: no path, no control
+                 *     characters, at most 255 bytes.
+                 */
+                filename: string;
+            };
+            header?: {
+                /** @description The `content_token` that came with the draft on screen, as a save names it. */
+                "X-Content-Token"?: string | null;
+            };
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": components["schemas"]["UploadBytes"];
+            };
+        };
+        responses: {
+            /** @description The draft, with the file and its new version. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description No bytes (`file_empty`), no usable name (`filename_missing`), a type mail providers block (`attachment_blocked`) or over 20 files (`too_many_attachments`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then attach. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The file, or the draft's attachments together, would pass 25 MiB (`attachments_too_large`). */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -331,7 +331,18 @@
     },
     "tooLate": "Too late to undo: it was sent.",
     "readingQuote": "Reading the email to quote it…",
-    "quoteCut": "This email is long: the quote holds its first part."
+    "quoteCut": "This email is long: the quote holds its first part.",
+    "draftRestoredWithoutFiles_one": "Draft restored. Attach its file again.",
+    "draftRestoredWithoutFiles_other": "Draft restored. Attach its {{count}} files again.",
+    "attach": {
+      "refused": {
+        "file_empty": "{{name}} is empty, so it wasn't attached.",
+        "filename_missing": "A file without a name can't be attached.",
+        "attachment_blocked": "{{name}} wasn't attached: mail providers block this kind of file.",
+        "attachments_too_large": "{{name}} wasn't attached: a message can carry {{max}} MB at most.",
+        "too_many_attachments": "{{name}} wasn't attached: a message can carry {{files}} files at most."
+      }
+    }
   },
   "needs": {
     "line": {

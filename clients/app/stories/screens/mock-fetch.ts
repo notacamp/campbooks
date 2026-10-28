@@ -30,10 +30,16 @@ export function mockFetch(routes: Record<string, MockRoute>): () => void {
     if (handler === undefined) {
       return Response.json({ status: 404, code: "not_found", title: "Not found" }, { status: 404 });
     }
+    // A file upload sends its bytes, not JSON: the handler gets them as text.
+    const parsed = (): unknown => {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return text;
+      }
+    };
     const answer =
-      typeof handler === "function"
-        ? handler(text === "" ? undefined : JSON.parse(text), url)
-        : handler;
+      typeof handler === "function" ? handler(text === "" ? undefined : parsed(), url) : handler;
     const status = answer.status ?? 200;
     if (answer.stream !== undefined) {
       const encoder = new TextEncoder();

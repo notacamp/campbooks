@@ -331,7 +331,18 @@
     },
     "tooLate": "Ya es tarde para deshacer: se ha enviado.",
     "readingQuote": "Leyendo el correo para citarlo…",
-    "quoteCut": "Este correo es largo: la cita contiene la primera parte."
+    "quoteCut": "Este correo es largo: la cita contiene la primera parte.",
+    "draftRestoredWithoutFiles_one": "Borrador restaurado. Vuelve a adjuntar su archivo.",
+    "draftRestoredWithoutFiles_other": "Borrador restaurado. Vuelve a adjuntar sus {{count}} archivos.",
+    "attach": {
+      "refused": {
+        "file_empty": "{{name}} está vacío, así que no se adjuntó.",
+        "filename_missing": "No se puede adjuntar un archivo sin nombre.",
+        "attachment_blocked": "{{name}} no se adjuntó: los proveedores de correo bloquean este tipo de archivo.",
+        "attachments_too_large": "{{name}} no se adjuntó: un mensaje puede llevar {{max}} MB como máximo.",
+        "too_many_attachments": "{{name}} no se adjuntó: un mensaje puede llevar {{files}} archivos como máximo."
+      }
+    }
   },
   "needs": {
     "line": {

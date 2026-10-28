@@ -189,6 +189,132 @@ pub fn content_disposition(inline: bool, name: &str) -> HeaderValue {
     HeaderValue::from_str(&value).unwrap_or_else(|_| HeaderValue::from_static("attachment"))
 }
 
+/// Most files a draft may carry.
+pub const MAX_FILES: usize = 20;
+/// Longest stored file name, in bytes.
+pub const MAX_NAME_BYTES: usize = 255;
+/// Longest extension kept when a name is cut.
+const MAX_KEPT_EXTENSION: usize = 20;
+
+/// Extensions mail providers refuse to carry (Gmail's list), lower-case.
+pub const BLOCKED_EXTENSIONS: [&str; 53] = [
+    "ade",
+    "adp",
+    "apk",
+    "appx",
+    "appxbundle",
+    "bat",
+    "cab",
+    "chm",
+    "cmd",
+    "com",
+    "cpl",
+    "diagcab",
+    "diagcfg",
+    "diagpack",
+    "dll",
+    "dmg",
+    "ex",
+    "ex_",
+    "exe",
+    "hta",
+    "img",
+    "ins",
+    "iso",
+    "isp",
+    "jar",
+    "jnlp",
+    "js",
+    "jse",
+    "lib",
+    "lnk",
+    "mde",
+    "msc",
+    "msi",
+    "msix",
+    "msixbundle",
+    "msp",
+    "mst",
+    "nsh",
+    "pif",
+    "ps1",
+    "scr",
+    "sct",
+    "shb",
+    "sys",
+    "vb",
+    "vbe",
+    "vbs",
+    "vhd",
+    "vxd",
+    "wsc",
+    "wsf",
+    "wsh",
+    "xll",
+];
+
+/// An uploaded file's name as stored: the part after the last `/` or `\`,
+/// without control or invisible characters or quotes, spaces and dots
+/// trimmed at both ends, at most [`MAX_NAME_BYTES`] bytes (cut on a
+/// character boundary, keeping a short extension). `None` when nothing is
+/// left.
+pub fn clean_upload_name(name: &str) -> Option<String> {
+    let base = name.rsplit(['/', '\\']).next().unwrap_or_default();
+    let kept: String = base
+        .chars()
+        .filter(|c| is_displayable(*c) && *c != '"')
+        .collect();
+    let trimmed = kept.trim_matches(|c: char| c == '.' || c.is_whitespace());
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.len() <= MAX_NAME_BYTES {
+        return Some(trimmed.to_owned());
+    }
+    let (stem, extension) = match trimmed.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() && ext.len() <= MAX_KEPT_EXTENSION => {
+            (stem, format!(".{ext}"))
+        }
+        _ => (trimmed, String::new()),
+    };
+    let mut end = MAX_NAME_BYTES - extension.len();
+    while !stem.is_char_boundary(end) {
+        end -= 1;
+    }
+    let stem = stem[..end].trim_end_matches(|c: char| c == '.' || c.is_whitespace());
+    if stem.is_empty() {
+        return None;
+    }
+    Some(format!("{stem}{extension}"))
+}
+
+/// Whether `name` ends in an extension mail providers block
+/// ([`BLOCKED_EXTENSIONS`], case-insensitive).
+pub fn is_blocked(name: &str) -> bool {
+    name.rsplit_once('.').is_some_and(|(_, extension)| {
+        let extension = extension.to_ascii_lowercase();
+        BLOCKED_EXTENSIONS.contains(&extension.as_str())
+    })
+}
+
+/// The media type an upload is stored with: the request's, without
+/// parameters and lower-cased, when it is a well-formed `type/subtype`;
+/// else [`OCTET_STREAM`]. Kept for the message, never trusted.
+pub fn upload_type(sent: Option<&str>) -> String {
+    let token = |part: &str| {
+        !part.is_empty()
+            && part.len() <= 127
+            && part
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"!#$&^_.+-".contains(&b))
+    };
+    let essence = essence(sent.unwrap_or_default());
+    match essence.split_once('/') {
+        Some((kind, subtype)) if token(kind) && token(subtype) => essence,
+        _ => OCTET_STREAM.to_owned(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,5 +404,63 @@ mod tests {
             inline.to_str().unwrap(),
             "inline; filename=\"a.pdf\"; filename*=UTF-8''a.pdf"
         );
+    }
+
+    #[test]
+    fn upload_names_are_cleaned() {
+        assert_eq!(
+            clean_upload_name("../../etc/passwd").as_deref(),
+            Some("passwd")
+        );
+        assert_eq!(
+            clean_upload_name(r"C:\Users\sam\lease 4b.pdf").as_deref(),
+            Some("lease 4b.pdf")
+        );
+        assert_eq!(
+            clean_upload_name("  \"a\u{0}b\u{202e}.txt. ").as_deref(),
+            Some("ab.txt")
+        );
+        assert_eq!(clean_upload_name("..."), None);
+        assert_eq!(clean_upload_name("dir/"), None);
+        assert_eq!(clean_upload_name(""), None);
+        let long = format!("{}.pdf", "é".repeat(300));
+        let cut = clean_upload_name(&long).unwrap();
+        assert!(cut.len() <= MAX_NAME_BYTES, "{}", cut.len());
+        assert_eq!(cut.rsplit('.').next(), Some("pdf"), "{cut}");
+        assert!(clean_upload_name(&"a".repeat(400)).unwrap().len() <= MAX_NAME_BYTES);
+    }
+
+    #[test]
+    fn blocked_extensions_ignore_case() {
+        for name in ["setup.EXE", "run.Bat", "x.js", "a.b.scr", "p.ps1", "d.ex_"] {
+            assert!(is_blocked(name), "{name}");
+        }
+        for name in [
+            "lease.pdf",
+            "exe",
+            "notes.exe.txt",
+            "a.json",
+            "archive.zip",
+            ".exe",
+        ] {
+            assert_eq!(is_blocked(name), name == ".exe", "{name}");
+        }
+        let mut sorted = BLOCKED_EXTENSIONS;
+        sorted.sort_unstable();
+        assert_eq!(
+            sorted, BLOCKED_EXTENSIONS,
+            "keep the list sorted, no duplicates"
+        );
+        assert!(sorted.windows(2).all(|w| w[0] != w[1]));
+    }
+
+    #[test]
+    fn upload_types_are_checked_not_trusted() {
+        assert_eq!(upload_type(Some("Application/PDF")), "application/pdf");
+        assert_eq!(upload_type(Some("text/plain; charset=utf-8")), "text/plain");
+        for bad in ["", "pdf", "a/b/c", "text/ html", "<script>/x", "/x", "x/"] {
+            assert_eq!(upload_type(Some(bad)), OCTET_STREAM, "{bad}");
+        }
+        assert_eq!(upload_type(None), OCTET_STREAM);
     }
 }

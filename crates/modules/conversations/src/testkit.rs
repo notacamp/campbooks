@@ -393,6 +393,25 @@ impl Kit {
         self.call(Method::POST, token, uri, body).await
     }
 
+    /// `POST uri` with `bytes` as the body (a file upload) and the extra
+    /// `headers`.
+    pub async fn upload(
+        &self,
+        token: &str,
+        uri: &str,
+        content_type: &str,
+        bytes: Vec<u8>,
+        headers: &[(&str, &str)],
+    ) -> TestResponse {
+        let mut request = Request::post(uri)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(header::CONTENT_TYPE, content_type);
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        testing::send(&self.app, request.body(Body::from(bytes)).unwrap()).await
+    }
+
     /// `DELETE uri`.
     pub async fn delete(&self, token: &str, uri: &str) -> TestResponse {
         self.call(Method::DELETE, token, uri, None).await

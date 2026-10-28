@@ -53,4 +53,5 @@ pub mod suggest_rules;
 pub mod suspended_authors;
 pub mod trash;
 pub mod update_draft;
+pub mod upload_draft_attachment;
 pub mod wake_needs;

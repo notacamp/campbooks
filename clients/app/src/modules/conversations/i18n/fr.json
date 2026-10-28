@@ -331,7 +331,18 @@
     },
     "tooLate": "Trop tard pour annuler : il a été envoyé.",
     "readingQuote": "Lecture de l’e-mail pour le citer…",
-    "quoteCut": "Cet e-mail est long : la citation en contient le début."
+    "quoteCut": "Cet e-mail est long : la citation en contient le début.",
+    "draftRestoredWithoutFiles_one": "Brouillon restauré. Joignez à nouveau son fichier.",
+    "draftRestoredWithoutFiles_other": "Brouillon restauré. Joignez à nouveau ses {{count}} fichiers.",
+    "attach": {
+      "refused": {
+        "file_empty": "{{name}} est vide, il n’a donc pas été joint.",
+        "filename_missing": "Impossible de joindre un fichier sans nom.",
+        "attachment_blocked": "{{name}} n’a pas été joint : les fournisseurs de messagerie bloquent ce type de fichier.",
+        "attachments_too_large": "{{name}} n’a pas été joint : un message peut contenir {{max}} Mo au plus.",
+        "too_many_attachments": "{{name}} n’a pas été joint : un message peut contenir {{files}} fichiers au plus."
+      }
+    }
   },
   "needs": {
     "line": {

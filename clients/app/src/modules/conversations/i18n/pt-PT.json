@@ -331,7 +331,18 @@
     },
     "tooLate": "Já não é possível anular: a mensagem foi enviada.",
     "readingQuote": "A ler o email para o citar…",
-    "quoteCut": "Este email é longo: a citação tem a primeira parte."
+    "quoteCut": "Este email é longo: a citação tem a primeira parte.",
+    "draftRestoredWithoutFiles_one": "Rascunho restaurado. Anexe o ficheiro outra vez.",
+    "draftRestoredWithoutFiles_other": "Rascunho restaurado. Anexe os seus {{count}} ficheiros outra vez.",
+    "attach": {
+      "refused": {
+        "file_empty": "{{name}} está vazio, por isso não foi anexado.",
+        "filename_missing": "Não é possível anexar um ficheiro sem nome.",
+        "attachment_blocked": "{{name}} não foi anexado: os fornecedores de correio bloqueiam este tipo de ficheiro.",
+        "attachments_too_large": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{max}} MB.",
+        "too_many_attachments": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{files}} ficheiros."
+      }
+    }
   },
   "needs": {
     "line": {

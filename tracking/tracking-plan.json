@@ -144,6 +144,12 @@
       "date": "2026-10-27",
       "plan_version": 19,
       "pr": "#685"
+    },
+    {
+      "change": "Attaching a file to a draft (campbooks-cloud#391): Coverage for conversations.upload_draft_attachment, which tracks conversations.draft_updated as a save does.",
+      "date": "2026-10-28",
+      "plan_version": 20,
+      "pr": "#391"
     }
   ],
   "coverage": [
@@ -1362,6 +1368,14 @@
       "exemption": "",
       "kind": "operation",
       "name": "conversations.update_rule"
+    },
+    {
+      "events": [
+        "conversations.draft_updated"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "conversations.upload_draft_attachment"
     },
     {
       "events": [],
@@ -24540,8 +24554,8 @@
     }
   ],
   "generated_by": "campbooks-tracking-plan",
-  "plan_date": "2026-10-27",
-  "plan_version": 19,
+  "plan_date": "2026-10-28",
+  "plan_version": 20,
   "properties": [
     {
       "classification": "operational",
