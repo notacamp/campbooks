@@ -749,11 +749,11 @@ describe("MessageComposer", () => {
     });
 
     it("keeps the text read-only with Scout's thinking while it writes, then editable", async () => {
-      let finish: (text: string) => void = () => undefined;
+      const holder: { finish?: (text: string) => void } = {};
       const onRewrite = vi.fn(
         () =>
           new Promise<string | undefined>((resolve) => {
-            finish = resolve;
+            holder.finish = resolve;
           }),
       );
       renderUi(
@@ -773,7 +773,7 @@ describe("MessageComposer", () => {
       expect(screen.getByText("Scout is rewriting…")).toBeInTheDocument();
       expect(screen.getByText("Reading the email.")).toBeInTheDocument();
       act(() => {
-        finish("Hello");
+        holder.finish?.("Hello");
       });
       await waitFor(() => {
         expect(box).toHaveAttribute("contenteditable", "true");
@@ -808,7 +808,7 @@ describe("MessageComposer", () => {
       expect(box.querySelectorAll("p")).toHaveLength(2);
       // What is saved has the brackets escaped: the server reads them as text.
       const saved = onBodyChange.mock.calls.at(-1)?.[0] as string;
-      expect(saved).toContain("\\[pay here\\]");
+      expect(saved).toContain(String.raw`\[pay here\]`);
       expect(saved).not.toMatch(/(?<!\\)\[pay here\]\(/u);
     });
 

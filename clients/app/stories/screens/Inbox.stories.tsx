@@ -662,6 +662,30 @@ export const DraftsViewPhone: Story = { ...drafts, ...at("phone", 375, 812) };
  * A reply draft open in its thread, saved as you type (a draft held in
  * memory): the roomier composer in place, for recordings (campbooks-cloud#390).
  */
+/** A second mailbox Sam sends from (campbooks-cloud#394): From becomes a picker. */
+const OFFICE = {
+  ...INBOX,
+  id: "0192f1a0-0000-7000-8000-0000000000b2",
+  address: "office@rivera-lettings.example",
+  display_name: "Rivera Lettings",
+  role: "sender",
+  unread_count: 0,
+} as const;
+
+/** Scout's rewrite as the stream sends it: some thinking, the words, then done. */
+function rewriteStream(text: string): MockRoute {
+  const frame = (event: string, data: unknown) =>
+    `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  return {
+    delay: 250,
+    stream: [
+      frame("thinking", { delta: "Reading the email. " }),
+      frame("thinking", { delta: "Keeping what the draft says, in fewer words." }),
+      frame("done", { message_id: "m1", text }),
+    ],
+  };
+}
+
 function replyDraftOpen(): Record<string, MockRoute> {
   // Sam's signature for the mailbox: a new draft carries it (campbooks-cloud#393).
   const signature = "**Sam Rivera**\nRivera Lettings";
@@ -671,6 +695,11 @@ function replyDraftOpen(): Record<string, MockRoute> {
     body: "Thanks, Maya. I will go through **the plan on Thursday** and send you my notes.",
   };
   return inbox({
+    [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX, OFFICE] } },
+    [`GET ${W}/inboxes/${OFFICE.id}/signature`]: { body: { text: "Sam Rivera, Rivera Lettings" } },
+    [`POST ${W}/conversations/${Q4.id}/reply/draft/stream`]: rewriteStream(
+      "Thursday works for me. I'll send my notes by the end of the day.",
+    ),
     [`GET ${W}/drafts`]: () => ({ body: { drafts: [draft] } }),
     [`GET ${W}/drafts/${draft.id}`]: () => ({ body: draft }),
     [`PATCH ${W}/drafts/${draft.id}`]: (changes) => {
@@ -678,11 +707,27 @@ function replyDraftOpen(): Record<string, MockRoute> {
       const {
         attachments: keep,
         signature: on,
+        inbox_id: to,
         ...rest
       } = changes as Partial<Omit<Draft, "attachments" | "signature">> & {
         attachments?: string[] | null;
         signature?: boolean | null;
       };
+      // From: another mailbox, with that mailbox's address and signature.
+      const target = to === OFFICE.id ? OFFICE : to === INBOX.id ? INBOX : undefined;
+      if (target !== undefined) {
+        draft = {
+          ...draft,
+          inbox_id: target.id,
+          from: { name: target.display_name, address: target.address },
+          signature:
+            (draft.signature ?? "") === ""
+              ? ""
+              : target.id === OFFICE.id
+                ? "Sam Rivera, Rivera Lettings"
+                : signature,
+        };
+      }
       draft = {
         ...draft,
         ...rest,
@@ -725,6 +770,43 @@ function replyDraftOpen(): Record<string, MockRoute> {
 }
 export const ReplyDraftOpen: Story = {
   args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
+};
+
+/** From inside the composer: the reply moves to the other mailbox, and its signature with it. */
+export const ReplyDraftFrom: Story = {
+  args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const from = await canvas.findByRole("combobox", { name: "From" });
+    await userEvent.selectOptions(from, OFFICE.id);
+    await expect(await canvas.findByText("Sam Rivera, Rivera Lettings")).toBeVisible();
+    await expect(from).toHaveValue(OFFICE.id);
+  },
+};
+
+/** Scout ▾: Shorter rewrites the reply in place, with Undo. */
+export const ReplyDraftScout: Story = {
+  args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Ask Scout to rewrite" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Shorter" }));
+    await expect(
+      await canvas.findByText(/I'll send my notes by the end of the day\./u),
+    ).toBeVisible();
+    await expect(await within(document.body).findByText("Rewritten by Scout")).toBeVisible();
+  },
+};
+
+/** The reply type menu in the title: Reply, Reply all, Forward. */
+export const ReplyDraftModeMenu: Story = {
+  args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Change reply type" }));
+    await expect(canvas.getByRole("menuitemradio", { name: /Reply all/u })).toBeVisible();
+    await expect(canvas.getByRole("menuitemradio", { name: /Forward/u })).toBeVisible();
+  },
 };
 
 /** The open reply carries Sam's signature under the text: Leave off, then Add signature. */

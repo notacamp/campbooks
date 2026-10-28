@@ -8,7 +8,7 @@ import { useShortcut } from "~/lib/shortcuts";
 import { Button, Icon, IconButton, Popover } from "@notacamp/ui";
 import { AskLine } from "../ReplyDraft/ReplyDraft";
 
-import type { ComposerMode, ComposerModes, ComposerScout, ScoutRewrite } from "./MessageComposer";
+import type { ComposerMode, ComposerModes, ComposerScout, ScoutRewrite } from "./composer-types";
 import type { DocNode } from "./marks";
 import styles from "./ComposerMenus.module.css";
 
@@ -81,7 +81,7 @@ export function ComposerHeaderMenus({ modes }: { modes: ComposerModes }) {
  * single line breaks stay line breaks. Every piece is a text node with no
  * marks, so nothing in it is read as formatting, HTML or a link.
  */
-export function plainDoc(text: string): DocNode {
+function plainDoc(text: string): DocNode {
   const paragraphs = text
     .replaceAll("\r\n", "\n")
     .trim()
@@ -106,7 +106,7 @@ export function plainDoc(text: string): DocNode {
  * schema (never `insertContent(string)`, which parses HTML, and never
  * `fromMarks`). Autolinking is off for it, and it is its own undo step.
  */
-export function putPlainText(editor: Editor, text: string): void {
+function putPlainText(editor: Editor, text: string): void {
   const doc = editor.schema.nodeFromJSON(plainDoc(text));
   const tr = closeHistory(
     editor.state.tr
