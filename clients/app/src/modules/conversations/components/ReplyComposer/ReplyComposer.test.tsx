@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { INBOX, Q4, Q4_DETAIL, W } from "../../../../../test/demo/conversations";
 import { REPLY } from "../../../../../test/demo/drafts";
 import { DUARTE } from "../../../../../test/demo/workspaces";
+import { replaceText } from "../../../../../test/composer";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
 import type { ReplyRequest } from "../Reader/ReplySlot";
 
@@ -71,7 +72,7 @@ describe("ReplyComposer", () => {
       /Maya Okafor wrote:\n> Hi Sam, here is the first draft/u,
     );
 
-    fireEvent.change(box, { target: { value: "Thursday works." } });
+    replaceText(box, "Thursday works.");
     await waitFor(
       () => {
         expect(screen.getByText("Saved")).toBeVisible();
@@ -173,7 +174,7 @@ describe("ReplyComposer", () => {
     const box = await screen.findByRole("textbox", { name: "Message" });
     // Leo was removed just before sending, but the save failed: the server
     // still has him, so nothing may be sent.
-    fireEvent.change(box, { target: { value: "Without Leo." } });
+    replaceText(box, "Without Leo.");
     fireEvent.click(screen.getByRole("button", { name: /Send/u }));
     expect(
       await screen.findByText(
@@ -277,7 +278,7 @@ describe("ReplyComposer", () => {
       await screen.findByText("This changed since you opened it. Check it and send again."),
     ).toBeVisible();
     // Shown as it is now, and nothing sent for the member.
-    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Thursday at ten works.");
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent("Thursday at ten works.");
     expect(sends).toBe(1);
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /Send/u }));
@@ -316,7 +317,7 @@ describe("ReplyComposer", () => {
     });
     renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
     const box = await screen.findByRole("textbox", { name: "Message" });
-    fireEvent.change(box, { target: { value: "Thursday works." } });
+    replaceText(box, "Thursday works.");
     expect(
       await screen.findByText(
         "This changed since you opened it. Check it and send again.",
@@ -327,10 +328,10 @@ describe("ReplyComposer", () => {
       ),
     ).toBeVisible();
     // Nothing typed is lost, and nothing is saved again on its own.
-    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Thursday works.");
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent("Thursday works.");
     expect(saves).toBe(1);
     // The next edit saves the typed text with the token of the draft read again.
-    fireEvent.change(box, { target: { value: "Thursday works for me." } });
+    replaceText(box, "Thursday works for me.");
     await waitFor(
       () => {
         expect(saves).toBe(2);
@@ -511,7 +512,7 @@ describe("ReplyComposer", () => {
     });
     renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
     const box = await screen.findByRole("textbox", { name: "Message" });
-    fireEvent.change(box, { target: { value: "Not saved yet." } });
+    replaceText(box, "Not saved yet.");
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     expect(await screen.findByText("Draft deleted")).toBeVisible();
     // The pending autosave never reached the server.
@@ -541,13 +542,13 @@ describe("ReplyComposer", () => {
     });
     renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
     const box = await screen.findByRole("textbox", { name: "Message" });
-    fireEvent.change(box, { target: { value: "Typed, not saved yet." } });
+    replaceText(box, "Typed, not saved yet.");
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     await waitFor(() => {
       expect(api.calls.some((c) => c.route.startsWith("DELETE"))).toBe(true);
     });
     // Still here, with the text the member typed.
-    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Typed, not saved yet.");
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent("Typed, not saved yet.");
     fireEvent.click(screen.getByRole("button", { name: /Send/u }));
     await waitFor(() => {
       expect(api.calls.some((c) => c.route.endsWith("/send"))).toBe(true);

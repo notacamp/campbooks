@@ -21,7 +21,7 @@ describe("marks", () => {
       "Hi **Ana**,\n\n- one\n- two\n\nThanks *a lot*.",
       "> quoted\n>\n> - a\n> - b\n\nafter",
       "1. a\n2. b\n\n[the lease](https://example.com/4b) and ~~gone~~",
-      "2 \\* 3 \\[x\\] C:\\\\temp",
+      String.raw`2 \* 3 \[x\] C:\\temp`,
     ]) {
       expect(toMarks(fromMarks(marks))).toBe(marks);
     }

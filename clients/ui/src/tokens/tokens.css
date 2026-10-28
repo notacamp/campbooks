@@ -369,6 +369,8 @@
   --overlay-width: 560px;
   --dialog-width: 520px;
   --dialog-result-width: 380px;
+  /* The composer opened as a sheet over the page (Expand). */
+  --composer-sheet-width: 820px;
   --dialog-sheet-max-height: 88dvh;
   --dialog-drain-height: 3px;
   --actions-divider-height: 18px;

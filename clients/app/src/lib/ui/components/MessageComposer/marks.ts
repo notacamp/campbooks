@@ -10,10 +10,10 @@
 /** The part of a ProseMirror node the composer's schema uses. */
 export interface DocNode {
   type: string;
-  text?: string | undefined;
-  attrs?: Record<string, unknown> | undefined;
-  marks?: { type: string; attrs?: Record<string, unknown> | undefined }[] | undefined;
-  content?: DocNode[] | undefined;
+  text?: string;
+  attrs?: Record<string, unknown>;
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+  content?: DocNode[];
 }
 
 type Style = "strike" | "bold" | "italic";
@@ -79,7 +79,9 @@ function blockToMarks(block: DocNode): string {
         .join("\n");
     default:
       // Anything the schema holds no mark for: its text, as a paragraph.
-      return lines(flattenText(block)).map(lineToMarks).join("\n");
+      return lines(flattenText(block))
+        .map((line) => lineToMarks(line))
+        .join("\n");
   }
 }
 
@@ -129,7 +131,7 @@ function lines(nodes: readonly DocNode[]): Fragment[][] {
       const types = new Set((node.marks ?? []).map((mark) => mark.type));
       const link = node.marks?.find((mark) => mark.type === "link");
       const href = link?.attrs?.["href"];
-      result[result.length - 1]?.push({
+      result.at(-1)?.push({
         text: node.text,
         styles: new Set(STYLES.filter((style) => types.has(style))),
         href: typeof href === "string" && isLinkable(href) ? href : undefined,
@@ -137,7 +139,7 @@ function lines(nodes: readonly DocNode[]): Fragment[][] {
     }
   }
   // A list item's trailing break (added to join paragraphs) is no line.
-  while (result.length > 1 && result[result.length - 1]?.length === 0) {
+  while (result.length > 1 && result.at(-1)?.length === 0) {
     result.pop();
   }
   return result;
@@ -152,13 +154,13 @@ const intersect = (a: ReadonlySet<Style>, b: ReadonlySet<Style> | undefined): Se
  */
 function trimEdges(line: readonly Fragment[]): Fragment[] {
   const out: Fragment[] = [];
-  line.forEach((fragment, at) => {
+  for (const [at, fragment] of line.entries()) {
     const before = line[at - 1]?.styles;
     const after = line[at + 1]?.styles;
     const lead = /^\s*/u.exec(fragment.text)?.[0] ?? "";
     if (lead.length === fragment.text.length) {
       out.push({ ...fragment, styles: intersect(intersect(fragment.styles, before), after) });
-      return;
+      continue;
     }
     const trail = /\s*$/u.exec(fragment.text)?.[0] ?? "";
     const core = fragment.text.slice(lead.length, fragment.text.length - trail.length);
@@ -169,9 +171,9 @@ function trimEdges(line: readonly Fragment[]): Fragment[] {
     if (trail !== "") {
       out.push({ ...fragment, text: trail, styles: intersect(fragment.styles, after) });
     }
-  });
+  }
   return out.reduce<Fragment[]>((merged, fragment) => {
-    const last = merged[merged.length - 1];
+    const last = merged.at(-1);
     if (
       last !== undefined &&
       last.href === fragment.href &&
@@ -215,7 +217,7 @@ class Escaper {
       } else if (start && this.digits === 0 && (char === "-" || char === ">")) {
         out += `\\${char}`;
       } else if (start && this.digits > 0 && char === "." && (next === " " || next === undefined)) {
-        out += "\\.";
+        out += String.raw`\.`;
       } else {
         out += char;
       }
@@ -279,7 +281,7 @@ function bareAddress(words: string, href: string): boolean {
 function encodeAddress(href: string): string {
   return href.replaceAll(
     /[\s)<>"]/gu,
-    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+    (char) => `%${(char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(2, "0")}`,
   );
 }
 
@@ -289,9 +291,9 @@ function styled(fragments: readonly Fragment[], escaper: Escaper): string {
   const open: Style[] = [];
   for (const fragment of fragments) {
     const unwanted = open.findIndex((style) => !fragment.styles.has(style));
-    if (unwanted >= 0) {
+    if (unwanted !== -1) {
       const above = open.splice(unwanted);
-      for (const style of [...above].reverse()) {
+      for (const style of above.toReversed()) {
         out += escaper.mark(MARKER[style]);
       }
       for (const style of above) {
@@ -309,7 +311,7 @@ function styled(fragments: readonly Fragment[], escaper: Escaper): string {
     }
     out += escaper.text(fragment.text);
   }
-  for (const style of [...open].reverse()) {
+  for (const style of open.toReversed()) {
     out += escaper.mark(MARKER[style]);
   }
   return out;
@@ -366,16 +368,7 @@ function blocksFrom(all: readonly string[]): DocNode[] {
         ),
       );
       i = end;
-    } else if (numberedItem(line) !== undefined) {
-      const end = run(i, (l) => numberedItem(l) !== undefined);
-      blocks.push(
-        listFrom(
-          "orderedList",
-          all.slice(i, end).map((l) => numberedItem(l) ?? ""),
-        ),
-      );
-      i = end;
-    } else {
+    } else if (numberedItem(line) === undefined) {
       const end = run(
         i,
         (l) =>
@@ -385,13 +378,22 @@ function blocksFrom(all: readonly string[]): DocNode[] {
           numberedItem(l) === undefined,
       );
       const content: DocNode[] = [];
-      all.slice(i, end).forEach((l, at) => {
+      for (const [at, l] of all.slice(i, end).entries()) {
         if (at > 0) {
           content.push({ type: "hardBreak" });
         }
         content.push(...inlineNodes(l));
-      });
+      }
       blocks.push(content.length === 0 ? { type: "paragraph" } : { type: "paragraph", content });
+      i = end;
+    } else {
+      const end = run(i, (l) => numberedItem(l) !== undefined);
+      blocks.push(
+        listFrom(
+          "orderedList",
+          all.slice(i, end).map((l) => numberedItem(l) ?? ""),
+        ),
+      );
       i = end;
     }
   }
@@ -452,7 +454,7 @@ function wordedLink(text: string): { words: string; url: string; rest: string } 
     return undefined;
   }
   const close = text.indexOf(")", end + 2);
-  if (close < 0) {
+  if (close === -1) {
     return undefined;
   }
   const words = text.slice(1, end);
@@ -462,7 +464,9 @@ function wordedLink(text: string): { words: string; url: string; rest: string } 
 
 /** An escaped mark character, anywhere. */
 const escapedChar = (text: string): string | undefined =>
-  text[0] === "\\" && text[1] !== undefined && "*~[]\\".includes(text[1]) ? text[1] : undefined;
+  text.startsWith("\\") && text[1] !== undefined && "*~[]\\".includes(text[1])
+    ? text[1]
+    : undefined;
 
 /** An escaped leading `-`, `>` or `1.`: what it stands for and how much it takes. */
 function leadingEscape(text: string): { lit: string; length: number } | undefined {
@@ -470,7 +474,7 @@ function leadingEscape(text: string): { lit: string; length: number } | undefine
   if (digits?.[1] !== undefined) {
     return { lit: `${digits[1]}.`, length: digits[0].length };
   }
-  if (text[0] === "\\" && (text[1] === "-" || text[1] === ">")) {
+  if (text.startsWith("\\") && (text[1] === "-" || text[1] === ">")) {
     return { lit: text[1], length: 2 };
   }
   return undefined;
@@ -523,7 +527,7 @@ function parseInline(
   let rest = line;
   let atStart = first;
   const push = (text: string) => {
-    const last = runs[runs.length - 1];
+    const last = runs.at(-1);
     if (
       last !== undefined &&
       last.href === href &&
