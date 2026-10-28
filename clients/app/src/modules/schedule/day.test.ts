@@ -184,6 +184,7 @@ describe("Add to my calendar", () => {
     name: "Campbooks",
     syncing: true,
     writable: true,
+    role: "mine",
     primary: false,
   };
   const work: CalendarView = {
@@ -192,6 +193,7 @@ describe("Add to my calendar", () => {
     name: "Work",
     syncing: true,
     writable: true,
+    role: "mine",
     primary: true,
   };
   const family: CalendarView = { ...work, id: "family", name: "Family", primary: false };

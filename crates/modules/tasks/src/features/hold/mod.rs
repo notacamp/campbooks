@@ -84,8 +84,8 @@ pub struct HoldTime {
         (status = OK, description = "The task afterwards, held and planned for that day.",
             body = TaskView),
         (status = BAD_REQUEST, description = "A start in the past or a length outside 15 to 240 \
-            minutes (`invalid_hold`), a bill (`pay_not_held`), or a calendar that cannot be \
-            written (`calendar_read_only`).",
+            minutes (`invalid_hold`), a bill (`pay_not_held`), a calendar you only follow \
+            (`calendar_followed`), or a calendar that cannot be written (`calendar_read_only`).",
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
