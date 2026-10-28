@@ -194,3 +194,15 @@ export function replyWhen(when: string | Date, locale: string, now: Date): strin
   );
   return isoDay(date) === isoDay(now) ? clock : `${whenLabel(date, locale)}, ${clock}`;
 }
+
+/** A day as "27 Oct" in `locale`, for "on {{date}} at {{time}}". */
+export function shortDay(when: string | Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(when));
+}
+
+/** The time of day as "14:20" in `locale`. */
+export function clockTime(when: string | Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(
+    new Date(when),
+  );
+}

@@ -137,3 +137,62 @@ export function taskItem(from: Task, extra: Partial<Schema<"ItemView">> = {}): S
     ...extra,
   };
 }
+
+type Entry = Schema<"TaskHistoryEntry">;
+
+const entry = (n: number, at: string, over: Partial<Entry>): Entry => ({
+  id: `0192f1a0-0000-7000-8000-0000000008${n.toString(16).padStart(2, "0")}`,
+  at,
+  actor: "member",
+  actor_member: ANA.user_id,
+  what: "created",
+  detail: {},
+  ...over,
+});
+
+/**
+ * What happened to the lease task Scout made: made from Marta's email, planned,
+ * held, moved by the calendar, replied to, "Not yet" and done.
+ */
+export const ASK_LEASE_HISTORY: Entry[] = [
+  entry(1, "2026-10-10T09:00:00Z", {
+    actor: "scout",
+    actor_member: null,
+    what: "created",
+    detail: { due_on: "2026-10-16" },
+  }),
+  entry(2, "2026-10-11T08:30:00Z", {
+    what: "planned",
+    detail: { plan: "date", plan_on: "2026-10-14" },
+  }),
+  entry(3, "2026-10-11T08:31:00Z", {
+    what: "held",
+    detail: { held_from: "2026-10-14T10:00:00Z", held_to: "2026-10-14T10:30:00Z" },
+  }),
+  entry(4, "2026-10-12T16:00:00Z", {
+    actor: "calendar",
+    actor_member: null,
+    what: "held",
+    detail: { held_from: "2026-10-14T14:00:00Z", held_to: "2026-10-14T14:30:00Z" },
+  }),
+  entry(5, "2026-10-13T14:20:00Z", { actor: "scout", actor_member: null, what: "replied" }),
+  entry(6, "2026-10-13T14:25:00Z", { what: "reply_answered" }),
+  entry(7, "2026-10-13T15:00:00Z", { what: "done" }),
+];
+
+/** The same task made by Sofia, handed to Ana, with ten changes (the history folds). */
+export const LONG_HISTORY: Entry[] = [
+  entry(10, "2026-10-01T09:00:00Z", { actor_member: SOFIA.user_id, what: "created" }),
+  ...Array.from({ length: 8 }, (_, index) =>
+    entry(11 + index, `2026-10-0${String(index + 2)}T09:00:00Z`, {
+      actor_member: SOFIA.user_id,
+      what: "due_changed",
+      detail: { due_on: `2026-10-${String(10 + index)}` },
+    }),
+  ),
+  entry(30, "2026-10-10T09:00:00Z", {
+    actor_member: SOFIA.user_id,
+    what: "handed_off",
+    detail: { member: ANA.user_id },
+  }),
+];
