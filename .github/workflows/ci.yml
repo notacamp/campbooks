@@ -325,7 +325,9 @@ jobs:
         run: pnpm --filter @campbooks/app test:fit
 
   clients-webkit:
-    runs-on: ubuntu-latest
+    # 24.04, not -latest: 26.04 has no webkit2gtk-driver, and Playwright's
+    # WebKit does not support it yet (runner image 20261025).
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 30
@@ -354,7 +356,9 @@ jobs:
   tauri:
     # The native shell is its own Cargo workspace so GUI system libraries never
     # enter the server build; it still gets fmt + clippy on every PR.
-    runs-on: ubuntu-latest
+    # 24.04, not -latest: 26.04 has no webkit2gtk-driver, and Playwright's
+    # WebKit does not support it yet (runner image 20261025).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run: { working-directory: clients/app/src-tauri }
@@ -388,7 +392,9 @@ jobs:
     # build driven by tauri-driver and WebKitWebDriver under a virtual display,
     # against a mock API serving hostile HTML mail. Its own job, in parallel
     # with the rest, and not a required check.
-    runs-on: ubuntu-latest
+    # 24.04, not -latest: 26.04 has no webkit2gtk-driver, and Playwright's
+    # WebKit does not support it yet (runner image 20261025).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run: { working-directory: clients }
