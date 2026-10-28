@@ -8,15 +8,15 @@
 ## 2. Client
 
 - [x] 2.1 `uploadAttachment` in `api/drafts.ts`; `useDraftEditor.attach(files)` queued with saves, 409 handled as a save's
-- [ ] 2.2 Composer: Attach button + `compose.attach` (⇧⌘A), hidden file input, drop zone, paste of files, chips (uploading / done / remove), total line
-- [ ] 2.3 Client-side refusals (empty, total, blocked) with toasts; server refusal codes mapped to the same toasts
-- [ ] 2.4 i18n en / pt-PT / es-ES / fr; `pnpm test:fit`; stories (idle, uploading, full, refused) + component tests; recording scenario
+- [x] 2.2 Composer: Attach button + `compose.attach` (⇧⌘A), hidden file input, drop zone, paste of files, chips (uploading / done / remove), total line
+- [x] 2.3 Client-side refusals (empty, total, blocked) with toasts; server refusal codes mapped to the same toasts
+- [x] 2.4 i18n en / pt-PT / es-ES / fr; `pnpm test:fit`; stories (idle, uploading, full, refused) + component tests; recording scenario
 
 ## 3. Finish
 
 - [x] 3.1 OpenAPI and client types regenerated
 - [x] 3.2 Tracking plan regenerated (Coverage row for the new operation)
-- [ ] 3.3 Changelog entry `changelog/unreleased/added/391-attach-files.md`
+- [x] 3.3 Changelog entry `changelog/unreleased/added/391-attach-files.md`
 - [ ] 3.4 Gates green in CI
 - [ ] 3.5 Recording at 375 px and desktop
 - [ ] 3.6 `openspec archive draft-attachments --yes` before merge
