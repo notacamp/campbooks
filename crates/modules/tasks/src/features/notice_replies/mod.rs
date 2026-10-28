@@ -15,7 +15,7 @@ use campbooks_kernel::{
     Event, EventHandler, JobContext, JobError,
     tenancy::{Access, WorkspaceId},
 };
-use chrono::Utc;
+use chrono::{SubsecRound, Utc};
 
 use crate::{
     domain::{
@@ -34,6 +34,9 @@ impl EventHandler for NoticeReplies {
 
     async fn handle(ctx: &mut JobContext, event: Event<MemberReplied>) -> Result<(), JobError> {
         let reply = event.payload;
+        // Postgres keeps microseconds: compare what it will store, so a
+        // repeated delivery finds the reply already kept.
+        let sent_at = reply.sent_at.trunc_subsecs(6);
         let workspace: WorkspaceId = reply
             .workspace
             .parse()
@@ -51,7 +54,7 @@ impl EventHandler for NoticeReplies {
         .bind(workspace.as_uuid())
         .bind(reply.owner.as_uuid())
         .bind(&reply.conversation)
-        .bind(reply.sent_at)
+        .bind(sent_at)
         .fetch_all(&mut **tx)
         .await?;
         let access = Access {
@@ -68,7 +71,7 @@ impl EventHandler for NoticeReplies {
             else {
                 continue;
             };
-            if !before.is_open() || before.replied_at.is_some_and(|at| at >= reply.sent_at) {
+            if !before.is_open() || before.replied_at.is_some_and(|at| at >= sent_at) {
                 continue;
             }
             sqlx::query(
@@ -77,7 +80,7 @@ impl EventHandler for NoticeReplies {
                   WHERE id = $1",
             )
             .bind(id)
-            .bind(reply.sent_at)
+            .bind(sent_at)
             .bind(reply.message)
             .execute(&mut **tx)
             .await?;

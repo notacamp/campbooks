@@ -3,7 +3,7 @@
 
 use campbooks_kernel::tenancy::{UserId, WorkspaceId};
 use campbooks_kernel::testing;
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, SubsecRound, TimeDelta, Utc};
 use serde_json::{Value, json};
 use sqlx::{PgPool, types::Uuid};
 
@@ -47,7 +47,8 @@ async fn fetch(kit: &Kit, token: &str, workspace: WorkspaceId, id: &str) -> Valu
 }
 
 fn later() -> DateTime<Utc> {
-    Utc::now() + TimeDelta::hours(1)
+    // As Postgres keeps it (microseconds), so a read back compares equal.
+    (Utc::now() + TimeDelta::hours(1)).trunc_subsecs(6)
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
