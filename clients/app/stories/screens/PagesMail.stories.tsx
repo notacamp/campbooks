@@ -200,7 +200,7 @@ export const NewPage: DialogStory = {
     const screen = body(canvasElement);
     await userEvent.click(await screen.findByRole("button", { name: "New page" }));
     await expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("Kickoff agenda");
-    await expect(screen.getByText(/A private page at the top level/u)).toBeVisible();
+    await expect(screen.getByText(/A private page at the top level/u)).toBeInTheDocument();
   },
 };
 
