@@ -809,7 +809,6 @@ export function ConversationReader({
         )}
         {makingTask ? (
           <MakeTaskForm
-            key={conversation.id}
             workspaceId={workspaceId}
             conversationId={conversation.id}
             subject={conversation.subject}

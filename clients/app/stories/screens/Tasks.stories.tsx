@@ -349,21 +349,7 @@ export const MakeItATask: Story = {
     const canvas = within(canvasElement);
     // N T makes a task from the email on screen.
     await canvas.findByRole("heading", { level: 2 });
-    // DIAG
-    const probe = (label: string) => {
-      const path = (el: Element) => {
-        const parts: string[] = [];
-        for (let at: Element | null = el; at && parts.length < 14; at = at.parentElement) {
-          parts.push(at.tagName.toLowerCase() + (at.getAttribute("aria-label") ? `[${at.getAttribute("aria-label")}]` : "") + (at.getAttribute("role") ? `{${at.getAttribute("role")}}` : ""));
-        }
-        return parts.join("<");
-      };
-      console.log("DIAG", label, "roots", document.querySelectorAll("#storybook-root > *").length, "accounts", canvasElement.querySelectorAll('[aria-label="Account"]').length, "forms", [...canvasElement.querySelectorAll("form")].map(path).join(" || "), "h2", [...canvasElement.querySelectorAll("h2")].map((h) => h.textContent).join("|"));
-    };
-    probe("before");
     await userEvent.keyboard("nt");
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    probe("after");
     await expect(await canvas.findByRole("textbox", { name: "Title" })).toBeVisible();
   },
 };
