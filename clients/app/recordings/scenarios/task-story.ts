@@ -13,6 +13,8 @@ export default async function taskStory({ page }: ScenarioContext): Promise<void
   await page.goto(story("why-and-history-idle"));
   await page.getByText("Scout made it").first().waitFor();
   await caption(page, "Why it's here: Scout made it, from this email", 2600);
+  await page.getByRole("blockquote").first().waitFor();
+  await caption(page, "The sender's own sentence that asked for it", 2600);
   const history = page.getByRole("heading", { name: "History" });
   await history.scrollIntoViewIfNeeded();
   await page.getByText("You marked it done").first().waitFor();
