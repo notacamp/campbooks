@@ -8263,6 +8263,169 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}/attachments": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Attach a file to a draft.",
+        "operationId": "conversations.upload_draft_attachment",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "draft_id",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DraftId"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "description": "The draft's version as last read (a save's answer, or the draft).",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "filename",
+            "in": "query",
+            "description": "The file's name. Cleaned before it is stored: no path, no control\ncharacters, at most 255 bytes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Content-Token",
+            "in": "header",
+            "description": "The `content_token` that came with the draft on screen, as a save names it.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadBytes"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The draft, with the file and its new version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No bytes (`file_empty`), no usable name (`filename_missing`), a type mail providers block (`attachment_blocked`) or over 20 files (`too_many_attachments`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you only read its inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such draft, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then attach.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file, or the draft's attachments together, would pass 25 MiB (`attachments_too_large`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.draft"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.draft"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/drafts/{draft_id}/cancel_send": {
       "post": {
         "tags": [
@@ -22109,6 +22272,14 @@
         "format": "uuid",
         "description": "AttachmentId (UUIDv7)"
       },
+      "AttachmentSource": {
+        "type": "string",
+        "description": "Where a draft's attachment came from.",
+        "enum": [
+          "forwarded",
+          "uploaded"
+        ]
+      },
       "AttachmentView": {
         "type": "object",
         "description": "An attachment of a message.",
@@ -24708,7 +24879,7 @@
       },
       "DraftAttachment": {
         "type": "object",
-        "description": "A forwarded attachment, as the draft shows it.",
+        "description": "An attachment, as the draft shows it.",
         "required": [
           "id",
           "filename",
@@ -24726,13 +24897,17 @@
           },
           "id": {
             "$ref": "#/components/schemas/AttachmentId",
-            "description": "The original message's attachment."
+            "description": "The original message's attachment, or the uploaded file's own id."
           },
           "size": {
             "type": "integer",
             "format": "int64",
             "description": "Its size in bytes.",
             "minimum": 0
+          },
+          "source": {
+            "$ref": "#/components/schemas/AttachmentSource",
+            "description": "Whether it was forwarded or uploaded."
           }
         }
       },
@@ -24751,7 +24926,7 @@
             "items": {
               "$ref": "#/components/schemas/AttachmentId"
             },
-            "description": "The forwarded attachments to keep (the others are dropped)."
+            "description": "The attachments to keep, forwarded or uploaded (the others are dropped)."
           },
           "bcc": {
             "type": [
@@ -24887,7 +25062,7 @@
             "items": {
               "$ref": "#/components/schemas/DraftAttachment"
             },
-            "description": "The forwarded attachments."
+            "description": "The attachments, forwarded and uploaded."
           },
           "bcc": {
             "type": "array",

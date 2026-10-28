@@ -584,3 +584,28 @@ async fn the_assistant_cannot_attach_files(db: PgPool) {
     }
     assert_eq!(held(&kit, &uri).await, 0);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_upload_is_tracked_as_a_change_without_the_file_name(db: PgPool) {
+    let kit = Kit::new(db).await.tracking();
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let (uri, shown) = draft(&kit, (workspace, inbox), &sam).await;
+    let up = upload(
+        &kit,
+        &sam,
+        &uri,
+        &shown,
+        ("lease-4b.pdf", "application/pdf"),
+        pdf(64),
+    )
+    .await;
+    assert_eq!(up.status, StatusCode::CREATED, "{:?}", up.json);
+    let events =
+        campbooks_kernel::testing::tracked_events(&kit.db, "conversations.draft_updated").await;
+    assert_eq!(events.len(), 1);
+    assert_eq!(
+        events[0].envelope["operation"],
+        "conversations.upload_draft_attachment"
+    );
+    assert!(!events[0].body.to_string().contains("lease-4b"));
+}

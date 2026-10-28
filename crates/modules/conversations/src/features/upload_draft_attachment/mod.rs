@@ -34,10 +34,12 @@ use crate::{
             attachment_bytes, shown_to_author,
         },
         paths::DraftPath,
+        tracked,
     },
     events::DRAFT_RECORD,
     model::{AttachmentId, DraftId, DraftState},
     scopes::ConversationsSend,
+    tracking,
 };
 
 /// The header carrying the draft's `content_token`.
@@ -197,6 +199,12 @@ pub async fn handler(
     let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
         .await?
         .shown(&state.binding, access)?;
+    // A file added is a change to the draft, tracked as a save's change is.
+    let workspace = access.workspace;
+    tracked::track_draft(&state.tracker, &mut tx, id, |draft| {
+        tracking::DraftUpdated { workspace, draft }
+    })
+    .await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(draft)))
 }

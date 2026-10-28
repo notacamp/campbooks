@@ -792,6 +792,11 @@ pub const ANSWER_FIELDS_ALLOWED: &[(&str, &str, &str)] = &[
     ),
     ("conversations.create_draft", "content_token", CONTENT_TOKEN),
     ("conversations.update_draft", "content_token", CONTENT_TOKEN),
+    (
+        "conversations.upload_draft_attachment",
+        "content_token",
+        CONTENT_TOKEN,
+    ),
     ("conversations.cancel_send", "content_token", CONTENT_TOKEN),
     ("conversations.send_draft", "content_token", CONTENT_TOKEN),
     ("conversations.create_rule", "content_token", CONTENT_TOKEN),
