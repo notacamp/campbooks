@@ -16,13 +16,19 @@
 //! `internetMessageId` first: found, it is sent; otherwise it is looked for
 //! again, and it is never sent again (`unknown_outcome` once no attempt is
 //! left), since Graph files the copy asynchronously and a miss proves
-//! nothing. After a 202 the copy is looked up: found, the message is
-//! indexed and announced under its Graph id (the send is recorded sent with
-//! it), so the next sync knows it; not there yet, the attempt stays unclear
-//! and the next one looks again.
+//! nothing. After a 202 the message is sent, whatever comes next: its copy
+//! is looked up, and found, the message is indexed and announced under its
+//! Graph id (the send is recorded sent with it), so the next sync knows it;
+//! not found (filed late, under another `Message-ID`, or an id that cannot
+//! be looked up), the send is recorded sent under the message's own
+//! `Message-ID` (what an IMAP send is known by; the event's contract wants an
+//! id) and the next sync brings the copy. An accepted send is never
+//! `unknown_outcome`, which would have the member send it again.
+
+use std::time::Duration;
 
 use campbooks_kernel::{JobContext, JobError, db::BeginFor as _};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 
 use super::{
     Attempt, SendMessage, Sent, Target, UNCLEAR_WAIT, clear_unclear, finish_failed, message_bytes,
@@ -31,7 +37,8 @@ use super::{
 use crate::{
     contract::OutgoingMessage,
     domain::{
-        model::{ConnectionId, StreamId},
+        health,
+        model::{ConnectionId, Health, StreamId},
         schedule::{self, Rate},
     },
     mail::{Fetched, Receiver},
@@ -137,23 +144,25 @@ impl SendMessage {
         target.unclear = true;
         match client.send_mime(token, &raw).await {
             Ok(SendAnswer::Accepted) => {
-                // Graph files the copy in Sent Items, perhaps not yet: until
-                // it is found, the attempt stays unclear, so the next one
-                // only looks it up and never sends again.
-                match client.sent_copy(token, &document.rfc_message_id).await {
-                    Ok(SentLookup::Found(copy)) => {
-                        let sent = as_sent(&target, copy, Some(raw), now);
-                        self.finish_sent(ctx, workspace, send, &target, stream, sent, now)
-                            .await
-                    }
+                // Graph took it: the message is sent. Its copy in Sent Items
+                // is indexed under its Graph id when it is there; when it is
+                // not (filed late, another `Message-ID`, a failed look-up),
+                // the send is still sent, under its own `Message-ID`, and
+                // the next sync brings the copy.
+                let sent = match client.sent_copy(token, &document.rfc_message_id).await {
+                    Ok(SentLookup::Found(copy)) => as_sent(&target, copy, Some(raw), now),
                     Ok(SentLookup::Missing | SentLookup::Several) | Err(_) => {
-                        tracing::info!(%workspace, %send, "sent; its copy is not in Sent Items yet");
-                        Err(JobError::retry_after(
-                            "sent; looking for its copy in Sent Items next time",
-                            UNCLEAR_WAIT,
-                        ))
+                        tracing::info!(%workspace, %send, "sent; its copy is not in Sent Items");
+                        Sent {
+                            id: Some(document.rfc_message_id.clone()),
+                            thread_key: None,
+                            fetched: None,
+                            copy: None,
+                        }
                     }
-                }
+                };
+                self.finish_sent(ctx, workspace, send, &target, stream, sent, now)
+                    .await
             }
             Ok(SendAnswer::TooLarge) => {
                 // A definite answer: not sent.
@@ -173,6 +182,9 @@ impl SendMessage {
                 // A definite answer (a refusal, throttling): not sent.
                 clear_unclear(ctx.pool(), workspace, send, Some(now)).await?;
                 target.unclear = false;
+                if let ProviderError::RateLimited { retry_after } = &err {
+                    throttled(ctx, workspace, (stream, connection), *retry_after, now).await?;
+                }
                 self.refused(ctx, workspace, send, &target, &err).await
             }
         }
@@ -195,6 +207,42 @@ impl SendMessage {
             )),
         }
     }
+}
+
+/// Graph throttled the send: the connection is `throttled` and its
+/// stream waits as long as the send does, as when a read is throttled.
+async fn throttled(
+    ctx: &JobContext,
+    workspace: campbooks_kernel::tenancy::WorkspaceId,
+    (stream, connection): (StreamId, ConnectionId),
+    retry_after: Option<Duration>,
+    now: DateTime<Utc>,
+) -> Result<(), JobError> {
+    // The wait `refused` retries after.
+    let wait = retry_after.unwrap_or(Duration::from_secs(30));
+    let until = now + TimeDelta::from_std(wait).unwrap_or(TimeDelta::seconds(30));
+    let tracker = ctx.state().tracker.clone();
+    let mut tx = ctx.pool().begin_for(workspace).await?;
+    health::lock(&mut tx, connection).await?;
+    sqlx::query("UPDATE connectors.streams SET throttled_until = $2 WHERE id = $1")
+        .bind(stream)
+        .bind(until)
+        .execute(&mut *tx)
+        .await?;
+    health::set(
+        &mut tx,
+        &tracker,
+        workspace,
+        connection,
+        Health::Throttled,
+        Some("rate_limited"),
+        now,
+    )
+    .await?;
+    schedule::set_due(&mut tx, workspace, stream, until).await?;
+    tx.commit().await?;
+    tracing::info!(%workspace, %stream, %until, "a send was throttled by the provider");
+    Ok(())
 }
 
 /// Why `document` may not go out through `stream`'s connection (a stable

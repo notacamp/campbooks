@@ -1,9 +1,11 @@
 //! Sending from Outlook mailboxes through Graph's `sendMail`
 //! (campbooks-cloud#317), end to end against the fake Graph: once, as MIME
 //! with its threading headers, no copy written to Sent Items, the copy Graph
-//! filed known to the next sync, a copy filed late brought once, Graph's
-//! size limit, From the verified mailbox only, a lost answer found and not
-//! sent again, and throttling.
+//! filed known to the next sync, an accepted send that stays sent whatever
+//! became of its copy (filed late, under another `Message-ID`), Graph's size
+//! limit, From the verified mailbox only, a lost answer found and not sent
+//! again, and throttling that marks the connection. Nothing is deleted at
+//! Graph after any run.
 
 use campbooks_kernel::{
     clock::Clock as _,
@@ -145,9 +147,20 @@ impl Mailbox {
         self.send_with(edit, Vec::new()).await
     }
 
+    /// Run the jobs; nothing was deleted.
+    async fn jobs(&self) {
+        self.kit.run_jobs().await;
+        self.only_sent();
+    }
+
     /// Run the jobs, then (minutes later) the sends waiting to retry, until
-    /// none is left.
+    /// none is left; nothing was deleted.
     async fn settle(&self) {
+        self.settle_jobs().await;
+        self.only_sent();
+    }
+
+    async fn settle_jobs(&self) {
         for _ in 0..12 {
             self.kit.run_jobs().await;
             self.kit.clock.advance(TimeDelta::minutes(2));
@@ -206,9 +219,11 @@ impl Mailbox {
             .count()
     }
 
-    /// The stream's next run, past its longest interval.
+    /// The stream's next run, past its longest interval; nothing was
+    /// deleted.
     async fn run(&self) {
         self.kit.tick(TimeDelta::hours(5)).await;
+        self.only_sent();
     }
 
     /// Only `sendMail` ever changed anything at Graph; nothing was deleted.
@@ -253,23 +268,39 @@ async fn a_reply_goes_out_once_with_its_thread_and_no_copy_written(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_copy_filed_late_is_found_and_never_sent_again(db: PgPool) {
+async fn an_accepted_send_whose_copy_is_filed_late_is_sent_and_never_sent_again(db: PgPool) {
     let m = mailbox(db, true).await;
     m.kit.microsoft.delay_filing(true);
     let send = m.send(|_| {}).await;
-    m.kit.run_jobs().await;
-    // Taken, its copy not in Sent Items yet: not settled, not sent again.
-    assert!(m.completed().await.is_empty());
+    m.jobs().await;
+    // Taken, its copy not in Sent Items yet: sent all the same, under its
+    // own Message-ID, and never sent again.
+    assert_eq!(m.outcome().await, ("sent".to_owned(), None));
+    let rfc_id = format!("{send}@example.com");
+    assert_eq!(m.key(send).await.as_deref(), Some(rfc_id.as_str()));
     assert_eq!(m.kit.microsoft.send_calls(), 1);
     m.kit.microsoft.file_sent();
     m.settle().await;
-    assert_eq!(m.outcome().await, ("sent".to_owned(), None));
     assert_eq!(m.kit.microsoft.send_calls(), 1);
+    // The next sync brings the copy, once.
     let id = m.kit.microsoft.sent_items()[0].id.clone();
-    assert_eq!(m.key(send).await.as_deref(), Some(id.as_str()));
+    m.run().await;
     m.run().await;
     assert_eq!(m.upserts(&id).await, 1);
-    m.only_sent();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_accepted_send_whose_copy_has_another_message_id_is_not_unknown(db: PgPool) {
+    let m = mailbox(db, true).await;
+    // Exchange rewrites the Message-ID: the copy is never found by it.
+    m.kit.microsoft.rewrite_sent_ids(true);
+    let send = m.send(|_| {}).await;
+    m.settle().await;
+    assert_eq!(m.outcome().await, ("sent".to_owned(), None));
+    let rfc_id = format!("{send}@example.com");
+    assert_eq!(m.key(send).await.as_deref(), Some(rfc_id.as_str()));
+    assert_eq!(m.kit.microsoft.send_calls(), 1);
+    assert_eq!(m.kit.microsoft.sent_items().len(), 1);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -356,9 +387,19 @@ async fn a_throttled_send_waits_and_goes_once(db: PgPool) {
     let m = mailbox(db, true).await;
     m.kit.microsoft.throttle_next(120);
     m.send(|_| {}).await;
-    m.kit.run_jobs().await;
+    m.jobs().await;
     assert!(m.completed().await.is_empty(), "waiting");
     assert!(m.kit.microsoft.sent_mime().is_empty());
+    // The connection says so, as when a read is throttled.
+    let health: (String, Option<String>) =
+        sqlx::query_as("SELECT health, health_reason FROM connectors.connections")
+            .fetch_one(&m.kit.db)
+            .await
+            .unwrap();
+    assert_eq!(
+        health,
+        ("throttled".to_owned(), Some("rate_limited".to_owned()))
+    );
     m.settle().await;
     assert_eq!(m.outcome().await, ("sent".to_owned(), None));
     assert_eq!(m.kit.microsoft.sent_mime().len(), 1);
