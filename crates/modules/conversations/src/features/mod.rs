@@ -47,6 +47,7 @@ pub mod rule_notices;
 pub mod rules;
 pub mod search_source;
 pub mod send_draft;
+pub mod signature;
 pub mod spam;
 pub mod star;
 pub mod suggest_rules;

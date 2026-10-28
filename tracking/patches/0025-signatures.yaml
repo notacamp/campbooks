@@ -1,0 +1,21 @@
+# A member's signature per inbox (campbooks-cloud#393, OpenSpec change
+# signatures): two operations, with no new event. Reading a signature changes
+# nothing. Keeping one is a member's text for their own mail, private to them
+# and, like what they told Scout about a person, never put in the tracked
+# events (their words are personal data: only a count could be, and nothing
+# acts on one).
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0025-signatures.yaml`.
+changelog:
+  - date: "2026-10-29"
+    plan_version: 25
+    change: "Signatures (campbooks-cloud#393): Coverage for conversations.get_signature and conversations.set_signature, which track nothing."
+    pr: "#393"
+
+coverage:
+  - kind: "operation"
+    name: "conversations.get_signature"
+    exemption: "reads a member's own signature for an inbox; it changes nothing"
+  - kind: "operation"
+    name: "conversations.set_signature"
+    exemption: "keeps a member's own text for their mail, private to them; their words are personal data and no tracked event holds them"

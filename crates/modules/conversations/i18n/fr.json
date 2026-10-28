@@ -49,6 +49,8 @@
     "images_need_you": "Vous seul pouvez choisir d’afficher toujours les images d’un expéditeur. Ouvrez l’un de ses messages et choisissez-le là.",
     "person_note_invalid": "Une note demande une adresse e-mail simple et de 1 à {{max}} caractères sur la personne.",
     "person_notes_full": "Vous avez déjà {{max}} notes sur des personnes. Supprimez-en une pour en ajouter une autre.",
-    "person_notes_need_member": "Seul un membre de cet espace de travail garde des notes sur des personnes."
+    "person_notes_need_member": "Seul un membre de cet espace de travail garde des notes sur des personnes.",
+    "signature_needs_member": "Il faut être membre pour enregistrer une signature.",
+    "signature_too_long": "Une signature peut contenir {{max}} caractères au plus."
   }
 }

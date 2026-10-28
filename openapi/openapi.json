@@ -9439,6 +9439,206 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/inboxes/{inbox_id}/signature": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Your signature for an inbox.",
+        "operationId": "conversations.get_signature",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "inbox_id",
+            "in": "path",
+            "description": "The inbox.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/InboxId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your signature for this inbox; empty when you have none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Signature"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, not a member (`signature_needs_member`), or you only read the inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such inbox, or you are not in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.inbox"
+          ],
+          "risk": "low"
+        }
+      },
+      "put": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Set your signature for an inbox.",
+        "operationId": "conversations.set_signature",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "inbox_id",
+            "in": "path",
+            "description": "The inbox.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/InboxId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Signature"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Your signature as kept.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Signature"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Over 2000 characters (`signature_too_long`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, not a member (`signature_needs_member`), or you only read the inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such inbox, or you are not in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.inbox"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/invitations": {
       "get": {
         "tags": [
@@ -24969,6 +25169,13 @@
             ],
             "description": "The quoted history."
           },
+          "signature": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "`false` leaves the signature off; `true` adds the author's current\nsignature for the inbox (campbooks-cloud#393). Absent keeps it as it is."
+          },
           "subject": {
             "type": [
               "string",
@@ -25150,6 +25357,10 @@
             ],
             "format": "date-time",
             "description": "When a scheduled send leaves (until then it can be cancelled)."
+          },
+          "signature": {
+            "type": "string",
+            "description": "The author's signature this draft carries (campbooks-cloud#393): text\nwith the marks a message may carry, copied when the draft was made\nor added back; empty when it carries none."
           },
           "state": {
             "$ref": "#/components/schemas/DraftState",
@@ -32405,6 +32616,21 @@
             "description": "Otherwise, a same-origin path to land on."
           }
         }
+      },
+      "Signature": {
+        "type": "object",
+        "description": "A member's signature for an inbox.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text with bold (`**x**`), italic (`*x*`) and links (`[words](url)`);\nempty when there is none.",
+            "example": "**Sam Rivers**\nRivers Lettings"
+          }
+        },
+        "additionalProperties": false
       },
       "SignedInWith": {
         "type": "object",
