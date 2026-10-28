@@ -30,6 +30,18 @@ describe("parseBinding", () => {
 });
 
 describe("chordFromEvent", () => {
+  it("reads a digit with a modifier and Shift as the digit, not what Shift types", () => {
+    const chord = chordFromEvent(
+      key({ key: "*", code: "Digit8", metaKey: true, shiftKey: true }),
+      "apple",
+    );
+    expect(chord).toEqual({ key: "8", mod: true, shift: true, alt: false });
+    // Without a modifier, "*" is still the symbol.
+    expect(chordFromEvent(key({ key: "*", code: "Digit8", shiftKey: true }), "apple")?.key).toBe(
+      "*",
+    );
+  });
+
   it("maps ⌘ to mod on Apple platforms and Ctrl elsewhere", () => {
     expect(chordFromEvent(key({ key: "k", metaKey: true }), "apple")?.mod).toBe(true);
     expect(chordFromEvent(key({ key: "k", metaKey: true }), "other")?.mod).toBe(false);
