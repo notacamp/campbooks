@@ -18,6 +18,7 @@ import {
   CONVERSATIONS_SHORTCUTS,
   PersonNotesList,
   RulesList,
+  useAskQuote,
   useConversationSources,
 } from "~/modules/conversations";
 import {
@@ -112,6 +113,7 @@ export function buildModuleRoutes<
       // Hold time reads the schedule module's free time and calendars.
       ...buildTasksRoutes(workspace, {
         useSources: useConversationSources,
+        useQuote: useAskQuote,
         holdSources: HOLD_SOURCES,
       }),
       ...buildScheduleRoutes(workspace, {

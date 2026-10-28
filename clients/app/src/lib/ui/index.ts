@@ -144,6 +144,7 @@ export {
   MetaLine,
   MoreMessages,
   QuotedText,
+  SenderSentence,
   type FoldedMessageProps,
   type MessageCardProps,
   type MessageSide,

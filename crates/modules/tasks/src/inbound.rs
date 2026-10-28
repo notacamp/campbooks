@@ -27,6 +27,9 @@ pub struct ReadAsk {
     /// The reference of an open task it repeats.
     #[serde(default)]
     pub same_as: Option<String>,
+    /// `reply` or `elsewhere` (checked when used); absent from older reads.
+    #[serde(default)]
+    pub done_by: Option<String>,
 }
 
 /// `conversations.message_read` v1: a read of one message was stored.

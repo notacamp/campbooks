@@ -82,6 +82,7 @@
     "tomorrow": "Tomorrow",
     "nextWeek": "Next week",
     "sourceLine": "{{subject}} · {{date}}",
+    "quote": "“{{quote}}”",
     "openEmail": "Open the email",
     "hand": "Hand it to someone",
     "handFind": "Find a teammate by name",

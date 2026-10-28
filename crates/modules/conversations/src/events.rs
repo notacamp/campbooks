@@ -20,9 +20,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::model::{
-    BlobPointer, Channel, ClearCause, ConnectionId, ConversationId, DraftId, InboxId, ItemKind,
-    LabelId, MessageId, NeedReason, NeedTrust, ReadLayer, RuleId, RuleRunId, RuleState, RunKind,
-    RunState, SendId, Stream, Verb,
+    BlobPointer, Channel, ClearCause, ConnectionId, ConversationId, DoneBy, DraftId, InboxId,
+    ItemKind, LabelId, MessageId, NeedReason, NeedTrust, ReadLayer, RuleId, RuleRunId, RuleState,
+    RunKind, RunState, SendId, Stream, Verb,
 };
 
 /// Record type of an inbox: the container a conversation's changes are
@@ -401,6 +401,9 @@ pub struct ReadAskFacts {
     /// The reference of an open task it repeats.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub same_as: Option<String>,
+    /// How it gets done: by replying, or some other way (an enum, no text).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_by: Option<DoneBy>,
 }
 
 /// A read of a message was stored, of either layer

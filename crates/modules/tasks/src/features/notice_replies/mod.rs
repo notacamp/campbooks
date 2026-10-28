@@ -5,7 +5,10 @@
 //!
 //! - Facts only: no message is read. Whether the reply did what the task
 //!   asks is the member's answer, never Scout's.
-//! - Pay tasks are never marked: a reply does not pay a bill.
+//! - Pay tasks are never marked: a reply does not pay a bill. Neither is a
+//!   task whose read said it is done some other way (`done_by = 'elsewhere'`:
+//!   sign and send a form, file, upload); a task with no `done_by` (made
+//!   before it was read) is marked as before.
 //! - Only forward: a task keeps the newest reply, so a repeated or
 //!   out-of-order delivery changes nothing.
 //! - A reply sent before the task was made (the sync of old sent mail)
@@ -47,6 +50,7 @@ impl EventHandler for NoticeReplies {
             "SELECT id FROM tasks.tasks
               WHERE workspace_id = $1 AND assignee = $2 AND state = 'open' AND verb = 'do'
                 AND source_type = 'conversations.conversation' AND source_id = $3
+                AND (done_by IS NULL OR done_by = 'reply')
                 AND created_at < $4
                 AND (replied_at IS NULL OR replied_at < $4)
               ORDER BY id",

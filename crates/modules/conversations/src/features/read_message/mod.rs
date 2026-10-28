@@ -758,6 +758,7 @@ pub(crate) fn ask_facts(ask: &ReadAsk) -> ReadAskFacts {
         due: ask.due.clone(),
         has_amount: ask.amount.is_some(),
         same_as: ask.same_as.clone(),
+        done_by: ask.done_by,
     }
 }
 

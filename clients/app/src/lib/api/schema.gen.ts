@@ -4775,6 +4775,12 @@ export interface components {
             update: string;
         };
         /**
+         * @description How an ask gets done (campbooks-cloud#396): by replying to the email
+         *     that made it, or some other way.
+         * @enum {string}
+         */
+        DoneBy: "reply" | "elsewhere";
+        /**
          * Format: binary
          * @description A file's bytes, as the OpenAPI document describes them.
          */
@@ -7127,6 +7133,7 @@ export interface components {
         /** @description An obligation of the reader, dated or not. */
         ReadAsk: {
             amount?: components["schemas"]["Amount"] | null;
+            done_by?: components["schemas"]["DoneBy"] | null;
             /** @description By when: a date, or an RFC 3339 time with an offset. */
             due?: string | null;
             /**
@@ -8637,6 +8644,11 @@ export interface components {
             task: components["schemas"]["TaskView"];
         };
         /**
+         * @description How an ask gets done (campbooks-cloud#396).
+         * @enum {string}
+         */
+        TaskDoneBy: "reply" | "elsewhere";
+        /**
          * @description A field `tasks.update` changed.
          * @enum {string}
          */
@@ -8829,6 +8841,7 @@ export interface components {
             created_at: string;
             /** @description The member who made it. */
             created_by: components["schemas"]["UserId"];
+            done_by?: components["schemas"]["TaskDoneBy"] | null;
             /**
              * Format: date-time
              * @description The time it is due, when it has one (`due_on` is its local day).
@@ -8866,6 +8879,12 @@ export interface components {
              */
             revision: number;
             source?: components["schemas"]["RecordRef"] | null;
+            /**
+             * @description The key of the ask in the email's read that made it (ids only: the
+             *     message id and a position). The sender's own sentence is not here; the
+             *     conversation serves it to members who may read the email.
+             */
+            source_ask?: string | null;
             /** @description Open, done or not needed. */
             state: components["schemas"]["TaskState"];
             /** @description What to do, in the member's words. */

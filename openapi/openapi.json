@@ -26045,6 +26045,14 @@
           }
         }
       },
+      "DoneBy": {
+        "type": "string",
+        "description": "How an ask gets done (campbooks-cloud#396): by replying to the email\nthat made it, or some other way.",
+        "enum": [
+          "reply",
+          "elsewhere"
+        ]
+      },
       "DownloadBytes": {
         "type": "string",
         "format": "binary",
@@ -31262,6 +31270,17 @@
               }
             ]
           },
+          "done_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DoneBy",
+                "description": "How it gets done, when the read says (a model read only; absent from\nreads made before it was asked)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "due": {
             "type": [
               "string",
@@ -34648,6 +34667,14 @@
           }
         }
       },
+      "TaskDoneBy": {
+        "type": "string",
+        "description": "How an ask gets done (campbooks-cloud#396).",
+        "enum": [
+          "reply",
+          "elsewhere"
+        ]
+      },
       "TaskEditedField": {
         "type": "string",
         "description": "A field `tasks.update` changed.",
@@ -35013,6 +35040,17 @@
             "$ref": "#/components/schemas/UserId",
             "description": "The member who made it."
           },
+          "done_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TaskDoneBy",
+                "description": "How it gets done, when Scout's read said: by a reply, or some other\nway. Absent for a task made without it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "due_at": {
             "type": [
               "string",
@@ -35109,6 +35147,13 @@
                 "type": "null"
               }
             ]
+          },
+          "source_ask": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key of the ask in the email's read that made it (ids only: the\nmessage id and a position). The sender's own sentence is not here; the\nconversation serves it to members who may read the email."
           },
           "state": {
             "$ref": "#/components/schemas/TaskState",

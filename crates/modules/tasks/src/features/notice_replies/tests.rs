@@ -205,3 +205,41 @@ async fn a_repeated_delivery_changes_nothing_and_only_a_newer_reply_moves_it(db:
         newest.message.to_string()
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn only_an_ask_a_reply_can_do_is_asked_done(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, ana_id) = kit.member("ana", workspace);
+    kit.let_see(INBOX, ana_id);
+    // `done_by` is Scout's reading of the ask: a reply, some other way, or
+    // not read (a task made before it was).
+    let mut ids = Vec::new();
+    for (title, how) in [
+        ("Confirm Thursday", Some("reply")),
+        ("Sign and send the contract", Some("elsewhere")),
+        ("Made before it was read", None),
+    ] {
+        let id = from_email(&kit, &ana, workspace, json!({"title": title})).await;
+        sqlx::query("UPDATE tasks.tasks SET done_by = $2 WHERE id = $1::uuid")
+            .bind(&id)
+            .bind(how)
+            .execute(&kit.db)
+            .await
+            .unwrap();
+        ids.push(id);
+    }
+
+    kit.publish(workspace, &reply(workspace, ana_id, CONVERSATION, later()))
+        .await;
+
+    let asked = [true, false, true];
+    for (id, asked) in ids.iter().zip(asked) {
+        let read = fetch(&kit, &ana, workspace, id).await;
+        assert_eq!(read["task"]["asks_done"], asked, "{id}");
+        assert_eq!(read["task"]["replied"] != Value::Null, asked, "{id}");
+    }
+    let read = fetch(&kit, &ana, workspace, &ids[1]).await;
+    assert_eq!(read["task"]["done_by"], "elsewhere");
+    assert_eq!(read["task"]["revision"], 1);
+}

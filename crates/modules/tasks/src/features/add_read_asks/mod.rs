@@ -145,6 +145,19 @@ fn amount_of(words: Option<&AskText>) -> Option<&AskAmount> {
         })
 }
 
+/// How the ask gets done, when the read said and it is one of the two: a
+/// payment is never done by a reply, whatever the read says. Facts only.
+fn done_by_of(ask: &ReadAsk, verb: TaskVerb) -> Option<&'static str> {
+    if verb == TaskVerb::Pay {
+        return Some("elsewhere");
+    }
+    match ask.done_by.as_deref() {
+        Some("reply") => Some("reply"),
+        Some("elsewhere") => Some("elsewhere"),
+        _ => None,
+    }
+}
+
 /// The task of the owner that `ask` repeats: the open one `same_as` names
 /// (from the same conversation or inbox), or, for a `pay` ask, the `pay` task the
 /// other layer's read of the same message made.
@@ -238,9 +251,9 @@ async fn add_ask(
     let inserted = sqlx::query(
         "INSERT INTO tasks.tasks
              (id, workspace_id, title, verb, origin, due_on, due_at, assignee, created_by,
-              source_type, source_id, source_container, amount_minor, currency, ask_key)
+              source_type, source_id, source_container, amount_minor, currency, ask_key, done_by)
          VALUES ($1, $2, $3, $4, 'ask', $5, $6, $7, $7, 'conversations.conversation', $8, $9,
-                 $10, $11, $12)
+                 $10, $11, $12, $13)
          ON CONFLICT (workspace_id, ask_key) WHERE ask_key IS NOT NULL DO NOTHING",
     )
     .bind(id)
@@ -255,6 +268,7 @@ async fn add_ask(
     .bind(amount.map(|amount| amount.minor))
     .bind(amount.map(|amount| amount.currency.clone()))
     .bind(&ask.key)
+    .bind(done_by_of(ask, verb))
     .execute(&mut **tx)
     .await?
     .rows_affected();
