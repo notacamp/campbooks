@@ -33,7 +33,7 @@ import {
   W,
 } from "../../test/demo/conversations";
 import type { Draft } from "../../src/modules/conversations/api/drafts";
-import { DRAFT_LIST, NEW, REPLY_WRITTEN } from "../../test/demo/drafts";
+import { DRAFT_LIST, NEW, REPLY_WRITTEN, TO_MARTA } from "../../test/demo/drafts";
 import { DUARTE, SESSION } from "../../test/demo/workspaces";
 
 import { mockFetch, type MockRoute } from "./mock-fetch";
@@ -684,6 +684,21 @@ function replyDraftOpen(): Record<string, MockRoute> {
       };
       return { body: draft };
     },
+    // Send, now or later: scheduled until `send_at`; Undo takes it back.
+    [`POST ${W}/drafts/${draft.id}/send`]: (body) => {
+      const { send_at: at } = body as { send_at?: string | null };
+      draft = {
+        ...draft,
+        state: "scheduled",
+        send_at: at ?? new Date(Date.now() + 10_000).toISOString(),
+        version: draft.version + 1,
+      };
+      return { status: 202, body: draft };
+    },
+    [`POST ${W}/drafts/${draft.id}/cancel_send`]: () => {
+      draft = { ...draft, state: "draft", send_at: null, version: draft.version + 1 };
+      return { body: draft };
+    },
     // An upload: the bytes are the body, the name is in the query.
     [`POST ${W}/drafts/${draft.id}/attachments`]: (bytes, url) => {
       const file = {
@@ -721,6 +736,55 @@ export const ReplyDraftAttach: Story = {
       await within(document.body).findByText(/setup\.exe wasn.t attached/u),
     ).toBeVisible();
   },
+};
+
+/** Send later from the open reply: the composer closes with "Scheduled: …" and Undo. */
+export const ReplyDraftSendLater: Story = {
+  args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Send later" }));
+    await userEvent.click(await canvas.findByRole("button", { name: /Tomorrow morning/u }));
+    await expect(await within(document.body).findByText(/^Scheduled: /u)).toBeVisible();
+  },
+};
+
+/**
+ * Sends scheduled for later (campbooks-cloud#392): their own group above the
+ * drafts, each with when it leaves; Cancel send turns one back into a draft.
+ */
+function scheduledDrafts(): Record<string, MockRoute> {
+  const leaving = new Date(Date.now() + 20 * 3_600_000).toISOString();
+  let list: Draft[] = [
+    { ...TO_MARTA, state: "scheduled", send_at: leaving },
+    ...DRAFT_LIST.filter((d) => d.id !== TO_MARTA.id),
+  ];
+  return inbox({
+    [`GET ${W}/drafts`]: () => ({ body: { drafts: list } }),
+    [`POST ${W}/drafts/${TO_MARTA.id}/cancel_send`]: () => {
+      list = list.map((d) => (d.id === TO_MARTA.id ? { ...d, state: "draft", send_at: null } : d));
+      return { body: list.find((d) => d.id === TO_MARTA.id) };
+    },
+  });
+}
+export const DraftsScheduled: Story = {
+  args: { path: `${PATH}/drafts`, api: scheduledDrafts() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const group = await canvas.findByRole("region", { name: "Scheduled" });
+    await expect(within(group).getByText(/^Leaves /u)).toBeVisible();
+    await userEvent.click(within(group).getByRole("button", { name: /^Cancel send:/u }));
+    await expect(await within(document.body).findByText("Send cancelled")).toBeVisible();
+    await waitFor(() => expect(canvas.queryByRole("region", { name: "Scheduled" })).toBeNull());
+  },
+};
+
+/** Scheduled sends on a phone. */
+export const DraftsScheduledPhone: Story = {
+  ...DraftsScheduled,
+  // Its own mailbox: the other story's Cancel send changed that one.
+  args: { path: `${PATH}/drafts`, api: scheduledDrafts() },
+  ...at("phone", 375, 812),
 };
 
 /** No drafts: one plain line. */

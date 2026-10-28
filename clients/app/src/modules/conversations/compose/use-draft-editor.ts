@@ -306,54 +306,62 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     [draft.id, flush, workspaceId],
   );
 
-  /** Send: save first, then schedule. Resolves with the scheduled draft, or undefined. */
-  const send = useCallback(async (): Promise<Draft | undefined> => {
-    setSending(true);
-    // Send only what the member sees: the server sends the saved version.
-    const current = latest.current;
-    try {
-      if (!(await flush()) || latest.current !== current) {
-        // A save refused as changed has said so already; keep that notice.
-        setError((shownError) => (shownError === "content_changed" ? shownError : "not_saved"));
-        return undefined;
-      }
-      const scheduled = await sendDraft(workspaceId, draft.id, {
-        version: version.current,
-        contentToken: shownToken.current,
-      });
-      replace(scheduled);
-      void refresh();
-      return scheduled;
-    } catch (thrown) {
-      if (!changedElsewhere(thrown)) {
-        setError(problemCode(thrown) ?? "unknown");
-        return undefined;
-      }
-      // Not the draft the member was shown: saved since elsewhere (another
-      // tab, another device, the assistant: `draft_changed`) or changed
-      // under it (`content_changed`). Nothing was sent. Read it again and
-      // show it as it is now, so the next Send names its version and token
-      // (campbooks-cloud#242); never sent on their behalf.
+  /**
+   * Send: save first, then schedule, to leave when the undo window ends or at
+   * `sendAt`. Resolves with the scheduled draft, or undefined.
+   */
+  const send = useCallback(
+    async (sendAt?: Date): Promise<Draft | undefined> => {
+      setSending(true);
+      // Send only what the member sees: the server sends the saved version.
+      const current = latest.current;
       try {
-        const fresh = await fetchDraft(workspaceId, draft.id);
-        if (latest.current === current) {
-          showCurrent(fresh);
-        } else {
-          // Typed while the send was refused: keep it, take only the
-          // version and token, and the next save writes it over them.
-          version.current = fresh.version;
-          shownToken.current = fresh.content_token;
-          setShown(shownOf(fresh));
+        if (!(await flush()) || latest.current !== current) {
+          // A save refused as changed has said so already; keep that notice.
+          setError((shownError) => (shownError === "content_changed" ? shownError : "not_saved"));
+          return undefined;
         }
-      } catch {
-        // The notice still says to check it; the next send asks again.
+        const scheduled = await sendDraft(
+          workspaceId,
+          draft.id,
+          { version: version.current, contentToken: shownToken.current },
+          sendAt,
+        );
+        replace(scheduled);
+        void refresh();
+        return scheduled;
+      } catch (thrown) {
+        if (!changedElsewhere(thrown)) {
+          setError(problemCode(thrown) ?? "unknown");
+          return undefined;
+        }
+        // Not the draft the member was shown: saved since elsewhere (another
+        // tab, another device, the assistant: `draft_changed`) or changed
+        // under it (`content_changed`). Nothing was sent. Read it again and
+        // show it as it is now, so the next Send names its version and token
+        // (campbooks-cloud#242); never sent on their behalf.
+        try {
+          const fresh = await fetchDraft(workspaceId, draft.id);
+          if (latest.current === current) {
+            showCurrent(fresh);
+          } else {
+            // Typed while the send was refused: keep it, take only the
+            // version and token, and the next save writes it over them.
+            version.current = fresh.version;
+            shownToken.current = fresh.content_token;
+            setShown(shownOf(fresh));
+          }
+        } catch {
+          // The notice still says to check it; the next send asks again.
+        }
+        setError("content_changed");
+        return undefined;
+      } finally {
+        setSending(false);
       }
-      setError("content_changed");
-      return undefined;
-    } finally {
-      setSending(false);
-    }
-  }, [draft.id, flush, refresh, replace, showCurrent, workspaceId]);
+    },
+    [draft.id, flush, refresh, replace, showCurrent, workspaceId],
+  );
 
   /** Take a scheduled send back. Whether it was in time. */
   const undo = useCallback(async (): Promise<boolean> => {

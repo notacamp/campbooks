@@ -8,12 +8,13 @@ import {
   IconButton,
   initialsOf,
   SkeletonList,
+  sendTimeLabel,
   Tag,
   Text,
 } from "~/lib/ui";
 
 import { DRAFTS_MAX, type Draft } from "../../api/drafts";
-import { sendTimeLabel } from "../../compose/send-time";
+
 import { displayName, listTime, type Translate } from "../../model";
 
 /** A draft the member can still change: not one on its way out. */

@@ -3,7 +3,7 @@
 // is one the server takes. Pure helpers, no React.
 
 /** The furthest ahead a send may be scheduled, in days (the server's limit). */
-export const MAX_SEND_AHEAD_DAYS = 366;
+const MAX_SEND_AHEAD_DAYS = 366;
 
 /** How soon a picked time may be, in minutes: past the undo window and a minute. */
 const SOONEST_MINUTES = 2;

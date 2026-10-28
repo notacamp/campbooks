@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { editorOf, typeInto } from "../../../../../test/composer";
 import { renderUi } from "../../../../../test/render";
@@ -171,7 +171,7 @@ describe("MessageComposer", () => {
     );
     fireEvent.click(within(toolbar).getByRole("button", { name: "Numbered list" }));
     expect(onBodyChange).toHaveBeenLastCalledWith("1. budget");
-    expect(screen.getByRole("button", { name: /Send/u })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^Send(?! later)/u })).toHaveAttribute(
       "aria-keyshortcuts",
       "Control+Enter",
     );
@@ -393,7 +393,7 @@ describe("MessageComposer", () => {
   it("does not send twice while sending", () => {
     const onSend = vi.fn();
     renderUi(<MessageComposer {...props({ onSend, sending: true })} />);
-    expect(screen.getByRole("button", { name: /Send/u })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Send(?! later)/u })).toBeDisabled();
     act(() => {
       fireEvent.keyDown(screen.getByRole("textbox", { name: "Message" }), {
         key: "Enter",
@@ -518,6 +518,80 @@ describe("MessageComposer", () => {
       // Text alone.
       paste([], { "text/plain": "hello" });
       expect(onAttach).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("sending later", () => {
+    // Friday 30 October 2026, mid-morning, in the test's own time zone.
+    const FRIDAY = new Date(2026, 9, 30, 10, 0);
+
+    function open(onSendLater = vi.fn()) {
+      vi.useFakeTimers({ toFake: ["Date"], now: FRIDAY });
+      renderUi(<MessageComposer {...props({ onSendLater })} />);
+      fireEvent.click(screen.getByRole("button", { name: "Send later" }));
+      return onSendLater;
+    }
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("has no chevron without onSendLater, and Send alone sends now", () => {
+      const onSend = vi.fn();
+      renderUi(<MessageComposer {...props({ onSend })} />);
+      expect(screen.queryByRole("button", { name: "Send later" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Send/u }));
+      expect(onSend).toHaveBeenCalledOnce();
+    });
+
+    it("offers tomorrow morning and, on a Friday, Monday as the next working day", () => {
+      open();
+      const tomorrow = screen.getByRole("button", { name: /Tomorrow morning/u });
+      const working = screen.getByRole("button", { name: /Next working day/u });
+      expect(tomorrow).toHaveTextContent("Sat");
+      expect(tomorrow).toHaveTextContent("31");
+      expect(tomorrow).toHaveTextContent("08:00");
+      expect(working).toHaveTextContent("Mon");
+      expect(working).toHaveTextContent("2");
+      expect(working).toHaveTextContent("08:00");
+      expect(screen.getByRole("button", { name: "Pick a time…" })).toBeInTheDocument();
+    });
+
+    it("schedules the choice picked, at 08:00", () => {
+      const onSendLater = open();
+      fireEvent.click(screen.getByRole("button", { name: /Next working day/u }));
+      expect(onSendLater).toHaveBeenCalledWith(new Date(2026, 10, 2, 8, 0));
+      expect(screen.queryByRole("button", { name: /Tomorrow morning/u })).not.toBeInTheDocument();
+    });
+
+    it("picks a time: tomorrow 08:00 to begin with, refused when it has passed", () => {
+      const onSendLater = open();
+      fireEvent.click(screen.getByRole("button", { name: "Pick a time…" }));
+      const date = screen.getByLabelText("Date");
+      const time = screen.getByLabelText("Time");
+      expect(date).toHaveValue("2026-10-31");
+      expect(time).toHaveValue("08:00");
+
+      fireEvent.change(date, { target: { value: "2026-10-30" } });
+      fireEvent.change(time, { target: { value: "09:00" } });
+      fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("That time has passed");
+      expect(onSendLater).not.toHaveBeenCalled();
+
+      fireEvent.change(date, { target: { value: "2028-01-01" } });
+      fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("up to a year ahead");
+
+      fireEvent.change(date, { target: { value: "2026-11-03" } });
+      fireEvent.change(time, { target: { value: "14:30" } });
+      fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+      expect(onSendLater).toHaveBeenCalledWith(new Date(2026, 10, 3, 14, 30));
+    });
+
+    it("goes back from the form to the choices", () => {
+      open();
+      fireEvent.click(screen.getByRole("button", { name: "Pick a time…" }));
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(screen.getByRole("button", { name: /Tomorrow morning/u })).toBeInTheDocument();
     });
   });
 });

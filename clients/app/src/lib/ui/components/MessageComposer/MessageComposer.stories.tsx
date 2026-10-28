@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { Editor } from "@tiptap/core";
 import { useState } from "react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fireEvent, fn, userEvent, within } from "storybook/test";
 
 import type { Recipient, RecipientSuggestion } from "../RecipientField/RecipientField";
 
@@ -24,6 +24,7 @@ interface DemoProps {
   uploading?: ComposerUpload[];
   attachmentBudget?: number;
   onAttach?: (files: File[]) => void;
+  onSendLater?: (at: Date) => void;
   status?: string;
   error?: string;
   sending?: boolean;
@@ -310,6 +311,46 @@ export const NearTheLimit: Story = {
   },
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByText("24.4 MB of 25 MB")).toBeVisible();
+  },
+};
+
+/** The chevron beside Send: tomorrow morning, the next working day and a time of one's own. */
+export const SendLaterMenu: Story = {
+  args: { body: "Thursday works for me.", onSendLater: fn() },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Send later" }));
+    await expect(canvas.getByRole("button", { name: /Tomorrow morning/u })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: /Next working day/u })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Pick a time…" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: /Tomorrow morning/u }));
+    await expect(args.onSendLater).toHaveBeenCalledOnce();
+  },
+};
+
+/** "Pick a time…": a date and a time, tomorrow at 08:00 to begin with. */
+export const PickATime: Story = {
+  args: { body: "Thursday works for me.", onSendLater: fn() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Send later" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Pick a time…" }));
+    await expect(canvas.getByLabelText("Date")).toBeVisible();
+    await expect(canvas.getByLabelText("Time")).toHaveValue("08:00");
+  },
+};
+
+/** A time that has passed is refused, and the form says why. */
+export const InvalidPickedTime: Story = {
+  args: { body: "Thursday works for me.", onSendLater: fn() },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Send later" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Pick a time…" }));
+    await fireEvent.change(canvas.getByLabelText("Date"), { target: { value: "2020-01-01" } });
+    await userEvent.click(canvas.getByRole("button", { name: "Schedule" }));
+    await expect(canvas.getByRole("alert")).toHaveTextContent("That time has passed");
+    await expect(args.onSendLater).not.toHaveBeenCalled();
   },
 };
 

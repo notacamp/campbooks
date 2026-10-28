@@ -324,7 +324,8 @@
       "unknown": "Something went wrong. Try again.",
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
       "content_changed": "This changed since you opened it. Check it and send again.",
-      "quote": "Couldn’t read the email to quote it. Nothing was started. Try again."
+      "quote": "Couldn’t read the email to quote it. Nothing was started. Try again.",
+      "send_at_invalid": "This time can’t be used. Pick a later one, up to a year ahead."
     },
     "shortcuts": {
       "newMessage": "New message"
@@ -342,7 +343,8 @@
         "attachments_too_large": "{{name}} wasn't attached: a message can carry {{max}} MB at most.",
         "too_many_attachments": "{{name}} wasn't attached: a message can carry {{files}} files at most."
       }
-    }
+    },
+    "scheduled": "Scheduled: {{time}}"
   },
   "needs": {
     "line": {

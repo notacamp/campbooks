@@ -157,6 +157,7 @@ export {
   type RecipientFieldName,
   type RecipientSuggester,
 } from "./components/MessageComposer/MessageComposer";
+export { sendTimeLabel } from "./components/MessageComposer/send-time";
 export { Offer, type OfferProps } from "./components/Offer/Offer";
 export { ProviderMark, type ProviderMarkProps } from "./components/ProviderMark/ProviderMark";
 export {
