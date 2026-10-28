@@ -19,6 +19,8 @@
     "no_recipients": "Adicione pelo menos um destinatário.",
     "invalid_address": "Este endereço não é válido: {{address}}",
     "attachments_too_large": "Os anexos podem somar no máximo {{max}} MB.",
+    "attachments_too_large_for_mailbox": "Esta caixa de correio só envia até {{max}} MB de anexos numa mensagem.",
+    "upload_incomplete": "O ficheiro não chegou completo. Tente anexá-lo outra vez.",
     "file_empty": "O ficheiro não tem conteúdo.",
     "filename_missing": "O ficheiro precisa de um nome.",
     "attachment_blocked": "Não é possível anexar {{name}}: os fornecedores de correio bloqueiam este tipo de ficheiro.",

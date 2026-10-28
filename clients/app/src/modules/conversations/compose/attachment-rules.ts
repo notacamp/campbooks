@@ -74,7 +74,10 @@ export type RefusalReason =
   | "filename_missing"
   | "attachment_blocked"
   | "attachments_too_large"
-  | "too_many_attachments";
+  | "attachments_too_large_for_mailbox"
+  | "too_many_attachments"
+  | "upload_incomplete"
+  | "request_timed_out";
 
 export interface Refusal {
   file: File;
@@ -86,7 +89,10 @@ const REASONS = new Set<string>([
   "filename_missing",
   "attachment_blocked",
   "attachments_too_large",
+  "attachments_too_large_for_mailbox",
   "too_many_attachments",
+  "upload_incomplete",
+  "request_timed_out",
 ]);
 
 /** The refusal a server problem code stands for, if it is one. */
@@ -115,13 +121,15 @@ export interface Held {
 
 /**
  * Split `files` into the ones to upload and the ones refused up front: an
- * empty file, a blocked type, one that would take the total past 25 MiB or
- * the draft past 20 files (counting what is held and what is accepted before
- * it in the same drop).
+ * empty file, a blocked type, one that would take the total past `budget`
+ * (25 MiB, or less for a mailbox that carries less) or the draft past 20
+ * files (counting what is held and what is accepted before it in the same
+ * drop).
  */
 export function screen(
   files: readonly File[],
   held: Held,
+  budget: number = MAX_ATTACHMENT_BYTES,
 ): { accepted: File[]; refused: Refusal[] } {
   const accepted: File[] = [];
   const refused: Refusal[] = [];
@@ -135,8 +143,11 @@ export function screen(
       reason = "attachment_blocked";
     } else if (count >= MAX_ATTACHMENTS) {
       reason = "too_many_attachments";
-    } else if (bytes + file.size > MAX_ATTACHMENT_BYTES) {
-      reason = "attachments_too_large";
+    } else if (bytes + file.size > budget) {
+      reason =
+        budget < MAX_ATTACHMENT_BYTES
+          ? "attachments_too_large_for_mailbox"
+          : "attachments_too_large";
     }
     if (reason === undefined) {
       accepted.push(file);
@@ -147,4 +158,11 @@ export function screen(
     }
   }
   return { accepted, refused };
+}
+
+/** `bytes` in MB as the server says it: one decimal under 10 MB ("2.1"), whole MiB above. */
+export function megabytes(bytes: number): string {
+  return bytes < 10_000_000
+    ? (Math.floor(bytes / 100_000) / 10).toFixed(1)
+    : String(Math.floor(bytes / (1024 * 1024)));
 }

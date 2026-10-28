@@ -19,6 +19,8 @@
     "no_recipients": "Ajoutez au moins un destinataire.",
     "invalid_address": "Cette adresse n’est pas valide : {{address}}",
     "attachments_too_large": "Les pièces jointes peuvent totaliser au plus {{max}} Mo.",
+    "attachments_too_large_for_mailbox": "Cette boîte aux lettres peut envoyer au plus {{max}} Mo de pièces jointes par message.",
+    "upload_incomplete": "Le fichier n’est pas arrivé en entier. Joignez-le de nouveau.",
     "file_empty": "Le fichier est vide.",
     "filename_missing": "Le fichier a besoin d’un nom.",
     "attachment_blocked": "Impossible de joindre {{name}} : les fournisseurs de messagerie bloquent ce type de fichier.",

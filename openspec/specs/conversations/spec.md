@@ -4109,6 +4109,25 @@ past 20 files. A draft that is scheduled or sending SHALL answer 409
 - **WHEN** a draft holds 24 MiB of attachments and a 2 MiB file is uploaded
 - **THEN** the response is 413 `attachments_too_large` and the draft still holds 24 MiB
 
+### Requirement: What a mailbox can carry
+An upload SHALL also be refused with 413 `attachments_too_large_for_mailbox`
+when the draft's attachments would pass what its mailbox's provider can send
+in one message, when that is less than 25 MiB (a Microsoft mailbox: about
+2 MB, as Graph takes at most 4 MB of base64 holding a MIME message), and
+`conversations.list_inboxes` SHALL say each inbox's limit as
+`max_attachment_bytes`. An upload SHALL have the longest a request may run
+(100 s) for its bytes to arrive, its body SHALL be read only after that, and
+a body past 25 MiB SHALL be refused as the `attachments_too_large` problem.
+A caller with no signed-in member SHALL find no draft to upload to (404).
+
+#### Scenario: A Microsoft mailbox
+- **WHEN** Sam uploads a 2.2 MB file to a draft from a Microsoft mailbox
+- **THEN** the response is 413 `attachments_too_large_for_mailbox`, its detail names about 2.1 MB, and the inbox lists `max_attachment_bytes` near 2.1 MB
+
+#### Scenario: No member behind the token
+- **WHEN** a client token with no user uploads to a draft
+- **THEN** the response is 404 and nothing is stored
+
 ### Requirement: Blocked file types and clean names
 An upload whose cleaned file name ends in an extension that mail providers
 block (such as `.exe`, `.js`, `.bat` or `.scr`, case-insensitive) SHALL be

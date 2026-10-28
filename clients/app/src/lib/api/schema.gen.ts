@@ -5292,6 +5292,12 @@ export interface components {
             /** @description The inbox. */
             id: components["schemas"]["InboxId"];
             /**
+             * Format: int64
+             * @description The most bytes of attachments one message from it can carry: 25 MiB,
+             *     or less when its provider takes less (campbooks-cloud#391).
+             */
+            max_attachment_bytes: number;
+            /**
              * @description Kept as read-only history after its connection was removed: no
              *     longer synced, nothing can be written or sent from it.
              */
@@ -14105,7 +14111,7 @@ export interface operations {
                     "application/json": components["schemas"]["DraftView"];
                 };
             };
-            /** @description No bytes (`file_empty`), no usable name (`filename_missing`), a type mail providers block (`attachment_blocked`) or over 20 files (`too_many_attachments`). */
+            /** @description No bytes (`file_empty`), cut short (`upload_incomplete`), no usable name (`filename_missing`), a type mail providers block (`attachment_blocked`) or over 20 files (`too_many_attachments`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14150,8 +14156,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The file, or the draft's attachments together, would pass 25 MiB (`attachments_too_large`). */
+            /** @description The file, or the draft's attachments together, would pass 25 MiB (`attachments_too_large`), or what the draft's mailbox can send in one message (`attachments_too_large_for_mailbox`; `conversations.list_inboxes` says it as `max_attachment_bytes`). */
             413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The bytes took longer to arrive than a request may run (`request_timed_out`, 100 s here): try again, or a smaller file. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

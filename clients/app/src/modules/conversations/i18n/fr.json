@@ -338,7 +338,10 @@
         "filename_missing": "Impossible de joindre un fichier sans nom.",
         "attachment_blocked": "{{name}} n’a pas été joint : les fournisseurs de messagerie bloquent ce type de fichier.",
         "attachments_too_large": "{{name}} n’a pas été joint : un message peut contenir {{max}} Mo au plus.",
-        "too_many_attachments": "{{name}} n’a pas été joint : un message peut contenir {{files}} fichiers au plus."
+        "too_many_attachments": "{{name}} n’a pas été joint : un message peut contenir {{files}} fichiers au plus.",
+        "attachments_too_large_for_mailbox": "{{name}} n’a pas été joint : cette boîte aux lettres envoie au plus {{max}} Mo de pièces jointes par message.",
+        "upload_incomplete": "{{name}} n’est pas arrivé en entier. Joignez-le de nouveau.",
+        "request_timed_out": "{{name}} a mis trop de temps à se charger. Réessayez avec une connexion plus rapide, ou joignez un fichier plus petit."
       }
     }
   },

@@ -19,6 +19,8 @@
     "no_recipients": "Add at least one recipient.",
     "invalid_address": "This address is not valid: {{address}}",
     "attachments_too_large": "Attachments can add up to {{max}} MB at most.",
+    "attachments_too_large_for_mailbox": "This mailbox can send at most {{max}} MB of attachments in one message.",
+    "upload_incomplete": "The file didn't arrive whole. Try attaching it again.",
     "file_empty": "The file has no content.",
     "filename_missing": "The file needs a name.",
     "attachment_blocked": "{{name}} can't be attached: mail providers block this kind of file.",

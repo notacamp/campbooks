@@ -338,7 +338,10 @@
         "filename_missing": "No se puede adjuntar un archivo sin nombre.",
         "attachment_blocked": "{{name}} no se adjuntó: los proveedores de correo bloquean este tipo de archivo.",
         "attachments_too_large": "{{name}} no se adjuntó: un mensaje puede llevar {{max}} MB como máximo.",
-        "too_many_attachments": "{{name}} no se adjuntó: un mensaje puede llevar {{files}} archivos como máximo."
+        "too_many_attachments": "{{name}} no se adjuntó: un mensaje puede llevar {{files}} archivos como máximo.",
+        "attachments_too_large_for_mailbox": "{{name}} no se adjuntó: este buzón solo envía {{max}} MB de adjuntos en un mensaje.",
+        "upload_incomplete": "{{name}} no llegó completo. Vuelve a adjuntarlo.",
+        "request_timed_out": "{{name}} tardó demasiado en subirse. Inténtalo de nuevo con una conexión más rápida o adjunta un archivo más pequeño."
       }
     }
   },

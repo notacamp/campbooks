@@ -8344,7 +8344,7 @@
             }
           },
           "400": {
-            "description": "No bytes (`file_empty`), no usable name (`filename_missing`), a type mail providers block (`attachment_blocked`) or over 20 files (`too_many_attachments`).",
+            "description": "No bytes (`file_empty`), cut short (`upload_incomplete`), no usable name (`filename_missing`), a type mail providers block (`attachment_blocked`) or over 20 files (`too_many_attachments`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8394,7 +8394,17 @@
             }
           },
           "413": {
-            "description": "The file, or the draft's attachments together, would pass 25 MiB (`attachments_too_large`).",
+            "description": "The file, or the draft's attachments together, would pass 25 MiB (`attachments_too_large`), or what the draft's mailbox can send in one message (`attachments_too_large_for_mailbox`; `conversations.list_inboxes` says it as `max_attachment_bytes`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The bytes took longer to arrive than a request may run (`request_timed_out`, 100 s here): try again, or a smaller file.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -26751,7 +26761,8 @@
           "address",
           "unread_count",
           "shared",
-          "read_only"
+          "read_only",
+          "max_attachment_bytes"
         ],
         "properties": {
           "address": {
@@ -26773,6 +26784,12 @@
           "id": {
             "$ref": "#/components/schemas/InboxId",
             "description": "The inbox."
+          },
+          "max_attachment_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The most bytes of attachments one message from it can carry: 25 MiB,\nor less when its provider takes less (campbooks-cloud#391).",
+            "minimum": 0
           },
           "read_only": {
             "type": "boolean",
