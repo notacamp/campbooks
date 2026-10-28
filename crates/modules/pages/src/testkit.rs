@@ -15,12 +15,13 @@ use axum::{
 };
 use campbooks_kernel::{
     AppState, Error, RecordRef,
+    attachments::{AttachmentBlob, AttachmentBlobFuture, AttachmentBlobs},
     auth::{Principal, PrincipalKind},
     authz::{
         Catalogue, Facts, FactsFuture, Owner, OwnerFact, ResourceFacts, ResourceType, Resources,
         Tenancy,
     },
-    blobs::BlobStore,
+    blobs::{BlobRef, BlobStore},
     changes::Visibilities,
     config::BlobsConfig,
     db::BeginFor as _,
@@ -31,7 +32,7 @@ use campbooks_kernel::{
 use sqlx::{PgConnection, PgPool};
 
 /// Every scope of this module.
-pub const ALL_SCOPES: &str = "pages:read pages:write";
+pub const ALL_SCOPES: &str = "pages:read pages:write conversations:read";
 
 #[derive(Debug, Default)]
 struct TestMembership {
@@ -77,6 +78,37 @@ impl Membership for TestMembership {
                 .map(|(_, (_, role))| *role)
         });
         Box::pin(async move { Ok::<_, Error>(held) })
+    }
+}
+
+/// The mail module's side of the attachments port, as a test double: the
+/// attachments it knows, each readable by one member alone.
+#[derive(Debug, Default)]
+struct TestAttachments {
+    known: Mutex<HashMap<AttachmentKey, (UserId, BlobRef, String)>>,
+}
+
+/// An attachment: its conversation, its message and itself.
+type AttachmentKey = (uuid::Uuid, uuid::Uuid, uuid::Uuid);
+
+impl AttachmentBlobs for TestAttachments {
+    fn blob_of<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _conn: &'a mut PgConnection,
+        access: &'a Access,
+        conversation: uuid::Uuid,
+        message: uuid::Uuid,
+        attachment: uuid::Uuid,
+    ) -> AttachmentBlobFuture<'a> {
+        let found = self
+            .known
+            .lock()
+            .ok()
+            .and_then(|known| known.get(&(conversation, message, attachment)).cloned())
+            .filter(|(reader, ..)| access.user == Some(*reader))
+            .map(|(_, blob, filename)| AttachmentBlob { blob, filename });
+        Box::pin(async move { Ok::<_, Error>(found) })
     }
 }
 
@@ -163,6 +195,7 @@ pub struct Kit {
     membership: Arc<TestMembership>,
     tasks: Arc<TaskFacts>,
     connections: Arc<ConnectionFacts>,
+    attachments: Arc<TestAttachments>,
 }
 
 impl Kit {
@@ -173,6 +206,7 @@ impl Kit {
         let membership = Arc::new(TestMembership::default());
         let tasks = Arc::new(TaskFacts::default());
         let connections = Arc::new(ConnectionFacts::default());
+        let attachments = Arc::new(TestAttachments::default());
         let module = crate::module(crate::Deps::default());
         let catalogue = Catalogue::new([
             &module.resources,
@@ -185,6 +219,7 @@ impl Kit {
             .state(pool)
             .with_blobs(blobs)
             .with_membership(membership.clone())
+            .with_attachment_blobs(attachments.clone())
             .with_visibility(Arc::new(Visibilities::new(vec![crate::visibility()])))
             .with_search_sources(campbooks_kernel::search::SearchSources::new(vec![
                 crate::search_source(),
@@ -200,6 +235,7 @@ impl Kit {
             membership,
             tasks,
             connections,
+            attachments,
         }
     }
 
@@ -211,6 +247,7 @@ impl Kit {
                 enabled: false,
                 tables: false,
                 databases: false,
+                mail_scout: false,
             }),
             self.state.clone(),
         );
@@ -225,6 +262,7 @@ impl Kit {
                 enabled: true,
                 tables: on,
                 databases: on,
+                mail_scout: true,
             }),
             self.state.clone(),
         );
@@ -240,9 +278,36 @@ impl Kit {
                 enabled: true,
                 tables: true,
                 databases: on,
+                mail_scout: true,
             }),
             self.state.clone(),
         );
+        self
+    }
+
+    /// The same kit with mail and Scout switched on or off (pages stay on).
+    #[must_use]
+    pub fn with_mail_scout(mut self, on: bool) -> Self {
+        self.app = testing::app(
+            crate::module(crate::Deps {
+                enabled: true,
+                tables: true,
+                databases: true,
+                mail_scout: on,
+            }),
+            self.state.clone(),
+        );
+        self
+    }
+
+    /// The same kit before the mail module registers its port: no
+    /// attachment is answered for anyone.
+    #[must_use]
+    pub fn without_mail(mut self) -> Self {
+        self.state = self
+            .state
+            .with_attachment_blobs(Arc::new(campbooks_kernel::attachments::NoAttachmentBlobs));
+        self.app = testing::app(crate::module(crate::Deps::default()), self.state.clone());
         self
     }
 
@@ -310,6 +375,51 @@ impl Kit {
         id
     }
 
+    /// An attachment of message `message` of conversation `conversation`
+    /// that `reader` alone may read: its bytes are stored in the workspace.
+    /// Returns the attachment's id.
+    pub async fn mail_attachment(
+        &self,
+        workspace: WorkspaceId,
+        reader: UserId,
+        (conversation, message): (uuid::Uuid, uuid::Uuid),
+        filename: &str,
+        bytes: &[u8],
+    ) -> uuid::Uuid {
+        let blob = self
+            .state
+            .blobs
+            .put(&workspace.to_string(), bytes.to_vec(), "application/pdf")
+            .await
+            .unwrap();
+        let attachment = uuid::Uuid::now_v7();
+        self.attachments.known.lock().unwrap().insert(
+            (conversation, message, attachment),
+            (reader, blob, filename.to_owned()),
+        );
+        attachment
+    }
+
+    /// An attachment the mail module knows whose bytes were never stored:
+    /// `reader` may read it, but its blob is not in the workspace.
+    pub fn mail_attachment_without_bytes(
+        &self,
+        reader: UserId,
+        (conversation, message): (uuid::Uuid, uuid::Uuid),
+    ) -> uuid::Uuid {
+        let blob = BlobRef {
+            hash: campbooks_kernel::blobs::BlobHash::of(b"never stored"),
+            size: 12,
+            content_type: "application/pdf".to_owned(),
+        };
+        let attachment = uuid::Uuid::now_v7();
+        self.attachments.known.lock().unwrap().insert(
+            (conversation, message, attachment),
+            (reader, blob, "Lost.pdf".to_owned()),
+        );
+        attachment
+    }
+
     /// A Notion connection that `owner` alone may import through.
     pub fn connection_of(&self, owner: UserId) -> uuid::Uuid {
         let id = uuid::Uuid::now_v7();
@@ -343,6 +453,15 @@ impl Kit {
         workspace: WorkspaceId,
     ) -> sqlx::Transaction<'static, sqlx::Postgres> {
         self.state.db.begin_for(workspace).await.unwrap()
+    }
+
+    /// The page as text, as Scout reads it (`GET …/text`).
+    pub async fn page_text(&self, token: &str, workspace: WorkspaceId, page: &str) -> String {
+        let read = self
+            .get(token, &format!("{}/{page}/text", Self::pages(workspace)))
+            .await;
+        assert_eq!(read.status, axum::http::StatusCode::OK, "{:?}", read.json);
+        read.json["markdown"].as_str().unwrap().to_owned()
     }
 
     /// How many pages the workspace holds.

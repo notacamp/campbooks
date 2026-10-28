@@ -69,7 +69,7 @@ pub const REF_TYPES: &[&str] = &[
 ];
 
 /// The code languages a code block may name.
-const LANGUAGES: &[&str] = &[
+pub const LANGUAGES: &[&str] = &[
     "bash",
     "c",
     "cpp",
@@ -378,7 +378,7 @@ pub fn clean_address(raw: &str) -> Option<String> {
     well_formed.then_some(address)
 }
 
-fn is_reference(ref_type: &str, ref_id: &str) -> bool {
+pub fn is_reference(ref_type: &str, ref_id: &str) -> bool {
     match ref_type {
         "person" => clean_address(ref_id).as_deref() == Some(ref_id),
         other => REF_TYPES.contains(&other) && is_uuid(ref_id),

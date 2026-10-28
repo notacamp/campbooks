@@ -55,6 +55,14 @@
     "nothing_to_undo": "Não há nenhuma escolha a anular nesse conflito.",
     "conflict_gone": "Esse conflito já não diz respeito a uma coluna desta tabela.",
     "not_a_database": "Essa não é uma base de dados do Notion que possas importar.",
-    "no_table_conflict": "Essa tabela não tem esse conflito."
+    "no_table_conflict": "Essa tabela não tem esse conflito.",
+    "invalid_attachments": "Escolha entre 1 e 20 ficheiros.",
+    "not_a_page": "Isto é uma tabela: não tem corpo onde acrescentar.",
+    "file_too_large": "Um ficheiro pode ter no máximo 20 MiB.",
+    "markdown_empty": "Não há nada para acrescentar.",
+    "markdown_too_large": "Uma secção pode ter no máximo 16 KiB.",
+    "too_many_sources": "Uma secção pode indicar no máximo 10 fontes.",
+    "markdown_with_document": "Envie o corpo como documento ou como Markdown, não os dois.",
+    "sources_without_markdown": "As fontes vão com Markdown. Acrescente o Markdown a que pertencem."
   }
 }

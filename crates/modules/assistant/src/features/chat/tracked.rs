@@ -111,6 +111,8 @@ fn tool(tool: ChatTool) -> tracking::ChatTool {
         ChatTool::MyCalendar => T::MyCalendar,
         ChatTool::FreeTime => T::FreeTime,
         ChatTool::ReadEvent => T::ReadEvent,
+        ChatTool::FindPages => T::FindPages,
+        ChatTool::ReadPage => T::ReadPage,
     }
 }
 
@@ -149,5 +151,7 @@ fn action(action: ProposalAction) -> tracking::ProposalAction {
         ProposalAction::RespondEvent => A::RespondEvent,
         ProposalAction::PushEvent => A::PushEvent,
         ProposalAction::UnpushEvent => A::UnpushEvent,
+        ProposalAction::AppendSection => A::AppendSection,
+        ProposalAction::NewPage => A::NewPage,
     }
 }

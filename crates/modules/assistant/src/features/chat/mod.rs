@@ -110,12 +110,19 @@ const MAX_ZONE_CHARS: usize = 64;
 pub struct Chatter {
     ai: Option<Gateway>,
     handbook: Handbook,
+    /// Whether mail and Scout work with pages.
+    pages: bool,
 }
 
 impl Chatter {
-    /// Answering through `ai`'s `complete` role, from `handbook`.
-    pub fn new(ai: Option<Gateway>, handbook: Handbook) -> Self {
-        Self { ai, handbook }
+    /// Answering through `ai`'s `complete` role, from `handbook`, with the
+    /// tools for pages while `pages`.
+    pub fn new(ai: Option<Gateway>, handbook: Handbook, pages: bool) -> Self {
+        Self {
+            ai,
+            handbook,
+            pages,
+        }
     }
 
     /// The gateway, if its `complete` role is configured and may receive
@@ -200,7 +207,7 @@ pub async fn start(
     )?;
     let user = caller(&workspace.access)?;
     if let Some(about) = &body.about
-        && about::entry(&about.record_type).is_none()
+        && about::entry(&about.record_type, chatter.pages).is_none()
     {
         return Err(Error::BadRequest(
             crate::MESSAGES.reason("about_unsupported"),
@@ -212,6 +219,7 @@ pub async fn start(
             state: state.clone(),
             principal: workspace.principal.clone(),
             workspace: workspace.id,
+            pages: chatter.pages,
         };
         about::check(&member, about)
             .await
@@ -844,6 +852,7 @@ impl Question {
             state: state.clone(),
             principal: workspace.principal.clone(),
             workspace: workspace.id,
+            pages: chatter.pages,
         };
         let seen = match row.about() {
             Some(about) => Some(about::read(&member, &about).await.unwrap_or_else(|unread| {
@@ -859,7 +868,8 @@ impl Question {
         };
         let lost = match (&seen, row.about()) {
             (Some(Seen::Lost), Some(about)) => Some(
-                about::entry(&about.record_type).map_or("chat.about_lost", |entry| entry.lost_line),
+                about::entry(&about.record_type, chatter.pages)
+                    .map_or("chat.about_lost", |entry| entry.lost_line),
             ),
             _ => None,
         };
@@ -881,7 +891,7 @@ impl Question {
             lost,
             about: row
                 .about()
-                .and_then(|about| about::entry(&about.record_type))
+                .and_then(|about| about::entry(&about.record_type, chatter.pages))
                 .map_or("none", |entry| entry.record_type),
             handbook_version: chatter.handbook.version(),
             asking: Asking::new(gateway, usage, Toolbox::new(member, utc_offset), messages),
