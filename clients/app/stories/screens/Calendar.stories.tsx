@@ -612,6 +612,7 @@ export const Settings: Story = {
     await expect(canvas.queryByRole("button", { name: "Add calendar access" })).toBeNull();
     // Mine, Following and Off: each provider calendar says which it is.
     const group = (name: string) => canvas.getByRole("list", { name });
+    await canvas.findByRole("list", { name: "Mine" });
     await expect(within(group("Mine")).getByText("Work")).toBeVisible();
     await expect(within(group("Following")).getByText("Marta Lopes")).toBeVisible();
     await expect(within(group("Following")).getByText(/Shared with you/)).toBeVisible();

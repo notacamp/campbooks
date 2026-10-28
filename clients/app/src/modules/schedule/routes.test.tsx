@@ -543,8 +543,7 @@ describe("Settings → Calendar", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Undo/u }));
     await waitFor(() => {
       expect(
-        calls.calls.findLast((call) => call.route === `PATCH ${S}/calendars/${HOLIDAYS.id}`)
-          ?.body,
+        calls.calls.findLast((call) => call.route === `PATCH ${S}/calendars/${HOLIDAYS.id}`)?.body,
       ).toEqual({ role: "off" });
     });
   });
