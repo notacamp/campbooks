@@ -1,0 +1,8 @@
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-0-5);
+  min-width: 0;
+  padding: var(--space-2);
+}

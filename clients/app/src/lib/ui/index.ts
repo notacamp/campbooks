@@ -153,7 +153,12 @@ export {
 export {
   MessageComposer,
   type ComposerAttachment,
+  type ComposerFrom,
+  type ComposerMode,
+  type ComposerModes,
+  type ComposerScout,
   type ComposerSignature,
+  type ScoutRewrite,
   type MessageComposerProps,
   type RecipientFieldName,
   type RecipientSuggester,

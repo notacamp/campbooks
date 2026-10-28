@@ -122,6 +122,7 @@ export interface Held {
 export function screen(
   files: readonly File[],
   held: Held,
+  limit: number = MAX_ATTACHMENT_BYTES,
 ): { accepted: File[]; refused: Refusal[] } {
   const accepted: File[] = [];
   const refused: Refusal[] = [];
@@ -135,7 +136,7 @@ export function screen(
       reason = "attachment_blocked";
     } else if (count >= MAX_ATTACHMENTS) {
       reason = "too_many_attachments";
-    } else if (bytes + file.size > MAX_ATTACHMENT_BYTES) {
+    } else if (bytes + file.size > limit) {
       reason = "attachments_too_large";
     }
     if (reason === undefined) {

@@ -63,10 +63,17 @@ export interface DraftShown {
   attachments: Draft["attachments"];
   /** The signature the draft carries, as marks; empty when it carries none. */
   signature: string;
+  /** The inbox it goes from. */
+  inboxId: string;
 }
 
 function shownOf(draft: Draft): DraftShown {
-  return { from: draft.from, attachments: draft.attachments, signature: draft.signature ?? "" };
+  return {
+    from: draft.from,
+    attachments: draft.attachments,
+    signature: draft.signature ?? "",
+    inboxId: draft.inbox_id,
+  };
 }
 
 function changesOf(
@@ -309,29 +316,33 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
   );
 
   /**
-   * Leave the signature off (`false`) or add the member's current one back
-   * (`true`): a save of its own, after any in flight and after what was typed
-   * is saved, naming the version and token on screen. A draft changed
-   * elsewhere is handled as a save's is.
+   * A save of its own (after any in flight, and after what was typed is
+   * saved), naming the version and token on screen: leaving the signature
+   * off or adding it back, or moving the draft to another inbox. A draft
+   * changed elsewhere is handled as a save's is. Resolves with whether it
+   * was saved.
    */
-  const setSignature = useCallback(
-    async (on: boolean): Promise<void> => {
+  const saveNow = useCallback(
+    async (change: Pick<DraftChanges, "signature" | "inbox_id">): Promise<boolean> => {
       await flush();
+      let done = false;
       const run = async () => {
         setSaveState("saving");
         try {
           const answer = await saveDraft(workspaceId, draft.id, {
             version: version.current,
             content_token: shownToken.current ?? null,
-            signature: on,
+            ...change,
           });
           version.current = answer.version;
           shownToken.current = answer.content_token;
           setShown(shownOf(answer));
           setSaveState(latest.current === saved.current ? "saved" : "unsaved");
+          done = true;
         } catch (thrown) {
           if (!changedElsewhere(thrown)) {
             setSaveState("failed");
+            setError(problemCode(thrown) ?? "unknown");
             return;
           }
           try {
@@ -349,8 +360,27 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
       inFlight.current = run();
       await inFlight.current;
       inFlight.current = null;
+      return done;
     },
     [draft.id, flush, workspaceId],
+  );
+
+  /** Leave the signature off (`false`) or add the member's current one back (`true`). */
+  const setSignature = useCallback(
+    async (on: boolean): Promise<void> => {
+      await saveNow({ signature: on });
+    },
+    [saveNow],
+  );
+
+  /**
+   * Move the draft to another inbox the member may send from (From). Its
+   * signature switches to theirs there. Resolves with whether it moved; a
+   * refusal (a reader's inbox) is the editor's error.
+   */
+  const moveTo = useCallback(
+    (inboxId: string): Promise<boolean> => saveNow({ inbox_id: inboxId }),
+    [saveNow],
   );
 
   /**
@@ -464,6 +494,7 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     attach,
     uploading,
     setSignature,
+    moveTo,
     saveState,
     error,
     sending,

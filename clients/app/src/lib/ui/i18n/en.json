@@ -78,6 +78,26 @@
       "add": "Add signature",
       "edit": "Edit in Settings",
       "create": "Add a signature in Settings"
+    },
+    "mode": {
+      "label": "Change reply type",
+      "reply": "Reply",
+      "reply_all": "Reply all",
+      "forward": "Forward"
+    },
+    "scout": {
+      "label": "Scout",
+      "menu": "Ask Scout to rewrite",
+      "shorter": "Shorter",
+      "warmer": "Warmer",
+      "spelling": "Fix spelling",
+      "change": {
+        "label": "Change…",
+        "placeholder": "e.g. mention the plans",
+        "action": "Change"
+      },
+      "thinking": "Scout is rewriting…",
+      "thoughts": "How Scout thought about it"
     }
   },
   "attachments": {

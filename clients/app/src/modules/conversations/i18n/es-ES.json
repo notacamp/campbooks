@@ -325,7 +325,9 @@
       "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",
       "content_changed": "Esto ha cambiado desde que lo abriste. Revísalo y vuelve a enviarlo.",
       "quote": "No se pudo leer el correo para citarlo. No se ha iniciado nada. Inténtalo de nuevo.",
-      "send_at_invalid": "Esta hora no se puede usar. Elige una posterior, con hasta un año de antelación."
+      "send_at_invalid": "Esta hora no se puede usar. Elige una posterior, con hasta un año de antelación.",
+      "switch_failed": "No se pudo cambiar. El borrador está como lo dejaste.",
+      "inbox_read_only": "Puedes leer este buzón, pero no enviar desde él."
     },
     "shortcuts": {
       "newMessage": "Mensaje nuevo"
@@ -937,5 +939,11 @@
     "chars": "{{chars}} de {{max}} caracteres",
     "tooLong": "Una firma puede tener {{max}} caracteres como máximo.",
     "failed": "No se pudo guardar la firma. Inténtalo de nuevo."
+  },
+  "rewrite": {
+    "keep": "Mantén lo que dice mi borrador",
+    "warmer": "Hazlo más cercano; mantén lo que dice",
+    "spelling": "Corrige solo la ortografía y la gramática; no cambies nada más",
+    "done": "Reescrito por Scout"
   }
 }

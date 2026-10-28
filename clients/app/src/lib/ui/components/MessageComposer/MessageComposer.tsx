@@ -20,6 +20,7 @@ import {
   Icon,
   IconButton,
   OverflowActions,
+  Select,
   type IconName,
   type OverflowAction,
 } from "@notacamp/ui";
@@ -29,8 +30,10 @@ import {
   type RecipientSuggestion,
 } from "../RecipientField/RecipientField";
 
+import { ThinkingTrace } from "../ThinkingTrace/ThinkingTrace";
 import { composerExtensions } from "./editor";
 import { LinkForm } from "./LinkForm";
+import { ComposerHeaderMenus, ScoutMenu } from "./ComposerMenus";
 import { SendLater } from "./SendLater";
 import { SignatureText } from "./SignatureText";
 import { fromMarks, toMarks, type DocNode } from "./marks";
@@ -44,6 +47,48 @@ export interface ComposerAttachment {
   size: number;
   /** Where it came from; a forward's own files and the member's uploads look alike. */
   source?: "forwarded" | "uploaded" | undefined;
+}
+
+/** The inboxes the member may send from, when more than one (campbooks-cloud#394). */
+export interface ComposerFrom {
+  options: readonly { id: string; label: string }[];
+  /** The inbox the draft goes from. */
+  value: string;
+  onChange: (inbox: string) => void;
+}
+
+/** What a reply can be switched to. */
+export type ComposerMode = "reply" | "reply_all" | "forward";
+
+/** The title's menu: Reply, Reply all, Forward. */
+export interface ComposerModes {
+  value: ComposerMode;
+  /** Resolves once the switch is done (the composer then goes with the old draft). */
+  onChange: (mode: ComposerMode) => void;
+}
+
+/** What Scout is asked to do with the text. */
+export type ScoutRewrite =
+  | { kind: "shorter" }
+  | { kind: "warmer" }
+  | { kind: "spelling" }
+  | { kind: "change"; change: string };
+
+/** Scout in the composer (campbooks-cloud#394). */
+export interface ComposerScout {
+  /** Scout's thinking so far, while it writes. */
+  thinking: string;
+  /**
+   * Ask Scout to rewrite `plain` (the text as plain text). Resolves with its
+   * words, or nothing when it failed or was stopped. The composer puts them
+   * in as plain text, never as marks or HTML.
+   */
+  onRewrite: (how: ScoutRewrite, plain: string) => Promise<string | undefined>;
+  /**
+   * The text was replaced: `undo` puts the previous text back (the screen
+   * offers it in a toast; the editor's own undo, ⌘Z, does the same).
+   */
+  onDone?: ((undo: () => void) => void) | undefined;
 }
 
 /** The signature under the text (campbooks-cloud#393). */
@@ -121,6 +166,12 @@ export interface MessageComposerProps {
   uploading?: readonly ComposerUpload[] | undefined;
   /** Most bytes of attachments in all; with it, the total is said once something is attached. */
   attachmentBudget?: number | undefined;
+  /** From as a picker, when the member may send from more than one inbox. */
+  fromPicker?: ComposerFrom | undefined;
+  /** The title as a menu to switch between Reply, Reply all and Forward. */
+  modes?: ComposerModes | undefined;
+  /** Scout ▾ (⌘J): rewrite the text in place. */
+  scout?: ComposerScout | undefined;
   /** The signature under the text; omit for a composer that has none. */
   signature?: ComposerSignature | undefined;
   /** "Saved", "Saving…": said politely next to Send. */
@@ -229,6 +280,9 @@ export function MessageComposer({
   quotedNote,
   attachments = [],
   onRemoveAttachment,
+  fromPicker,
+  modes,
+  scout,
   signature,
   onAttach,
   uploading = [],
@@ -261,6 +315,8 @@ export function MessageComposer({
   const frameRef = useRef<HTMLDialogElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const compact = useCompact(sectionRef, open);
+  // Scout is rewriting the text: it cannot be edited meanwhile.
+  const [writing, setWriting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   // Files dragged over it: counted in and out of its children, so the drop
   // zone does not flicker as the pointer crosses them.
@@ -666,6 +722,7 @@ export function MessageComposer({
         <h2 id={`${id}-title`} className={styles["title"]}>
           {title}
         </h2>
+        {modes === undefined ? null : <ComposerHeaderMenus modes={modes} />}
         {wide ? (
           <IconButton
             label={open ? t("composer.shrink") : t("composer.expand")}
@@ -686,10 +743,20 @@ export function MessageComposer({
       </header>
 
       <div className={styles["fields"]}>
-        <p className={styles["from"]}>
-          <span className={styles["fromLabel"]}>{t("composer.from")}</span>
-          <span className={styles["fromValue"]}>{from}</span>
-        </p>
+        {fromPicker === undefined || fromPicker.options.length < 2 ? (
+          <p className={styles["from"]}>
+            <span className={styles["fromLabel"]}>{t("composer.from")}</span>
+            <span className={styles["fromValue"]}>{from}</span>
+          </p>
+        ) : (
+          <Select
+            label={t("composer.from")}
+            size="md"
+            value={fromPicker.value}
+            options={fromPicker.options.map((o) => ({ value: o.id, label: o.label }))}
+            onChange={fromPicker.onChange}
+          />
+        )}
         <RecipientField
           label={t("composer.to")}
           recipients={to}
@@ -754,7 +821,24 @@ export function MessageComposer({
           }
           more={compact ? [strike, numbers, quote] : []}
         />
+        {scout === undefined ? null : (
+          <ScoutMenu
+            scout={scout}
+            active={active}
+            editor={editor}
+            onWriting={setWriting}
+            writing={writing}
+          />
+        )}
       </div>
+      {scout !== undefined && writing ? (
+        <ThinkingTrace
+          label={t("composer.scout.thinking")}
+          text={scout.thinking}
+          live
+          summary={t("composer.scout.thoughts")}
+        />
+      ) : null}
 
       {link === null ? null : (
         <LinkForm

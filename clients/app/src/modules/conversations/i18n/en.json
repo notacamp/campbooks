@@ -325,7 +325,9 @@
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
       "content_changed": "This changed since you opened it. Check it and send again.",
       "quote": "Couldn’t read the email to quote it. Nothing was started. Try again.",
-      "send_at_invalid": "This time can’t be used. Pick a later one, up to a year ahead."
+      "send_at_invalid": "This time can’t be used. Pick a later one, up to a year ahead.",
+      "switch_failed": "Couldn’t switch. Your draft is as you left it.",
+      "inbox_read_only": "You can read this mailbox but not send from it."
     },
     "shortcuts": {
       "newMessage": "New message"
@@ -937,5 +939,11 @@
     "chars": "{{chars}} of {{max}} characters",
     "tooLong": "A signature can have {{max}} characters at most.",
     "failed": "Couldn’t save the signature. Try again."
+  },
+  "rewrite": {
+    "keep": "Keep what my draft says",
+    "warmer": "Make it warmer; keep what it says",
+    "spelling": "Fix spelling and grammar only; change nothing else",
+    "done": "Rewritten by Scout"
   }
 }

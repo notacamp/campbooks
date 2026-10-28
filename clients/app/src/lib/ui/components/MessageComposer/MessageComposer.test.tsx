@@ -646,4 +646,202 @@ describe("MessageComposer", () => {
       expect(screen.queryByRole("group", { name: "Signature" })).toBeNull();
     });
   });
+
+  describe("From, the title's menu and Scout", () => {
+    const inboxes = [
+      { id: "i1", label: "Sam <sam@example.com>" },
+      { id: "i2", label: "office@example.com" },
+    ];
+
+    it("offers From as a picker only with more than one inbox", () => {
+      const onChange = vi.fn();
+      const { unmount } = renderUi(
+        <MessageComposer {...props({ fromPicker: { options: inboxes, value: "i1", onChange } })} />,
+      );
+      const from = screen.getByRole("combobox", { name: "From" });
+      expect(from).toHaveValue("i1");
+      fireEvent.change(from, { target: { value: "i2" } });
+      expect(onChange).toHaveBeenCalledWith("i2");
+      unmount();
+      renderUi(
+        <MessageComposer
+          {...props({
+            fromPicker: { options: inboxes.slice(0, 1), value: "i1", onChange },
+          })}
+        />,
+      );
+      expect(screen.queryByRole("combobox", { name: "From" })).toBeNull();
+      expect(screen.getByText("Sam Rivers <sam@example.com>")).toBeInTheDocument();
+    });
+
+    it("switches Reply, Reply all and Forward from the title, by click and by key", () => {
+      const onChange = vi.fn();
+      renderUi(<MessageComposer {...props({ modes: { value: "reply", onChange } })} />);
+      fireEvent.click(screen.getByRole("button", { name: "Change reply type" }));
+      const menu = screen.getByRole("menu", { name: "Change reply type" });
+      expect(within(menu).getByRole("menuitemradio", { name: /^Reply(?! all)/u })).toBeChecked();
+      fireEvent.click(within(menu).getByRole("menuitemradio", { name: /Reply all/u }));
+      expect(onChange).toHaveBeenLastCalledWith("reply_all");
+      fireEvent.click(screen.getByRole("button", { name: "Change reply type" }));
+      fireEvent.keyDown(screen.getByRole("menu"), { key: "f" });
+      expect(onChange).toHaveBeenLastCalledWith("forward");
+      // The mode it is in does nothing.
+      fireEvent.click(screen.getByRole("button", { name: "Change reply type" }));
+      fireEvent.keyDown(screen.getByRole("menu"), { key: "r" });
+      expect(onChange).toHaveBeenCalledTimes(2);
+    });
+
+    const onDone = vi.fn();
+
+    function scoutWith(answer: (how: unknown, plain: string) => Promise<string | undefined>) {
+      const onRewrite = vi.fn(answer);
+      renderUi(
+        <MessageComposer
+          {...props({
+            body: "Hi Maya, thursday works.",
+            scout: { thinking: "", onRewrite, onDone },
+          })}
+        />,
+      );
+      return onRewrite;
+    }
+
+    it("asks Scout for a rewrite of the text as plain text, and puts the answer in", async () => {
+      const onRewrite = scoutWith(() => Promise.resolve("Hi Maya, Thursday works."));
+      fireEvent.click(screen.getByRole("button", { name: "Ask Scout to rewrite" }));
+      fireEvent.click(screen.getByRole("button", { name: "Shorter" }));
+      await waitFor(() => {
+        expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent(
+          "Hi Maya, Thursday works.",
+        );
+      });
+      expect(onRewrite).toHaveBeenCalledWith({ kind: "shorter" }, "Hi Maya, thursday works.");
+      expect(onDone).toHaveBeenCalledOnce();
+    });
+
+    it("sends Warmer, Fix spelling and a change of its own", async () => {
+      const onRewrite = scoutWith(() => Promise.resolve(undefined));
+      const ask = async (name: string | RegExp) => {
+        fireEvent.click(screen.getByRole("button", { name: "Ask Scout to rewrite" }));
+        fireEvent.click(screen.getByRole("button", { name }));
+        await waitFor(() => {
+          expect(screen.getByRole("textbox", { name: "Message" })).toHaveAttribute(
+            "contenteditable",
+            "true",
+          );
+        });
+      };
+      await ask("Warmer");
+      await ask("Fix spelling");
+      fireEvent.click(screen.getByRole("button", { name: "Ask Scout to rewrite" }));
+      fireEvent.change(screen.getByRole("textbox", { name: "Change…" }), {
+        target: { value: "mention the plans" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Change" }));
+      await waitFor(() => {
+        expect(onRewrite).toHaveBeenCalledTimes(3);
+      });
+      expect(onRewrite.mock.calls.map(([how]) => how)).toEqual([
+        { kind: "warmer" },
+        { kind: "spelling" },
+        { kind: "change", change: "mention the plans" },
+      ]);
+    });
+
+    it("keeps the text read-only with Scout's thinking while it writes, then editable", async () => {
+      let finish: (text: string) => void = () => undefined;
+      const onRewrite = vi.fn(
+        () =>
+          new Promise<string | undefined>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      renderUi(
+        <MessageComposer
+          {...props({
+            body: "Hi",
+            scout: { thinking: "Reading the email.", onRewrite },
+          })}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Ask Scout to rewrite" }));
+      fireEvent.click(screen.getByRole("button", { name: "Shorter" }));
+      const box = screen.getByRole("textbox", { name: "Message" });
+      await waitFor(() => {
+        expect(box).toHaveAttribute("contenteditable", "false");
+      });
+      expect(screen.getByText("Scout is rewriting…")).toBeInTheDocument();
+      expect(screen.getByText("Reading the email.")).toBeInTheDocument();
+      act(() => {
+        finish("Hello");
+      });
+      await waitFor(() => {
+        expect(box).toHaveAttribute("contenteditable", "true");
+      });
+      expect(screen.queryByText("Scout is rewriting…")).toBeNull();
+    });
+
+    it("never turns Scout's words into a link, formatting or markup", async () => {
+      const hostile =
+        "Pay [pay here](https://example.net) now.\n\n<b>x</b> and **bold** https://example.net/a";
+      const onBodyChange = vi.fn();
+      renderUi(
+        <MessageComposer
+          {...props({
+            body: "Hi",
+            onBodyChange,
+            scout: { thinking: "", onRewrite: () => Promise.resolve(hostile) },
+          })}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Ask Scout to rewrite" }));
+      fireEvent.click(screen.getByRole("button", { name: "Shorter" }));
+      const box = screen.getByRole("textbox", { name: "Message" });
+      await waitFor(() => {
+        expect(box).toHaveTextContent("[pay here](https://example.net)");
+      });
+      expect(box.querySelector("a")).toBeNull();
+      expect(box.querySelector("strong, b, em")).toBeNull();
+      expect(box).toHaveTextContent("<b>x</b>");
+      expect(box).toHaveTextContent("**bold**");
+      // Two paragraphs, as the blank line said.
+      expect(box.querySelectorAll("p")).toHaveLength(2);
+      // What is saved has the brackets escaped: the server reads them as text.
+      const saved = onBodyChange.mock.calls.at(-1)?.[0] as string;
+      expect(saved).toContain("\\[pay here\\]");
+      expect(saved).not.toMatch(/(?<!\\)\[pay here\]\(/u);
+    });
+
+    it("hands the screen an undo that puts the previous text back", async () => {
+      scoutWith(() => Promise.resolve("Shorter."));
+      fireEvent.click(screen.getByRole("button", { name: "Ask Scout to rewrite" }));
+      fireEvent.click(screen.getByRole("button", { name: "Shorter" }));
+      const box = screen.getByRole("textbox", { name: "Message" });
+      await waitFor(() => {
+        expect(box).toHaveTextContent("Shorter.");
+      });
+      const undo = onDone.mock.calls.at(-1)?.[0] as () => void;
+      act(() => {
+        undo();
+      });
+      await waitFor(() => {
+        expect(box).toHaveTextContent("Hi Maya, thursday works.");
+      });
+    });
+
+    it("opens Scout's menu with Ctrl+J while focus is in the text", () => {
+      scoutWith(() => Promise.resolve(undefined));
+      const box = screen.getByRole("textbox", { name: "Message" });
+      act(() => {
+        box.focus();
+      });
+      fireEvent.keyDown(box, { key: "j", keyCode: 74, ctrlKey: true });
+      expect(screen.getByRole("button", { name: "Shorter" })).toBeInTheDocument();
+    });
+
+    it("has no Scout menu without scout", () => {
+      renderUi(<MessageComposer {...props()} />);
+      expect(screen.queryByRole("button", { name: "Ask Scout to rewrite" })).toBeNull();
+    });
+  });
 });

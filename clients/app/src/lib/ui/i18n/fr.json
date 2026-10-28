@@ -78,6 +78,26 @@
       "add": "Ajouter la signature",
       "edit": "Modifier dans les paramètres",
       "create": "Ajoutez une signature dans les paramètres"
+    },
+    "mode": {
+      "label": "Changer le type de réponse",
+      "reply": "Répondre",
+      "reply_all": "Répondre à tous",
+      "forward": "Transférer"
+    },
+    "scout": {
+      "label": "Scout",
+      "menu": "Demander à Scout de réécrire",
+      "shorter": "Plus court",
+      "warmer": "Plus chaleureux",
+      "spelling": "Corriger l’orthographe",
+      "change": {
+        "label": "Modifier…",
+        "placeholder": "p. ex. mentionner les projets",
+        "action": "Modifier"
+      },
+      "thinking": "Scout réécrit…",
+      "thoughts": "Comment Scout y a réfléchi"
     }
   },
   "attachments": {

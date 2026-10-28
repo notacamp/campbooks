@@ -4593,6 +4593,7 @@ export interface components {
              *     is saved (campbooks-cloud#242).
              */
             content_token?: string | null;
+            inbox_id?: components["schemas"]["InboxId"] | null;
             /** @description The quoted history. */
             quoted?: string | null;
             /**

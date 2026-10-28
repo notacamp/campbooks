@@ -335,3 +335,33 @@ describe("useDraftEditor.setSignature", () => {
     expect(bodies[1]).toMatchObject({ version: 2, content_token: "token-2", signature: true });
   });
 });
+
+describe("useDraftEditor.moveTo", () => {
+  it("moves the draft to another inbox, naming the version and token on screen", async () => {
+    const calls = stub(() => ({ body: { ...draftAt(2), inbox_id: "i2" } }));
+    const editor = mount(draftAt(1));
+    let moved = false;
+    await act(async () => {
+      moved = await editor().moveTo("i2");
+    });
+    expect(moved).toBe(true);
+    expect(JSON.parse(calls[0]?.text ?? "{}")).toEqual({
+      version: 1,
+      content_token: "token-1",
+      inbox_id: "i2",
+    });
+    expect(editor().shown.inboxId).toBe("i2");
+  });
+
+  it("says why when the inbox may not be sent from, and stays where it was", async () => {
+    stub(() => problem(403, "inbox_read_only"));
+    const editor = mount(draftAt(1));
+    let moved = true;
+    await act(async () => {
+      moved = await editor().moveTo("i3");
+    });
+    expect(moved).toBe(false);
+    expect(editor().error).toBe("inbox_read_only");
+    expect(editor().shown.inboxId).toBe(draftAt(1).inbox_id);
+  });
+});

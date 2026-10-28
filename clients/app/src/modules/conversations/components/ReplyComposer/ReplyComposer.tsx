@@ -2,9 +2,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Banner, Button, Text, useUndoToast } from "~/lib/ui";
+import { Banner, Button, Text, useUndoToast, type ComposerMode } from "~/lib/ui";
 
-import { createDraft, draftKeys, useConversationDrafts, type Draft } from "../../api/drafts";
+import {
+  createDraft,
+  deleteDraft as removeDraft,
+  draftKeys,
+  saveDraft,
+  useConversationDrafts,
+  type Draft,
+} from "../../api/drafts";
 import { useMessageWords, withWords } from "../../api/queries";
 import { displayName, forwardQuote, replyQuote, type QuoteWords } from "../../compose/quote";
 import { useDeleteDraft } from "../../compose/use-delete-draft";
@@ -123,6 +130,49 @@ export function ReplyComposer({
     }
   }, [request, drafts.data]);
 
+  // Reply ▾ in the title: a draft of the new kind with the text carried over,
+  // then the old one deleted (best effort). If the new one cannot be made or
+  // written, it is dropped and the old one stays as it was.
+  const switchMode = async (
+    old: Draft,
+    mode: ComposerMode,
+    carried: { body: string; subject: string | undefined },
+  ) => {
+    const message = messages.find((m) => m.id === old.message_id);
+    if (message === undefined) {
+      throw new Error("the message answered is not here");
+    }
+    const full = await withWords(queryClient, workspaceId, conversation.id, message);
+    const quoted =
+      mode === "forward"
+        ? forwardQuote(full, i18n.language, words)
+        : replyQuote(full, i18n.language, words);
+    const made = await createDraft(workspaceId, { kind: mode, message_id: full.id, quoted });
+    let ready = made;
+    try {
+      ready = await saveDraft(workspaceId, made.id, {
+        version: made.version,
+        content_token: made.content_token ?? null,
+        body: carried.body,
+        ...(carried.subject === undefined ? {} : { subject: carried.subject }),
+      });
+    } catch (error) {
+      void removeDraft(workspaceId, made.id).catch(() => null);
+      throw error;
+    }
+    queryClient.setQueryData<Draft[]>(
+      draftKeys.forConversation(workspaceId, conversation.id),
+      (list) => [ready, ...(list ?? []).filter((d) => d.id !== old.id)],
+    );
+    setDraftId(ready.id);
+    // Best effort: a failure leaves a stray draft, listed as a chip.
+    void removeDraft(workspaceId, old.id)
+      .catch(() => null)
+      .finally(() => {
+        void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
+      });
+  };
+
   const open = drafts.data?.filter(editable) ?? [];
   const draft = open.find((d) => d.id === draftId) ?? (request === null ? open[0] : undefined);
   // The message it quotes, and whether its words were cut (a long email):
@@ -195,7 +245,10 @@ export function ReplyComposer({
       workspaceId={workspaceId}
       draft={draft}
       title={title}
-      withSubject={draft.kind === "forward"}
+      withSubject
+      onSwitchMode={
+        draft.kind === "nudge" ? undefined : (mode, carried) => switchMode(draft, mode, carried)
+      }
       focus={draft.kind === "forward" ? "to" : "body"}
       quotedNote={quoteCut ? t("compose.quoteCut") : undefined}
       onClose={() => {

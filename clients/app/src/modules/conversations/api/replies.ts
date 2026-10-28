@@ -1,6 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { ApiError, api, canStream, readEventStream, unwrap, type Schema } from "~/lib/api";
+import {
+  ApiError,
+  api,
+  canStream,
+  problemCode,
+  readEventStream,
+  unwrap,
+  type Schema,
+} from "~/lib/api";
 
 type WriteReply = Schema<"WriteReply">;
 type ReplyText = Schema<"ReplyText">;
@@ -45,6 +53,24 @@ export function useReplySuggestions(
         ),
       ),
   });
+}
+
+/**
+ * Whether Scout is known not to write replies here (`reply_unavailable`),
+ * from what the reader already asked for `messageId`: it never asks the
+ * model itself.
+ */
+export function useRepliesUnavailable(
+  workspaceId: string,
+  conversationId: string | undefined,
+  messageId: string | undefined,
+): boolean {
+  const known = useQuery({
+    queryKey: replyKeys.suggestions(workspaceId, conversationId ?? "", messageId ?? ""),
+    enabled: false,
+    queryFn: () => null,
+  });
+  return problemCode(known.error) === "reply_unavailable";
 }
 
 /**

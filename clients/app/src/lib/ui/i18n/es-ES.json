@@ -78,6 +78,26 @@
       "add": "Añadir firma",
       "edit": "Editar en los ajustes",
       "create": "Añade una firma en los ajustes"
+    },
+    "mode": {
+      "label": "Cambiar el tipo de respuesta",
+      "reply": "Responder",
+      "reply_all": "Responder a todos",
+      "forward": "Reenviar"
+    },
+    "scout": {
+      "label": "Scout",
+      "menu": "Pedir a Scout que reescriba",
+      "shorter": "Más corto",
+      "warmer": "Más cercano",
+      "spelling": "Corregir la ortografía",
+      "change": {
+        "label": "Cambiar…",
+        "placeholder": "p. ej. mencionar los planes",
+        "action": "Cambiar"
+      },
+      "thinking": "Scout está reescribiendo…",
+      "thoughts": "Cómo lo pensó Scout"
     }
   },
   "attachments": {

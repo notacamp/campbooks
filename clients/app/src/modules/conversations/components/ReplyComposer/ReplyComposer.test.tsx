@@ -5,7 +5,7 @@ import { INBOX, Q4, Q4_DETAIL, W } from "../../../../../test/demo/conversations"
 import { REPLY } from "../../../../../test/demo/drafts";
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { replaceText } from "../../../../../test/composer";
-import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
+import { mockApi, problem, renderWithProviders, replyStream } from "../../../../../test/render";
 import type { ReplyRequest } from "../Reader/ReplySlot";
 
 import { ReplyComposer } from "./ReplyComposer";
@@ -562,5 +562,194 @@ describe("ReplyComposer", () => {
     expect(saved).toBeGreaterThanOrEqual(0);
     expect(saved).toBeLessThan(routes.indexOf(`POST ${D}/${REPLY.id}/send`));
     expect(api.calls[saved]?.body).toMatchObject({ body: "Typed, not saved yet." });
+  });
+
+  describe("From, the title's menu and Scout (campbooks-cloud#394)", () => {
+    const REPLY_ALL = {
+      ...REPLY,
+      id: "0192f1a0-0000-7000-8000-000000000199",
+      kind: "reply_all" as const,
+    };
+    const STREAM = `POST ${W}/conversations/${Q4.id}/reply/draft/stream`;
+
+    it("shows the subject on a reply", async () => {
+      mockApi({ [`GET ${D}`]: { body: { drafts: [REPLY] } } });
+      renderWithProviders(slot(null));
+      expect(await screen.findByRole("textbox", { name: "Subject" })).toHaveValue(REPLY.subject);
+    });
+
+    it("switches to Reply all: a new draft with the text, the old one deleted", async () => {
+      let stored = [REPLY];
+      const api = mockApi({
+        [`GET ${D}`]: () => ({ body: { drafts: stored } }),
+        [`POST ${D}`]: () => {
+          stored = [REPLY_ALL, ...stored];
+          return { status: 201, body: REPLY_ALL };
+        },
+        [`PATCH ${D}/${REPLY.id}`]: (_request, body) => ({
+          body: { ...REPLY, ...(body as object), version: 2 },
+        }),
+        [`PATCH ${D}/${REPLY_ALL.id}`]: (_request, body) => ({
+          body: { ...REPLY_ALL, ...(body as object), version: 2 },
+        }),
+        [`DELETE ${D}/${REPLY.id}`]: () => {
+          stored = stored.filter((d) => d.id !== REPLY.id);
+          return { status: 204 };
+        },
+      });
+      renderWithProviders(slot(null));
+      const box = await screen.findByRole("textbox", { name: "Message" });
+      replaceText(box, "Two lines.");
+      fireEvent.click(screen.getByRole("button", { name: "Change reply type" }));
+      fireEvent.click(screen.getByRole("menuitemradio", { name: /Reply all/u }));
+      await waitFor(() => {
+        expect(api.calls.some((call) => call.route === `DELETE ${D}/${REPLY.id}`)).toBe(true);
+      });
+      expect(api.calls.find((call) => call.route === `POST ${D}`)?.body).toMatchObject({
+        kind: "reply_all",
+        message_id: FIRST,
+      });
+      expect(
+        api.calls.find((call) => call.route === `PATCH ${D}/${REPLY_ALL.id}`)?.body,
+      ).toMatchObject({
+        version: 1,
+        body: "Two lines.",
+      });
+      expect(await screen.findByRole("region", { name: "Reply all" })).toBeVisible();
+    });
+
+    it("keeps the old draft, and says so, when the switch fails", async () => {
+      const api = mockApi({
+        [`GET ${D}`]: { body: { drafts: [REPLY] } },
+        [`POST ${D}`]: problem(500, "internal"),
+        [`PATCH ${D}/${REPLY.id}`]: (_request, body) => ({
+          body: { ...REPLY, ...(body as object), version: 2 },
+        }),
+      });
+      renderWithProviders(slot(null));
+      const box = await screen.findByRole("textbox", { name: "Message" });
+      replaceText(box, "Keep me.");
+      fireEvent.click(screen.getByRole("button", { name: "Change reply type" }));
+      fireEvent.click(screen.getByRole("menuitemradio", { name: /Forward/u }));
+      expect(await screen.findByText(/Couldn’t switch/u)).toBeVisible();
+      expect(screen.getByRole("region", { name: "Reply to Maya Okafor" })).toBeVisible();
+      expect(box).toHaveTextContent("Keep me.");
+      expect(api.calls.some((call) => call.route.startsWith("DELETE"))).toBe(false);
+    });
+
+    function withScout(extra: Parameters<typeof mockApi>[0]) {
+      return mockApi({
+        [`GET ${D}`]: { body: { drafts: [REPLY] } },
+        [`PATCH ${D}/${REPLY.id}`]: (_request, body) => ({
+          body: { ...REPLY, ...(body as object), version: 2 },
+        }),
+        ...extra,
+      });
+    }
+    const ask = async (name: string) => {
+      fireEvent.click(await screen.findByRole("button", { name: "Ask Scout to rewrite" }));
+      fireEvent.click(screen.getByRole("button", { name }));
+    };
+
+    it("rewrites in place through the reply stream, as plain text", async () => {
+      const api = withScout({ [STREAM]: replyStream("m1", "Thursday works.") });
+      renderWithProviders(slot(null));
+      const box = await screen.findByRole("textbox", { name: "Message" });
+      replaceText(box, "hi maya thursday works ok");
+      await ask("Shorter");
+      await waitFor(() => {
+        expect(box).toHaveTextContent("Thursday works.");
+      });
+      expect(api.calls.find((call) => call.route === STREAM)?.body).toEqual({
+        message_id: FIRST,
+        intent: "Keep what my draft says",
+        draft: "hi maya thursday works ok",
+        shorter: true,
+        change: null,
+      });
+      expect(await screen.findByText("Rewritten by Scout")).toBeVisible();
+    });
+
+    it("asks for Warmer and Fix spelling with their instructions", async () => {
+      const api = withScout({ [STREAM]: replyStream("m1", "Done.") });
+      renderWithProviders(slot(null));
+      replaceText(await screen.findByRole("textbox", { name: "Message" }), "ok");
+      await ask("Warmer");
+      await waitFor(() => {
+        expect(api.calls.filter((call) => call.route === STREAM)).toHaveLength(1);
+      });
+      await waitFor(() => {
+        expect(screen.getByRole("textbox", { name: "Message" })).toHaveAttribute(
+          "contenteditable",
+          "true",
+        );
+      });
+      await ask("Fix spelling");
+      await waitFor(() => {
+        expect(api.calls.filter((call) => call.route === STREAM)).toHaveLength(2);
+      });
+      const bodies = api.calls.filter((call) => call.route === STREAM).map((c) => c.body);
+      expect(bodies[0]).toMatchObject({
+        change: "Make it warmer; keep what it says",
+        shorter: false,
+      });
+      expect(bodies[1]).toMatchObject({
+        change: "Fix spelling and grammar only; change nothing else",
+      });
+    });
+
+    it("never lets Scout's words become a link or formatting", async () => {
+      withScout({
+        [STREAM]: replyStream("m1", "Pay [pay here](https://example.net).\n\n<b>x</b>"),
+      });
+      renderWithProviders(slot(null));
+      const box = await screen.findByRole("textbox", { name: "Message" });
+      replaceText(box, "ok");
+      await ask("Shorter");
+      await waitFor(() => {
+        expect(box).toHaveTextContent("[pay here](https://example.net)");
+      });
+      expect(box.querySelector("a")).toBeNull();
+      expect(box.querySelector("strong, b")).toBeNull();
+      expect(box).toHaveTextContent("<b>x</b>");
+    });
+
+    it("says why when Scout cannot write, and hides the menu if it never will", async () => {
+      withScout({ [STREAM]: problem(503, "reply_unavailable") });
+      renderWithProviders(slot(null));
+      replaceText(await screen.findByRole("textbox", { name: "Message" }), "ok");
+      await ask("Shorter");
+      expect(await screen.findByText(/Scout couldn't write that just now/u)).toBeVisible();
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: "Ask Scout to rewrite" })).toBeNull();
+      });
+    });
+
+    it("offers Scout on a nudge through write_nudge, and not on a forward", async () => {
+      const NUDGE = {
+        ...REPLY,
+        id: "0192f1a0-0000-7000-8000-000000000198",
+        kind: "nudge" as const,
+      };
+      const api = mockApi({
+        [`GET ${D}`]: { body: { drafts: [NUDGE] } },
+        [`PATCH ${D}/${NUDGE.id}`]: (_request, body) => ({
+          body: { ...NUDGE, ...(body as object), version: 2 },
+        }),
+        [`POST ${W}/conversations/${Q4.id}/nudge/draft`]: { body: { text: "Any news?" } },
+      });
+      renderWithProviders(slot(null));
+      const box = await screen.findByRole("textbox", { name: "Message" });
+      replaceText(box, "hello, any news on this");
+      await ask("Shorter");
+      await waitFor(() => {
+        expect(box).toHaveTextContent("Any news?");
+      });
+      expect(api.calls.find((call) => call.route.endsWith("/nudge/draft"))?.body).toEqual({
+        draft: "hello, any news on this",
+        shorter: true,
+        change: null,
+      });
+    });
   });
 });

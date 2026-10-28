@@ -325,7 +325,9 @@
       "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
       "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et renvoyez-le.",
       "quote": "Impossible de lire l’e-mail pour le citer. Rien n’a été commencé. Réessayez.",
-      "send_at_invalid": "Cette heure n’est pas utilisable. Choisissez-en une plus tardive, jusqu’à un an à l’avance."
+      "send_at_invalid": "Cette heure n’est pas utilisable. Choisissez-en une plus tardive, jusqu’à un an à l’avance.",
+      "switch_failed": "Impossible de changer. Votre brouillon est resté tel quel.",
+      "inbox_read_only": "Vous pouvez lire cette boîte, mais pas envoyer depuis celle-ci."
     },
     "shortcuts": {
       "newMessage": "Nouveau message"
@@ -937,5 +939,11 @@
     "chars": "{{chars}} sur {{max}} caractères",
     "tooLong": "Une signature peut contenir {{max}} caractères au plus.",
     "failed": "Impossible d’enregistrer la signature. Réessayez."
+  },
+  "rewrite": {
+    "keep": "Garde ce que dit mon brouillon",
+    "warmer": "Rends-le plus chaleureux ; garde ce qu’il dit",
+    "spelling": "Corrige uniquement l’orthographe et la grammaire ; ne change rien d’autre",
+    "done": "Réécrit par Scout"
   }
 }

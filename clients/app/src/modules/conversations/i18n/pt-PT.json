@@ -325,7 +325,9 @@
       "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
       "content_changed": "Isto mudou desde que o abriu. Verifique-o e envie de novo.",
       "quote": "Não foi possível ler o email para o citar. Nada foi iniciado. Tente novamente.",
-      "send_at_invalid": "Esta hora não pode ser usada. Escolha uma mais tarde, até um ano de antecedência."
+      "send_at_invalid": "Esta hora não pode ser usada. Escolha uma mais tarde, até um ano de antecedência.",
+      "switch_failed": "Não foi possível mudar. O rascunho ficou como o deixou.",
+      "inbox_read_only": "Pode ler esta caixa de correio, mas não enviar a partir dela."
     },
     "shortcuts": {
       "newMessage": "Nova mensagem"
@@ -937,5 +939,11 @@
     "chars": "{{chars}} de {{max}} caracteres",
     "tooLong": "Uma assinatura pode ter no máximo {{max}} caracteres.",
     "failed": "Não foi possível guardar a assinatura. Tente de novo."
+  },
+  "rewrite": {
+    "keep": "Manter o que o meu rascunho diz",
+    "warmer": "Torna-o mais caloroso; mantém o que diz",
+    "spelling": "Corrige apenas a ortografia e a gramática; não alteres mais nada",
+    "done": "Reescrito pelo Scout"
   }
 }
