@@ -2089,15 +2089,21 @@ instruction SHALL forbid time relative to the moment it is written ("in 10
 minutes", "today", "tomorrow", "expires soon") and ask for times and
 durations as the email states them, anchored to when it was sent, because
 the read is kept and shown later. The answer SHALL be held to a strict JSON
-schema with at least 4,096 tokens allowed (the model reasons within them),
-then the summary kept as plain text on one line without control, reordering
+schema with 8,192 tokens allowed at low reasoning effort (the model reasons
+within them; chosen from a measurement, because at the default effort and
+4,096 tokens a reasoning model could spend the whole budget thinking and
+write nothing), and a call that ran out of tokens before it wrote anything
+SHALL be asked again once in the same job with twice the budget before it
+counts, then the summary kept as plain text on one line without control, reordering
 or invisible characters, at most 400 characters per language, and not at all
 when English has nothing. The call SHALL be counted against the workspace's
 daily AI limit as background work under `conversations.read_message`, one
 call per message however often its need is worked out again or it is
 opened, and a message that already has a read SHALL NOT be asked again. A
 call with no usable answer SHALL be stored as failed and tried at most once
-more later. The job SHALL skip a message whose inbox is kept read-only, that
+more later. A newer message that raises a need and is flagged SHALL be read
+on its own, with its own two calls, whatever became of an older message's
+read. The job SHALL skip a message whose inbox is kept read-only, that
 is in spam or the trash, or that has no words. Failures SHALL be logged by
 kind only. When a summary is written the module SHALL publish
 `conversations.need_summarised` (ids only); once the read is stored it SHALL
@@ -2124,6 +2130,14 @@ again.
 - **WHEN** the model answers with nothing usable
 - **THEN** the message is stored as failed, nothing is shown, a later run asks once more, and after that never
 
+#### Scenario: The model thinks for its whole budget
+- **WHEN** the model stops at its token limit without writing anything
+- **THEN** the same job asks again once with twice the budget and low effort, and that answer is the call's answer
+
+#### Scenario: A newer message after a failed read
+- **WHEN** a read failed for good and a newer flagged message raises the need
+- **THEN** the newer message is read on its own, with its own two calls
+
 #### Scenario: No role
 - **WHEN** no `complete` role may receive mail on this server
 - **THEN** no read job is queued and the conversation shows its email without a summary
@@ -2141,9 +2155,11 @@ again.
 behind the conversation's open need, in the caller's language (English when
 theirs is missing), or none when there is no open need, the need is a
 phishing warning (even with a summary written before it became one), none is
-written yet, or none can be. It SHALL be read with the same access checks as the
-conversation, so a caller who may not read the inbox gets 404 and no summary,
-and reading it SHALL never ask the model.
+written yet, or none can be. It SHALL also return `need_read_failed: true`
+when the model's read of that email failed on every call it gets (so none
+will be written), and nothing otherwise. It SHALL be read with the same access
+checks as the conversation, so a caller who may not read the inbox gets 404
+and no summary, and reading it SHALL never ask the model.
 
 #### Scenario: Each member reads their own language
 - **WHEN** a Portuguese reader and an English reader open the same item
@@ -2152,6 +2168,14 @@ and reading it SHALL never ask the model.
 #### Scenario: Not in the inbox
 - **WHEN** a member who is not in the inbox asks for the conversation
 - **THEN** the answer is 404
+
+#### Scenario: A read that failed for good
+- **WHEN** both calls for the read of the open need's message gave no usable answer
+- **THEN** `need_read_failed` is true and `need_summary` is none
+
+#### Scenario: A read with a call left
+- **WHEN** the read failed once and may be asked again
+- **THEN** `need_read_failed` is absent
 
 ### Requirement: Summaries for needs that opened before
 On upgrade every inbox SHALL be queued for the needs backfill, without any

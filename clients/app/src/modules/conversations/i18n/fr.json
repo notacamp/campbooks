@@ -162,6 +162,7 @@
   },
   "scout": {
     "label": "Où en sont les choses",
+    "readFailed": "Scout n’a pas pu lire celui-ci.",
     "suggestion": "Suggère {{stream}}",
     "suggestionNote": "Campbooks pense que ceci va dans {{stream}}. C’est une suggestion : rien ne bouge sans votre accord.",
     "prompt": "La déplacer ?",

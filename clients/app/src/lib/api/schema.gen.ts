@@ -4169,6 +4169,14 @@ export interface components {
             /** @description Up to the 100 newest messages, oldest first. */
             messages: components["schemas"]["MessageView"][];
             /**
+             * @description Scout's read of the email behind the open need failed for good (the
+             *     model gave no usable answer on every try), so there is no summary and
+             *     there will not be one: the reader says so instead of staying blank
+             *     (campbooks-cloud#375). False when there is no open need, the read is
+             *     pending or done, or the need is a phishing warning.
+             */
+            need_read_failed?: boolean;
+            /**
              * @description Scout's summary of the email behind the conversation's open need, in
              *     your language (English when it has none in yours), written once when
              *     the need was raised. None when there is no open need, the summary is
