@@ -26,8 +26,22 @@
     "format": {
       "bold": "Negrita",
       "italic": "Cursiva",
+      "strike": "Tachado",
+      "link": "Enlace",
       "bullets": "Lista con viñetas",
-      "numbers": "Lista numerada"
+      "numbers": "Lista numerada",
+      "quote": "Cita"
+    },
+    "moreFormatting": "Más formato",
+    "link": {
+      "title": "Añadir un enlace",
+      "words": "Texto",
+      "address": "Dirección",
+      "add": "Añadir enlace",
+      "update": "Actualizar enlace",
+      "remove": "Quitar enlace",
+      "cancel": "Cancelar",
+      "refused": "Solo se pueden enlazar direcciones web y de correo electrónico."
     },
     "showQuoted": "Mostrar texto citado",
     "hideQuoted": "Ocultar texto citado",
@@ -36,7 +50,9 @@
     "removeAttachment": "Quitar {{name}}",
     "discard": "Descartar",
     "send": "Enviar",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "expand": "Ampliar",
+    "shrink": "Reducir"
   },
   "attachments": {
     "label": "Adjuntos",

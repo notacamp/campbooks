@@ -26,8 +26,22 @@
     "format": {
       "bold": "Gras",
       "italic": "Italique",
+      "strike": "Barré",
+      "link": "Lien",
       "bullets": "Liste à puces",
-      "numbers": "Liste numérotée"
+      "numbers": "Liste numérotée",
+      "quote": "Citation"
+    },
+    "moreFormatting": "Plus de mise en forme",
+    "link": {
+      "title": "Ajouter un lien",
+      "words": "Texte",
+      "address": "Adresse",
+      "add": "Ajouter le lien",
+      "update": "Mettre à jour le lien",
+      "remove": "Retirer le lien",
+      "cancel": "Annuler",
+      "refused": "Seules les adresses web et de messagerie peuvent être liées."
     },
     "showQuoted": "Afficher le texte cité",
     "hideQuoted": "Masquer le texte cité",
@@ -36,7 +50,9 @@
     "removeAttachment": "Retirer {{name}}",
     "discard": "Supprimer",
     "send": "Envoyer",
-    "close": "Fermer"
+    "close": "Fermer",
+    "expand": "Agrandir",
+    "shrink": "Réduire"
   },
   "attachments": {
     "label": "Pièces jointes",

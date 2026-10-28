@@ -38,6 +38,12 @@ export interface OverflowActionsProps {
   buttons?: boolean | undefined;
   /** Actions that always live in the More menu, after the rest. */
   more?: OverflowAction[] | undefined;
+  /**
+   * Where the More menu opens (`Popover`'s `layer`): `top` when the row sits
+   * in something that clips or scrolls (a composer in the reader's pinned
+   * area, a dialog).
+   */
+  layer?: "inline" | "top" | undefined;
 }
 
 /**
@@ -50,6 +56,7 @@ export interface OverflowActionsProps {
 export function OverflowActions({
   label,
   actions,
+  layer,
   end = [],
   buttons = false,
   more = [],
@@ -100,6 +107,7 @@ export function OverflowActions({
   const menu = (items: OverflowAction[]) => (
     <Popover
       label={label}
+      layer={layer}
       renderTrigger={(trigger) => <IconButton {...trigger} label={label} icon="more" />}
     >
       {(close) => (

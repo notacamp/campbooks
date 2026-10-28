@@ -1,9 +1,46 @@
+/* The one element the composer lives in. Inline it is no box of its own; the
+   top layer (Expand) makes it the sheet. A native dialog, not the app's
+   Dialog, which swallows the keys the composer's shortcuts need. */
+.frame {
+  display: block;
+  position: static;
+  inset: auto;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  overflow: visible;
+}
+
+.frame[data-expanded] {
+  position: fixed;
+  inset: 0;
+  width: min(var(--composer-sheet-width), calc(100% - var(--space-8)));
+  max-height: var(--dialog-sheet-max-height);
+  height: fit-content;
+  margin: auto;
+  border-radius: var(--overlay-radius);
+  box-shadow: var(--shadow-overlay);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.frame[data-expanded]::backdrop {
+  background: var(--surface-scrim);
+}
+
 .composer {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
-  padding: var(--space-3) var(--space-4) var(--space-4);
+  padding: var(--space-3) var(--space-4) 0;
   border-radius: var(--panel-radius);
   background: var(--surface-raised);
   box-shadow: inset 0 0 0 var(--border-width) var(--border-strong);
@@ -42,7 +79,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: var(--btn-height);
+  min-height: var(--space-10);
   margin: 0;
   border-bottom: var(--border-width) solid var(--border-subtle);
 }
@@ -54,7 +91,7 @@
 .fromLabel {
   flex: none;
   min-width: var(--space-10);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   color: var(--text-secondary);
 }
@@ -62,7 +99,7 @@
 .fromValue {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-secondary);
@@ -71,19 +108,42 @@
 .subject {
   flex: 1 1 0;
   min-width: 0;
-  height: var(--btn-height);
+  height: var(--space-10);
   padding: 0;
   border: 0;
   outline: 0;
   background: none;
   color: var(--text-primary);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
 }
 
+/* One row, always: OverflowActions folds what does not fit into More. */
 .toolbar {
   display: flex;
+  min-width: 0;
+}
+
+.link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.linkTitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+
+.linkActions {
+  display: flex;
   flex-wrap: wrap;
-  gap: var(--space-0-5);
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .hidden {
@@ -95,7 +155,6 @@
   white-space: nowrap;
 }
 
-.body,
 .quotedText {
   width: 100%;
   min-width: 0;
@@ -109,8 +168,54 @@
   resize: vertical;
 }
 
-.body {
-  min-height: calc(var(--space-12) * 2);
+/* The text: ten lines at the body size at least, growing with what is written. */
+.text {
+  min-width: 0;
+}
+
+.editor {
+  min-width: 0;
+  min-height: var(--composer-text-min-height);
+  outline: 0;
+  color: var(--text-primary);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.editor p {
+  margin: 0 0 var(--space-2);
+}
+
+.editor ul,
+.editor ol {
+  margin: 0 0 var(--space-2);
+  padding-inline-start: var(--space-6);
+}
+
+/* The base styles strip list markers; the text shows them as they are sent. */
+.editor ul {
+  list-style: disc;
+}
+
+.editor ol {
+  list-style: decimal;
+}
+
+.editor li p {
+  margin: 0;
+}
+
+.editor blockquote {
+  margin: 0 0 var(--space-2);
+  padding-inline-start: var(--space-3);
+  border-inline-start: var(--border-width) solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.editor a {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 .quoted {
@@ -178,12 +283,17 @@
   color: var(--danger);
 }
 
+/* Pinned to the bottom of the composer while the text scrolls. */
 .footer {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--space-2);
+  padding-block: var(--space-2) var(--space-3);
+  border-top: var(--border-width) solid var(--border-subtle);
+  background: var(--surface-raised);
 }
 
 .status {

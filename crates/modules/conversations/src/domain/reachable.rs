@@ -8,7 +8,7 @@
 
 use campbooks_ai::decide::signals::facts::{Facts, dmarc_refused, sender_checks_failed};
 
-/// SQL, true when any of `k.address`'s own inbound mail in the inboxes `$1`
+/// SQL, true when any of `$who`'s (`k.address` by default) own inbound mail in the inboxes `$1`
 /// within the last `$4` days, spam included, was reported (Report and delete
 /// moves it to spam), is under review (open, or cleared because a later
 /// message replaced it), or was found suspicious and not said safe by a
@@ -19,13 +19,20 @@ use campbooks_ai::decide::signals::facts::{Facts, dmarc_refused, sender_checks_f
 ///
 /// A macro so that it can be `concat!`ed into a query's text; the query
 /// binds the inboxes as `$1` and the window in days as `$4`, and names the
-/// row being checked `k`.
+/// row being checked `k`. `$who` names the address checked, `k.address` by
+/// default.
 macro_rules! flagged_sender_sql {
     () => {
-        r"EXISTS (
+        flagged_sender_sql!("k.address")
+    };
+    ($who:literal) => {
+        concat!(
+            r"EXISTS (
            SELECT 1 FROM conversations.messages m
             WHERE m.inbox_id = ANY($1) AND m.direction = 'inbound'
-              AND m.sender_address = k.address
+              AND m.sender_address = ",
+            $who,
+            r"
               AND m.sent_at > now() - make_interval(days => $4)
               AND (m.in_spam
                    OR EXISTS (SELECT 1 FROM conversations.needs n
@@ -37,6 +44,7 @@ macro_rules! flagged_sender_sql {
                        AND NOT EXISTS (SELECT 1 FROM conversations.corrections c
                                         WHERE c.message_id = m.id AND c.question = 'suspicious'
                                           AND c.to_value = 'false' AND c.withdrawn_at IS NULL))))"
+        )
     };
 }
 pub(crate) use flagged_sender_sql;
