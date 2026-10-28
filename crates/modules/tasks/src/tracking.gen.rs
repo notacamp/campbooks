@@ -269,6 +269,52 @@ impl types::TrackedEvent for TaskReopened {
     }
 }
 
+/// `tasks.task_reply_answered` v1: The member answered "You replied. Is this done?" with Not yet: the task stays open and the question is asked again only after a newer reply. Done is tracked as tasks.task_done.
+///
+/// Fires when: tasks.answer_reply records the answer, in the transaction of the change.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct TaskReplyAnswered {
+    /// The workspace it happened in (written in the envelope, not the body).
+    #[serde(skip)]
+    pub workspace: types::WorkspaceId,
+    /// The task afterwards.
+    pub task: TaskSnapshot,
+}
+
+impl types::TrackedEvent for TaskReplyAnswered {
+    const NAME: &'static str = "tasks.task_reply_answered";
+    const VERSION: u16 = 1;
+    const MODULE: &'static str = "tasks";
+    const WORKSPACE_SCOPED: bool = true;
+
+    fn workspace(&self) -> Option<types::WorkspaceId> {
+        Some(self.workspace)
+    }
+}
+
+/// `tasks.task_reply_noticed` v1: The member replied in the conversation an open Do task of theirs came from, after the task was made, so the task now asks whether it is done. Nothing of the reply is read: the task keeps when it was sent and which message it was.
+///
+/// Fires when: tasks.notice_replies marks the task, in the transaction of the change; a task already marked with this or a newer reply tracks nothing.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct TaskReplyNoticed {
+    /// The workspace it happened in (written in the envelope, not the body).
+    #[serde(skip)]
+    pub workspace: types::WorkspaceId,
+    /// The task afterwards.
+    pub task: TaskSnapshot,
+}
+
+impl types::TrackedEvent for TaskReplyNoticed {
+    const NAME: &'static str = "tasks.task_reply_noticed";
+    const VERSION: u16 = 1;
+    const MODULE: &'static str = "tasks";
+    const WORKSPACE_SCOPED: bool = true;
+
+    fn workspace(&self) -> Option<types::WorkspaceId> {
+        Some(self.workspace)
+    }
+}
+
 /// A snapshot of a `tasks.task`, filled from the `tasks` module's own rows in the transaction of the change.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct TaskSnapshot {

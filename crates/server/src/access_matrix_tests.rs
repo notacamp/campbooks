@@ -1255,8 +1255,15 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "tasks.create" => json!({"title": "Call the accountant"}),
         "tasks.update" => json!({"revision": 1, "title": "Call the accountant", "verb": "do"}),
         "tasks.plan" => json!({"revision": 1, "plan": "none"}),
-        "tasks.done" | "tasks.not_needed" | "tasks.reopen" | "tasks.take_back"
-        | "tasks.release_hold" => json!({"revision": 1}),
+        "tasks.done"
+        | "tasks.not_needed"
+        | "tasks.reopen"
+        | "tasks.take_back"
+        | "tasks.release_hold"
+        | "tasks.answer_reply"
+        | "tasks.unanswer_reply" => {
+            json!({"revision": 1})
+        }
         "tasks.hold" => {
             let starts = chrono::Utc::now() + chrono::TimeDelta::days(1);
             json!({"revision": 1, "starts": starts, "ends": starts + chrono::TimeDelta::minutes(30)})

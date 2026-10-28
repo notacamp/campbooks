@@ -153,7 +153,7 @@ async fn group(
             let mut found = Vec::new();
             for ask in &asks {
                 match gateway
-                    .chat(Role::Complete, grouping::request_for(&ask.subjects))
+                    .chat_with_room(Role::Complete, grouping::request_for(&ask.subjects))
                     .await
                 {
                     // An answer that is not the JSON asked for is kept as

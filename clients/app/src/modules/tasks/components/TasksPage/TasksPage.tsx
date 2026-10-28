@@ -296,6 +296,8 @@ export function TasksPage({
   const row = (task: TaskView) => {
     const source = sourceOf(task);
     const chips = [
+      // You replied in its thread: is it done? (campbooks-cloud#396)
+      task.asks_done ? { text: t("row.repliedAsk"), signal: "do" as const } : undefined,
       dueChip(task),
       planChip(task),
       isMine(task) ? undefined : { text: t("row.with", { name: nameOf(task.assignee) }) },

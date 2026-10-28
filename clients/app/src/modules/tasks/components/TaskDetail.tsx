@@ -23,7 +23,15 @@ import {
 
 import type { TaskView } from "../api/queries";
 import { holdable, type HoldSources } from "../hold";
-import { dayLabel, isLater, isoDay, laterChoices, laterOnDay, whenLabel } from "../model";
+import {
+  dayLabel,
+  isLater,
+  isoDay,
+  laterChoices,
+  laterOnDay,
+  replyWhen,
+  whenLabel,
+} from "../model";
 import type { TaskSource } from "../source";
 import { heldText } from "../task-text";
 
@@ -106,6 +114,22 @@ export function TaskDetail({
     });
   };
   useShortcut("scout.ask", askScout, { enabled: scout !== undefined });
+  // "You replied. Is this task done?": 1 is Done, 2 is Not yet.
+  const asking = task.asks_done && mine;
+  useShortcut(
+    "item.choice1",
+    () => {
+      actions.done(task);
+    },
+    { enabled: asking },
+  );
+  useShortcut(
+    "item.choice2",
+    () => {
+      actions.notYet(task);
+    },
+    { enabled: asking },
+  );
 
   const held = heldText(task, t, i18n.language);
   const canHold = holdSources !== undefined && holdable(task);
@@ -336,6 +360,45 @@ export function TaskDetail({
           </section>
         ) : null}
 
+        {task.asks_done && task.replied !== null && task.replied !== undefined ? (
+          // You replied in the task's thread: is it done? (campbooks-cloud#396)
+          <section className="flex flex-col gap-3" aria-label={t("detail.replyQuestion.done")}>
+            <div className="flex flex-col gap-1">
+              <Text weight="medium">
+                {t("detail.replyQuestion.replied", {
+                  name: source?.name ?? t("detail.someone"),
+                  time: replyWhen(task.replied.at, i18n.language, clock),
+                })}
+              </Text>
+              <Text tone="secondary">{t("detail.replyQuestion.done")}</Text>
+            </div>
+            {mine ? (
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  shortcut="item.choice1"
+                  onClick={() => {
+                    actions.done(task);
+                  }}
+                >
+                  {t("detail.done")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  shortcut="item.choice2"
+                  onClick={() => {
+                    actions.notYet(task);
+                  }}
+                >
+                  {t("detail.notYet")}
+                </Button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         {source === undefined ? null : (
           <section className="flex flex-col gap-2">
             <Heading level={3} size="section">
@@ -358,6 +421,11 @@ export function TaskDetail({
                 </Text>
               </div>
             </div>
+            {task.replied === null || task.replied === undefined ? null : (
+              <Text tone="secondary" size="sm">
+                {t("detail.yourReply", { date: whenLabel(task.replied.at, i18n.language) })}
+              </Text>
+            )}
             <div>
               <ButtonLink variant="link" href={source.href} onClick={openEmail}>
                 {t("detail.openEmail")}

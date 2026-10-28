@@ -19512,6 +19512,249 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/reply_answered": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Answer \"Is this done?\" with Not yet: the task stays open and the\nquestion is not asked again until the member replies again.",
+        "operationId": "tasks.answer_reply",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), it is closed (`task_closed`) or it asks nothing (`no_reply_question`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low",
+          "undo": "tasks.unanswer_reply"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tasks/{task_id}/reply_unanswered": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Take back a Not yet: the question is asked again.",
+        "operationId": "tasks.unanswer_reply",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "The task.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskId"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0):\nwhere their day starts, for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The task afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or the task is with someone else now (`task_not_yours`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such task, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task changed since you saw it (`task_changed`), it is closed (`task_closed`) or no Not yet was given (`no_reply_question`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "tasks:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "tasks.task"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "tasks.task"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/tasks/{task_id}/take_back": {
       "post": {
         "tags": [
@@ -24701,6 +24944,10 @@
               "$ref": "#/components/schemas/MessageView"
             },
             "description": "Up to the 100 newest messages, oldest first."
+          },
+          "need_read_failed": {
+            "type": "boolean",
+            "description": "Scout's read of the email behind the open need failed for good (the\nmodel gave no usable answer on every try), so there is no summary and\nthere will not be one: the reader says so instead of staying blank\n(campbooks-cloud#375). False when there is no open need, the read is\npending or done, or the need is a phishing warning."
           },
           "need_summary": {
             "type": [
@@ -34320,7 +34567,10 @@
           "handed_off",
           "taken_back",
           "held",
-          "released"
+          "released",
+          "replied",
+          "reply_answered",
+          "reply_unanswered"
         ]
       },
       "TaskHold": {
@@ -34393,6 +34643,26 @@
           "date",
           "later"
         ]
+      },
+      "TaskReply": {
+        "type": "object",
+        "description": "The member's reply in the conversation a task came from, noticed after\nthe task was made (campbooks-cloud#396).",
+        "required": [
+          "at",
+          "message"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the reply was sent."
+          },
+          "message": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The reply (the conversations module's message id)."
+          }
+        }
       },
       "TaskRevision": {
         "type": "object",
@@ -34480,11 +34750,16 @@
           "state",
           "assignee",
           "created_by",
+          "asks_done",
           "revision",
           "created_at",
           "updated_at"
         ],
         "properties": {
+          "asks_done": {
+            "type": "boolean",
+            "description": "Whether to ask the member \"You replied. Is this done?\": the task is\nopen, a Do, replied to, and the question was not answered (Not yet)\nsince the newest reply."
+          },
           "assignee": {
             "$ref": "#/components/schemas/UserId",
             "description": "The member it is with."
@@ -34575,6 +34850,17 @@
             ],
             "format": "date",
             "description": "The planned day, for `date`."
+          },
+          "replied": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TaskReply",
+                "description": "The newest reply the member sent in the conversation it came from\nafter the task was made (a Do task only)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "revision": {
             "type": "integer",

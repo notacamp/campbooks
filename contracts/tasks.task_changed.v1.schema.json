@@ -30,7 +30,10 @@
         "not_needed",
         "reopened",
         "handed_off",
-        "taken_back"
+        "taken_back",
+        "replied",
+        "reply_answered",
+        "reply_unanswered"
       ]
     },
     "state": { "enum": ["open", "done", "not_needed"] },
@@ -61,6 +64,15 @@
     "previous_handed_by": {
       "description": "For a hand-off or a take-back, the member who had handed it off before.",
       "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }]
+    },
+    "asks_done": {
+      "description": "Whether the member is asked \"You replied. Is this done?\": the task is an open Do with a reply of the member in its conversation that Not yet has not answered since. Absent (false) from events written before it existed.",
+      "type": "boolean"
+    },
+    "replied_at": {
+      "description": "When the member's newest reply in the task's conversation was sent, for a Do task that has one. Absent from events written before it existed.",
+      "type": ["string", "null"],
+      "format": "date-time"
     },
     "source": {
       "description": "The record it came from, or null.",

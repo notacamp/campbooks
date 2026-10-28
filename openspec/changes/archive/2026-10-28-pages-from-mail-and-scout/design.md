@@ -215,7 +215,7 @@ against the code on `next` (task 0.3), what differs:
   pages module's switch by the server, which composes the pages handbook section
   only while it is on.
 - **Tracked events**: this part tracks `pages.files_attached` and
-  `pages.section_appended` (patch 0020), and adds `find_pages`, `read_page`,
+  `pages.section_appended` (patch 0021), and adds `find_pages`, `read_page`,
   `append_section` and `new_page` to the assistant's tool and action enums, so
   settling a page card is tracked by the existing proposal event.
   `thread_saved_to_page` and `page_proposal_settled` are the client's, in part

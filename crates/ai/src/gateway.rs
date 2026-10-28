@@ -381,6 +381,11 @@ pub struct ChatRequest {
     /// Whether it must, may or may not call one; the provider's default
     /// (`auto` with tools) when `None`.
     pub tool_choice: Option<ToolChoice>,
+    /// How much the model may think for this call; it wins over the role's
+    /// own `reasoning_effort`. Sent only to a provider that takes the
+    /// `reasoning` object ([`ProviderConfig::accepts_reasoning`]), else
+    /// dropped.
+    pub reasoning_effort: Option<ReasoningEffort>,
 }
 
 impl ChatRequest {
@@ -390,6 +395,23 @@ impl ChatRequest {
             messages,
             ..Self::default()
         }
+    }
+
+    /// Ask for `effort` of thinking on this call alone.
+    #[must_use]
+    pub fn with_reasoning_effort(mut self, effort: ReasoningEffort) -> Self {
+        self.reasoning_effort = Some(effort);
+        self
+    }
+
+    /// This request with twice the token budget and low thinking: what to
+    /// ask again with when an answer used its whole budget before it wrote
+    /// anything ([`ChatResponse::ran_out_of_room`]).
+    #[must_use]
+    pub fn with_more_room(mut self) -> Self {
+        self.max_tokens = self.max_tokens.map(|tokens| tokens.saturating_mul(2));
+        self.reasoning_effort = Some(ReasoningEffort::Low);
+        self
     }
 
     /// Require JSON matching `schema`.
@@ -434,6 +456,15 @@ impl ChatResponse {
     #[must_use]
     pub fn finish_kind(&self) -> &'static str {
         finish_kind(self.finish_reason.as_deref())
+    }
+
+    /// The model stopped at its token limit without writing a word: a
+    /// reasoning model that spent the whole budget thinking.
+    #[must_use]
+    pub fn ran_out_of_room(&self) -> bool {
+        self.finish_kind() == "length"
+            && self.content.trim().is_empty()
+            && self.tool_calls.is_empty()
     }
 
     /// Parse structured output. Some models wrap the JSON in one Markdown
@@ -530,8 +561,10 @@ impl<'a> WireChatRequest<'a> {
             stream_options: stream.then_some(StreamOptions {
                 include_usage: true,
             }),
-            reasoning: provider
+            reasoning: request
                 .reasoning_effort
+                .filter(|_| provider.accepts_reasoning())
+                .or(provider.reasoning_effort)
                 .map(|effort| WireReasoning { effort }),
         }
     }
@@ -703,6 +736,24 @@ impl Gateway {
         call.finish(&result, |r| (Some(r.model.as_str()), r.usage));
         usage::settle(ticket, &result, |r| r.usage).await;
         result
+    }
+
+    /// [`chat`](Self::chat), asked once more with more room
+    /// ([`ChatRequest::with_more_room`]) when the answer ran out of tokens
+    /// before it wrote anything ([`ChatResponse::ran_out_of_room`]). The
+    /// second call is a call like any other: it is counted and held to the
+    /// daily cap.
+    pub async fn chat_with_room(
+        &self,
+        role: Role,
+        request: ChatRequest,
+    ) -> Result<ChatResponse, Error> {
+        let response = self.chat(role, request.clone()).await?;
+        if !response.ran_out_of_room() {
+            return Ok(response);
+        }
+        tracing::info!(%role, "the answer used its whole budget; asking again with more room");
+        self.chat(role, request.with_more_room()).await
     }
 
     async fn chat_with(

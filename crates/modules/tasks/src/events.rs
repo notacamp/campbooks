@@ -57,6 +57,15 @@ pub struct TaskChanged {
     pub previous_handed_by: Option<UserId>,
     /// The record it came from.
     pub source: Option<RecordRef>,
+    /// Whether the member is asked "You replied. Is this done?"
+    /// (campbooks-cloud#396). Absent from events written before.
+    #[serde(default)]
+    pub asks_done: bool,
+    /// When the member's newest reply in the task's conversation was sent,
+    /// while the task is an open Do with one. Absent from events written
+    /// before.
+    #[serde(default)]
+    pub replied_at: Option<DateTime<Utc>>,
 }
 
 impl DomainEvent for TaskChanged {

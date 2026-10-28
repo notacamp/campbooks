@@ -6,7 +6,7 @@
 # page's title or any of its text, a section's Markdown or a source: ids,
 # enums and counts only.
 # Applied with
-# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0020-pages-mail-scout.yaml`.
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0021-pages-mail-scout.yaml`.
 changelog:
   - date: "2026-10-28"
     plan_version: 20
