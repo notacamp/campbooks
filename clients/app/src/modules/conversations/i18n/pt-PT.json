@@ -344,7 +344,7 @@
         "too_many_attachments": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{files}} ficheiros."
       }
     },
-    "scheduled": "Agendado: {{time}}"
+    "scheduled": "Agendado para {{time}}"
   },
   "needs": {
     "line": {

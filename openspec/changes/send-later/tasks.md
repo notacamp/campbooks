@@ -10,5 +10,5 @@
 - [ ] 3.2 Tracking plan regenerated (no change expected)
 - [x] 3.3 Changelog entry `changelog/unreleased/added/392-send-later.md`
 - [ ] 3.4 Gates green in CI
-- [ ] 3.5 Recording at 375 px and desktop
+- [x] 3.5 Recording at 375 px and desktop
 - [ ] 3.6 `openspec archive send-later --yes` before merge

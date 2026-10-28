@@ -58,7 +58,7 @@ export function sendTimeLabel(at: Date | string, locale: string): string {
     weekday: "short",
     day: "numeric",
     month: "short",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
   }).format(typeof at === "string" ? new Date(at) : at);
 }

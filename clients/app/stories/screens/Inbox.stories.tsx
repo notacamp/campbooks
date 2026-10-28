@@ -738,14 +738,14 @@ export const ReplyDraftAttach: Story = {
   },
 };
 
-/** Send later from the open reply: the composer closes with "Scheduled: …" and Undo. */
+/** Send later from the open reply: the composer closes with "Scheduled for …" and Undo. */
 export const ReplyDraftSendLater: Story = {
   args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByRole("button", { name: "Send later" }));
     await userEvent.click(await canvas.findByRole("button", { name: /Tomorrow morning/u }));
-    await expect(await within(document.body).findByText(/^Scheduled: /u)).toBeVisible();
+    await expect(await within(document.body).findByText(/^Scheduled for /u)).toBeVisible();
   },
 };
 
@@ -777,6 +777,11 @@ export const DraftsScheduled: Story = {
     await expect(await within(document.body).findByText("Send cancelled")).toBeVisible();
     await waitFor(() => expect(canvas.queryByRole("region", { name: "Scheduled" })).toBeNull());
   },
+};
+
+/** The same list without a play, for recordings: nothing cancelled yet. */
+export const DraftsScheduledIdle: Story = {
+  args: { path: `${PATH}/drafts`, api: scheduledDrafts() },
 };
 
 /** Scheduled sends on a phone. */

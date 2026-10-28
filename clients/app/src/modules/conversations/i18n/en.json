@@ -344,7 +344,7 @@
         "too_many_attachments": "{{name}} wasn't attached: a message can carry {{files}} files at most."
       }
     },
-    "scheduled": "Scheduled: {{time}}"
+    "scheduled": "Scheduled for {{time}}"
   },
   "needs": {
     "line": {

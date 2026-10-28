@@ -344,7 +344,7 @@
         "too_many_attachments": "{{name}} n’a pas été joint : un message peut contenir {{files}} fichiers au plus."
       }
     },
-    "scheduled": "Programmé : {{time}}"
+    "scheduled": "Programmé pour {{time}}"
   },
   "needs": {
     "line": {
