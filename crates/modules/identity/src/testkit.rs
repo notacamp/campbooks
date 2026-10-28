@@ -649,7 +649,7 @@ impl Kit {
     /// A fresh world whose instance has signup `policy`, where `invited`
     /// addresses have a pending invitation.
     pub async fn with_signup(db: PgPool, policy: SignupPolicy, invited: &[&str]) -> Self {
-        Self::build(db, policy, invited, None, true, None).await
+        Self::build(db, policy, invited, None, true, None, false).await
     }
 
     /// Like [`with_signup`](Self::with_signup), with the allow-list
@@ -660,19 +660,34 @@ impl Kit {
         invited: &[&str],
         allowed: &str,
     ) -> Self {
-        Self::build(db, policy, invited, None, true, Some(allowed)).await
+        Self::build(db, policy, invited, None, true, Some(allowed), false).await
     }
 
     /// A fresh world whose instance left self-registration off (the
     /// default: no dynamic registration, no metadata documents).
     pub async fn without_self_registration(db: PgPool) -> Self {
-        Self::build(db, SignupPolicy::Open, &[], None, false, None).await
+        Self::build(db, SignupPolicy::Open, &[], None, false, None, false).await
     }
 
     /// A fresh world whose Google client was registered with the callback
     /// path `redirect_path` (`CAMPBOOKS_GOOGLE__REDIRECT_PATH`).
     pub async fn with_google_redirect_path(db: PgPool, redirect_path: &str) -> Self {
-        Self::build(db, SignupPolicy::Open, &[], Some(redirect_path), true, None).await
+        Self::build(
+            db,
+            SignupPolicy::Open,
+            &[],
+            Some(redirect_path),
+            true,
+            None,
+            false,
+        )
+        .await
+    }
+
+    /// A fresh world whose server treats an instance app's stored loopback
+    /// `http` redirects as production does: not registered.
+    pub async fn in_production(db: PgPool) -> Self {
+        Self::build(db, SignupPolicy::Open, &[], None, true, None, true).await
     }
 
     async fn build(
@@ -682,6 +697,7 @@ impl Kit {
         redirect_path: Option<&str>,
         self_registration: bool,
         allowed: Option<&str>,
+        production_redirects: bool,
     ) -> Self {
         let google = TestIdp::start().await;
         let microsoft = TestIdp::start().await;
@@ -718,6 +734,11 @@ impl Kit {
             // Microsoft sends no `email_verified`.
             "email_verified": null,
         }));
+        if production_redirects {
+            // The test URL is plain http, which only development allows; this
+            // is the one setting production differs in that matters here.
+            issuer.clients.allow_instance_loopback(false);
+        }
         issuer.upstreams = fakes(&google, &microsoft, &zoho, &zoho_eu, redirect_path);
         let documents = Arc::new(FakeDocuments::default());
         issuer.fetcher = documents.clone();

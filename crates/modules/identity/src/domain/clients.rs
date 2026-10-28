@@ -348,6 +348,11 @@ pub struct Clients {
     /// Whether clients known by their metadata document are
     /// (`CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS`).
     documents: bool,
+    /// Whether an instance app's stored loopback `http` redirects count
+    /// (`CAMPBOOKS_ENV=development` only). The CLI refuses to store one
+    /// unless it runs in development, but it runs on the database login and
+    /// could be pointed at production's; the server does not trust the row.
+    instance_loopback: bool,
 }
 
 impl Clients {
@@ -358,6 +363,7 @@ impl Clients {
         Self {
             dynamic: false,
             documents: false,
+            instance_loopback: false,
             first_party: vec![
                 Client {
                     id: WEB_CLIENT_ID.to_owned(),
@@ -405,6 +411,13 @@ impl Clients {
         self
     }
 
+    /// Honour (`true`) or ignore an instance app's stored loopback `http`
+    /// redirects. Off unless the server runs in
+    /// development.
+    pub fn allow_instance_loopback(&mut self, allowed: bool) {
+        self.instance_loopback = allowed;
+    }
+
     /// Whether `/oauth2/register` takes registrations.
     pub fn dynamic_registration(&self) -> bool {
         self.dynamic
@@ -432,11 +445,29 @@ impl Clients {
         tx.commit().await?;
         // A kind the instance turned off is unknown, even if registered
         // while it was on: its codes and tokens stop with it.
-        Ok(client.filter(|c| match c.kind {
-            Kind::Dynamic => self.dynamic,
-            Kind::MetadataDocument => self.documents,
-            Kind::FirstParty | Kind::Workspace | Kind::Instance => true,
-        }))
+        Ok(client
+            .filter(|c| match c.kind {
+                Kind::Dynamic => self.dynamic,
+                Kind::MetadataDocument => self.documents,
+                Kind::FirstParty | Kind::Workspace | Kind::Instance => true,
+            })
+            .map(|client| self.without_unsafe_redirects(client)))
+    }
+}
+
+impl Clients {
+    /// `client` as this server may use it: an instance app's redirects that
+    /// are not `https` are treated as not registered, unless this server
+    /// runs in development. Authorization, the token exchange and logout all
+    /// read the client through [`find`](Self::find), so this is the one place.
+    fn without_unsafe_redirects(&self, mut client: Client) -> Client {
+        if client.kind == Kind::Instance && !self.instance_loopback {
+            client.redirect_uris.retain(|uri| is_https_redirect(uri));
+            client
+                .post_logout_redirect_uris
+                .retain(|uri| is_https_redirect(uri));
+        }
+        client
     }
 }
 

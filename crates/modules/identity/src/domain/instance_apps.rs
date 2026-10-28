@@ -17,11 +17,16 @@
 //! - uses the authorization code with PKCE (S256), and refresh tokens when
 //!   granted `offline_access`;
 //! - matches redirect URIs exactly: `https` with a host, or loopback `http`
-//!   on a development instance, written in their canonical form;
+//!   on a development instance, written in their canonical form (a server
+//!   not in development ignores a stored loopback URI, whatever put it
+//!   there);
 //! - may ask for at most its **ceiling**, scopes it was registered with
 //!   from the OIDC scopes and the API catalogue a third party may hold (never
 //!   `identity:*`, `workspaces:write`, `workspaces:admin` or `admin:access`);
 //!   asking for more gets the intersection;
+//! - signs people out with RP-initiated logout, which also ends their
+//!   Campbooks browser session (shared by every app on the instance), not
+//!   only the app's own sign-in;
 //! - is shown on the consent screen once per person, bound to the workspace
 //!   they pick, like any app that is not Campbooks' own; revocable from
 //!   Settings → Apps and integrations.
