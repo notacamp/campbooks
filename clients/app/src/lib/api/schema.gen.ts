@@ -1844,6 +1844,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/pages/{page_id}/sharing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who can read a page, and whether it is in step with Notion. */
+        get: operations["pages.get_sharing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/pages/{page_id}/sync": {
         parameters: {
             query?: never;
@@ -3421,7 +3438,8 @@ export interface components {
             append_id: string;
             /**
              * Format: int32
-             * @description How many blocks it added (a list item counts one).
+             * @description How many blocks it added (a list item counts one; the line of sources
+             *     does not count).
              */
             blocks: number;
             /**
@@ -6334,6 +6352,27 @@ export interface components {
          * @enum {string}
          */
         PageRole: "reader" | "writer" | "manager";
+        /** @description Who reads a page. */
+        PageSharing: {
+            /**
+             * @description Every member of the workspace reads it (a workspace page): `readers`
+             *     is then empty.
+             */
+            everyone: boolean;
+            /**
+             * @description Whether the page is kept in step with a Notion page, so what is added
+             *     here is sent there too.
+             */
+            notion: boolean;
+            /** @description Private or workspace. */
+            place: components["schemas"]["Place"];
+            /**
+             * @description The members who read a private page, the caller included: its
+             *     creator, the creators of the pages above it and everyone granted a
+             *     role on it or above it.
+             */
+            readers: components["schemas"]["UserId"][];
+        };
         /** @description One page of the tree, as `pages.list` shows it. */
         PageSummary: {
             /** @description The member who made it. */
@@ -6701,6 +6740,11 @@ export interface components {
          * @enum {string}
          */
         ProposalAction: "archive" | "unarchive" | "mark_read" | "mark_unread" | "star" | "unstar" | "add_label" | "remove_label" | "move_to_stream" | "trash" | "untrash" | "report_spam" | "not_spam" | "done" | "not_needed" | "already_paid" | "still_to_pay" | "yes_to_question" | "later" | "task_done" | "task_not_needed" | "plan_day" | "task_later" | "due" | "hand_off" | "create_event" | "update_event" | "delete_event" | "respond_event" | "push_event" | "unpush_event" | "append_section" | "new_page";
+        /**
+         * @description Who will read what a page proposal adds.
+         * @enum {string}
+         */
+        ProposalAudience: "only_you" | "named" | "everyone";
         /** @description What a change takes besides its conversation. */
         ProposalDetail: {
             /**
@@ -6815,12 +6859,38 @@ export interface components {
         ProposalMethod: "POST" | "PATCH" | "DELETE";
         /**
          * @description A page's own facts, read from its record when the proposal was made:
-         *     what a card names, never the model's words.
+         *     what a card names, never the model's words. The audience is the page's
+         *     effective one, grants inherited from the pages above it included: a card
+         *     never calls a page private that anyone else can read.
          */
         ProposalPage: {
-            /** @description `private` or `workspace`: who will read what is added. */
-            place: string;
-            /** @description Its title, as the member wrote it (empty when it has none yet). */
+            /** @description Who will read it. */
+            audience: components["schemas"]["ProposalAudience"];
+            /**
+             * @description Whether the page is kept in step with a Notion page: what is added
+             *     goes there too.
+             */
+            notion: boolean;
+            /**
+             * Format: int32
+             * @description How many more teammates can read it than `readers` names; for
+             *     `everyone`, how many teammates there are.
+             */
+            others: number;
+            /**
+             * @description For a new page, the title of the page it goes under, which it takes
+             *     its readers from.
+             */
+            parent?: string | null;
+            /**
+             * @description The teammates who can read it, by name as the workspace lists them (at
+             *     most five; the member is not among them).
+             */
+            readers: string[];
+            /**
+             * @description Its title, as the member wrote it (empty when it has none yet). For a
+             *     new page, the title proposed.
+             */
             title: string;
         };
         /**
@@ -16010,7 +16080,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you may read the page but not change it. */
+            /** @description Missing scope (`pages:write` and `conversations:read` are both needed), or you may read the page but not change it. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -16565,6 +16635,58 @@ export interface operations {
             };
             /** @description The page is not in the trash (`page_not_trashed`), or was deleted with another page: restore that one (`page_not_trash_root`). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pages.get_sharing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The page. */
+                page_id: components["schemas"]["PageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Who reads the page, and whether Notion keeps a copy. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageSharing"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such page, or you cannot see it. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -18561,6 +18683,14 @@ export interface operations {
                 cursor?: string;
                 /** @description The caller's time zone for `before:` and `after:` (IANA, default UTC). */
                 tz?: string;
+                /**
+                 * @description Only these kinds of record, as a comma-separated list of record types
+                 *     (`pages.page`, `conversations.conversation`): the others are not
+                 *     searched at all, so they cannot crowd out the page of results. What
+                 *     the caller may read is decided as ever; a type nobody can search for
+                 *     them finds nothing. Default: everything they may search.
+                 */
+                types?: string;
             };
             header?: never;
             path: {

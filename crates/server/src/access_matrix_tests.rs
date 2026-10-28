@@ -2443,3 +2443,53 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
     }
     tx.rollback().await.unwrap();
 }
+
+/// Saving a message's attachment to a page needs the mail scope as well as
+/// the pages scope: a token without `conversations:read` is refused, even for
+/// a member who may read the message and write the page (campbooks-cloud#364).
+#[sqlx::test(migrations = "../../migrations")]
+async fn saving_an_attachment_needs_the_mail_scope_as_well_as_the_pages_scope(db: PgPool) {
+    let mut world = World::new(db).await;
+    world.seed().await;
+    let id = "pages.attach_from_message";
+    let path = "/api/v1/w/{workspace_id}/pages/{page_id}/files/from-message";
+    let uri = fill(&world, path, id);
+    let payload = body(&world, id);
+    let token_with = |scopes: &str| {
+        let mut claims = world.idp.claims(scopes);
+        claims["sub"] = json!(format!("{}-{}", Who::Connector.subject(), world.run));
+        world.idp.token(&claims)
+    };
+    let (status, bytes, _) = world
+        .call(
+            Some(&token_with("pages:read pages:write")),
+            "POST",
+            &uri,
+            payload.as_ref(),
+        )
+        .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "{}",
+        String::from_utf8_lossy(&bytes)
+    );
+    assert!(String::from_utf8_lossy(&bytes).contains("insufficient_scope"));
+    // The same member with the mail scope as well is let through.
+    let (status, bytes, _) = world
+        .call(
+            Some(&token_with("pages:read pages:write conversations:read")),
+            "POST",
+            &uri,
+            payload.as_ref(),
+        )
+        .await;
+    assert!(
+        !matches!(
+            status,
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::NOT_FOUND
+        ),
+        "{status}: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+}

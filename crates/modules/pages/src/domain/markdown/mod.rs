@@ -21,7 +21,7 @@
 mod parse;
 mod render;
 
-pub use parse::parse;
+pub use parse::{parse, parse_counted};
 pub use render::{Rendered, render};
 
 /// The most Markdown `pages.append` and `pages.create` take, in bytes.

@@ -188,3 +188,76 @@ async fn a_page_in_the_trash_keeps_its_section(db: PgPool) {
     assert_eq!(undone.status, StatusCode::CONFLICT);
     assert_eq!(undone.json["code"], "page_trashed");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_edited_block_keeps_the_append_so_a_second_undo_can_still_remove_it(db: PgPool) {
+    let (kit, workspace, ana, page) = fixture(db).await;
+    let added = append(&kit, &ana, workspace, &page, "- one\n- two").await;
+    let records = || async {
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM pages.appends")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap()
+    };
+    assert_eq!(records().await, 1);
+
+    // Ana adds a word to the second bullet, and syncs.
+    let client = docs::client(51);
+    let pull = kit.sync(&ana, workspace, &page, &client, None).await;
+    docs::apply(
+        &client,
+        &STANDARD
+            .decode(pull.json["update"].as_str().unwrap())
+            .unwrap(),
+    );
+    let item_run = |txn: &mut yrs::TransactionMut, root: &yrs::XmlFragmentRef| {
+        let Some(XmlOut::Element(list)) = root.get(txn, 0) else {
+            panic!("no list");
+        };
+        let Some(XmlOut::Element(item)) = list.get(txn, 1) else {
+            panic!("no item");
+        };
+        let Some(XmlOut::Element(lead)) = item.get(txn, 0) else {
+            panic!("no lead");
+        };
+        let Some(XmlOut::Text(run)) = lead.get(txn, 0) else {
+            panic!("no text");
+        };
+        run
+    };
+    let typed = docs::edit(&client, |txn, root| {
+        let run = item_run(txn, root);
+        let end = run.len(txn);
+        run.insert(txn, end, "!");
+    });
+    assert_eq!(
+        kit.sync(&ana, workspace, &page, &client, Some(&typed))
+            .await
+            .status,
+        StatusCode::OK
+    );
+
+    let first = unappend(&kit, &ana, workspace, &page, &added["append_id"]).await;
+    assert_eq!(first.json, json!({"removed": 1, "stayed": 1}));
+    // The record stays: one block of the append is still on the page.
+    assert_eq!(records().await, 1);
+    let again = unappend(&kit, &ana, workspace, &page, &added["append_id"]).await;
+    assert_eq!(again.json, json!({"removed": 0, "stayed": 1}));
+
+    // Ana takes her word back out; now it is as it was added.
+    let erased = docs::edit(&client, |txn, root| {
+        let run = item_run(txn, root);
+        let end = run.len(txn);
+        run.remove_range(txn, end - 1, 1);
+    });
+    kit.sync(&ana, workspace, &page, &client, Some(&erased))
+        .await;
+    let last = unappend(&kit, &ana, workspace, &page, &added["append_id"]).await;
+    assert_eq!(last.json, json!({"removed": 1, "stayed": 0}));
+    // Every block of it is gone: the record goes too.
+    assert_eq!(records().await, 0);
+    assert_eq!(
+        kit.page_text(&ana, workspace, &page).await,
+        "# Client onboarding"
+    );
+}

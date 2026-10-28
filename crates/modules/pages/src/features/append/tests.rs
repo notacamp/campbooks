@@ -75,8 +75,8 @@ async fn a_writer_adds_a_section_and_the_page_reads_it_back(db: PgPool) {
     )
     .await;
     assert_eq!(added.status, StatusCode::OK, "{:?}", added.json);
-    // A heading, two items and the line of sources.
-    assert_eq!(added.json["blocks"], 4);
+    // A heading and two items: the line of sources is not one of them.
+    assert_eq!(added.json["blocks"], 3);
     assert!(added.json["append_id"].as_str().is_some());
     assert_eq!(added.json["revision"], 3);
 
@@ -384,8 +384,8 @@ async fn an_append_is_tracked_with_ids_and_buckets_only(db: PgPool) {
     assert_eq!(event.envelope["operation"], "pages.append");
     assert_eq!(event.envelope["actor"]["type"], "user");
     assert_eq!(event.body["page"]["id"], page["id"]);
-    // Two blocks (the section and the sources), one source.
-    assert_eq!(event.body["blocks"], "few");
+    // One block (the sources are counted apart), one source.
+    assert_eq!(event.body["blocks"], "one");
     assert_eq!(event.body["sources"], "one");
     let body = event.body.to_string();
     for text in ["Secret", TASK, "\"title\":"] {

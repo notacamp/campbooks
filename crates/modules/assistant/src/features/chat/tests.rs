@@ -1372,7 +1372,8 @@ fn only_reads(kit: &Kit) {
                 "schedule.get_event",
                 "schedule.list_calendars",
                 "pages.list",
-                "pages.read_text"
+                "pages.read_text",
+                "pages.get_sharing"
             ]
             .contains(&called.as_str()),
             "{called}"
@@ -3187,6 +3188,17 @@ async fn kit_with_pages(db: PgPool, server: &MockServer) -> Kit {
         mail.conversations.insert(CONVERSATION.into(), marta(RENT));
         mail.histories.insert(CONVERSATION.into(), history());
         mail.tasks.insert(ERRAND.into(), errand());
+        mail.members = team();
+        // Who reads each page: Sam alone, but for the workspace page.
+        let alone =
+            json!({"place": "private", "everyone": false, "readers": [SAM], "notion": false});
+        for id in [ONBOARDING, SHARED_READ_ONLY, TEAM_PAGE] {
+            mail.sharing.insert(id.into(), alone.clone());
+        }
+        mail.sharing.insert(
+            WEEKLY.into(),
+            json!({"place": "workspace", "everyone": true, "readers": [], "notion": false}),
+        );
         mail.pages = vec![
             page_row(
                 ONBOARDING,
@@ -3336,6 +3348,39 @@ async fn find_pages_gives_titles_of_the_pages_the_member_reads_never_text(db: Pg
         ["Weekly plan", "Client onboarding", "Team notes", "Handbook"]
     );
     only_reads(&kit);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn find_pages_finds_a_page_among_more_than_fifty_matching_emails(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_pages(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    {
+        // A common word: sixty emails match it better than the one page.
+        let mut hits: Vec<Value> = (0..60)
+            .map(|n| {
+                json!({"record": {"type": "conversations.conversation", "id": format!("c-{n}")}})
+            })
+            .collect();
+        hits.push(json!({"record": {"type": "pages.page", "id": ONBOARDING}}));
+        kit.mail.lock().unwrap().hits = hits;
+    }
+    ask_proposing(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        &[("find_pages", json!({"query": "invoice"}))],
+    )
+    .await;
+    let told = results(&server).await;
+    let found: Value = serde_json::from_str(&told[0]).unwrap();
+    assert_eq!(found["pages"][0]["id"], ONBOARDING, "{told:?}");
+    // The search was asked for pages alone.
+    assert_eq!(kit.mail.lock().unwrap().searched, ["pages.page"]);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -3560,7 +3605,8 @@ async fn each_page_action_is_stored_with_its_request_and_undo_and_nothing_runs(d
     // The card names the page from the member's own records.
     assert_eq!(
         proposal["page"],
-        json!({"title": "Client onboarding", "place": "private"})
+        json!({"title": "Client onboarding", "audience": "only_you", "readers": [],
+               "others": 0, "notion": false})
     );
     assert_eq!(proposal["detail"]["markdown"], markdown);
     assert_eq!(proposal["detail"]["sources"], kept);
@@ -3590,7 +3636,8 @@ async fn each_page_action_is_stored_with_its_request_and_undo_and_nothing_runs(d
     .await;
     assert_eq!(
         answer["proposals"][0]["page"],
-        json!({"title": "Weekly plan", "place": "workspace"})
+        json!({"title": "Weekly plan", "audience": "everyone", "readers": [],
+               "others": 1, "notion": false})
     );
 
     // A new page: private, with no record yet.
@@ -3605,7 +3652,12 @@ async fn each_page_action_is_stored_with_its_request_and_undo_and_nothing_runs(d
     .await;
     let proposal = &answer["proposals"][0];
     assert_eq!(proposal["action"], "new_page");
-    assert!(proposal.get("record").is_none() && proposal.get("page").is_none());
+    assert!(proposal.get("record").is_none());
+    assert_eq!(
+        proposal["page"],
+        json!({"title": "Acme kickoff", "audience": "only_you", "readers": [],
+               "others": 0, "notion": false})
+    );
     assert_eq!(proposal["detail"]["title"], "Acme kickoff");
     assert_eq!(
         proposal["request"],
@@ -3910,4 +3962,159 @@ async fn reading_a_page_logs_sizes_and_names_never_its_words(db: PgPool) {
     ] {
         assert!(!logged.contains(never), "{never}: {logged}");
     }
+}
+
+/// The card's page facts for `append_section` to `page`.
+async fn card_for(
+    kit: &Kit,
+    server: &MockServer,
+    token: &str,
+    workspace: WorkspaceId,
+    id: &str,
+    call: (&'static str, Value),
+) -> Value {
+    let answer = ask_proposing(kit, server, token, workspace, id, &[call]).await;
+    answer["proposals"][0].clone()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_card_for_a_page_only_the_member_reads_says_so(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_pages(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let card = card_for(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        page_change("append_section", &json!({"page_id": ONBOARDING})),
+    )
+    .await;
+    assert_eq!(
+        card["page"]["audience"],
+        "only_you",
+        "{:?} {:?}",
+        results(&server).await,
+        kit.mail.lock().unwrap().called
+    );
+    assert_eq!(card["page"]["readers"], json!([]));
+    assert_eq!(card["page"]["notion"], false);
+    // The Markdown that will be written is on the card, whole.
+    assert_eq!(
+        card["detail"]["markdown"],
+        "## Kickoff\n\n- send the agenda"
+    );
+    assert_eq!(
+        card["request"]["body"]["markdown"],
+        card["detail"]["markdown"]
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_card_for_a_page_shared_through_an_inherited_grant_names_who_reads_it(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_pages(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    {
+        // "Acme" is a private sub-page with no grant of its own: Rui reads it
+        // through the one on the page above, and another teammate too.
+        let mut mail = kit.mail.lock().unwrap();
+        mail.pages.push(page_row(
+            "0192f0c4-7d4e-7b39-a7f1-3a8f0e2d0010",
+            "Acme",
+            "private",
+            "manager",
+            "page",
+            "2026-10-28T10:00:00Z",
+        ));
+        mail.sharing.insert(
+            "0192f0c4-7d4e-7b39-a7f1-3a8f0e2d0010".into(),
+            json!({"place": "private", "everyone": false,
+                   "readers": [SAM, RUI, "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b0099"],
+                   "notion": false}),
+        );
+    }
+    let acme = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2d0010";
+    let card = card_for(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        page_change("append_section", &json!({"page_id": acme})),
+    )
+    .await;
+    assert_eq!(
+        card["page"],
+        json!({"title": "Acme", "audience": "named", "readers": ["Rui Matos"],
+               "others": 1, "notion": false})
+    );
+    // And a new page under it takes the same readers, and says whose it is.
+    let card = card_for(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        page_change("new_page", &json!({"title": "Kickoff", "parent_id": acme})),
+    )
+    .await;
+    assert_eq!(card["page"]["audience"], "named");
+    assert_eq!(card["page"]["readers"], json!(["Rui Matos"]));
+    assert_eq!(card["page"]["parent"], "Acme");
+    assert_eq!(card["page"]["title"], "Kickoff");
+    // What the model reads back of the card never calls it private.
+    once(&server, text(ANSWER)).await;
+    kit.post(
+        &sam,
+        &format!("{}/{id}/questions", chats(workspace)),
+        json!({"text": "Thanks"}),
+    )
+    .await;
+    let seen = sent(&server).await.last().unwrap().to_string();
+    assert!(seen.contains("readable by Rui Matos and 1 more"), "{seen}");
+    assert!(!seen.contains("only the member reads"), "{seen}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_card_for_a_page_kept_in_step_with_notion_says_so(db: PgPool) {
+    let server = MockServer::start().await;
+    let kit = kit_with_pages(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    kit.mail.lock().unwrap().sharing.insert(
+        ONBOARDING.into(),
+        json!({"place": "private", "everyone": false, "readers": [SAM], "notion": true}),
+    );
+    let card = card_for(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        page_change("append_section", &json!({"page_id": ONBOARDING})),
+    )
+    .await;
+    assert_eq!(card["page"]["audience"], "only_you");
+    assert_eq!(card["page"]["notion"], true);
+    // A new page is not in step with anything yet, whatever its parent is.
+    let card = card_for(
+        &kit,
+        &server,
+        &sam,
+        workspace,
+        &id,
+        page_change(
+            "new_page",
+            &json!({"title": "Kickoff", "parent_id": ONBOARDING}),
+        ),
+    )
+    .await;
+    assert_eq!(card["page"]["notion"], false);
 }

@@ -370,3 +370,37 @@ async fn without_the_mail_modules_port_nothing_is_ever_attached(db: PgPool) {
     assert_eq!(refused.status, StatusCode::NOT_FOUND, "{:?}", refused.json);
     assert_eq!(f.files().await, 0);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_token_without_the_mail_scope_attaches_nothing(db: PgPool) {
+    let f = fixture(db).await;
+    let attachment = f.attachment("Agenda.pdf", b"%PDF agenda").await;
+    let pages_only = f.kit.token_with("ana", "pages:read pages:write");
+    let refused = f.attach(&pages_only, &[attachment]).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "insufficient_scope");
+    assert_eq!(f.files().await, 0);
+    let with_mail = f
+        .kit
+        .token_with("ana", "pages:read pages:write conversations:read");
+    assert_eq!(
+        f.attach(&with_mail, &[attachment]).await.status,
+        StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn bytes_the_store_does_not_hold_are_a_404_and_nothing_is_attached(db: PgPool) {
+    let f = fixture(db).await;
+    let good = f.attachment("Agenda.pdf", b"%PDF agenda").await;
+    let lost = f.kit.mail_attachment_without_bytes(f.ana_id, f.message);
+    let refused = f.attach(&f.ana, &[good, lost]).await;
+    assert_eq!(refused.status, StatusCode::NOT_FOUND, "{:?}", refused.json);
+    assert_eq!(f.files().await, 0);
+    let held: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM kernel.blob_refs WHERE owner_type = 'pages.page'")
+            .fetch_one(&f.kit.db)
+            .await
+            .unwrap();
+    assert_eq!(held, 0);
+}

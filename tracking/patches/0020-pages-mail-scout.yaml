@@ -63,6 +63,9 @@ coverage:
     name: "pages.read_text"
     exemption: "reads a page as Markdown for Scout; it changes nothing, and the text is the page's own words, never tracked"
   - kind: "operation"
+    name: "pages.get_sharing"
+    exemption: "reads who can read a page and whether Notion keeps a copy, for Scout's card; it changes nothing"
+  - kind: "operation"
     name: "pages.append"
     events: [pages.section_appended]
   - kind: "operation"

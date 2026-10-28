@@ -27,8 +27,9 @@ use serde_json::{Map, Value, json};
 use super::{
     member::{Member, Unread},
     types::{
-        ChatProposal, ProposalAction, ProposalDetail, ProposalEvent, ProposalFacts, ProposalId,
-        ProposalKind, ProposalMethod, ProposalPage, ProposalRequest, ProposalState, ProposalTask,
+        ChatProposal, ProposalAction, ProposalAudience, ProposalDetail, ProposalEvent,
+        ProposalFacts, ProposalId, ProposalKind, ProposalMethod, ProposalPage, ProposalRequest,
+        ProposalState, ProposalTask,
     },
     words::{clean, cut_bytes},
 };
@@ -2110,10 +2111,15 @@ impl Proposer {
                     facts: None,
                     task: None,
                     event: None,
-                    page: Some(ProposalPage {
-                        title: found["title"].as_str().map(fact).unwrap_or_default(),
-                        place: found["place"].as_str().unwrap_or("private").to_owned(),
-                    }),
+                    page: Some(
+                        self.page_facts(
+                            Some(id),
+                            found["title"].as_str().map(fact).unwrap_or_default(),
+                            None,
+                            true,
+                        )
+                        .await?,
+                    ),
                     detail: Some(detail),
                     request: Some(request),
                     undo: Some(undo),
@@ -2132,7 +2138,7 @@ impl Proposer {
                     "sources": asked_sources,
                 });
                 let mut record = None;
-                let mut facts = None;
+                let mut parent_facts = None;
                 if let Some(parent) = parent {
                     let (found, writes) = find(parent).ok_or(Refusal::PageNotVisible)?;
                     if found["place"] != "private" {
@@ -2147,11 +2153,18 @@ impl Proposer {
                         .ok_or(Refusal::Unavailable)?;
                     body["parent"] = id.into();
                     record = Some(RecordRef::new(PAGE, id));
-                    facts = Some(ProposalPage {
-                        title: found["title"].as_str().map(fact).unwrap_or_default(),
-                        place: "private".to_owned(),
-                    });
+                    parent_facts =
+                        Some((id, found["title"].as_str().map(fact).unwrap_or_default()));
                 }
+                // The new page takes its readers from the page it goes under
+                // (grants reach sub-pages); with none, it is the member's alone.
+                let facts = match parent_facts {
+                    Some((id, parent_title)) => {
+                        self.page_facts(Some(id), fact(title), Some(parent_title), false)
+                            .await?
+                    }
+                    None => self.page_facts(None, fact(title), None, false).await?,
+                };
                 detail.title = Some(fact(title));
                 let request = self.request(row.operation, &[], Some(body), &[])?;
                 let undo = self.row_undo(row, &[], None)?;
@@ -2164,7 +2177,7 @@ impl Proposer {
                     facts: None,
                     task: None,
                     event: None,
-                    page: facts,
+                    page: Some(facts),
                     detail: Some(detail),
                     request: Some(request),
                     undo: Some(undo),
@@ -2174,6 +2187,69 @@ impl Proposer {
             }
             _ => Err(Refusal::InvalidArguments),
         }
+    }
+
+    /// Who will read a page's content, as the pages module says it: the
+    /// readers a page really has, grants of the pages above it included, and
+    /// whether Notion keeps a copy. `of` is the page whose readers they are
+    /// (none: a new top-level page, the member's alone); `notion` whether to
+    /// report that page's Notion link (a new page has none).
+    async fn page_facts(
+        &self,
+        of: Option<&str>,
+        title: String,
+        parent: Option<String>,
+        notion: bool,
+    ) -> Result<ProposalPage, Refusal> {
+        let Some(id) = of else {
+            return Ok(ProposalPage {
+                title,
+                audience: ProposalAudience::OnlyYou,
+                readers: Vec::new(),
+                others: 0,
+                notion: false,
+                parent,
+            });
+        };
+        let sharing = self
+            .member
+            .read("pages.get_sharing", json!({ "page_id": id }))
+            .await
+            .map_err(|_| Refusal::Unavailable)?;
+        let (me, people) = self.members().await?;
+        let others_in_workspace =
+            u32::try_from(people.iter().filter(|p| p.id != me).count()).unwrap_or(u32::MAX);
+        let (audience, readers, others) = if sharing["everyone"] == true {
+            (ProposalAudience::Everyone, Vec::new(), others_in_workspace)
+        } else {
+            let readers: Vec<&str> = sharing["readers"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .filter(|reader| *reader != me)
+                .collect();
+            if readers.is_empty() {
+                (ProposalAudience::OnlyYou, Vec::new(), 0)
+            } else {
+                let named: Vec<String> = readers
+                    .iter()
+                    .filter_map(|reader| people.iter().find(|p| p.id == *reader))
+                    .map(|p| p.name.clone())
+                    .take(5)
+                    .collect();
+                let others = u32::try_from(readers.len() - named.len()).unwrap_or(u32::MAX);
+                (ProposalAudience::Named, named, others)
+            }
+        };
+        Ok(ProposalPage {
+            title,
+            audience,
+            readers,
+            others,
+            notion: notion && sharing["notion"] == true,
+            parent,
+        })
     }
 
     /// Every source is a record the member can read now: a thread, a task or
@@ -2838,9 +2914,29 @@ fn page_line(proposal: &ChatProposal, action: ProposalAction) -> String {
         .map(|page| page.title.clone())
         .or_else(|| proposal.detail.as_ref().and_then(|d| d.title.clone()))
         .unwrap_or_default();
+    // Who reads it, in the words the card uses: never "private" when anyone
+    // else can read the page.
+    let readers = proposal.page.as_ref().map_or_else(String::new, |page| {
+        let notion = if page.notion {
+            ", and it is kept in step with Notion"
+        } else {
+            ""
+        };
+        match page.audience {
+            ProposalAudience::OnlyYou => format!(" (only the member reads it{notion})"),
+            ProposalAudience::Everyone => {
+                format!(" (every member of the workspace reads it{notion})")
+            }
+            ProposalAudience::Named => format!(
+                " (readable by {} and {} more{notion})",
+                page.readers.join(", "),
+                page.others
+            ),
+        }
+    });
     let what = match action {
-        ProposalAction::NewPage => format!("a new private page \"{title}\""),
-        _ => format!("a section at the end of the page \"{title}\""),
+        ProposalAction::NewPage => format!("a new page \"{title}\"{readers}"),
+        _ => format!("a section at the end of the page \"{title}\"{readers}"),
     };
     let state = match proposal.state {
         ProposalState::Pending => "The member has not answered it.",

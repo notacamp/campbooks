@@ -11231,7 +11231,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or you may read the page but not change it.",
+            "description": "Missing scope (`pages:write` and `conversations:read` are both needed), or you may read the page but not change it.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11274,7 +11274,8 @@
         "security": [
           {
             "bearer": [
-              "pages:write"
+              "pages:write",
+              "conversations:read"
             ]
           }
         ],
@@ -12192,6 +12193,97 @@
           ],
           "risk": "low",
           "undo": "pages.trash"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/pages/{page_id}/sharing": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Who can read a page, and whether it is in step with Notion.",
+        "operationId": "pages.get_sharing",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "description": "The page.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Who reads the page, and whether Notion keeps a copy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageSharing"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such page, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "pages.page"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
         }
       }
     },
@@ -15567,6 +15659,15 @@
             "name": "tz",
             "in": "query",
             "description": "The caller's time zone for `before:` and `after:` (IANA, default UTC).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "description": "Only these kinds of record, as a comma-separated list of record types\n(`pages.page`, `conversations.conversation`): the others are not\nsearched at all, so they cannot crowd out the page of results. What\nthe caller may read is decided as ever; a type nobody can search for\nthem finds nothing. Default: everything they may search.",
             "required": false,
             "schema": {
               "type": "string"
@@ -22667,7 +22768,7 @@
           "blocks": {
             "type": "integer",
             "format": "int32",
-            "description": "How many blocks it added (a list item counts one).",
+            "description": "How many blocks it added (a list item counts one; the line of sources\ndoes not count).",
             "minimum": 0
           },
           "revision": {
@@ -29164,6 +29265,37 @@
           "manager"
         ]
       },
+      "PageSharing": {
+        "type": "object",
+        "description": "Who reads a page.",
+        "required": [
+          "place",
+          "everyone",
+          "readers",
+          "notion"
+        ],
+        "properties": {
+          "everyone": {
+            "type": "boolean",
+            "description": "Every member of the workspace reads it (a workspace page): `readers`\nis then empty."
+          },
+          "notion": {
+            "type": "boolean",
+            "description": "Whether the page is kept in step with a Notion page, so what is added\nhere is sent there too."
+          },
+          "place": {
+            "$ref": "#/components/schemas/Place",
+            "description": "Private or workspace."
+          },
+          "readers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserId"
+            },
+            "description": "The members who read a private page, the caller included: its\ncreator, the creators of the pages above it and everyone granted a\nrole on it or above it."
+          }
+        }
+      },
       "PageSummary": {
         "type": "object",
         "description": "One page of the tree, as `pages.list` shows it.",
@@ -29970,6 +30102,15 @@
           "new_page"
         ]
       },
+      "ProposalAudience": {
+        "type": "string",
+        "description": "Who will read what a page proposal adds.",
+        "enum": [
+          "only_you",
+          "named",
+          "everyone"
+        ]
+      },
       "ProposalDetail": {
         "type": "object",
         "description": "What a change takes besides its conversation.",
@@ -30177,19 +30318,46 @@
       },
       "ProposalPage": {
         "type": "object",
-        "description": "A page's own facts, read from its record when the proposal was made:\nwhat a card names, never the model's words.",
+        "description": "A page's own facts, read from its record when the proposal was made:\nwhat a card names, never the model's words. The audience is the page's\neffective one, grants inherited from the pages above it included: a card\nnever calls a page private that anyone else can read.",
         "required": [
           "title",
-          "place"
+          "audience",
+          "readers",
+          "others",
+          "notion"
         ],
         "properties": {
-          "place": {
-            "type": "string",
-            "description": "`private` or `workspace`: who will read what is added."
+          "audience": {
+            "$ref": "#/components/schemas/ProposalAudience",
+            "description": "Who will read it."
+          },
+          "notion": {
+            "type": "boolean",
+            "description": "Whether the page is kept in step with a Notion page: what is added\ngoes there too."
+          },
+          "others": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many more teammates can read it than `readers` names; for\n`everyone`, how many teammates there are.",
+            "minimum": 0
+          },
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a new page, the title of the page it goes under, which it takes\nits readers from."
+          },
+          "readers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The teammates who can read it, by name as the workspace lists them (at\nmost five; the member is not among them)."
           },
           "title": {
             "type": "string",
-            "description": "Its title, as the member wrote it (empty when it has none yet)."
+            "description": "Its title, as the member wrote it (empty when it has none yet). For a\nnew page, the title proposed."
           }
         }
       },

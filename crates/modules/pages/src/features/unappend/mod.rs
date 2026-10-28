@@ -3,9 +3,10 @@
 //!
 //! Each block the append added is removed only if it still holds what it did
 //! when it was added: a block someone has edited since stays, and the answer
-//! says how many stayed. Taking back an append that is not there (undone
-//! already, or never made on this page) removes nothing and says so, so an
-//! undo can be sent again.
+//! says how many stayed, and keeps the record of those, so that taking the
+//! append back again removes them once they are as they were. Taking back an
+//! append that is not there (every block gone, or never made on this page)
+//! removes nothing and says so, so an undo can be sent again.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -82,9 +83,11 @@ pub async fn handler(
     let row =
         access::require_page(&state, &mut tx, access, Action::Write, path.page_id, true).await?;
     expect_live(&row)?;
-    // Only this page's own appends, each taken back once.
+    // Only this page's own appends. The record stays while blocks someone
+    // edited stay, so taking the append back again can still remove them
+    // once they are as they were; it goes when every block of it is gone.
     let units: Option<sqlx::types::Json<Vec<append::Unit>>> = sqlx::query_scalar(
-        "DELETE FROM pages.appends WHERE id = $1 AND page_id = $2 RETURNING units",
+        "SELECT units FROM pages.appends WHERE id = $1 AND page_id = $2 FOR UPDATE",
     )
     .bind(request.append_id)
     .bind(path.page_id)
@@ -99,6 +102,18 @@ pub async fn handler(
     };
     let loaded = store::load(&mut tx, path.page_id).await?;
     let taken = append::remove(&loaded.doc, &units)?;
+    if taken.kept.is_empty() {
+        sqlx::query("DELETE FROM pages.appends WHERE id = $1")
+            .bind(request.append_id)
+            .execute(&mut *tx)
+            .await?;
+    } else if taken.removed > 0 || taken.kept.len() < units.len() {
+        sqlx::query("UPDATE pages.appends SET units = $2 WHERE id = $1")
+            .bind(request.append_id)
+            .bind(sqlx::types::Json(&taken.kept))
+            .execute(&mut *tx)
+            .await?;
+    }
     let removed = u32::try_from(taken.removed).unwrap_or(u32::MAX);
     let stayed = u32::try_from(taken.stayed).unwrap_or(u32::MAX);
     if taken.removed > 0 {

@@ -26,3 +26,21 @@ existing blocks.
 #### Scenario: Kickoff notes from mail
 - **WHEN** Ana asks Scout to write kickoff notes for Acme on "Client onboarding"
 - **THEN** a card shows the section with its source threads, and the page is unchanged until Ana chooses "Add to page"
+
+### Requirement: A page proposal says who will read it
+A proposal for a page SHALL carry who can read the page it lands on, worked
+out from the page's effective readers (grants inherited from the pages above
+it included) and not from its place alone: only the member, the teammates
+named with a count of the others, or every member; and whether the page is
+kept in step with Notion. A new page SHALL take its readers from the page it
+goes under. The card SHALL never call a page private that anyone else can
+read, and SHALL carry the whole Markdown that would be written.
+
+#### Scenario: A proposal to a shared page names who can read it
+- **WHEN** an email gets Scout to propose a section for "Acme", a private page Rui reads through a grant on the page above it
+- **THEN** the card names Rui as a reader of "Acme" and does not call it private, and shows the Markdown that would be added
+
+#### Scenario: A page kept in step with Notion
+- **WHEN** Scout proposes a section for a page that is linked to a Notion page
+- **THEN** the card says what is added will be sent to Notion too
+

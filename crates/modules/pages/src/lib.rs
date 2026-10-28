@@ -118,11 +118,12 @@ pub fn module(deps: Deps) -> Module {
 fn router(deps: Deps) -> OpenApiRouter<AppState> {
     use features::{
         add_property, add_row, append, attach_from_message, backlinks, create, create_table,
-        create_view, detach_files, file, get, get_table, get_table_sync, import_from_notion, list,
-        list_notion_links, move_page, query_table, read_text, remove_property, remove_view,
-        resolve_conflict, resolve_table_conflict, restore_property, set_cells, set_options, share,
-        stop_sync, stop_table_sync, sync, trash, unappend, undo_resolve_conflict,
-        undo_resolve_table_conflict, update, update_property, update_view, upload,
+        create_view, detach_files, file, get, get_sharing, get_table, get_table_sync,
+        import_from_notion, list, list_notion_links, move_page, query_table, read_text,
+        remove_property, remove_view, resolve_conflict, resolve_table_conflict, restore_property,
+        set_cells, set_options, share, stop_sync, stop_table_sync, sync, trash, unappend,
+        undo_resolve_conflict, undo_resolve_table_conflict, update, update_property, update_view,
+        upload,
     };
     // A file is up to 20 MiB; everything else is small.
     let uploads = OpenApiRouter::new()
@@ -171,6 +172,7 @@ fn router(deps: Deps) -> OpenApiRouter<AppState> {
         .routes(routes!(attach_from_message::handler))
         .routes(routes!(detach_files::handler))
         .routes(routes!(read_text::handler))
+        .routes(routes!(get_sharing::handler))
         .routes(routes!(append::handler))
         .routes(routes!(unappend::handler))
         .layer(middleware::from_fn(

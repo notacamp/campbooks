@@ -352,14 +352,42 @@ pub enum ProposalAction {
     NewPage,
 }
 
+/// Who will read what a page proposal adds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProposalAudience {
+    /// Only the member: nobody else can open the page.
+    OnlyYou,
+    /// The teammates named in `readers`, and `others` more.
+    Named,
+    /// Every member of the workspace.
+    Everyone,
+}
+
 /// A page's own facts, read from its record when the proposal was made:
-/// what a card names, never the model's words.
+/// what a card names, never the model's words. The audience is the page's
+/// effective one, grants inherited from the pages above it included: a card
+/// never calls a page private that anyone else can read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ProposalPage {
-    /// Its title, as the member wrote it (empty when it has none yet).
+    /// Its title, as the member wrote it (empty when it has none yet). For a
+    /// new page, the title proposed.
     pub title: String,
-    /// `private` or `workspace`: who will read what is added.
-    pub place: String,
+    /// Who will read it.
+    pub audience: ProposalAudience,
+    /// The teammates who can read it, by name as the workspace lists them (at
+    /// most five; the member is not among them).
+    pub readers: Vec<String>,
+    /// How many more teammates can read it than `readers` names; for
+    /// `everyone`, how many teammates there are.
+    pub others: u32,
+    /// Whether the page is kept in step with a Notion page: what is added
+    /// goes there too.
+    pub notion: bool,
+    /// For a new page, the title of the page it goes under, which it takes
+    /// its readers from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
 }
 
 /// A calendar event's own facts, read from its record when the proposal was

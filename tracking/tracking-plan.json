@@ -1681,6 +1681,12 @@
     },
     {
       "events": [],
+      "exemption": "reads who can read a page and whether Notion keeps a copy, for Scout's card; it changes nothing",
+      "kind": "operation",
+      "name": "pages.get_sharing"
+    },
+    {
+      "events": [],
       "exemption": "reads a table's link to its Notion database and the conflicts waiting for a choice; it changes nothing",
       "kind": "operation",
       "name": "pages.get_table_sync"

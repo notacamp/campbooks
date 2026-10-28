@@ -56,7 +56,8 @@ pub struct AppendRequest {
 pub struct Appended {
     /// This append, for `pages.unappend`.
     pub append_id: Uuid,
-    /// How many blocks it added (a list item counts one).
+    /// How many blocks it added (a list item counts one; the line of sources
+    /// does not count).
     pub blocks: u32,
     /// The page's revision after it.
     pub revision: i64,
@@ -162,6 +163,8 @@ pub async fn handler(
     )
     .await?;
     let append_id = Uuid::now_v7();
+    // The blocks of the Markdown: the line of sources is not one of them.
+    let content_blocks = added.units.len() - usize::from(!sources.is_empty());
     if accepted.changed {
         body::store(
             &mut tx,
@@ -198,7 +201,7 @@ pub async fn handler(
             &mut tx,
             access.workspace,
             path.page_id,
-            added.units.len(),
+            content_blocks,
             sources.len(),
         )
         .await?;
@@ -210,7 +213,7 @@ pub async fn handler(
     tx.commit().await?;
     Ok(Json(Appended {
         append_id,
-        blocks: u32::try_from(added.units.len()).unwrap_or(u32::MAX),
+        blocks: u32::try_from(content_blocks).unwrap_or(u32::MAX),
         revision,
     }))
 }

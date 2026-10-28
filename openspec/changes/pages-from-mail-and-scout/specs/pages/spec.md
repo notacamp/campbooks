@@ -6,7 +6,8 @@ files of a page, without copying their bytes, only when the caller may write
 the page and the `AttachmentBlobs` port answers each attachment for the
 caller. If any attachment is not answered, the call SHALL answer 404 and
 attach nothing. `pages.detach_files` SHALL undo it for files no block still
-names.
+names. The call SHALL need both the `pages:write` and the `conversations:read`
+scope: the port checks the user's access to the message, never the token's.
 
 #### Scenario: Saving a thread's files
 - **WHEN** Ana saves both attachments of "Kickoff agenda" to "Client onboarding"
@@ -15,6 +16,10 @@ names.
 #### Scenario: An attachment from an inbox the caller cannot read
 - **WHEN** Rui asks to attach a file from a conversation in Ana's inbox to a page he can write
 - **THEN** the response is 404 and the page holds no new file
+
+#### Scenario: A token without the mail scope
+- **WHEN** an app token with `pages:read` and `pages:write` but without `conversations:read` asks to attach an attachment its user can read
+- **THEN** the response is 403 `insufficient_scope` and the page holds no new file
 
 ### Requirement: A page as text
 `pages.read_text` SHALL answer a page the caller may read as Markdown, in

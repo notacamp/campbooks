@@ -561,7 +561,12 @@ impl Toolbox {
                 .member
                 .read(
                     "search.query",
-                    json!({ "q": query, "limit": PAGE_HITS, "sort": "relevance" }),
+                    json!({
+                        "q": query,
+                        "limit": PAGE_HITS,
+                        "sort": "relevance",
+                        "types": PAGE,
+                    }),
                 )
                 .await?;
             hits["hits"]

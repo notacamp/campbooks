@@ -109,8 +109,12 @@ pub struct Mail {
     pub events: HashMap<String, Value>,
     /// `schedule.list_calendars`'s `calendars`.
     pub calendars: Vec<Value>,
+    /// The `types` of every `search.query`, in order (`""` for none).
+    pub searched: Vec<String>,
     /// `pages.list`'s `pages`.
     pub pages: Vec<Value>,
+    /// `pages.get_sharing`'s answers, by page id; any other id is 404.
+    pub sharing: HashMap<String, Value>,
     /// `pages.read_text`'s answers, by page id; any other id is 404.
     pub page_texts: HashMap<String, Value>,
     /// Every stand-in operation called, in order.
@@ -372,14 +376,39 @@ async fn list_streams(
 #[utoipa::path(get, path = "/api/v1/w/{workspace_id}/search",
     operation_id = "search.query",
     params(("workspace_id" = String, Path), ("q" = Option<String>, Query),
-        ("limit" = Option<u32>, Query), ("sort" = Option<String>, Query)),
+        ("limit" = Option<u32>, Query), ("sort" = Option<String>, Query),
+        ("types" = Option<String>, Query)),
     security(("bearer" = ["search:read"])),
     extensions(("x-campbooks" = json!(Operation::query().assistant().records(["search.result"])))),
     responses((status = OK, body = Value)))]
-async fn search(_: Workspace<SearchRead>, Extension(mail): Extension<Shared>) -> Json<Value> {
+async fn search(
+    _: Workspace<SearchRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Query(query): extract::Query<SearchQuery>,
+) -> Json<Value> {
     let mut mail = mail.lock().unwrap();
     mail.called.push("search.query".into());
-    Json(json!({ "hits": mail.hits, "indexing": false, "query": {} }))
+    mail.searched.push(query.types.clone().unwrap_or_default());
+    // As the real search: only the kinds asked for are searched, and `limit`
+    // counts what is left.
+    let kinds: Option<Vec<&str>> = query.types.as_deref().map(|t| t.split(',').collect());
+    let hits: Vec<&Value> = mail
+        .hits
+        .iter()
+        .filter(|hit| {
+            kinds.as_ref().is_none_or(|kinds| {
+                kinds.contains(&hit["record"]["type"].as_str().unwrap_or_default())
+            })
+        })
+        .take(query.limit.unwrap_or(20) as usize)
+        .collect();
+    Json(json!({ "hits": hits, "indexing": false, "query": {} }))
+}
+
+#[derive(Deserialize)]
+struct SearchQuery {
+    limit: Option<u32>,
+    types: Option<String>,
 }
 
 #[utoipa::path(get, path = "/api/v1/w/{workspace_id}/attention",
@@ -776,6 +805,26 @@ async fn list_pages(_: Workspace<PagesRead>, Extension(mail): Extension<Shared>)
     Json(json!({ "pages": mail.pages, "tables": true }))
 }
 
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/pages/{page_id}/sharing",
+    operation_id = "pages.get_sharing",
+    params(("workspace_id" = String, Path), ("page_id" = String, Path)),
+    security(("bearer" = ["pages:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["pages.page"])))),
+    responses((status = OK, body = Value)))]
+async fn get_page_sharing(
+    _: Workspace<PagesRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Path(path): extract::Path<(String, String)>,
+) -> Result<Json<Value>, Error> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("pages.get_sharing".into());
+    mail.sharing
+        .get(&path.1)
+        .cloned()
+        .map(Json)
+        .ok_or(Error::NotFound)
+}
+
 #[utoipa::path(get, path = "/api/v1/w/{workspace_id}/pages/{page_id}/text",
     operation_id = "pages.read_text",
     params(("workspace_id" = String, Path), ("page_id" = String, Path)),
@@ -923,6 +972,7 @@ impl Kit {
             .routes(routes!(never_unpush_event))
             .routes(routes!(list_pages))
             .routes(routes!(read_page_text))
+            .routes(routes!(get_page_sharing))
             .routes(routes!(never_page_append))
             .routes(routes!(never_page_unappend))
             .routes(routes!(never_page_create))

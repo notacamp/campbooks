@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use campbooks_kernel::RecordRef;
 use yrs::{Any, Doc, Xml, XmlElementPrelim, XmlFragment, XmlTextPrelim};
 
-use super::{MAX_TEXT_BYTES, parse, render};
+use super::{MAX_TEXT_BYTES, parse, parse_counted, render};
 use crate::{
     domain::{
         append, document,
@@ -297,4 +297,69 @@ fn what_cannot_be_read_is_left_out() {
         render(&doc, "", 1000).markdown,
         "ok\n\n[pages.page:00000000-0000-0000-0000-000000000000]"
     );
+}
+
+/// How many steps reading `markdown` may take: a few dozen per character of
+/// it, however it is built. A scan that started over from each bracket would
+/// need the square of its length.
+fn steps_allowed(markdown: &str) -> usize {
+    40 * markdown.chars().count()
+}
+
+#[test]
+fn brackets_and_emphasis_are_read_in_steps_proportional_to_the_text() {
+    let nested = format!("{}x{}", "[".repeat(7900), "]".repeat(7900));
+    let half = format!("{}x{}", "[".repeat(3900), "]".repeat(3900));
+    let inside_emphasis = format!("**{}**", "[x".repeat(4000));
+    let cases = [
+        // Nested brackets, each matching one far away.
+        nested.clone(),
+        format!("*{nested}*"),
+        format!("_{half}_ **{half}**"),
+        inside_emphasis,
+        // Many `[x]` with no `(` after them.
+        "[x]".repeat(5000),
+        "[x] ".repeat(4000),
+        // Many `[a](` with no `)`, and with a `)` far away.
+        "[a](".repeat(4000),
+        format!("{}{})", "[a](".repeat(3000), "z".repeat(3000)),
+        // An address that goes on and on.
+        format!("[a]({})", "u".repeat(16 * 1024 - 8)),
+        // Openers that never close, and closers that never match.
+        "_a ".repeat(5000),
+        "*a ".repeat(5000),
+        "~~a ".repeat(4000),
+        "_a_b".repeat(4000),
+        "`a ".repeat(5000),
+    ];
+    for markdown in cases {
+        assert!(markdown.len() <= 16 * 1024, "{}", markdown.len());
+        let (blocks, steps) = parse_counted(&markdown);
+        assert!(
+            steps <= steps_allowed(&markdown),
+            "{steps} steps for {} characters: {:.40}",
+            markdown.chars().count(),
+            markdown
+        );
+        // And whatever was made is still a page the schema accepts.
+        let doc = Doc::new();
+        let added = append::append(&doc, &blocks, &[]).unwrap();
+        document::apply(&doc, &added.update).unwrap();
+        document::inspect(&doc).unwrap();
+    }
+}
+
+#[test]
+fn nested_links_and_balanced_parentheses_still_read() {
+    let blocks = parse("[one [two]](https://a.example/x_(y)) and [no](notalink");
+    assert_eq!(text(&blocks[0]), "one [two] and [no](notalink");
+    assert_eq!(
+        blocks[0].runs[0].link.as_deref(),
+        Some("https://a.example/x_(y)")
+    );
+    // An address too long to keep leaves the words.
+    let long = format!("[words](https://a.example/{})", "u".repeat(3000));
+    let blocks = parse(&long);
+    assert_eq!(text(&blocks[0]), "words");
+    assert!(blocks[0].runs.iter().all(|run| run.link.is_none()));
 }

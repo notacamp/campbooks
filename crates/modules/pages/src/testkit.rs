@@ -32,7 +32,7 @@ use campbooks_kernel::{
 use sqlx::{PgConnection, PgPool};
 
 /// Every scope of this module.
-pub const ALL_SCOPES: &str = "pages:read pages:write";
+pub const ALL_SCOPES: &str = "pages:read pages:write conversations:read";
 
 #[derive(Debug, Default)]
 struct TestMembership {
@@ -396,6 +396,26 @@ impl Kit {
         self.attachments.known.lock().unwrap().insert(
             (conversation, message, attachment),
             (reader, blob, filename.to_owned()),
+        );
+        attachment
+    }
+
+    /// An attachment the mail module knows whose bytes were never stored:
+    /// `reader` may read it, but its blob is not in the workspace.
+    pub fn mail_attachment_without_bytes(
+        &self,
+        reader: UserId,
+        (conversation, message): (uuid::Uuid, uuid::Uuid),
+    ) -> uuid::Uuid {
+        let blob = BlobRef {
+            hash: campbooks_kernel::blobs::BlobHash::of(b"never stored"),
+            size: 12,
+            content_type: "application/pdf".to_owned(),
+        };
+        let attachment = uuid::Uuid::now_v7();
+        self.attachments.known.lock().unwrap().insert(
+            (conversation, message, attachment),
+            (reader, blob, "Lost.pdf".to_owned()),
         );
         attachment
     }

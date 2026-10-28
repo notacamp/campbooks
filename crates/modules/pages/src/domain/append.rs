@@ -58,6 +58,9 @@ pub struct Removed {
     pub removed: usize,
     /// How many stayed because they were changed since.
     pub stayed: usize,
+    /// Those that stayed, as they were added: taking the append back again
+    /// still finds them.
+    pub kept: Vec<Unit>,
 }
 
 /// A copy of `doc` to change.
@@ -173,7 +176,7 @@ pub fn remove(doc: &Doc, units: &[Unit]) -> Result<Removed, Rejection> {
     let work = scratch(doc)?;
     let before = document::state_vector(doc);
     let mut removed = 0;
-    let mut stayed = 0;
+    let mut kept: Vec<Unit> = Vec::new();
     {
         let root = work.get_or_insert_xml_fragment(ROOT);
         let mut txn = work.transact_mut();
@@ -183,7 +186,7 @@ pub fn remove(doc: &Doc, units: &[Unit]) -> Result<Removed, Rejection> {
                 continue;
             };
             if hash_of(&txn, &found.element) != unit.hash {
-                stayed += 1;
+                kept.push(unit.clone());
                 continue;
             }
             found.place.remove(&mut txn, found.index);
@@ -200,7 +203,8 @@ pub fn remove(doc: &Doc, units: &[Unit]) -> Result<Removed, Rejection> {
     Ok(Removed {
         update,
         removed,
-        stayed,
+        stayed: kept.len(),
+        kept,
     })
 }
 

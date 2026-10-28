@@ -23,7 +23,7 @@ use axum::{Json, extract::State};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     authz::Action,
-    blobs::BlobOwner,
+    blobs::{BlobError, BlobOwner},
     db::BeginFor as _,
     extract,
     tenancy::{Workspace, WorkspaceId},
@@ -103,7 +103,7 @@ fn block_name(raw: &str) -> String {
     path = "/api/v1/w/{workspace_id}/pages/{page_id}/files/from-message",
     operation_id = "pages.attach_from_message",
     tag = "pages",
-    security(("bearer" = ["pages:write"])),
+    security(("bearer" = ["pages:write", "conversations:read"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("pages.detach_files")
         .records(["pages.page"]).access("pages.page", campbooks_kernel::authz::Action::Write)))),
@@ -118,7 +118,7 @@ fn block_name(raw: &str) -> String {
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, or you may read the page but not change it.",
+        (status = FORBIDDEN, description = "Missing scope (`pages:write` and `conversations:read` are both needed), or you may read the page but not change it.",
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such page, or you cannot see it; or any of the attachments is not one of that message that you may read. Nothing is attached.",
             body = Problem, content_type = "application/problem+json"),
@@ -135,6 +135,12 @@ pub async fn handler(
     extract::Json(request): extract::Json<AttachFromMessage>,
 ) -> Result<Json<AttachedFiles>> {
     let access = &workspace.access;
+    // The attachments are mail: the token needs the mail scope as well as the
+    // pages scope, whoever its user is (the port checks the user, not the
+    // token).
+    if !workspace.principal.has_scope("conversations:read") {
+        return Err(Error::InsufficientScope("conversations:read"));
+    }
     // Each attachment once, in the order asked.
     let mut seen = BTreeSet::new();
     let asked: Vec<Uuid> = request
@@ -203,6 +209,8 @@ pub async fn handler(
         .bind(attachment.to_string())
         .execute(&mut *tx)
         .await?;
+        // Bytes the store does not hold are an attachment that is not there:
+        // the same 404, and nothing is attached.
         state
             .blobs
             .attach(
@@ -211,7 +219,11 @@ pub async fn handler(
                 &found.blob,
                 &BlobOwner::new("pages.page", *path.page_id.as_uuid()),
             )
-            .await?;
+            .await
+            .map_err(|error| match error {
+                BlobError::NotStored => Error::NotFound,
+                other => other.into(),
+            })?;
         files.push(AttachedFile {
             attachment,
             blob: found.blob.hash.to_string(),

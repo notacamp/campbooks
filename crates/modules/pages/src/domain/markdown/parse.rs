@@ -1,5 +1,7 @@
 //! Markdown to blocks: a fixed subset, read line by line.
 
+use std::cell::Cell;
+
 use campbooks_kernel::text;
 use uuid::Uuid;
 
@@ -14,6 +16,18 @@ const MAX_DEPTH: usize = 6;
 /// `markdown` as blocks, each with a fresh stable id. Never fails: what is
 /// not understood is text.
 pub fn parse(markdown: &str) -> Vec<Block> {
+    parse_counted(markdown).0
+}
+
+/// [`parse`], and how many steps the inline reading took: a count the tests
+/// bound by the length of the input, so no input can make it quadratic.
+pub fn parse_counted(markdown: &str) -> (Vec<Block>, usize) {
+    let steps = Cell::new(0);
+    let blocks = parse_with(markdown, &steps);
+    (blocks, steps.get())
+}
+
+fn parse_with(markdown: &str, steps: &Cell<usize>) -> Vec<Block> {
     let lines: Vec<String> = markdown
         .lines()
         .map(|line| text::displayable(&line.replace('\t', "    ")))
@@ -25,7 +39,7 @@ pub fn parse(markdown: &str) -> Vec<Block> {
         at += 1;
         let trimmed = line.trim();
         if let Some(info) = fence_info(line) {
-            reader.flush();
+            reader.flush(steps);
             let mut code: Vec<&str> = Vec::new();
             while at < lines.len() {
                 let next = lines[at].as_str();
@@ -37,25 +51,25 @@ pub fn parse(markdown: &str) -> Vec<Block> {
             }
             reader.out.push(code_block(info, &code));
         } else if trimmed.is_empty() {
-            reader.flush();
+            reader.flush(steps);
         } else if is_rule(trimmed) {
-            reader.flush();
+            reader.flush(steps);
             reader.out.push(Block::new(Uuid::now_v7(), Kind::Divider));
         } else if let Some((level, rest)) = heading(trimmed) {
-            reader.flush();
+            reader.flush(steps);
             let mut block = Block::new(Uuid::now_v7(), Kind::Heading);
             block.level = Some(level);
-            block.runs = inline(rest);
+            block.runs = inline(rest, steps);
             reader.out.push(block);
         } else if let Some(rest) = quote_line(line) {
-            reader.quote(rest);
+            reader.quote(rest, steps);
         } else if let Some((kind, checked, rest)) = list_marker(line) {
-            reader.item(kind, checked, rest);
+            reader.item(kind, checked, rest, steps);
         } else {
-            reader.text(line, trimmed);
+            reader.text(line, trimmed, steps);
         }
     }
-    reader.flush();
+    reader.flush(steps);
     reader.out
 }
 
@@ -82,23 +96,23 @@ struct Reader {
 
 impl Reader {
     /// Close what is open as a block.
-    fn flush(&mut self) {
+    fn flush(&mut self, steps: &Cell<usize>) {
         match std::mem::take(&mut self.open) {
             Open::Nothing => {}
             Open::Paragraph(lines) => {
                 let mut block = Block::new(Uuid::now_v7(), Kind::Paragraph);
-                block.runs = inline(&lines.join(" "));
+                block.runs = inline(&lines.join(" "), steps);
                 self.out.push(block);
             }
             Open::Quote(paragraphs) => {
                 let mut paragraphs = paragraphs.into_iter().filter(|p| !p.is_empty());
                 let mut block = Block::new(Uuid::now_v7(), Kind::Quote);
                 if let Some(lead) = paragraphs.next() {
-                    block.runs = inline(&lead.join(" "));
+                    block.runs = inline(&lead.join(" "), steps);
                 }
                 for rest in paragraphs {
                     let mut child = Block::new(Uuid::now_v7(), Kind::Paragraph);
-                    child.runs = inline(&rest.join(" "));
+                    child.runs = inline(&rest.join(" "), steps);
                     block.children.push(child);
                 }
                 self.out.push(block);
@@ -112,14 +126,14 @@ impl Reader {
                 if kind == Kind::Todo {
                     block.checked = Some(checked);
                 }
-                block.runs = inline(&parts.join(" "));
+                block.runs = inline(&parts.join(" "), steps);
                 self.out.push(block);
             }
         }
     }
 
     /// A line of a quote, without its `>`.
-    fn quote(&mut self, rest: &str) {
+    fn quote(&mut self, rest: &str, steps: &Cell<usize>) {
         let content = rest.trim();
         if let Open::Quote(paragraphs) = &mut self.open {
             if content.is_empty() {
@@ -129,7 +143,7 @@ impl Reader {
             }
             return;
         }
-        self.flush();
+        self.flush(steps);
         self.open = Open::Quote(vec![if content.is_empty() {
             Vec::new()
         } else {
@@ -137,8 +151,8 @@ impl Reader {
         }]);
     }
 
-    fn item(&mut self, kind: Kind, checked: bool, rest: &str) {
-        self.flush();
+    fn item(&mut self, kind: Kind, checked: bool, rest: &str, steps: &Cell<usize>) {
+        self.flush(steps);
         self.open = Open::Item {
             kind,
             checked,
@@ -148,12 +162,12 @@ impl Reader {
 
     /// A line that is none of the others: more of the open paragraph, a
     /// continuation of the open item, or a new paragraph.
-    fn text(&mut self, line: &str, trimmed: &str) {
+    fn text(&mut self, line: &str, trimmed: &str, steps: &Cell<usize>) {
         match &mut self.open {
             Open::Paragraph(lines) => lines.push(trimmed.to_owned()),
             Open::Item { parts, .. } if line.starts_with(' ') => parts.push(trimmed.to_owned()),
             _ => {
-                self.flush();
+                self.flush(steps);
                 self.open = Open::Paragraph(vec![trimmed.to_owned()]);
             }
         }
@@ -285,10 +299,10 @@ struct Marks {
 }
 
 /// `text` as runs.
-fn inline(text: &str) -> Vec<Run> {
+fn inline(text: &str, steps: &Cell<usize>) -> Vec<Run> {
     let chars: Vec<char> = text.chars().collect();
     let mut out = Vec::new();
-    read(&chars, &Marks::default(), &mut out, 0);
+    read(&chars, &Marks::default(), &mut out, 0, steps);
     normalize(out)
 }
 
@@ -301,11 +315,10 @@ enum Delimiter {
     Star,
     Under,
     Code,
-    Bracket,
 }
 
 #[derive(Debug, Default)]
-struct Failed([Option<usize>; 7]);
+struct Failed([Option<usize>; 6]);
 
 impl Failed {
     /// Whether a search for `which` from `from` already found nothing: a
@@ -338,11 +351,12 @@ fn starts(chars: &[char], at: usize, pattern: &[char]) -> bool {
 }
 
 /// The index of the first valid closer `pattern` at or after `from`: one
-/// not escaped and not right after a space. The words between must not be
-/// empty.
-fn closer(chars: &[char], from: usize, pattern: &[char]) -> Option<usize> {
+/// not escaped and not right after a space (and, for a single `_`, not inside
+/// a word). The words between must not be empty.
+fn closer(chars: &[char], from: usize, pattern: &[char], steps: &Cell<usize>) -> Option<usize> {
     let mut at = from;
     while at + pattern.len() <= chars.len() {
+        steps.set(steps.get() + 1);
         if chars[at] == '\\' {
             at += 2;
             continue;
@@ -350,10 +364,16 @@ fn closer(chars: &[char], from: usize, pattern: &[char]) -> Option<usize> {
         if starts(chars, at, pattern) && at > from && chars[at - 1] != ' ' {
             // A single `*` or `_` is not the first half of a double one.
             let single = pattern.len() == 1;
-            if !(single && chars.get(at + 1) == Some(&pattern[0])) {
+            if single && chars.get(at + 1) == Some(&pattern[0]) {
+                at += 2;
+                continue;
+            }
+            // A closing `_` inside a word closes nothing: looking on past it
+            // keeps "no closer from here" true for every later opener.
+            if !(single && pattern[0] == '_' && !word_edge(chars, at, 1)) {
                 return Some(at);
             }
-            at += 2;
+            at += 1;
             continue;
         }
         at += 1;
@@ -372,7 +392,8 @@ fn word_edge(chars: &[char], at: usize, length: usize) -> bool {
     clippy::too_many_lines,
     reason = "one arm per piece of syntax, read top to bottom"
 )]
-fn read(chars: &[char], marks: &Marks, out: &mut Vec<Run>, depth: usize) {
+fn read(chars: &[char], marks: &Marks, out: &mut Vec<Run>, depth: usize, steps: &Cell<usize>) {
+    let pairs = Pairs::of(chars, steps);
     let mut buffer = String::new();
     let mut failed = Failed::default();
     let mut at = 0;
@@ -385,6 +406,7 @@ fn read(chars: &[char], marks: &Marks, out: &mut Vec<Run>, depth: usize) {
         };
     }
     'scan: while at < chars.len() {
+        steps.set(steps.get() + 1);
         let c = chars[at];
         // An escaped punctuation mark is itself.
         if c == '\\'
@@ -422,7 +444,7 @@ fn read(chars: &[char], marks: &Marks, out: &mut Vec<Run>, depth: usize) {
                     && (pattern[0] != '_' || word_edge(chars, at, 2))
                     && !failed.already(which, at + 2)
                 {
-                    match closer(chars, at + 2, &pattern) {
+                    match closer(chars, at + 2, &pattern, steps) {
                         Some(end) => {
                             flush!();
                             let mut inner = marks.clone();
@@ -431,7 +453,7 @@ fn read(chars: &[char], marks: &Marks, out: &mut Vec<Run>, depth: usize) {
                             } else {
                                 inner.bold = true;
                             }
-                            read(&chars[at + 2..end], &inner, out, depth + 1);
+                            read(&chars[at + 2..end], &inner, out, depth + 1, steps);
                             at = end + 2;
                             continue 'scan;
                         }
@@ -445,32 +467,30 @@ fn read(chars: &[char], marks: &Marks, out: &mut Vec<Run>, depth: usize) {
                 && (c != '_' || word_edge(chars, at, 1))
                 && !failed.already(which_single(c), at + 1)
             {
-                match closer(chars, at + 1, &[c]) {
-                    Some(end) if c != '_' || word_edge(chars, end, 1) => {
+                match closer(chars, at + 1, &[c], steps) {
+                    Some(end) => {
                         flush!();
                         let mut inner = marks.clone();
                         inner.italic = true;
-                        read(&chars[at + 1..end], &inner, out, depth + 1);
+                        read(&chars[at + 1..end], &inner, out, depth + 1, steps);
                         at = end + 1;
                         continue;
                     }
-                    Some(_) => {}
                     None => failed.note(which_single(c), at + 1),
                 }
             }
             // [words](address)
-            if c == '[' && marks.link.is_none() && !failed.already(Delimiter::Bracket, at + 1) {
-                match link(chars, at) {
+            if c == '[' && marks.link.is_none() {
+                match link(chars, at, &pairs, steps) {
                     Linked::Link(end, after, address) => {
                         flush!();
                         let mut inner = marks.clone();
                         inner.link = safe_address(&address);
-                        read(&chars[at + 1..end], &inner, out, depth + 1);
+                        read(&chars[at + 1..end], &inner, out, depth + 1, steps);
                         at = after;
                         continue;
                     }
-                    Linked::NoClose => failed.note(Delimiter::Bracket, at + 1),
-                    Linked::NotALink => {}
+                    Linked::NoClose | Linked::NotALink => {}
                 }
             }
         }
@@ -489,6 +509,81 @@ const fn which_single(c: char) -> Delimiter {
     }
 }
 
+/// The longest address read, in characters: longer is no address a link
+/// keeps (`safe_address`).
+const MAX_ADDRESS: usize = 2048;
+
+/// Where every `[` and `(` of a text closes, found in one pass with a stack
+/// (an escaped character is skipped, as everywhere): looking a bracket up is
+/// then one step, however many there are or how far apart.
+struct Pairs {
+    bracket: Vec<usize>,
+    paren: Vec<usize>,
+}
+
+/// No partner.
+const NONE: usize = usize::MAX;
+
+impl Pairs {
+    fn of(chars: &[char], steps: &Cell<usize>) -> Self {
+        let mut bracket = vec![NONE; chars.len()];
+        let mut paren = vec![NONE; chars.len()];
+        let (mut brackets, mut parens): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
+        let mut at = 0;
+        while at < chars.len() {
+            steps.set(steps.get() + 1);
+            match chars[at] {
+                '\\' => at += 1,
+                '[' => brackets.push(at),
+                ']' => {
+                    if let Some(open) = brackets.pop() {
+                        bracket[open] = at;
+                    }
+                }
+                '(' => parens.push(at),
+                ')' => {
+                    if let Some(open) = parens.pop() {
+                        paren[open] = at;
+                    }
+                }
+                _ => {}
+            }
+            at += 1;
+        }
+        Self { bracket, paren }
+    }
+}
+
+/// A link starting at the `[` at `at`.
+fn link(chars: &[char], at: usize, pairs: &Pairs, steps: &Cell<usize>) -> Linked {
+    let end = pairs.bracket[at];
+    if end == NONE {
+        return Linked::NoClose;
+    }
+    if end == at + 1 || chars.get(end + 1) != Some(&'(') {
+        return Linked::NotALink;
+    }
+    let close = pairs.paren[end + 1];
+    if close == NONE {
+        return Linked::NotALink;
+    }
+    // `(address "title")`: the address is up to the first space, and never
+    // more than the longest one a link keeps (one more character says it is
+    // too long).
+    let mut address = String::new();
+    for c in chars[end + 2..close].iter().take(MAX_ADDRESS + 1) {
+        steps.set(steps.get() + 1);
+        if c.is_whitespace() {
+            if address.is_empty() {
+                continue;
+            }
+            break;
+        }
+        address.push(*c);
+    }
+    Linked::Link(end, close + 1, address)
+}
+
 /// What the `[` at some index starts.
 enum Linked {
     /// A link: where its words end (the `]`), the index after its `)`, and
@@ -496,51 +591,8 @@ enum Linked {
     Link(usize, usize, String),
     /// Brackets, but no link.
     NotALink,
-    /// No `]` after it at all, so none after a later `[` either.
+    /// No `]` closes it at all.
     NoClose,
-}
-
-/// A link starting at the `[` at `at`.
-fn link(chars: &[char], at: usize) -> Linked {
-    let mut end = at + 1;
-    let mut depth = 0usize;
-    while end < chars.len() {
-        match chars[end] {
-            '\\' => end += 1,
-            '[' => depth += 1,
-            ']' if depth == 0 => break,
-            ']' => depth -= 1,
-            _ => {}
-        }
-        end += 1;
-    }
-    if end >= chars.len() {
-        return Linked::NoClose;
-    }
-    if end == at + 1 || chars.get(end + 1) != Some(&'(') {
-        return Linked::NotALink;
-    }
-    // The address may hold balanced parentheses: `(javascript:alert(1))`.
-    let mut open = 0usize;
-    let mut close = None;
-    for (at, c) in chars.iter().enumerate().skip(end + 2) {
-        match c {
-            '(' => open += 1,
-            ')' if open == 0 => {
-                close = Some(at);
-                break;
-            }
-            ')' => open -= 1,
-            _ => {}
-        }
-    }
-    let Some(close) = close else {
-        return Linked::NotALink;
-    };
-    let inside: String = chars[end + 2..close].iter().collect();
-    // `(address "title")`: the address is up to the first space.
-    let address = inside.split_whitespace().next().unwrap_or_default();
-    Linked::Link(end, close + 1, address.to_owned())
 }
 
 /// The address as a link keeps it: `https`, `http` or `mailto` only.

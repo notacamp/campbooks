@@ -17,6 +17,7 @@ pub mod detach_files;
 pub mod file;
 pub mod forget_member;
 pub mod get;
+pub mod get_sharing;
 pub mod get_table;
 pub mod get_table_sync;
 pub mod import_from_notion;
