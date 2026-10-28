@@ -25,10 +25,10 @@ use crate::{
         drafts::{self, DraftView, check_limits, shown_to_author, tidy},
         format,
         paths::DraftPath,
-        tracked,
+        resources, tracked,
     },
     events::DRAFT_RECORD,
-    model::{Address, AttachmentId, DraftId, DraftState},
+    model::{Address, AttachmentId, DraftId, DraftState, InboxId},
     scopes::ConversationsSend,
     tracking,
 };
@@ -72,6 +72,15 @@ pub struct DraftChanges {
     /// signature for the inbox (campbooks-cloud#393). Absent keeps it as it is.
     #[serde(default)]
     pub signature: Option<bool>,
+    /// Move the draft to another inbox the author may send from
+    /// (campbooks-cloud#394): it is then sent from that inbox's address. A
+    /// reply keeps its `In-Reply-To` and `References` and drops the first
+    /// mailbox's thread key; a signature that was on switches to the
+    /// author's for the new inbox. The inbox must be in this workspace with
+    /// the `sender` or `manager` role and not read-only: a `reader` gets
+    /// 403 `inbox_read_only`, any other inbox 404. Choosing From sends nothing.
+    #[serde(default)]
+    pub inbox_id: Option<InboxId>,
 }
 
 /// Save a draft.
@@ -141,11 +150,15 @@ pub async fn update(
         None => row.body.clone(),
     };
     let quoted = changes.quoted.unwrap_or_else(|| row.quoted.clone());
-    let signature = match changes.signature {
-        Some(false) => String::new(),
-        Some(true) => signature::own(&mut tx, row.inbox_id, access.user).await?,
-        None => row.signature.clone(),
-    };
+    let (moved, signature) = from_and_signature(
+        &state,
+        &mut tx,
+        access,
+        &row,
+        changes.inbox_id,
+        changes.signature,
+    )
+    .await?;
     check_limits(to.len() + cc.len() + bcc.len(), &subject, &body, &quoted)?;
 
     let mut attachments = row.stored_attachments()?;
@@ -166,6 +179,9 @@ pub async fn update(
         attachments = kept;
     }
 
+    if let Some(target) = moved {
+        move_row(&mut tx, id, target).await?;
+    }
     sqlx::query!(
         r#"
         UPDATE conversations.drafts
@@ -197,6 +213,7 @@ pub async fn update(
         || body != row.body
         || quoted != row.quoted
         || signature != row.signature
+        || moved.is_some()
         || attachments != attachments_before
         || row.state()? != DraftState::Draft;
     if edited {
@@ -208,6 +225,49 @@ pub async fn update(
     }
     tx.commit().await?;
     Ok(Json(draft))
+}
+
+/// Put draft `id` in `inbox`. The provider's thread key belongs to the first
+/// mailbox, so it goes; the reply headers stay, and the recipient's mail
+/// still threads the reply.
+async fn move_row(tx: &mut sqlx::PgConnection, id: DraftId, inbox: InboxId) -> Result<()> {
+    sqlx::query("UPDATE conversations.drafts SET inbox_id = $2, thread_key = NULL WHERE id = $1")
+        .bind(id)
+        .bind(inbox)
+        .execute(tx)
+        .await?;
+    Ok(())
+}
+
+/// Where the draft goes from after this save, and the signature it carries.
+///
+/// From is another inbox the author may send from (the catalogue decides: a
+/// reader 403, anything else outside their inboxes 404); `None` when it
+/// stays. The signature follows the author to the new inbox when it was on
+/// (off stays off), unless the save says `true` (the author's current one
+/// for the inbox) or `false` (none).
+async fn from_and_signature(
+    state: &AppState,
+    tx: &mut sqlx::PgConnection,
+    access: &campbooks_kernel::tenancy::Access,
+    row: &drafts::DraftRow,
+    to: Option<InboxId>,
+    signed: Option<bool>,
+) -> Result<(Option<InboxId>, String)> {
+    let moved = to.filter(|target| *target != row.inbox_id);
+    if let Some(target) = moved {
+        resources::authorize(state, tx, access, Action::Send, &resources::inbox(target)).await?;
+    }
+    let inbox = moved.unwrap_or(row.inbox_id);
+    let signature = match signed {
+        Some(false) => String::new(),
+        Some(true) => signature::own(tx, inbox, access.user).await?,
+        None if moved.is_some() && !row.signature.is_empty() => {
+            signature::own(tx, inbox, access.user).await?
+        }
+        None => row.signature.clone(),
+    };
+    Ok((moved, signature))
 }
 
 /// Discard a draft (not one on its way: cancel its send first).
@@ -283,3 +343,6 @@ pub async fn discard(
         .await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

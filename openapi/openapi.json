@@ -25162,6 +25162,17 @@
             ],
             "description": "The `content_token` that came with the draft on screen (its last\nsave's answer, or the draft as read). Every save keeps fields it\ncannot set (the inbox, the reply headers, the attachments' files),\nso every save names what it was shown: missing, another member's, or\nnot the draft as it is now answers 409 `content_changed` and nothing\nis saved (campbooks-cloud#242)."
           },
+          "inbox_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InboxId",
+                "description": "Move the draft to another inbox the author may send from\n(campbooks-cloud#394): it is then sent from that inbox's address. A\nreply keeps its `In-Reply-To` and `References` and drops the first\nmailbox's thread key; a signature that was on switches to the\nauthor's for the new inbox. The inbox must be in this workspace with\nthe `sender` or `manager` role and not read-only: a `reader` gets\n403 `inbox_read_only`, any other inbox 404. Choosing From sends nothing."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "quoted": {
             "type": [
               "string",
