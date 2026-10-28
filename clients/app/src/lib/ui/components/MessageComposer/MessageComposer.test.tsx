@@ -302,6 +302,24 @@ describe("MessageComposer", () => {
     expect(box).not.toHaveTextContent("?");
   });
 
+  // ProseMirror prevents Esc's default in the text, so the shortcut registry
+  // never sees it there: the editor hands it to the composer itself.
+  it("Esc in the text shrinks the sheet, then closes the composer", () => {
+    const onClose = vi.fn();
+    renderUi(<MessageComposer {...props({ onClose, body: "Thursday works." })} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => {
+      box.focus();
+    });
+    fireEvent.keyDown(box, { key: "e", ctrlKey: true, shiftKey: true });
+    expect(box.closest("dialog")).not.toBeNull();
+    fireEvent.keyDown(box, { key: "Escape", keyCode: 27 });
+    expect(box.closest("dialog")).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(box, { key: "Escape", keyCode: 27 });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("hides Expand on a phone", () => {
     vi.stubGlobal("matchMedia", (query: string) => ({
       matches: false,

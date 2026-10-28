@@ -362,17 +362,49 @@ export function MessageComposer({
     }
     if (placed.current) {
       editor.commands.focus();
+      // Focus lands before the moved section's focus listeners are back:
+      // its shortcuts (Esc, ⇧⌘E) stay live across the move.
+      setActive(true);
     }
     placed.current = true;
   }, [open, editor]);
 
-  // Esc is the registry's (it shrinks); the browser's own cancel and a click
-  // on the scrim (the dialog itself, outside the composer) shrink it too.
+  // The sheet owns Esc from its fields too: the page under a modal dialog is
+  // inert, so Esc goes to the sheet, before the shortcut registry (where the
+  // reader's own Esc might sit on top). The browser's own cancel and a click
+  // on the backdrop shrink it too.
+  // Esc closes the link form first, then shrinks the sheet, then closes the
+  // composer (keeping the draft): from the text, the sheet or the registry.
+  function onEscape() {
+    if (link !== null) {
+      closeLink();
+    } else if (open) {
+      shrink();
+    } else {
+      onClose();
+    }
+  }
+  const escape = useRef(onEscape);
+  useEffect(() => {
+    escape.current = onEscape;
+    Object.assign((editor.storage as unknown as Record<string, object>)["composerSend"] ?? {}, {
+      escape: () => {
+        escape.current();
+      },
+    });
+  });
   useEffect(() => {
     const frame = frameRef.current;
     if (frame === null) {
       return;
     }
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.isComposing && !event.defaultPrevented) {
+        event.preventDefault();
+        event.stopPropagation();
+        escape.current();
+      }
+    };
     const cancel = (event: Event) => {
       event.preventDefault();
       shrink();
@@ -382,9 +414,11 @@ export function MessageComposer({
         shrink();
       }
     };
+    frame.addEventListener("keydown", key);
     frame.addEventListener("cancel", cancel);
     frame.addEventListener("click", scrim);
     return () => {
+      frame.removeEventListener("keydown", key);
       frame.removeEventListener("cancel", cancel);
       frame.removeEventListener("click", scrim);
     };
@@ -406,22 +440,10 @@ export function MessageComposer({
     },
     { enabled: active && wide },
   );
-  useShortcut(
-    "overlay.close",
-    () => {
-      if (link !== null) {
-        closeLink();
-      } else if (open) {
-        shrink();
-      } else {
-        onClose();
-      }
-    },
-    { enabled: active },
-  );
+  useShortcut("overlay.close", onEscape, { enabled: active });
 
   // Its shortcuts are live while focus is anywhere inside it.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const section = sectionRef.current;
     if (section === null) {
       return;

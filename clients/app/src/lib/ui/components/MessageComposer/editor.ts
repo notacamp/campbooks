@@ -57,17 +57,26 @@ export function composerExtensions(): Extensions {
   const send = () => {
     // Replaced by the composer once it has the editor (see `onSend` there).
   };
-  // ⌘↵ would split the block here (TipTap binds it): it sends instead.
+  const escape = () => {
+    // Replaced by the composer, as `send` is.
+  };
+  // ⌘↵ would split the block here (TipTap binds it): it sends instead. Esc
+  // never reaches the shortcut registry from the text (ProseMirror prevents
+  // its default), so the editor hands it to the composer itself.
   const Send = Extension.create({
     name: "composerSend",
     priority: 1000,
     addStorage() {
-      return { send };
+      return { send, escape };
     },
     addKeyboardShortcuts() {
       return {
         "Mod-Enter": () => {
           this.storage.send();
+          return true;
+        },
+        Escape: () => {
+          this.storage.escape();
           return true;
         },
       };
