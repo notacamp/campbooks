@@ -26,8 +26,22 @@
     "format": {
       "bold": "Bold",
       "italic": "Italic",
+      "strike": "Strikethrough",
+      "link": "Link",
       "bullets": "Bulleted list",
-      "numbers": "Numbered list"
+      "numbers": "Numbered list",
+      "quote": "Quote"
+    },
+    "moreFormatting": "More formatting",
+    "link": {
+      "title": "Add a link",
+      "words": "Words",
+      "address": "Address",
+      "add": "Add link",
+      "update": "Update link",
+      "remove": "Remove link",
+      "cancel": "Cancel",
+      "refused": "Only web and email addresses can be linked."
     },
     "showQuoted": "Show quoted text",
     "hideQuoted": "Hide quoted text",
@@ -36,7 +50,9 @@
     "removeAttachment": "Remove {{name}}",
     "discard": "Discard",
     "send": "Send",
-    "close": "Close"
+    "close": "Close",
+    "expand": "Expand",
+    "shrink": "Shrink"
   },
   "attachments": {
     "label": "Attachments",

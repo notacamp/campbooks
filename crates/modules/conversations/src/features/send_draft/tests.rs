@@ -970,3 +970,43 @@ async fn the_assistant_never_takes_back_a_send_the_member_made(db: PgPool) {
     window_ends(&kit).await;
     assert_eq!(kit.events("conversations.send_requested").await.len(), 1);
 }
+
+/// The assistant's words never carry a link whose words hide where it goes
+/// (campbooks-cloud#390): `[` and `]` it writes are kept as text, in a new
+/// draft and in a save.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistants_words_carry_no_worded_link(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, _sam) = kit.sams_inbox().await;
+    let message = kit.message_of("en-1").await;
+    let lure = "Pay [here](https://example.net/pay) today.";
+    let written = kit
+        .as_assistant(
+            "sam",
+            workspace,
+            (
+                "conversations.create_draft",
+                json!({"kind": "reply", "message_id": message, "body": lure}),
+            ),
+            false,
+        )
+        .await
+        .unwrap();
+    let plain = r"Pay \[here\](https://example.net/pay) today.";
+    assert_eq!(written.body["body"], plain, "{}", written.body);
+    let id = written.body["id"].as_str().unwrap().to_owned();
+    let saved = kit
+        .as_assistant(
+            "sam",
+            workspace,
+            (
+                "conversations.update_draft",
+                json!({"draft_id": id, "version": written.body["version"],
+                    "content_token": written.body["content_token"], "body": lure}),
+            ),
+            false,
+        )
+        .await
+        .unwrap();
+    assert_eq!(saved.body["body"], plain, "{}", saved.body);
+}

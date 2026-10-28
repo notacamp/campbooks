@@ -692,6 +692,64 @@ export const ScoutIsntSurePhoneRecording: Story = {
   ...at("phone", 375, 812),
 };
 
+// A shared mailbox (campbooks-cloud#379): Ana wrote to "Geral"
+// <geral@aguas-ribatejo.example>. The server names a role address for its
+// organisation, so the card reads "Nudge Aguas Ribatejo", not "Nudge Geral".
+const ROLE_PARTY = { name: "Aguas Ribatejo", address: "geral@aguas-ribatejo.example" };
+const COPIED_ROLE = {
+  ...COPIED,
+  need: COPIED.need && {
+    ...COPIED.need,
+    unsure: COPIED.need.unsure && {
+      ...COPIED.need.unsure,
+      others: [ROLE_PARTY],
+      party: ROLE_PARTY,
+    },
+  },
+};
+
+function copiedRole(): Record<string, MockRoute> {
+  return {
+    ...copied(),
+    [`GET ${W}/conversations`]: {
+      body: { conversations: [COPIED_ROLE, ...NEEDS, SOFIA], next_cursor: null },
+    },
+    [`GET ${W}/conversations/${COPIED.id}`]: {
+      body: {
+        ...COPIED_DETAIL,
+        conversation: COPIED_ROLE,
+        messages: COPIED_DETAIL.messages.map((m) => ({
+          ...m,
+          to: [{ name: "Geral", address: ROLE_PARTY.address }],
+        })),
+      },
+    },
+  };
+}
+
+/** The mail went to a shared mailbox shown as "Geral": the card names its organisation. */
+export const ScoutIsntSureSharedMailbox: Story = {
+  args: { path: PATH, api: copiedRole() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const line = await canvas.findByText("Ana Costa wrote to Aguas Ribatejo. You’re in Cc.");
+    await userEvent.click(line);
+    const actions = await canvas.findByRole("group", { name: "Actions for Ana Costa" });
+    await expect(
+      within(actions).getByRole("button", { name: /^Nudge Aguas Ribatejo…/u }),
+    ).toBeVisible();
+  },
+};
+
+export const ScoutIsntSureSharedMailboxRecording: Story = {
+  args: { path: PATH, api: copiedRole() },
+};
+
+export const ScoutIsntSureSharedMailboxPhoneRecording: Story = {
+  args: { path: PATH, api: copiedRole() },
+  ...at("phone", 375, 812),
+};
+
 // Invitations awaiting Sam's answer (campbooks-cloud#360), on the same
 // demo day: a webinar tomorrow from a service, while the furniture is
 // delivered (busy then), and Beatriz's offsite planning on Thursday (free

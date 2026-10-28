@@ -8621,8 +8621,9 @@ export interface components {
             in_to: boolean;
             /**
              * @description Who else the email went to, `To` before `Cc`, as the headers gave
-             *     them: without the inbox, the sender, and no-reply or service
-             *     addresses; at most six.
+             *     them: without the inbox, the sender and addresses that cannot answer
+             *     (no-reply, bounce); at most six. A role address stays. Each is named
+             *     by its header name, else its organisation, else its address.
              */
             others: components["schemas"]["Address"][];
             party?: components["schemas"]["Address"] | null;

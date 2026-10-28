@@ -40,9 +40,11 @@ import { useNudgeText, writeNudge } from "../../api/replies";
 import {
   addressLine,
   firstName,
+  literalLinks,
   MAX_ASK_CHARS,
   quotePreview,
   quoteWords,
+  shownLinks,
   undoWindow,
 } from "../../compose/dialog";
 import { displayName, replyQuote } from "../../compose/quote";
@@ -202,7 +204,9 @@ export function NudgeDialog({
     { enabled: resume === undefined },
   );
   // What the member has on screen once they (or a rewrite) changed it.
-  const [edited, setEdited] = useState<string | undefined>(resume?.draft.body);
+  const [edited, setEdited] = useState<string | undefined>(
+    resume === undefined ? undefined : shownLinks(resume.draft.body),
+  );
   const text = edited ?? scout.data ?? "";
   // A draft the next one replaces (the one an Undo handed back, or one that
   // changed after it was saved): discarded once the new one exists.
@@ -291,7 +295,7 @@ export function NudgeDialog({
     // No To or Cc: the server addresses a nudge, and keeps its addressing
     // when the draft is saved again.
     const content = {
-      body,
+      body: literalLinks(body),
       quoted: replyQuote(answered, i18n.language, words),
       bcc: [],
     };
@@ -461,7 +465,7 @@ export function NudgeDialog({
     working.current = true;
     setBusy(true);
     try {
-      await deleteWithUndo({ ...deletable, body: text });
+      await deleteWithUndo({ ...deletable, body: literalLinks(text) });
       onClose();
     } catch {
       setProblem("errors.delete");

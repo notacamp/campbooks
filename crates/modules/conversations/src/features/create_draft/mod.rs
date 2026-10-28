@@ -29,7 +29,7 @@ use crate::{
             self, AttachmentSource, DraftView, MAX_REFERENCES, StoredAttachment, check_limits,
             decode, tidy,
         },
-        tracked,
+        format, tracked,
     },
     events::DRAFT_RECORD,
     model::{Address, AttachmentId, ConversationId, DraftId, DraftKind, InboxId, MessageId},
@@ -147,7 +147,14 @@ pub async fn handler(
     };
     let [to, cc, bcc] = tidy([to, cc, body.bcc.unwrap_or_default()]);
     let subject = body.subject.unwrap_or(filled.subject);
+    // The assistant's words never carry a link whose words hide where it
+    // goes: only the member's own request writes `[words](url)`.
     let text = body.body.unwrap_or_default();
+    let text = if workspace.invoked_by.is_some() {
+        format::literal_links(&text)
+    } else {
+        text
+    };
     let quoted = body.quoted.unwrap_or_default();
     check_limits(to.len() + cc.len() + bcc.len(), &subject, &text, &quoted)?;
 

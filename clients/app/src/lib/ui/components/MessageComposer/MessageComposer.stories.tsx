@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Editor } from "@tiptap/core";
 import { useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 
@@ -184,6 +185,39 @@ export const NewMessage: Story = {
   args: { title: "New message", to: [], quoted: undefined, subject: "", focus: "to", status: "" },
 };
 
+/** A reply with formatting: bold, a link with words, a list and a struck word. */
+export const FormattedReply: Story = {
+  args: {
+    body: "I will **renew for a year** and read [the lease](https://example.com/lease).\n\n- parking P2-14\n- rent on the ~~5th~~ 1st",
+  },
+};
+
+/** At 375px the toolbar stays one row: Strikethrough, Numbers and Quote fold into More. */
+export const Narrow: Story = {
+  args: { body: "Thursday works for me." },
+  decorators: [
+    (Story) => (
+      <div style={{ width: "375px" }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "More formatting" })).toBeVisible();
+  },
+};
+
+/** ⇧⌘E (Ctrl+Shift+E) opens the same draft as a sheet; Esc puts it back. */
+export const Expanded: Story = {
+  args: { body: "Thursday works for me." },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }));
+    await expect(canvas.getByRole("button", { name: "Shrink" })).toBeVisible();
+  },
+};
+
 export const CannotSend: Story = {
   args: { error: "Your mail provider refused this message. Check the addresses and try again." },
 };
@@ -196,11 +230,13 @@ export const Sending: Story = {
 export const WriteAndSend: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    const box = canvas.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-    await userEvent.type(box, "Thursday works.");
-    box.setSelectionRange(0, 8);
+    const box = canvas.getByRole("textbox", { name: "Message" });
+    // Typed, then selected as a drag would (the editor sits on its element;
+    // userEvent's typing drops keys in a ProseMirror editor).
+    const editor = (box as HTMLElement & { editor: Editor }).editor;
+    editor.chain().focus().insertContent("Thursday works.").selectAll().run();
     await userEvent.click(canvas.getByRole("button", { name: "Bold" }));
-    await expect(box).toHaveValue("**Thursday** works.");
+    await expect(box.querySelector("strong")).toHaveTextContent("Thursday works.");
     await userEvent.click(canvas.getByRole("button", { name: "Show quoted text" }));
     await expect(canvas.getByRole("textbox", { name: "Quoted text" })).toBeVisible();
     await userEvent.click(box);
