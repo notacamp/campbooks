@@ -1277,6 +1277,16 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "pages.resolve_table_conflict" => json!({"keep": "ours"}),
         // The bytes of a file: this text.
         "pages.upload_file" => json!({"file": "matrix"}),
+        // Mail and Scout in pages (campbooks-cloud#364): a section, the
+        // seeded message's attachment, and the seeded file.
+        "pages.append" => json!({"markdown": "Matrix section"}),
+        "pages.unappend" => json!({"append_id": Uuid::now_v7().to_string()}),
+        "pages.attach_from_message" => json!({
+            "conversation": world.instances["conversations.conversation"],
+            "message": world.instances["conversations.message"],
+            "attachments": [world.instances["conversations.attachment"]],
+        }),
+        "pages.detach_files" => json!({"files": [world.instances["pages.file"]]}),
         // Tables: a table, its select property, a row and a view are seeded.
         "pages.create_table" => json!({"title": "Matrix table"}),
         "pages.add_property" => json!({"name": "Notes", "type": "text"}),
@@ -1462,6 +1472,15 @@ fn expected(
     // One of Scout's suggestions reads as the list shows it: a member who
     // only reads its inbox is never shown it, so it is not there for them.
     if id == "conversations.get_rule_notice" && decision == Decision::Forbidden {
+        return Decision::NotFound;
+    }
+    // Saving a message's attachment to a page needs the right to write the
+    // page and to read the message: a caller who may not read that inbox is
+    // answered as for an attachment that does not exist.
+    if id == "pages.attach_from_message"
+        && decision == Decision::Allow
+        && who.inbox_role().is_none()
+    {
         return Decision::NotFound;
     }
     // Importing from Notion goes through a Notion connection of the caller's

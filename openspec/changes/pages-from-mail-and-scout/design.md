@@ -142,3 +142,63 @@ not opted in for direct assistant calls: Scout can only *propose* them.
   - `page_proposal_settled` (`action`: `append_section` | `new_page`,
     `outcome`: `accepted` | `discarded` | `undone`).
 - Coverage rows for the four new operations and the port.
+
+## Deviations while building (part 1)
+
+The design was written before pages shipped (#672, #680, #681, #685). Checked
+against the code on `next` (task 0.3), what differs:
+
+- **Routes carry the page in the path**, as every pages operation does:
+  `POST …/pages/{page_id}/append`, `…/unappend`, `…/files/from-message`,
+  `…/files/detach` and `GET …/pages/{page_id}/text`. The bodies drop `page`.
+- **A file has no id of its own** (`pages.files` is keyed by page and blob
+  hash), so `pages.detach_files` takes blob hashes and answers
+  `{ removed, kept }`. It removes only files that came from a message (a new
+  `source_type`/`source_id` on `pages.files`, migration `20261114010000`) and
+  that no block names; a file the member uploaded is never touched.
+- **`AttachmentBlobs`** answers `{ blob, filename }` (the type and size are on
+  the `BlobRef`), takes `&AppState` and plain `Uuid`s, and is implemented by
+  `conversations` with the same catalogue `read` on `conversations.attachment`
+  and inbox membership as `conversations.get_attachment`, then the same join on
+  message and conversation. `pages.attach_from_message` also refuses a table,
+  a trashed page and a file over 20 MiB (413 `file_too_large`).
+- **`attach_from_message` announces nothing**: it changes no block. The file
+  blocks reach the page through `pages.sync`, which announces the body change.
+- **`pages.list` gains no `q`.** The search index already holds pages (ADR
+  0016) and answers only what the caller may read, so `find_pages` asks
+  `search.query`, keeps the `pages.page` hits and reads titles, places and
+  dates from `pages.list` (tables left out). `pages.list` is opted in with
+  `.assistant()`.
+- **`.assistant()` on `pages.append`, `pages.unappend`, `pages.create` and
+  `pages.trash`.** The catalogue's convention, checked by the assistant's tests,
+  is that an operation a proposal may build carries `.assistant()` (Low risk).
+  The server still never runs one for a chat: `invoke` refuses a mutating
+  operation without an idempotency key, and `Member::read` carries none.
+- **`pages.append`'s `sources`** end the section as a paragraph of mentions, so
+  they are links and backlinks. The pages module checks them structurally (a
+  record type and id a page may point at, at most ten); that the member can read
+  each one is checked by Scout when the proposal is stored. `pages.create` takes
+  `markdown` and `sources` too, off while the flag is off (404).
+- **`pages.unappend` is idempotent**: an `append_id` that is unknown, belongs to
+  another page or was taken back already answers 200 with nothing removed. An
+  append is remembered in `pages.appends` as block ids and content hashes (no
+  text). A list item is the unit inside a list.
+- **Markdown** is a small fixed subset read line by line (`domain::markdown`);
+  lists are one level (indentation is read but not kept), and an image, a table
+  or a footnote is plain text. Blocks are made with the Notion block builder, so
+  a synced page sends an append like any edit.
+- **`pages.read_text`** answers `{ markdown, truncated }` and 409 for a page in
+  the trash. `find_pages` and `read_page` add no operation of their own.
+- **Scout's proposal** keeps its page facts in `ChatProposal.page` and the
+  Markdown and sources in `detail`; `new_page`'s `parent_id` must be a private
+  page the member can write. Store-time caps are the 16 KiB of Markdown and the
+  ten sources; the page parser itself runs when the member confirms.
+- **The flag reaches the assistant** as `AssistantDeps.pages`, set from the
+  pages module's switch by the server, which composes the pages handbook section
+  only while it is on.
+- **Tracked events**: this part tracks `pages.files_attached` and
+  `pages.section_appended` (patch 0020), and adds `find_pages`, `read_page`,
+  `append_section` and `new_page` to the assistant's tool and action enums, so
+  settling a page card is tracked by the existing proposal event.
+  `thread_saved_to_page` and `page_proposal_settled` are the client's, in part
+  2. The port is not a Coverage subject: Coverage rows are the five operations.
