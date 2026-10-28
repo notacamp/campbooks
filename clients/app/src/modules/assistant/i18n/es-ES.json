@@ -425,6 +425,13 @@
     "taskWho": "¿Quién podría encargarse?",
     "taskLine": "Tarea: {{title}}",
     "unreadableTask": "Scout no puede abrir un chat sobre esta tarea.",
-    "gone": "Este chat ya no está."
+    "gone": "Este chat ya no está.",
+    "pageLine": "Página: {{title}}",
+    "pageUntitled": "Sin título",
+    "unreadablePage": "Scout no puede abrir un chat sobre esta página.",
+    "pageIntro": "Pregúntame sobre esta página.",
+    "pageOpen": "¿Qué sigue abierto en esta página?",
+    "pageSummary": "Resumir esta página",
+    "pageNext": "¿Qué debo hacer a continuación aquí?"
   }
 }

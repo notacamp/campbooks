@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -22,14 +23,17 @@ import {
   ReaderFooter,
   SkeletonList,
   Text,
+  useUndoToast,
   Visor,
   type OverflowAction,
 } from "~/lib/ui";
+import { SaveToPageDialog, useMailScoutAvailable, type SaveThread } from "~/modules/pages";
 import { MakeTaskForm, useReplyQuestion } from "~/modules/tasks";
 
 import {
   useConversation,
   useInboxes,
+  withWords,
   type ConversationPlace,
   type ConversationSummary,
   type MessageView,
@@ -62,6 +66,7 @@ import {
   unsureOf,
   warningReasons,
 } from "../../needs";
+import { saveThreadOf } from "../../save-thread";
 import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 import { ruleLine } from "../../rules-text";
 import { useNeedActions } from "../Needs/use-need-actions";
@@ -142,6 +147,7 @@ export function ConversationReader({
   const t = typed as unknown as Translate;
   const { t: tShortcuts } = useTranslation("shortcuts");
   const { t: tTasks } = useTranslation("tasks");
+  const { t: tPages } = useTranslation("pages");
   const query = useConversation(workspaceId, conversationId);
   const detail = query.data;
   const conversation = detail?.conversation;
@@ -256,6 +262,11 @@ export function ConversationReader({
   const [moving, setMoving] = useState(false);
   // "Make it a task": the inline form under the subject.
   const [makingTask, setMakingTask] = useState(false);
+  // Save to page (campbooks-cloud#364): only while the server offers it.
+  const mailScout = useMailScoutAvailable(workspaceId) === true;
+  const [savingThread, setSavingThread] = useState<SaveThread | undefined>();
+  const queryClient = useQueryClient();
+  const undoToast = useUndoToast();
   const [reply, setReply] = useState<ReplyRequest | null>(null);
   // Reply first asks Scout (the reply dialog).
   const [replying, setReplying] = useState<{ opened: number } | undefined>();
@@ -420,6 +431,26 @@ export function ConversationReader({
     // Asking changes nothing: a reader of the inbox asks too.
     { enabled: scout !== undefined && conversation !== undefined },
   );
+  /** Save to page: the messages' words first (some come later), then the dialog. */
+  const saveToPage = () => {
+    if (conversation === undefined || !mailScout || savingThread !== undefined) {
+      return;
+    }
+    void Promise.all(
+      messages.map((message) => withWords(queryClient, workspaceId, conversation.id, message)),
+    ).then(
+      (whole) => {
+        setSavingThread(saveThreadOf(conversation.id, conversation.subject, whole));
+      },
+      () => {
+        undoToast.fail({ label: tPages("saveToPage.readFailed") });
+      },
+    );
+  };
+  // ⇧P: save this thread to a page (only while the server offers it).
+  useShortcut("pages.save_thread", saveToPage, {
+    enabled: conversation !== undefined && mailScout && !binned && savingThread === undefined,
+  });
   const viewing = conversation !== undefined;
   // Remote images never load in spam.
   useShortcut("inbox.show_images", showAllImages, { enabled: viewing && !inSpam });
@@ -670,6 +701,16 @@ export function ConversationReader({
         },
       ]
     : [];
+  // Saving changes no mail: offered to a reader of the inbox too.
+  if (mailScout && !binned) {
+    moreActions.push({
+      id: "save-to-page",
+      label: tPages("shortcuts.saveThread"),
+      icon: "document",
+      shortcut: "pages.save_thread",
+      onSelect: saveToPage,
+    });
+  }
   // Asking changes nothing: offered to a reader of the inbox too.
   if (scout !== undefined) {
     moreActions.push({
@@ -751,6 +792,16 @@ export function ConversationReader({
             ]}
           />
         </div>
+        {savingThread === undefined ? null : (
+          <SaveToPageDialog
+            workspaceId={workspaceId}
+            thread={savingThread}
+            open
+            onClose={() => {
+              setSavingThread(undefined);
+            }}
+          />
+        )}
         {makingTask ? (
           <MakeTaskForm
             key={conversation.id}

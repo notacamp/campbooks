@@ -425,6 +425,13 @@
     "taskWho": "Qui pourrait la prendre ?",
     "taskLine": "Tâche : {{title}}",
     "unreadableTask": "Scout ne peut pas ouvrir de discussion sur cette tâche.",
-    "gone": "Cette discussion n’existe plus."
+    "gone": "Cette discussion n’existe plus.",
+    "pageLine": "Page : {{title}}",
+    "pageUntitled": "Sans titre",
+    "unreadablePage": "Scout ne peut pas ouvrir une conversation sur cette page.",
+    "pageIntro": "Posez-moi vos questions sur cette page.",
+    "pageOpen": "Qu’est-ce qui reste ouvert sur cette page ?",
+    "pageSummary": "Résumer cette page",
+    "pageNext": "Que dois-je faire ensuite ici ?"
   }
 }

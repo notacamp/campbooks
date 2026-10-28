@@ -425,6 +425,13 @@
     "taskWho": "Quem poderia ficar com isto?",
     "taskLine": "Tarefa: {{title}}",
     "unreadableTask": "O Scout não consegue abrir uma conversa sobre esta tarefa.",
-    "gone": "Esta conversa já não existe."
+    "gone": "Esta conversa já não existe.",
+    "pageLine": "Página: {{title}}",
+    "pageUntitled": "Sem título",
+    "unreadablePage": "O Scout não consegue abrir uma conversa sobre esta página.",
+    "pageIntro": "Pergunte-me sobre esta página.",
+    "pageOpen": "O que ainda está em aberto nesta página?",
+    "pageSummary": "Resumir esta página",
+    "pageNext": "O que devo fazer a seguir aqui?"
   }
 }

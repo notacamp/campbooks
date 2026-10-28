@@ -425,6 +425,13 @@
     "taskWho": "Who could take this?",
     "taskLine": "Task: {{title}}",
     "unreadableTask": "Scout can’t open a chat about this task.",
-    "gone": "This chat is no longer here."
+    "gone": "This chat is no longer here.",
+    "pageLine": "Page: {{title}}",
+    "pageUntitled": "Untitled",
+    "unreadablePage": "Scout can’t open a chat about this page.",
+    "pageIntro": "Ask me about this page.",
+    "pageOpen": "What is still open on this page?",
+    "pageSummary": "Summarise this page",
+    "pageNext": "What should I do next here?"
   }
 }
