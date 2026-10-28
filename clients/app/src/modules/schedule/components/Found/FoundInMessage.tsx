@@ -13,7 +13,17 @@ import {
 } from "../../api/queries";
 import { SCOUT_KINDS, type EventKind, type ReadItem, type ScoutKind } from "../../api/types";
 import type { T } from "../../labels";
-import { addDays, canPush, clock, dayLong, dayOf, isShown, minutesOf, nowIn } from "../../model";
+import {
+  addDays,
+  canPush,
+  clock,
+  dayLong,
+  dayOf,
+  isShown,
+  minutesOf,
+  nowIn,
+  takesTime,
+} from "../../model";
 import { AddToCalendar } from "../Calendar/AddToCalendar";
 import { EventDialog, type EventDraft } from "../Calendar/EventDialog";
 
@@ -188,7 +198,7 @@ function FoundEvent({
     (each) => isShown(each) && each.item_keys.includes(item.key),
   );
   const list = calendars.data ?? [];
-  const writable = list.filter((each) => each.source === "provider" && each.writable);
+  const writable = list.filter(takesTime);
   const when = item.all_day
     ? dayLong(locale, day)
     : `${dayLong(locale, day)}, ${clock(locale, minutesOf(item.starts))}`;
