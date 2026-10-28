@@ -60,27 +60,18 @@ async function row(index: number): Promise<HTMLElement> {
 }
 
 describe("MailboxesPage", () => {
-  it("gives each mailbox you can send from a signature editor (campbooks-cloud#393)", async () => {
-    const inbox = {
-      id: "0192f1a0-0000-7000-8000-0000000000b1",
-      channel: "email",
-      address: "ana@example.com",
-      role: "sender",
-      read_only: false,
-      unread_count: 0,
-      shared: false,
-    };
-    api([CONNECTION], {
-      [`GET /bff/api/v1/w/${DUARTE.id}/inboxes`]: { body: { inboxes: [inbox] } },
-      [`GET /bff/api/v1/w/${DUARTE.id}/inboxes/${inbox.id}/signature`]: {
-        body: { text: "Ana Costa" },
-      },
-    });
-    renderPage();
+  it("shows the signatures the app hands it, under their own heading (campbooks-cloud#393)", async () => {
+    api([CONNECTION]);
+    renderPage({ signatures: <p>Signature editors</p> });
     expect(await screen.findByRole("heading", { name: "Your signature" })).toBeVisible();
-    expect(
-      await screen.findByRole("textbox", { name: "Your signature for ana@example.com" }),
-    ).toHaveTextContent("Ana Costa");
+    expect(screen.getByText("Signature editors")).toBeVisible();
+  });
+
+  it("has no signature section when it is given none", async () => {
+    api([CONNECTION]);
+    renderPage();
+    await row(0);
+    expect(screen.queryByRole("heading", { name: "Your signature" })).toBeNull();
   });
 
   it("lists each mailbox with who connected it and how it is doing", async () => {

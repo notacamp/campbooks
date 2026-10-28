@@ -663,8 +663,11 @@ export const DraftsViewPhone: Story = { ...drafts, ...at("phone", 375, 812) };
  * memory): the roomier composer in place, for recordings (campbooks-cloud#390).
  */
 function replyDraftOpen(): Record<string, MockRoute> {
+  // Sam's signature for the mailbox: a new draft carries it (campbooks-cloud#393).
+  const signature = "**Sam Rivera**\nRivera Lettings";
   let draft: Draft = {
     ...REPLY_WRITTEN,
+    signature,
     body: "Thanks, Maya. I will go through **the plan on Thursday** and send you my notes.",
   };
   return inbox({
@@ -672,18 +675,25 @@ function replyDraftOpen(): Record<string, MockRoute> {
     [`GET ${W}/drafts/${draft.id}`]: () => ({ body: draft }),
     [`PATCH ${W}/drafts/${draft.id}`]: (changes) => {
       // A save names the attachments to keep, by id.
-      const { attachments: keep, ...rest } = changes as Partial<Omit<Draft, "attachments">> & {
+      const {
+        attachments: keep,
+        signature: on,
+        ...rest
+      } = changes as Partial<Omit<Draft, "attachments" | "signature">> & {
         attachments?: string[] | null;
+        signature?: boolean | null;
       };
       draft = {
         ...draft,
         ...rest,
+        signature: on == null ? (draft.signature ?? "") : on ? signature : "",
         attachments:
           keep == null ? draft.attachments : draft.attachments.filter((a) => keep.includes(a.id)),
         version: draft.version + 1,
       };
       return { body: draft };
     },
+    [`GET ${W}/inboxes/${INBOX.id}/signature`]: { body: { text: signature } },
     // Send, now or later: scheduled until `send_at`; Undo takes it back.
     [`POST ${W}/drafts/${draft.id}/send`]: (body) => {
       const { send_at: at } = body as { send_at?: string | null };
@@ -715,6 +725,19 @@ function replyDraftOpen(): Record<string, MockRoute> {
 }
 export const ReplyDraftOpen: Story = {
   args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
+};
+
+/** The open reply carries Sam's signature under the text: Leave off, then Add signature. */
+export const ReplyDraftSignature: Story = {
+  args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const group = await canvas.findByRole("group", { name: "Signature" });
+    await expect(within(group).getByText("Rivera Lettings")).toBeVisible();
+    await userEvent.click(within(group).getByRole("button", { name: "Leave off" }));
+    await userEvent.click(await within(group).findByRole("button", { name: "Add signature" }));
+    await expect(await within(group).findByText("Rivera Lettings")).toBeVisible();
+  },
 };
 
 /** Attaching to the open reply: a file picked is listed with its name, size and the total. */

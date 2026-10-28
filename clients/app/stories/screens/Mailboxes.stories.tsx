@@ -1,3 +1,4 @@
+import type { Editor } from "@tiptap/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import type { Meta, StoryObj } from "@storybook/react-vite";
@@ -214,6 +215,31 @@ function AppAt({ path }: { path: string }) {
   );
 }
 
+/**
+ * Your signatures (campbooks-cloud#393): the mailboxes you can send from, and
+ * what is kept for each, held in memory.
+ */
+function signatures(kept = "") {
+  let text = kept;
+  const inbox = {
+    id: "0192f1a0-0000-7000-8000-0000000000b1",
+    channel: "email",
+    address: "ana@example.com",
+    role: "manager",
+    read_only: false,
+    unread_count: 0,
+    shared: false,
+  };
+  return {
+    [`GET ${W}/inboxes`]: { body: { inboxes: [inbox] } },
+    [`GET ${W}/inboxes/${inbox.id}/signature`]: () => ({ body: { text } }),
+    [`PUT ${W}/inboxes/${inbox.id}/signature`]: (body: unknown) => {
+      text = (body as { text: string }).text;
+      return { body: { text } };
+    },
+  } satisfies Record<string, MockRoute>;
+}
+
 interface ScreenArgs {
   path: string;
   api: Record<string, MockRoute>;
@@ -243,6 +269,20 @@ export const EveryHealth: Story = {
     await expect(connect).toHaveAttribute("aria-keyshortcuts", "Shift+C");
     const reconnect = canvas.getByRole("button", { name: "Reconnect ana.duarte@example.net" });
     await expect(reconnect).toHaveAttribute("aria-keyshortcuts", "R");
+  },
+};
+
+/** Your signature for each mailbox you can send from: edit, Save, "Signature saved". */
+export const YourSignature: Story = {
+  args: { path: PAGE, api: { ...signedIn({}), ...signatures("**Ana Duarte**\nDuarte & Pessoa") } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const box = await canvas.findByRole("textbox", { name: "Your signature for ana@example.com" });
+    await expect(box.querySelector("strong")).toHaveTextContent("Ana Duarte");
+    const editor = (box as HTMLElement & { editor: Editor }).editor;
+    editor.chain().focus().insertContent(" · Lisbon").run();
+    await userEvent.click(canvas.getByRole("button", { name: "Save" }));
+    await expect(await within(document.body).findByText("Signature saved")).toBeVisible();
   },
 };
 

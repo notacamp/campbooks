@@ -55,7 +55,7 @@ describe("SignatureSettings", () => {
     await waitFor(() => {
       expect(api.calls.filter((call) => call.route.startsWith("PUT"))).toHaveLength(2);
     });
-    expect(api.calls.filter((call) => call.route.startsWith("PUT")).at(-1)?.body).toEqual({
+    expect(api.calls.findLast((call) => call.route.startsWith("PUT"))?.body).toEqual({
       text: "Sam Rivera · Rivers Lettings",
     });
   });
