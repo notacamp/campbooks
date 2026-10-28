@@ -75,8 +75,8 @@ pub use domain::{
     policy::{Policy, Switch},
 };
 pub use features::{
-    inbox_visibility::visibility, kept_mail::kept_mail, outbound_requests::outbound_requests,
-    search_source::search_source,
+    attachment_blobs::attachment_blobs, inbox_visibility::visibility, kept_mail::kept_mail,
+    outbound_requests::outbound_requests, search_source::search_source,
 };
 /// The owner's money mail as an eval set to label (campbooks-cloud#167).
 pub mod labelling {
@@ -218,6 +218,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
         background: Background::new()
             .publishes::<events::MessageReceived>()
             .publishes::<events::MessageSent>()
+            .publishes::<events::MemberReplied>()
             .publishes::<events::ConversationChanged>()
             .publishes::<events::ChangesRequested>()
             .publishes::<events::SendRequested>()

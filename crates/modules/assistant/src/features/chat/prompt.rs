@@ -161,11 +161,11 @@ pub fn messages(
 
 /// One model call over `messages`: with the tools, or, after the last
 /// round, told to answer without them.
-pub fn request(messages: &[Message], with_tools: bool) -> ChatRequest {
+pub fn request(messages: &[Message], with_tools: bool, pages: bool) -> ChatRequest {
     let mut request = ChatRequest::new(messages.to_vec());
     request.temperature = Some(0.3);
     request.max_tokens = Some(MAX_TOKENS);
-    request.tools = tools::definitions();
+    request.tools = tools::definitions(pages);
     request.tool_choice = Some(if with_tools {
         ToolChoice::Auto
     } else {
@@ -300,10 +300,10 @@ mod tests {
 
     #[test]
     fn the_last_round_answers_without_tools() {
-        let with = request(&[Message::user("q")], true);
+        let with = request(&[Message::user("q")], true, false);
         assert_eq!(with.tool_choice, Some(ToolChoice::Auto));
         assert_eq!(with.max_tokens, Some(MAX_TOKENS));
-        let without = request(&[Message::user("q")], false);
+        let without = request(&[Message::user("q")], false, false);
         assert_eq!(without.tool_choice, Some(ToolChoice::None));
     }
 }

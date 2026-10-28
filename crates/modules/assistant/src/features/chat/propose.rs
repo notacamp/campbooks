@@ -14,8 +14,10 @@
 //! the record's values read when the proposal is checked (the catalogue
 //! forbids an operation naming itself as its undo). Tasks add their rows
 //! (campbooks-cloud#43, `propose_task_change`); calendar events add theirs
-//! (campbooks-cloud#42, `propose_event_change`). The three-per-answer cap and the dedupe are shared
-//! by every proposing tool.
+//! (campbooks-cloud#42, `propose_event_change`); pages add theirs
+//! (campbooks-cloud#364, `propose_page_change`, only while mail and Scout work
+//! with pages). The three-per-answer cap and the dedupe are shared by every
+//! proposing tool.
 
 use campbooks_ai::{ToolCall, ToolDefinition};
 use campbooks_kernel::RecordRef;
@@ -25,8 +27,9 @@ use serde_json::{Map, Value, json};
 use super::{
     member::{Member, Unread},
     types::{
-        ChatProposal, ProposalAction, ProposalDetail, ProposalEvent, ProposalFacts, ProposalId,
-        ProposalKind, ProposalMethod, ProposalRequest, ProposalState, ProposalTask,
+        ChatProposal, ProposalAction, ProposalAudience, ProposalDetail, ProposalEvent,
+        ProposalFacts, ProposalId, ProposalKind, ProposalMethod, ProposalPage, ProposalRequest,
+        ProposalState, ProposalTask,
     },
     words::{clean, cut_bytes},
 };
@@ -62,6 +65,27 @@ const STREAMS: [&str; 4] = ["primary", "updates", "receipts", "newsletters"];
 
 /// The answers to an invitation a member may give.
 const RESPONSES: [&str; 3] = ["accepted", "tentative", "declined"];
+/// Record type of a page (the pages module's).
+const PAGE: &str = "pages.page";
+/// Most bytes of the Markdown of a section: the pages module's own cap
+/// (`pages.append`, `pages.create`), so a proposal that could only fail on
+/// confirm is refused now.
+const PAGE_MARKDOWN_BYTES: usize = 16 * 1024;
+/// Most characters of the Markdown the schema takes (a character may be
+/// several bytes).
+const PAGE_MARKDOWN_CHARS: usize = 16_000;
+/// Longest page title Scout may propose, in characters.
+const PAGE_TITLE_CHARS: usize = 200;
+/// Most sources a section names.
+const PAGE_SOURCES: usize = 10;
+/// The kinds of record a section may cite, with the read that proves the
+/// member can read one and the name its id goes by.
+const SOURCE_READS: [(&str, &str, &str); 4] = [
+    (CONVERSATION, "conversations.get", "conversation_id"),
+    (TASK, "tasks.get", "task_id"),
+    (EVENT, "schedule.get_event", "event_id"),
+    (PAGE, "pages.read_text", "page_id"),
+];
 
 /// A proposing tool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,17 +100,26 @@ pub enum Proposing {
     Task,
     /// One change to one calendar event.
     Event,
+    /// A section for a page, or a new page (campbooks-cloud#364).
+    Page,
 }
 
 impl Proposing {
     /// Every proposing tool, in the order they are offered.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Change,
         Self::Rule,
         Self::Reply,
         Self::Task,
         Self::Event,
+        Self::Page,
     ];
+
+    /// Whether it is the tool for pages, offered only while mail and Scout
+    /// work with pages.
+    pub const fn is_page(self) -> bool {
+        matches!(self, Self::Page)
+    }
 
     /// The name the model calls it by.
     pub const fn name(self) -> &'static str {
@@ -96,6 +129,7 @@ impl Proposing {
             Self::Reply => "propose_reply",
             Self::Task => "propose_task_change",
             Self::Event => "propose_event_change",
+            Self::Page => "propose_page_change",
         }
     }
 
@@ -148,6 +182,15 @@ impl ProposalAction {
         Self::PushEvent,
         Self::UnpushEvent,
     ];
+
+    /// The page actions, in the order the model is offered them.
+    pub const PAGES: [Self; 2] = [Self::AppendSection, Self::NewPage];
+
+    /// The page action the model names `name` (`append_section`,
+    /// `new_page`), if there is one.
+    pub fn page_named(name: &str) -> Option<Self> {
+        Self::PAGES.into_iter().find(|a| a.name() == name)
+    }
 
     /// The event action the model names `name` (`create`, `update`,
     /// `delete`, `respond`, `push`, `unpush`), if there is one.
@@ -221,6 +264,8 @@ impl ProposalAction {
             Self::RespondEvent => "respond_event",
             Self::PushEvent => "push_event",
             Self::UnpushEvent => "unpush_event",
+            Self::AppendSection => "append_section",
+            Self::NewPage => "new_page",
         }
     }
 
@@ -313,6 +358,11 @@ const REVISION: &[&str] = &["revision"];
 const NEW_EVENT: &[&str] = &["@event_id:id"];
 /// The token a delete gives, which brings the event back.
 const UNDO_TOKEN: &[&str] = &["undo_token"];
+/// The page a new-page change made is the one its undo trashes: its `id`, in
+/// the path.
+const NEW_PAGE: &[&str] = &["@page_id:id"];
+/// The append a section made is the one its undo takes back.
+const APPEND_ID: &[&str] = &["append_id"];
 /// An unpush gives the Campbooks event (`id`, the path) and the calendar it
 /// was taken off (`calendar_id`, the body), which push it back.
 const PUT_BACK: &[&str] = &["@event_id:id", "calendar_id"];
@@ -478,6 +528,24 @@ pub const ROWS: &[Row] = &[
         "schedule.push_event",
         PUT_BACK,
     ),
+    // A section at the end of a page: taken back by its append id.
+    Row {
+        action: ProposalAction::AppendSection,
+        operation: "pages.append",
+        undo: Undo::Catalogue {
+            operation: "pages.unappend",
+            from_response: APPEND_ID,
+        },
+    },
+    // A new private page: trashed by the id it was given.
+    Row {
+        action: ProposalAction::NewPage,
+        operation: "pages.create",
+        undo: Undo::Catalogue {
+            operation: "pages.trash",
+            from_response: NEW_PAGE,
+        },
+    },
 ];
 
 /// Why a proposal was not stored: a fixed code the model reads, and the log.
@@ -516,6 +584,16 @@ pub enum Refusal {
     /// No calendar of theirs by that id or name that an event can be added
     /// to.
     NoSuchCalendar,
+    /// The member cannot see the page (or it is in the trash, or a table).
+    PageNotVisible,
+    /// The member may only read the page.
+    PageReadOnly,
+    /// A new page goes under a private page only.
+    ParentNotPrivate,
+    /// A source is not a record the member can read.
+    SourceNotVisible,
+    /// The Markdown is over the pages module's cap.
+    MarkdownTooLong,
     /// The answer holds [`MAX_PROPOSALS`] already.
     TooMany,
     /// A read failed, or the operation is not here.
@@ -541,6 +619,11 @@ impl Refusal {
             Self::StartOutOfRange => "start_out_of_range",
             Self::InvalidWhen => "invalid_when",
             Self::NoSuchCalendar => "no_such_calendar",
+            Self::PageNotVisible => "page_not_visible",
+            Self::PageReadOnly => "page_read_only",
+            Self::ParentNotPrivate => "parent_not_private",
+            Self::SourceNotVisible => "source_not_visible",
+            Self::MarkdownTooLong => "markdown_too_long",
             Self::TooMany => "too_many",
             Self::Unavailable => "unavailable",
         }
@@ -607,6 +690,25 @@ impl Refusal {
                  (one that is not their Campbooks calendar, can be written and is shown). \
                  Nothing was proposed."
             }
+            Self::PageNotVisible => {
+                "The member cannot see this page, or it does not exist, or it is in the trash, \
+                 or it is a table. Nothing was proposed."
+            }
+            Self::PageReadOnly => {
+                "The member may only read this page: they cannot add to it. Nothing was \
+                 proposed."
+            }
+            Self::ParentNotPrivate => {
+                "A new page is private, so its parent must be a private page the member can \
+                 write. Nothing was proposed."
+            }
+            Self::SourceNotVisible => {
+                "A source is not a thread, task, event or page the member can read, or it does \
+                 not exist. Cite only what the tools showed you. Nothing was proposed."
+            }
+            Self::MarkdownTooLong => {
+                "The Markdown is too long: at most 16 KiB. Shorten it. Nothing was proposed."
+            }
             Self::TooMany => {
                 "This answer holds three proposals already: propose no more in it. Nothing was \
                  proposed."
@@ -636,7 +738,7 @@ fn object(properties: &Value, required: &[&str]) -> Value {
     clippy::too_many_lines,
     reason = "one schema per proposing tool, read top to bottom"
 )]
-pub fn definitions() -> Vec<ToolDefinition> {
+pub fn definitions(pages: bool) -> Vec<ToolDefinition> {
     let actions: Vec<&str> = ProposalAction::ALL.iter().map(|a| a.name()).collect();
     let task_actions: Vec<&str> = ProposalAction::TASKS
         .iter()
@@ -652,7 +754,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
         "minLength": 1,
         "maxLength": 64,
     });
-    vec![
+    let mut all = vec![
         ToolDefinition::new(
             Proposing::Change.name(),
             "Propose one change to one conversation, for the member to confirm on a card. \
@@ -750,7 +852,54 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 &["action"],
             ),
         ),
-    ]
+    ];
+    if pages {
+        all.push(page_definition());
+    }
+    all
+}
+
+/// `propose_page_change`'s definition.
+fn page_definition() -> ToolDefinition {
+    let page_actions: Vec<&str> = ProposalAction::PAGES.iter().map(|a| a.name()).collect();
+    let sources: Vec<&str> = SOURCE_READS.iter().map(|(kind, ..)| *kind).collect();
+    ToolDefinition::new(
+        Proposing::Page.name(),
+        "Propose adding to the member's pages, for the member to confirm on a card. Nothing \
+         changes unless they confirm, and what you propose is only added: you cannot change or \
+         remove what is on a page. append_section adds a section at the end of the page \
+         `page_id` (one the member can write); new_page makes a new private page with `title` \
+         (and, if the member asked, under the private page `parent_id`). Both take `markdown`, \
+         the section in plain Markdown (headings, short paragraphs, bullet and numbered lists, \
+         to-dos, quotes, code, links; no tables and no HTML; at most 16 KiB), and `sources`: \
+         the threads, tasks, events or pages you drew on, each with its id as the tools gave \
+         it. Nothing else is sent with an action.",
+        object(
+            &json!({
+                "action": {"type": "string", "enum": page_actions},
+                "page_id": {"type": "string", "minLength": 1, "maxLength": 64,
+                            "description": "The page's id, as `find_pages` or `about` gave it."},
+                "title": {"type": "string", "minLength": 1, "maxLength": PAGE_TITLE_CHARS},
+                "parent_id": {"type": "string", "minLength": 1, "maxLength": 64,
+                              "description": "A private page the new page goes under."},
+                "markdown": {"type": "string", "minLength": 1, "maxLength": PAGE_MARKDOWN_CHARS},
+                "sources": {
+                    "type": "array",
+                    "maxItems": PAGE_SOURCES,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "type": {"type": "string", "enum": sources},
+                            "id": {"type": "string", "minLength": 1, "maxLength": 64},
+                        },
+                        "required": ["type", "id"],
+                    },
+                },
+            }),
+            &["action", "markdown"],
+        ),
+    )
 }
 
 /// A proposing call's arguments, checked against its schema.
@@ -789,6 +938,15 @@ pub enum Asked {
         place: Option<String>,
         response: Option<String>,
         calendar: Option<String>,
+    },
+    /// `propose_page_change`.
+    Page {
+        action: ProposalAction,
+        page: Option<String>,
+        title: Option<String>,
+        parent: Option<String>,
+        markdown: String,
+        sources: Vec<RecordRef>,
     },
 }
 
@@ -841,6 +999,34 @@ fn event_shape(action: ProposalAction, given: [bool; 8]) -> bool {
     }
 }
 
+/// A section's sources as the model gave them: at most ten, each a record of
+/// a kind a section may cite with a plain id, each once; none when absent.
+fn page_sources(given: Option<&Value>) -> Option<Vec<RecordRef>> {
+    let Some(given) = given else {
+        return Some(Vec::new());
+    };
+    let items = given
+        .as_array()
+        .filter(|items| items.len() <= PAGE_SOURCES)?;
+    let mut sources: Vec<RecordRef> = Vec::new();
+    for item in items {
+        let fields = item.as_object()?;
+        if !fields.keys().all(|key| key == "type" || key == "id") {
+            return None;
+        }
+        let kind = fields.get("type")?.as_str()?;
+        let id = fields.get("id")?.as_str()?;
+        if !SOURCE_READS.iter().any(|(allowed, ..)| *allowed == kind) || !safe_segment(id) {
+            return None;
+        }
+        let source = RecordRef::new(kind, id);
+        if !sources.contains(&source) {
+            sources.push(source);
+        }
+    }
+    Some(sources)
+}
+
 /// `raw`'s arguments when they fit `tool`'s schema: only its properties,
 /// each of the right type and length, and for a change only the detail its
 /// action takes.
@@ -877,6 +1063,14 @@ pub fn arguments(tool: Proposing, raw: &str) -> Option<Asked> {
         Proposing::Task => &["action", "task_id", "day", "until", "member_id"],
         Proposing::Event => &[
             "action", "event_id", "title", "starts", "ends", "place", "response", "calendar",
+        ],
+        Proposing::Page => &[
+            "action",
+            "page_id",
+            "title",
+            "parent_id",
+            "markdown",
+            "sources",
         ],
     };
     if !object.keys().all(|key| allowed.contains(&key.as_str())) {
@@ -989,6 +1183,29 @@ pub fn arguments(tool: Proposing, raw: &str) -> Option<Asked> {
                 calendar,
             })
         }
+        Proposing::Page => {
+            let action = ProposalAction::page_named(object.get("action")?.as_str()?)?;
+            let page = text("page_id", (1, 64))?;
+            let title = text("title", (1, PAGE_TITLE_CHARS))?;
+            let parent = text("parent_id", (1, 64))?;
+            let markdown = text("markdown", (1, PAGE_MARKDOWN_CHARS))??;
+            let sources = page_sources(object.get("sources"))?;
+            let shape = match action {
+                ProposalAction::AppendSection => {
+                    page.is_some() && title.is_none() && parent.is_none()
+                }
+                ProposalAction::NewPage => page.is_none() && title.is_some(),
+                _ => false,
+            };
+            shape.then_some(Asked::Page {
+                action,
+                page,
+                title,
+                parent,
+                markdown,
+                sources,
+            })
+        }
         Proposing::Rule => Some(Asked::Rule {
             sentence: text("sentence", SENTENCE_CHARS)??,
         }),
@@ -1098,6 +1315,7 @@ impl Proposer {
                         detail: None,
                         request: None,
                         undo: None,
+                        page: None,
                         sentence: Some(sentence.clone()),
                         intent: None,
                     }
@@ -1125,6 +1343,7 @@ impl Proposer {
                         detail: None,
                         request: None,
                         undo: None,
+                        page: None,
                         sentence: None,
                         intent: Some(intent.clone()),
                     }
@@ -1159,6 +1378,7 @@ impl Proposer {
                         detail: Some(built.detail),
                         request: Some(built.request),
                         undo: Some(built.undo),
+                        page: None,
                         sentence: None,
                         intent: None,
                     }
@@ -1181,6 +1401,12 @@ impl Proposer {
                         return Err(Refusal::TooMany);
                     }
                     self.event_proposal(&asked).await?
+                }
+                Asked::Page { .. } => {
+                    if full && !self.holds(&asked) {
+                        return Err(Refusal::TooMany);
+                    }
+                    self.page_proposal(&asked).await?
                 }
             };
         if let Some(same) = self.proposals.iter().find(|p| same_card(p, &proposal)) {
@@ -1236,6 +1462,20 @@ impl Proposer {
                     && p.detail
                         .as_ref()
                         .is_some_and(|d| d.day == *day && d.until == until)
+            }
+            Asked::Page {
+                action,
+                page,
+                title,
+                markdown,
+                ..
+            } => {
+                // Rough, like a task's: the exact check is `same_card`.
+                p.action == Some(*action)
+                    && p.record.as_ref().map(|r| r.id.as_str()) == page.as_deref()
+                    && p.detail
+                        .as_ref()
+                        .is_some_and(|d| d.title == *title && d.markdown.as_ref() == Some(markdown))
             }
             Asked::Event {
                 action,
@@ -1438,13 +1678,16 @@ impl Proposer {
             A::TaskDone | A::TaskNotNeeded | A::PlanDay | A::TaskLater | A::Due | A::HandOff => {
                 return Err(Refusal::InvalidArguments);
             }
-            // Event actions are built by `event_proposal`, never here.
+            // Event actions are built by `event_proposal`, and page actions by
+            // `page_proposal`, never here.
             A::CreateEvent
             | A::UpdateEvent
             | A::DeleteEvent
             | A::RespondEvent
             | A::PushEvent
-            | A::UnpushEvent => return Err(Refusal::InvalidArguments),
+            | A::UnpushEvent
+            | A::AppendSection
+            | A::NewPage => return Err(Refusal::InvalidArguments),
         };
         if already {
             return Err(Refusal::AlreadySo);
@@ -1617,6 +1860,7 @@ impl Proposer {
             detail: Some(detail),
             request: Some(request),
             undo: Some(undo),
+            page: None,
             sentence: None,
             intent: None,
         })
@@ -1682,6 +1926,7 @@ impl Proposer {
                 detail: Some(detail),
                 request: Some(request),
                 undo: Some(undo),
+                page: None,
                 sentence: None,
                 intent: None,
             });
@@ -1789,9 +2034,253 @@ impl Proposer {
             detail: Some(detail),
             request: Some(request),
             undo: Some(undo),
+            page: None,
             sentence: None,
             intent: None,
         })
+    }
+
+    /// A section for a page, or a new page, checked as the member: the page
+    /// is theirs to write (or the parent a private page of theirs), the
+    /// Markdown is within the pages module's cap, and every source is a
+    /// record they can read. The card shows what the member's own records
+    /// say of the page, never the model's words about it.
+    #[allow(clippy::too_many_lines)]
+    async fn page_proposal(&self, asked: &Asked) -> Result<ChatProposal, Refusal> {
+        let Asked::Page {
+            action,
+            page,
+            title,
+            parent,
+            markdown,
+            sources,
+        } = asked
+        else {
+            return Err(Refusal::InvalidArguments);
+        };
+        let action = *action;
+        let row = action.row();
+        if markdown.len() > PAGE_MARKDOWN_BYTES {
+            return Err(Refusal::MarkdownTooLong);
+        }
+        let list = self
+            .member
+            .read("pages.list", json!({}))
+            .await
+            .map_err(|_| Refusal::Unavailable)?;
+        let pages: Vec<&Value> = list["pages"].as_array().into_iter().flatten().collect();
+        // The ordinary page named `id`, and what the member may do with it.
+        let find = |id: &str| -> Option<(&Value, bool)> {
+            pages
+                .iter()
+                .copied()
+                .find(|page| page["id"] == id && page["kind"] == "page")
+                .map(|page| (page, page["role"] != "reader"))
+        };
+        self.sources_readable(sources, &pages).await?;
+        let asked_sources: Vec<Value> = sources
+            .iter()
+            .map(|source| json!({ "type": source.record_type, "id": source.id }))
+            .collect();
+        let mut detail = ProposalDetail {
+            markdown: Some(markdown.clone()),
+            sources: sources.clone(),
+            ..ProposalDetail::default()
+        };
+        match action {
+            ProposalAction::AppendSection => {
+                let id = page.as_deref().ok_or(Refusal::InvalidArguments)?;
+                let (found, writes) = find(id).ok_or(Refusal::PageNotVisible)?;
+                if !writes {
+                    return Err(Refusal::PageReadOnly);
+                }
+                let id = found["id"]
+                    .as_str()
+                    .filter(|id| safe_segment(id))
+                    .ok_or(Refusal::Unavailable)?;
+                let params = [("page_id", id.to_owned())];
+                let body = json!({ "markdown": markdown, "sources": asked_sources });
+                let request = self.request(row.operation, &params, Some(body), &[])?;
+                let undo = self.row_undo(row, &params, None)?;
+                Ok(ChatProposal {
+                    id: ProposalId::new(),
+                    kind: ProposalKind::Change,
+                    state: ProposalState::Pending,
+                    action: Some(action),
+                    record: Some(RecordRef::new(PAGE, id)),
+                    facts: None,
+                    task: None,
+                    event: None,
+                    page: Some(
+                        self.page_facts(
+                            Some(id),
+                            found["title"].as_str().map(fact).unwrap_or_default(),
+                            None,
+                            true,
+                        )
+                        .await?,
+                    ),
+                    detail: Some(detail),
+                    request: Some(request),
+                    undo: Some(undo),
+                    sentence: None,
+                    intent: None,
+                })
+            }
+            ProposalAction::NewPage => {
+                let title = title.as_deref().ok_or(Refusal::InvalidArguments)?;
+                // A new page is always private; under a parent only if that
+                // is a private page the member can write.
+                let mut body = json!({
+                    "title": title,
+                    "place": "private",
+                    "markdown": markdown,
+                    "sources": asked_sources,
+                });
+                let mut record = None;
+                let mut parent_facts = None;
+                if let Some(parent) = parent {
+                    let (found, writes) = find(parent).ok_or(Refusal::PageNotVisible)?;
+                    if found["place"] != "private" {
+                        return Err(Refusal::ParentNotPrivate);
+                    }
+                    if !writes {
+                        return Err(Refusal::PageReadOnly);
+                    }
+                    let id = found["id"]
+                        .as_str()
+                        .filter(|id| safe_segment(id))
+                        .ok_or(Refusal::Unavailable)?;
+                    body["parent"] = id.into();
+                    record = Some(RecordRef::new(PAGE, id));
+                    parent_facts =
+                        Some((id, found["title"].as_str().map(fact).unwrap_or_default()));
+                }
+                // The new page takes its readers from the page it goes under
+                // (grants reach sub-pages); with none, it is the member's alone.
+                let facts = match parent_facts {
+                    Some((id, parent_title)) => {
+                        self.page_facts(Some(id), fact(title), Some(parent_title), false)
+                            .await?
+                    }
+                    None => self.page_facts(None, fact(title), None, false).await?,
+                };
+                detail.title = Some(fact(title));
+                let request = self.request(row.operation, &[], Some(body), &[])?;
+                let undo = self.row_undo(row, &[], None)?;
+                Ok(ChatProposal {
+                    id: ProposalId::new(),
+                    kind: ProposalKind::Change,
+                    state: ProposalState::Pending,
+                    action: Some(action),
+                    record,
+                    facts: None,
+                    task: None,
+                    event: None,
+                    page: Some(facts),
+                    detail: Some(detail),
+                    request: Some(request),
+                    undo: Some(undo),
+                    sentence: None,
+                    intent: None,
+                })
+            }
+            _ => Err(Refusal::InvalidArguments),
+        }
+    }
+
+    /// Who will read a page's content, as the pages module says it: the
+    /// readers a page really has, grants of the pages above it included, and
+    /// whether Notion keeps a copy. `of` is the page whose readers they are
+    /// (none: a new top-level page, the member's alone); `notion` whether to
+    /// report that page's Notion link (a new page has none).
+    async fn page_facts(
+        &self,
+        of: Option<&str>,
+        title: String,
+        parent: Option<String>,
+        notion: bool,
+    ) -> Result<ProposalPage, Refusal> {
+        let Some(id) = of else {
+            return Ok(ProposalPage {
+                title,
+                audience: ProposalAudience::OnlyYou,
+                readers: Vec::new(),
+                others: 0,
+                notion: false,
+                parent,
+            });
+        };
+        let sharing = self
+            .member
+            .read("pages.get_sharing", json!({ "page_id": id }))
+            .await
+            .map_err(|_| Refusal::Unavailable)?;
+        let (me, people) = self.members().await?;
+        let others_in_workspace =
+            u32::try_from(people.iter().filter(|p| p.id != me).count()).unwrap_or(u32::MAX);
+        let (audience, readers, others) = if sharing["everyone"] == true {
+            (ProposalAudience::Everyone, Vec::new(), others_in_workspace)
+        } else {
+            let readers: Vec<&str> = sharing["readers"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .filter(|reader| *reader != me)
+                .collect();
+            if readers.is_empty() {
+                (ProposalAudience::OnlyYou, Vec::new(), 0)
+            } else {
+                let named: Vec<String> = readers
+                    .iter()
+                    .filter_map(|reader| people.iter().find(|p| p.id == *reader))
+                    .map(|p| p.name.clone())
+                    .take(5)
+                    .collect();
+                let others = u32::try_from(readers.len() - named.len()).unwrap_or(u32::MAX);
+                (ProposalAudience::Named, named, others)
+            }
+        };
+        Ok(ProposalPage {
+            title,
+            audience,
+            readers,
+            others,
+            notion: notion && sharing["notion"] == true,
+            parent,
+        })
+    }
+
+    /// Every source is a record the member can read now: a thread, a task or
+    /// an event by the read that shows it, a page by the list.
+    async fn sources_readable(
+        &self,
+        sources: &[RecordRef],
+        pages: &[&Value],
+    ) -> Result<(), Refusal> {
+        for source in sources {
+            if source.record_type == PAGE {
+                if !pages.iter().any(|page| page["id"] == source.id.as_str()) {
+                    return Err(Refusal::SourceNotVisible);
+                }
+                continue;
+            }
+            let (_, read, param) = SOURCE_READS
+                .iter()
+                .find(|(kind, ..)| *kind == source.record_type)
+                .ok_or(Refusal::SourceNotVisible)?;
+            let mut input = Map::new();
+            input.insert((*param).to_owned(), Value::String(source.id.clone()));
+            self.member
+                .read(read, Value::Object(input))
+                .await
+                .map_err(|unread| match unread {
+                    Unread::NotVisible | Unread::Refused => Refusal::SourceNotVisible,
+                    Unread::Broken(_) => Refusal::Unavailable,
+                })?;
+        }
+        Ok(())
     }
 
     /// The undo of `row`'s change: its catalogue undo, or the same operation
@@ -2189,6 +2678,7 @@ fn same_card(one: &ChatProposal, other: &ChatProposal) -> bool {
     one.kind == other.kind
         && one.action == other.action
         && one.record == other.record
+        && one.page == other.page
         && one.detail == other.detail
         && one.sentence == other.sentence
         && one.intent == other.intent
@@ -2334,6 +2824,12 @@ pub fn line(proposal: &ChatProposal) -> String {
     {
         return event_line(proposal, action);
     }
+    if let Some(action) = proposal
+        .action
+        .filter(|action| ProposalAction::PAGES.contains(action))
+    {
+        return page_line(proposal, action);
+    }
     let about = proposal.facts.as_ref().map_or_else(String::new, |facts| {
         let subject = if facts.subject.is_empty() {
             "(no subject)"
@@ -2409,6 +2905,59 @@ fn task_line(proposal: &ChatProposal, action: ProposalAction, task: &ProposalTas
     )
 }
 
+/// Who reads a proposal's page, as words for its line: never "private" when
+/// anyone else can read it. Readers who are no longer members have no name to
+/// give, so then only their count is said.
+fn readers_words(page: &ProposalPage) -> String {
+    let notion = if page.notion {
+        ", and it is kept in step with Notion"
+    } else {
+        ""
+    };
+    match page.audience {
+        ProposalAudience::OnlyYou => format!(" (only the member reads it{notion})"),
+        ProposalAudience::Everyone => format!(" (every member of the workspace reads it{notion})"),
+        ProposalAudience::Named => match (page.readers.is_empty(), page.others) {
+            (true, 1) => format!(" (readable by one other person{notion})"),
+            (true, others) => format!(" (readable by {others} other people{notion})"),
+            (false, 0) => format!(" (readable by {}{notion})", page.readers.join(", ")),
+            (false, others) => format!(
+                " (readable by {} and {others} more{notion})",
+                page.readers.join(", ")
+            ),
+        },
+    }
+}
+
+/// The line for one of a page proposal: what it does and to which page, never
+/// the Markdown.
+fn page_line(proposal: &ChatProposal, action: ProposalAction) -> String {
+    let title = proposal
+        .page
+        .as_ref()
+        .map(|page| page.title.clone())
+        .or_else(|| proposal.detail.as_ref().and_then(|d| d.title.clone()))
+        .unwrap_or_default();
+    // Who reads it, in the words the card uses: never "private" when anyone
+    // else can read the page.
+    let readers = proposal
+        .page
+        .as_ref()
+        .map_or_else(String::new, readers_words);
+    let what = match action {
+        ProposalAction::NewPage => format!("a new page \"{title}\"{readers}"),
+        _ => format!("a section at the end of the page \"{title}\"{readers}"),
+    };
+    let state = match proposal.state {
+        ProposalState::Pending => "The member has not answered it.",
+        ProposalState::Done => "The member confirmed it.",
+        ProposalState::Declined => "The member said not now.",
+        ProposalState::Failed => "The member confirmed it, and it could not be done.",
+        ProposalState::Undone => "The member confirmed it, then undid it.",
+    };
+    format!("Proposed: {what}. {state}")
+}
+
 /// The line for one of an event proposal.
 fn event_line(proposal: &ChatProposal, action: ProposalAction) -> String {
     let detail = proposal.detail.as_ref();
@@ -2444,6 +2993,41 @@ fn event_line(proposal: &ChatProposal, action: ProposalAction) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    fn page(readers: &[&str], others: u32) -> ProposalPage {
+        ProposalPage {
+            title: "Acme".to_owned(),
+            audience: ProposalAudience::Named,
+            readers: readers.iter().map(|r| (*r).to_owned()).collect(),
+            others,
+            notion: false,
+            parent: None,
+        }
+    }
+
+    #[test]
+    fn readers_who_are_no_longer_members_are_counted_never_left_blank() {
+        assert_eq!(
+            readers_words(&page(&[], 1)),
+            " (readable by one other person)"
+        );
+        assert_eq!(
+            readers_words(&page(&[], 3)),
+            " (readable by 3 other people)"
+        );
+        assert_eq!(readers_words(&page(&["Rui"], 0)), " (readable by Rui)");
+        assert_eq!(
+            readers_words(&page(&["Rui", "Ana"], 2)),
+            " (readable by Rui, Ana and 2 more)"
+        );
+        for words in [
+            readers_words(&page(&[], 1)),
+            readers_words(&page(&["Rui"], 0)),
+        ] {
+            assert!(!words.contains("by  "), "{words}");
+            assert!(!words.contains("private"), "{words}");
+        }
+    }
     use super::*;
 
     fn event(all_day: bool) -> SeenEvent {
@@ -2559,6 +3143,7 @@ mod tests {
             .into_iter()
             .chain(ProposalAction::TASKS)
             .chain(ProposalAction::EVENTS)
+            .chain(ProposalAction::PAGES)
         {
             assert_eq!(
                 ROWS.iter().filter(|row| row.action == action).count(),
@@ -2594,11 +3179,20 @@ mod tests {
             assert_eq!(ProposalAction::named(action.name()), None);
             assert!(action.row().operation.starts_with("schedule."));
         }
+        for action in ProposalAction::PAGES {
+            assert_eq!(ProposalAction::page_named(action.name()), Some(action));
+            // A page action is never one `propose_change` takes.
+            assert_eq!(ProposalAction::named(action.name()), None);
+            assert!(action.row().operation.starts_with("pages."));
+        }
         assert_eq!(
             ROWS.len(),
-            ProposalAction::ALL.len() + ProposalAction::TASKS.len() + ProposalAction::EVENTS.len()
+            ProposalAction::ALL.len()
+                + ProposalAction::TASKS.len()
+                + ProposalAction::EVENTS.len()
+                + ProposalAction::PAGES.len()
         );
-        for definition in definitions() {
+        for definition in definitions(true) {
             assert_eq!(definition.parameters["additionalProperties"], false);
             assert!(Proposing::named(&definition.name).is_some());
         }

@@ -1,5 +1,6 @@
 {
   "errors": {
+    "calendar_followed": "Ese calendario es uno que sigues. Elige uno de tus propios calendarios o hazlo tuyo primero.",
     "calendar_read_only": "No se puede escribir en ese calendario. Elige uno de tus calendarios que lo permita.",
     "change_pending": "Un cambio anterior en este evento aún no ha llegado al calendario. Inténtalo de nuevo en un momento.",
     "invalid_calendar": "Elige uno de tus calendarios, activado y con escritura permitida, o déjalo en blanco.",

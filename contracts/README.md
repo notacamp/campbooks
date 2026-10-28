@@ -16,7 +16,8 @@ produce or accept against the file.
 | `outgoing-message.v1.schema.json` | `conversations` | `connectors` | A message a member asked to send (addresses, subject, bodies, attachment blobs), as a blob (`application/vnd.campbooks.outgoing-message+json; version=1`) |
 | `conversations.send_requested.v1.schema.json` | `conversations` | `connectors` | The event announcing a send once its undo window ends (ids and the outgoing message blob) |
 | `conversations.need_changed.v1.schema.json` | `conversations` | `attention` | What a conversation needs from its inbox's members, opened, changed or cleared (ids, enums and a date only) |
-| `tasks.task_changed.v1.schema.json` | `tasks` | `attention` | A task made or changed: state, verb, due, plan, assignee and source (ids, enums, dates and times only, never a title) |
+| `conversations.member_replied.v1.schema.json` | `conversations` | `tasks` | The member sent a message in a conversation of their personal inbox: asks "Done?" of their open Do tasks that came from it (ids and a time only) |
+| `tasks.task_changed.v1.schema.json` | `tasks` | `attention` | A task made or changed: state, verb, due, plan, assignee, source and whether it asks "Done?" (ids, enums, flags, dates and times only, never a title) |
 | `pages.page_changed.v1.schema.json` | `pages` | `search` | A page made or changed, trashed, moved, shared or deleted (ids and enums only, never a title or any text) |
 | `pages.table_changed.v1.schema.json` | `pages` | the change feed | A table's properties, views or set of rows changed (ids and enums only, never a name or a value) |
 | `connectors.send_completed.v1.schema.json` | `connectors` | `conversations` | The event telling how a send ended: sent (with the provider's id) or failed (with a reason) |

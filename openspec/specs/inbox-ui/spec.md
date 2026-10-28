@@ -987,6 +987,16 @@ question.
 - **WHEN** the user opens the conversation of João's message to Ana Costa, copying them
 - **THEN** the note reads "João Pereira wrote to Ana Costa. You're in Cc." with "Scout isn't sure" and the actions Nudge Ana…, Reply to João… and Nothing for me
 
+### Requirement: The note asks whether a task from the thread is done
+When an open task of the member that came from the conversation asks Done? and no
+need is open, the "where things stand" note SHALL add "Your task “<title>” is
+still open." and ask "Is it done?" with Done (1) and Not yet (2). While it asks,
+it takes the place of a stream suggestion's choice.
+
+#### Scenario: Ana opens the thread she replied in
+- **WHEN** Ana opens the conversation "Send the signed lease" came from
+- **THEN** the note says the task is still open and offers Done and Not yet
+
 ### Requirement: Room to write
 The message composer (Reply, Reply all, Forward, New message, and a draft
 reopened from Drafts) SHALL set From, To, Cc, Bcc and the subject at the
@@ -1092,3 +1102,18 @@ be said the same way.
 #### Scenario: A blocked type
 - **WHEN** the user drops `setup.exe`
 - **THEN** the composer says that file type can't be sent by email, and it is not attached
+
+### Requirement: The note says when Scout could not read the message
+When `conversations.get` says `need_read_failed`, the reader's note for an open
+need SHALL show one muted line, "Scout couldn't read this one.", under the
+need's sentence, in the user's language (English, European Portuguese,
+Spanish from Spain and French). It SHALL show nothing for a read that is
+pending, finished, or has a call left.
+
+#### Scenario: A read that failed for good
+- **WHEN** the user opens a conversation with an open need whose read failed on every call
+- **THEN** the note shows the need's sentence and, under it, "Scout couldn't read this one."
+
+#### Scenario: A read that did not fail
+- **WHEN** the user opens a conversation with an open need whose read is done or pending
+- **THEN** the note shows no such line

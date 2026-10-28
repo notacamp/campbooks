@@ -609,3 +609,132 @@ async fn an_upload_is_tracked_as_a_change_without_the_file_name(db: PgPool) {
     );
     assert!(!events[0].body.to_string().contains("lease-4b"));
 }
+
+/// Where every inbox sends from in these tests: a mailbox that carries at
+/// most `max` bytes of attachments (as Microsoft Graph does).
+#[derive(Debug)]
+struct Carries(u64);
+
+impl campbooks_kernel::outbound::OutboundDestinations for Carries {
+    fn destination<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        _inbox: sqlx::types::Uuid,
+    ) -> campbooks_kernel::outbound::DestinationFuture<'a> {
+        let max = self.0;
+        Box::pin(async move {
+            Ok(Some(campbooks_kernel::outbound::Resolved {
+                destination: campbooks_kernel::outbound::Destination {
+                    connection: sqlx::types::Uuid::nil(),
+                    stream: sqlx::types::Uuid::nil(),
+                    mailbox: "inbox".into(),
+                },
+                as_at_deploy: true,
+                max_attachment_bytes: Some(max),
+            }))
+        })
+    }
+}
+
+/// A mailbox that carries less than 25 MiB (Microsoft Graph): a file past
+/// its limit is refused at upload, naming it, and the inbox says its limit.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_mailbox_that_carries_less_refuses_the_file_up_front(db: PgPool) {
+    let kit = Kit::new(db)
+        .await
+        .with_destinations(std::sync::Arc::new(Carries(2_100_000)));
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let (uri, shown) = draft(&kit, (workspace, inbox), &sam).await;
+    let refused = upload(
+        &kit,
+        &sam,
+        &uri,
+        &shown,
+        ("plans.pdf", "application/pdf"),
+        vec![1; 2_200_000],
+    )
+    .await;
+    assert_eq!(
+        refused.status,
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "{:?}",
+        refused.json
+    );
+    assert_eq!(refused.json["code"], "attachments_too_large_for_mailbox");
+    assert!(
+        refused.json["detail"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("2.1 MB"),
+        "{:?}",
+        refused.json
+    );
+    // A smaller one goes.
+    let taken = upload(
+        &kit,
+        &sam,
+        &uri,
+        &shown,
+        ("plans.pdf", "application/pdf"),
+        vec![1; 1_000_000],
+    )
+    .await;
+    assert_eq!(taken.status, StatusCode::CREATED, "{:?}", taken.json);
+    // The inbox says what it carries.
+    let inboxes = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/inboxes"))
+        .await;
+    assert_eq!(
+        inboxes.json["inboxes"][0]["max_attachment_bytes"],
+        2_100_000
+    );
+}
+
+/// A client token with no member behind it attaches nothing: a draft is a
+/// member's, and one with no author must not match a caller with none.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_caller_with_no_member_cannot_upload(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let (uri, shown) = draft(&kit, (workspace, inbox), &sam).await;
+    let before = blobs(&kit).await;
+    let bare = kit.client(workspace, "conversations:read conversations:send");
+    let refused = upload(
+        &kit,
+        &bare,
+        &uri,
+        &shown,
+        ("a.txt", "text/plain"),
+        b"x".to_vec(),
+    )
+    .await;
+    assert_eq!(refused.status, StatusCode::NOT_FOUND, "{:?}", refused.json);
+    assert_eq!(blobs(&kit).await, before);
+}
+
+/// A body past 25 MiB is refused as a problem naming the limit, never the
+/// framework's plain-text 413.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_body_past_the_limit_is_a_problem(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let (uri, shown) = draft(&kit, (workspace, inbox), &sam).await;
+    let before = blobs(&kit).await;
+    let refused = upload(
+        &kit,
+        &sam,
+        &uri,
+        &shown,
+        ("big.bin", "application/octet-stream"),
+        vec![0; 25 * 1024 * 1024 + 1],
+    )
+    .await;
+    assert_eq!(
+        refused.status,
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "{:?}",
+        refused.json
+    );
+    assert_eq!(refused.json["code"], "attachments_too_large");
+    assert_eq!(blobs(&kit).await, before);
+}

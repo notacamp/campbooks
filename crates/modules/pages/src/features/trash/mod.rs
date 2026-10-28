@@ -35,6 +35,7 @@ use crate::{
     security(("bearer" = ["pages:write"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("pages.restore")
+        .assistant()
         .records(["pages.page"]).access("pages.page", campbooks_kernel::authz::Action::Delete)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),

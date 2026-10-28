@@ -40,7 +40,8 @@
     "fromEmail": "De {{name}} · correo",
     "with": "Con {{name}}",
     "markDone": "Marcar como hecha: {{title}}",
-    "markPaid": "Marcar como pagada: {{title}}"
+    "markPaid": "Marcar como pagada: {{title}}",
+    "repliedAsk": "Respondiste · ¿Hecha?"
   },
   "due": {
     "overdue_one": "Vencida · {{count}} día",
@@ -80,8 +81,6 @@
     "tonight": "Esta noche",
     "tomorrow": "Mañana",
     "nextWeek": "La semana que viene",
-    "source": "De dónde viene",
-    "foundByScout": "Scout encontró esto en el correo",
     "sourceLine": "{{subject}} · {{date}}",
     "openEmail": "Abrir el correo",
     "hand": "Pasársela a alguien",
@@ -95,7 +94,113 @@
     "notNeeded": "No hace falta",
     "payNote": "Campbooks nunca paga por ti. Esto solo la marca como pagada.",
     "holdTime": "Reservar tiempo",
-    "release": "Liberar"
+    "release": "Liberar",
+    "notYet": "Todavía no",
+    "yourReply": "Tu respuesta · {{date}}",
+    "replyQuestion": {
+      "replied": "Respondiste a {{name}} ({{time}}).",
+      "done": "¿Está hecha esta tarea?"
+    },
+    "why": "Por qué está aquí",
+    "history": "Historial"
+  },
+  "why": {
+    "scout": "Scout la creó",
+    "scoutRest": "el {{date}} a las {{time}}, a partir de un correo que leyó en tu bandeja de entrada.",
+    "you": "Creaste esta tarea",
+    "member": "{{name}} creó esta tarea",
+    "madeRest": "el {{date}} a las {{time}}.",
+    "handed": "{{name}} te la pasó el {{date}}.",
+    "handedNoDate": "{{name}} te la pasó."
+  },
+  "history": {
+    "teammate": "Un compañero",
+    "scout": "Scout",
+    "calendar": "El calendario",
+    "dueSuffix": ", para el {{date}}",
+    "showAll": "Mostrar todo ({{total}})",
+    "replied": "Respondiste en el hilo. Scout preguntó si estaba hecha.",
+    "field": {
+      "title": "el título",
+      "task_verb": "el tipo",
+      "due": "la fecha"
+    },
+    "created": {
+      "you": "Creaste la tarea",
+      "other": "{{who}} creó la tarea",
+      "scoutFrom": "Scout la creó a partir del correo de {{name}}"
+    },
+    "edited": {
+      "you": "Cambiaste {{fields}}",
+      "other": "{{who}} cambió {{fields}}"
+    },
+    "dueSet": {
+      "you": "Fijaste la fecha para el {{date}}",
+      "other": "{{who}} fijó la fecha para el {{date}}"
+    },
+    "dueRemoved": {
+      "you": "Quitaste la fecha",
+      "other": "{{who}} quitó la fecha"
+    },
+    "planned": {
+      "you": "La planificaste para el {{day}}",
+      "other": "{{who}} la planificó para el {{day}}"
+    },
+    "later": {
+      "you": "La pospusiste hasta el {{date}}",
+      "other": "{{who}} la pospuso hasta el {{date}}"
+    },
+    "unplanned": {
+      "you": "La quitaste del plan",
+      "other": "{{who}} la quitó del plan"
+    },
+    "done": {
+      "you": "La marcaste como hecha",
+      "other": "{{who}} la marcó como hecha"
+    },
+    "paid": {
+      "you": "La marcaste como pagada",
+      "other": "{{who}} la marcó como pagada"
+    },
+    "notNeeded": {
+      "you": "La marcaste como innecesaria",
+      "other": "{{who}} la marcó como innecesaria"
+    },
+    "reopened": {
+      "you": "La abriste de nuevo",
+      "other": "{{who}} la abrió de nuevo"
+    },
+    "handedOff": {
+      "you": "Se la pasaste a {{member}}",
+      "other": "{{who}} se la pasó a {{member}}",
+      "toYou": "{{who}} te la pasó"
+    },
+    "takenBack": {
+      "you": "La recuperaste de {{member}}",
+      "other": "{{who}} la recuperó de {{member}}",
+      "fromYou": "{{who}} la recuperó de ti"
+    },
+    "held": {
+      "you": "Reservaste tiempo {{when}}",
+      "other": "{{who}} reservó tiempo {{when}}",
+      "moved": "El calendario movió el tiempo reservado a {{when}}"
+    },
+    "released": {
+      "you": "Liberaste el tiempo reservado",
+      "other": "{{who}} liberó el tiempo reservado"
+    },
+    "replyAnswered": {
+      "you": "Dijiste que aún no está hecha",
+      "other": "{{who}} dijo que aún no está hecha"
+    },
+    "replyUnanswered": {
+      "you": "Deshiciste «Todavía no»",
+      "other": "{{who}} deshizo «Todavía no»"
+    },
+    "changed": {
+      "you": "Cambiaste la tarea",
+      "other": "{{who}} cambió la tarea"
+    }
   },
   "toast": {
     "done": "Hecha · {{title}}",
@@ -111,7 +216,8 @@
     "failed": "No se pudo cambiar {{title}}. Queda como estaba.",
     "changed": "{{title}} ha cambiado mientras tanto. Míralo de nuevo.",
     "held": "Reservado {{when}} · {{title}}",
-    "released": "Liberado · {{title}}"
+    "released": "Liberado · {{title}}",
+    "stillOpen": "De acuerdo, sigue abierta · {{title}}"
   },
   "make": {
     "button": "Convertir en tarea",
@@ -141,5 +247,15 @@
   "holdDialog": {
     "title": "Reservar tiempo",
     "description": "Un bloque ocupado en tu calendario, en tu tiempo libre."
+  },
+  "ask": {
+    "replied": "Respondiste",
+    "meta": "Tarea · {{kind}} · de {{name}}",
+    "line": "Respondiste al correo de {{name}}. ¿Está hecha esta tarea?",
+    "whyTitle": "Por qué pregunta Scout",
+    "whyText": "Respondiste en el mismo hilo ({{time}}), después de crear la tarea. Scout no leyó tu respuesta.",
+    "whyNote": "Nada cambia hasta que respondas.",
+    "openThread": "Abrir el hilo",
+    "openTask": "Abrir la tarea"
   }
 }

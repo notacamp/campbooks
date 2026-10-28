@@ -8,6 +8,7 @@ The Calendar is where the member's days are. Each member has their own calendars
 - A member who gives calendar access to a connected account also gets that account's calendars, such as their main calendar, a family calendar, or holidays. They are read from the provider and changes are written back to it.
 - Only the main calendar of an account is shown at first. The member turns the others on in Settings, under Calendar. A calendar that is off shows nothing.
 - Some provider calendars cannot be written, such as a holidays calendar. Events cannot be added to them.
+- Each provider calendar is Mine, Following or Off. Mine is the member's own: its events make them busy, time can be held on it, and invitations on it wait for their answer. Following is shown only: its events do not make the member busy, no time is held on it, and its invitations are not theirs to answer. Off shows nothing. A calendar shared by someone else starts as Following, and the member can change it in Settings, under Calendar. The Campbooks calendar is always Mine.
 - A shared inbox has no calendar. Nothing is added from a shared inbox.
 
 ### Events and kinds
@@ -55,7 +56,7 @@ Something the member has to do by a date, such as pay by Friday, sign, submit, o
 
 - Each member has a time zone, set from their device the first time and changeable in Settings. Until it is set, UTC is used.
 - Working hours are set per weekday. Until the member sets some they are Monday to Friday, 09:00 to 18:00.
-- Free time is the part of the working hours that no event overlaps. It counts the Campbooks calendar and the calendars that are on. It does not count cancelled events, all-day events, or events marked not busy.
+- Free time is the part of the working hours that no event overlaps. It counts the Campbooks calendar and the member's own calendars (Mine). Calendars the member follows or has off do not count. It does not count cancelled events, all-day events, or events marked not busy.
 
 ### Rules for answering
 

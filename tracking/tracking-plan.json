@@ -146,10 +146,28 @@
       "pr": "#685"
     },
     {
-      "change": "Attaching a file to a draft (campbooks-cloud#391): Coverage for conversations.upload_draft_attachment, which tracks conversations.draft_updated as a save does.",
+      "change": "You replied. Done? (campbooks-cloud#396): tasks.task_reply_noticed (a reply of the member in the conversation an open Do task came from) and tasks.task_reply_answered (the member answered Not yet); Coverage for tasks.notice_replies, tasks.answer_reply and tasks.unanswer_reply.",
       "date": "2026-10-28",
       "plan_version": 20,
-      "pr": "#391"
+      "pr": "#697"
+    },
+    {
+      "change": "Mail and Scout in pages (campbooks-cloud#364): 2 pages events for files saved from a message (how many) and a section appended (how many blocks and sources, in buckets); 2 assistant tools (find_pages, read_page) and 2 proposal actions (append_section, new_page); Coverage for every operation of the change.",
+      "date": "2026-10-28",
+      "plan_version": 21,
+      "pr": "#690"
+    },
+    {
+      "change": "Calendar roles (campbooks-cloud#399): schedule.calendar_role_changed for a calendar a member set to mine or following (which); schedule.update_calendar's Coverage names it.",
+      "date": "2026-10-28",
+      "plan_version": 22,
+      "pr": "#696"
+    },
+    {
+      "change": "Attaching a file to a draft (campbooks-cloud#391): Coverage for conversations.upload_draft_attachment, which tracks conversations.draft_updated as a save does.",
+      "date": "2026-10-28",
+      "plan_version": 23,
+      "pr": "#699"
     }
   ],
   "coverage": [
@@ -568,6 +586,14 @@
       "exemption": "",
       "kind": "handler",
       "name": "tasks.follow_hold_created"
+    },
+    {
+      "events": [
+        "tasks.task_reply_noticed"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "tasks.notice_replies"
     },
     {
       "events": [],
@@ -1642,6 +1668,22 @@
     },
     {
       "events": [
+        "pages.section_appended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.append"
+    },
+    {
+      "events": [
+        "pages.files_attached"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.attach_from_message"
+    },
+    {
+      "events": [
         "pages.page_created"
       ],
       "exemption": "",
@@ -1664,6 +1706,18 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.create_view"
+    },
+    {
+      "events": [],
+      "exemption": "takes back files that pages.attach_from_message made files of the page, for the ones no block names; nothing new is made, and the files were tracked when they were attached (pages.files_attached)",
+      "kind": "operation",
+      "name": "pages.detach_files"
+    },
+    {
+      "events": [],
+      "exemption": "reads who can read a page and whether Notion keeps a copy, for Scout's card; it changes nothing",
+      "kind": "operation",
+      "name": "pages.get_sharing"
     },
     {
       "events": [],
@@ -1703,6 +1757,12 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.query_table"
+    },
+    {
+      "events": [],
+      "exemption": "reads a page as Markdown for Scout; it changes nothing, and the text is the page's own words, never tracked",
+      "kind": "operation",
+      "name": "pages.read_text"
     },
     {
       "events": [],
@@ -1797,6 +1857,12 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.trash"
+    },
+    {
+      "events": [],
+      "exemption": "takes back the blocks of an append that nobody has changed since; nothing new is made, and the section was tracked when it was appended (pages.section_appended)",
+      "kind": "operation",
+      "name": "pages.unappend"
     },
     {
       "events": [
@@ -1900,7 +1966,8 @@
       "events": [
         "schedule.calendar_enabled",
         "schedule.calendar_disabled",
-        "schedule.calendar_recoloured"
+        "schedule.calendar_recoloured",
+        "schedule.calendar_role_changed"
       ],
       "exemption": "",
       "kind": "operation",
@@ -1966,6 +2033,14 @@
       "exemption": "telemetry itself: a screen the app shows, relayed to the operator's usage analytics and never stored; tracking it would record it twice",
       "kind": "operation",
       "name": "system.report_screen_view"
+    },
+    {
+      "events": [
+        "tasks.task_reply_answered"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "tasks.answer_reply"
     },
     {
       "events": [
@@ -2041,6 +2116,12 @@
       "exemption": "",
       "kind": "operation",
       "name": "tasks.take_back"
+    },
+    {
+      "events": [],
+      "exemption": "the undo of tasks.answer_reply: it puts the question back on the task, so the answer it undoes stays the one on record",
+      "kind": "operation",
+      "name": "tasks.unanswer_reply"
     },
     {
       "events": [
@@ -2399,6 +2480,11 @@
       "value": "find_conversations"
     },
     {
+      "description": "Looked for the member's pages.",
+      "enum": "assistant.chat_tool",
+      "value": "find_pages"
+    },
+    {
       "description": "Looked for people who write to the member.",
       "enum": "assistant.chat_tool",
       "value": "find_people"
@@ -2432,6 +2518,11 @@
       "description": "Read one event of the member's calendar.",
       "enum": "assistant.chat_tool",
       "value": "read_event"
+    },
+    {
+      "description": "Read one of the member's pages as text.",
+      "enum": "assistant.chat_tool",
+      "value": "read_page"
     },
     {
       "description": "Read one task and what changed in it.",
@@ -2472,6 +2563,11 @@
       "description": "Its Pay need: Already paid.",
       "enum": "assistant.proposal_action",
       "value": "already_paid"
+    },
+    {
+      "description": "Add a section at the end of a page.",
+      "enum": "assistant.proposal_action",
+      "value": "append_section"
     },
     {
       "description": "Archive the conversation.",
@@ -2522,6 +2618,11 @@
       "description": "Move it to another stream.",
       "enum": "assistant.proposal_action",
       "value": "move_to_stream"
+    },
+    {
+      "description": "Make a new private page.",
+      "enum": "assistant.proposal_action",
+      "value": "new_page"
     },
     {
       "description": "Its need: Not needed.",
@@ -4149,6 +4250,16 @@
       "value": "update_occurrence"
     },
     {
+      "description": "Shown only: it counts for nothing else.",
+      "enum": "schedule.calendar_role",
+      "value": "following"
+    },
+    {
+      "description": "The member's own calendar: it makes them busy, holds go on it, its invitations await them.",
+      "enum": "schedule.calendar_role",
+      "value": "mine"
+    },
+    {
       "description": "The member's own Campbooks calendar: no provider sees it.",
       "enum": "schedule.calendar_source",
       "value": "campbooks"
@@ -5099,6 +5210,7 @@
                   "enum": [
                     "conversation_history",
                     "find_conversations",
+                    "find_pages",
                     "find_people",
                     "free_time",
                     "my_calendar",
@@ -5106,6 +5218,7 @@
                     "my_tasks",
                     "read_conversation",
                     "read_event",
+                    "read_page",
                     "read_task",
                     "what_needs_me"
                   ],
@@ -5520,6 +5633,7 @@
                 "enum": [
                   "add_label",
                   "already_paid",
+                  "append_section",
                   "archive",
                   "create_event",
                   "delete_event",
@@ -5530,6 +5644,7 @@
                   "mark_read",
                   "mark_unread",
                   "move_to_stream",
+                  "new_page",
                   "not_needed",
                   "not_spam",
                   "plan_day",
@@ -5657,6 +5772,7 @@
                 "enum": [
                   "add_label",
                   "already_paid",
+                  "append_section",
                   "archive",
                   "create_event",
                   "delete_event",
@@ -5667,6 +5783,7 @@
                   "mark_read",
                   "mark_unread",
                   "move_to_stream",
+                  "new_page",
                   "not_needed",
                   "not_spam",
                   "plan_day",
@@ -5794,6 +5911,7 @@
                 "enum": [
                   "add_label",
                   "already_paid",
+                  "append_section",
                   "archive",
                   "create_event",
                   "delete_event",
@@ -5804,6 +5922,7 @@
                   "mark_read",
                   "mark_unread",
                   "move_to_stream",
+                  "new_page",
                   "not_needed",
                   "not_spam",
                   "plan_day",
@@ -15922,6 +16041,89 @@
       "version": 1
     },
     {
+      "action": "attached",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 21,
+      "description": "A member made attachments of a message files of a page, without copying their bytes: how many. Never their names, types or sizes, or which message.",
+      "fires_when": "pages.attach_from_message has attached every file it was asked for, in the transaction that stores them; a call that attaches nothing (any attachment unreadable) tracks nothing.",
+      "module": "pages",
+      "name": "pages.files_attached",
+      "object": "files",
+      "openspec_change": "pages-from-mail-and-scout",
+      "rust_type": "FilesAttached",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.files_attached:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member made attachments of a message files of a page, without copying their bytes: how many. Never their names, types or sizes, or which message.",
+        "properties": {
+          "files": {
+            "description": "How many attachments were attached: those of the call.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "files",
+          "page"
+        ],
+        "title": "pages.files_attached",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "raised",
       "actor_types": [
         "user",
@@ -17552,6 +17754,109 @@
           "table"
         ],
         "title": "pages.rows_queried",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "appended",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 21,
+      "description": "A section of Markdown was added at the end of a page, whether by the member or by Scout's proposal they confirmed: how many blocks and how many sources, in buckets. Never the Markdown, the sources or the page's title.",
+      "fires_when": "pages.append has stored the blocks it made, in that transaction; an append that changes nothing tracks nothing.",
+      "module": "pages",
+      "name": "pages.section_appended",
+      "object": "section",
+      "openspec_change": "pages-from-mail-and-scout",
+      "rust_type": "SectionAppended",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.section_appended:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A section of Markdown was added at the end of a page, whether by the member or by Scout's proposal they confirmed: how many blocks and how many sources, in buckets. Never the Markdown, the sources or the page's title.",
+        "properties": {
+          "blocks": {
+            "description": "How many blocks the section added.",
+            "enum": [
+              "few",
+              "many",
+              "none",
+              "one",
+              "some"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "sources": {
+            "description": "How many sources the section named.",
+            "enum": [
+              "few",
+              "many",
+              "none",
+              "one",
+              "some"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "blocks",
+          "page",
+          "sources"
+        ],
+        "title": "pages.section_appended",
         "type": "object"
       },
       "scope": "workspace",
@@ -20680,6 +20985,121 @@
       "version": 1
     },
     {
+      "action": "role_changed",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 22,
+      "description": "A member made a provider calendar their own (mine) or one they only follow. Never its name.",
+      "fires_when": "schedule.update_calendar stores another following than the calendar had, in that transaction.",
+      "module": "schedule",
+      "name": "schedule.calendar_role_changed",
+      "object": "calendar",
+      "openspec_change": "calendar-roles",
+      "rust_type": "CalendarRoleChanged",
+      "schema": {
+        "$id": "urn:campbooks:tracking:schedule.calendar_role_changed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member made a provider calendar their own (mine) or one they only follow. Never its name.",
+        "properties": {
+          "calendar": {
+            "additionalProperties": false,
+            "description": "The calendar afterwards.",
+            "properties": {
+              "connection_id": {
+                "description": "The connection it comes through (a connectors id), when it is a provider calendar.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "created_at": {
+                "description": "When it was added.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The calendar's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "member_id": {
+                "description": "The member whose calendar it is: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "primary": {
+                "description": "Whether it is its account's primary calendar.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "provider": {
+                "description": "Its provider, when it is a provider calendar.",
+                "enum": [
+                  "google",
+                  "zoho"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "source": {
+                "description": "Where it lives.",
+                "enum": [
+                  "campbooks",
+                  "provider"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "syncing": {
+                "description": "Whether it is on: its events sync and show.",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "writable": {
+                "description": "Whether events may be made on it.",
+                "type": "boolean",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "member_id",
+              "primary",
+              "source",
+              "syncing",
+              "writable"
+            ],
+            "title": "schedule.calendar",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "role": {
+            "description": "The role it has now: mine or following.",
+            "enum": [
+              "following",
+              "mine"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "calendar",
+          "role"
+        ],
+        "title": "schedule.calendar_role_changed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "applied",
       "actor_types": [
         "system"
@@ -23048,6 +23468,378 @@
       "version": 1
     },
     {
+      "action": "answered",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 20,
+      "description": "The member answered \"You replied. Is this done?\" with Not yet: the task stays open and the question is asked again only after a newer reply. Done is tracked as tasks.task_done.",
+      "fires_when": "tasks.answer_reply records the answer, in the transaction of the change.",
+      "module": "tasks",
+      "name": "tasks.task_reply_answered",
+      "object": "task_reply",
+      "openspec_change": "done-after-reply",
+      "rust_type": "TaskReplyAnswered",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_reply_answered:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The member answered \"You replied. Is this done?\" with Not yet: the task stays open and the question is asked again only after a newer reply. Done is tracked as tasks.task_done.",
+        "properties": {
+          "task": {
+            "additionalProperties": false,
+            "description": "The task afterwards.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "tasks.task_reply_answered",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "noticed",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 20,
+      "description": "The member replied in the conversation an open Do task of theirs came from, after the task was made, so the task now asks whether it is done. Nothing of the reply is read: the task keeps when it was sent and which message it was.",
+      "fires_when": "tasks.notice_replies marks the task, in the transaction of the change; a task already marked with this or a newer reply tracks nothing.",
+      "module": "tasks",
+      "name": "tasks.task_reply_noticed",
+      "object": "task_reply",
+      "openspec_change": "done-after-reply",
+      "rust_type": "TaskReplyNoticed",
+      "schema": {
+        "$id": "urn:campbooks:tracking:tasks.task_reply_noticed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The member replied in the conversation an open Do task of theirs came from, after the task was made, so the task now asks whether it is done. Nothing of the reply is read: the task keeps when it was sent and which message it was.",
+        "properties": {
+          "task": {
+            "additionalProperties": false,
+            "description": "The task afterwards.",
+            "properties": {
+              "assignee": {
+                "description": "The member it is with: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "closed_at": {
+                "description": "When it was closed, while it is.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_at": {
+                "description": "When it was made.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "created_by": {
+                "description": "The member who made it, or for whom Scout made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "due_at": {
+                "description": "The time it is due, when it has one (due_on is its local day).",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "due_on": {
+                "description": "The day it is due.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "handed_by": {
+                "description": "The member who handed it to the assignee, while it is handed off: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "has_amount": {
+                "description": "Whether it carries an amount read from the email (never the amount or its currency).",
+                "type": "boolean",
+                "x-classification": "operational"
+              },
+              "id": {
+                "description": "The task's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "later_until": {
+                "description": "When Later ends, for a later plan.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "origin": {
+                "description": "How it came to be.",
+                "enum": [
+                  "ask",
+                  "deadline",
+                  "own"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan": {
+                "description": "The plan as stored (a Later whose time has passed still says later).",
+                "enum": [
+                  "date",
+                  "later",
+                  "none"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "plan_on": {
+                "description": "The planned day, for a date plan.",
+                "format": "date",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the task.",
+                "type": "integer",
+                "x-classification": "operational"
+              },
+              "source": {
+                "additionalProperties": false,
+                "description": "The record it came from (a conversation), by reference; never the sender or the inbox.",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "type": "object",
+                "x-classification": "id"
+              },
+              "state": {
+                "description": "Whether it still needs doing.",
+                "enum": [
+                  "done",
+                  "not_needed",
+                  "open"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "updated_at": {
+                "description": "When it last changed.",
+                "format": "date-time",
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "verb": {
+                "description": "Something to do, or a bill to pay.",
+                "enum": [
+                  "do",
+                  "pay"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "assignee",
+              "created_at",
+              "created_by",
+              "has_amount",
+              "id",
+              "origin",
+              "plan",
+              "revision",
+              "state",
+              "updated_at",
+              "verb"
+            ],
+            "title": "tasks.task",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "tasks.task_reply_noticed",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "created",
       "actor_types": [
         "user"
@@ -24555,7 +25347,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-28",
-  "plan_version": 20,
+  "plan_version": 23,
   "properties": [
     {
       "classification": "operational",
@@ -27549,6 +28341,32 @@
     },
     {
       "classification": "operational",
+      "description": "How many attachments were attached: those of the call.",
+      "event": "pages.files_attached",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "files",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.files_attached",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "How many blocks are in conflict now that were not before.",
       "event": "pages.notion_conflict_raised",
       "example": "",
@@ -28082,6 +28900,45 @@
     },
     {
       "classification": "operational",
+      "description": "How many blocks the section added.",
+      "event": "pages.section_appended",
+      "example": "",
+      "list": false,
+      "of": "pages.count_bucket",
+      "pattern": "",
+      "property": "blocks",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.section_appended",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many sources the section named.",
+      "event": "pages.section_appended",
+      "example": "",
+      "list": false,
+      "of": "pages.count_bucket",
+      "pattern": "",
+      "property": "sources",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "The table page afterwards.",
       "event": "pages.table_created",
       "example": "",
@@ -28403,6 +29260,32 @@
       "property": "calendar_events",
       "required": true,
       "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The calendar afterwards.",
+      "event": "schedule.calendar_role_changed",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar",
+      "pattern": "",
+      "property": "calendar",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The role it has now: mine or following.",
+      "event": "schedule.calendar_role_changed",
+      "example": "",
+      "list": false,
+      "of": "schedule.calendar_role",
+      "pattern": "",
+      "property": "role",
+      "required": true,
+      "type": "enum",
       "version": 1
     },
     {
@@ -28864,6 +29747,32 @@
       "classification": "operational",
       "description": "The task, open again.",
       "event": "tasks.task_reopened",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task afterwards.",
+      "event": "tasks.task_reply_answered",
+      "example": "",
+      "list": false,
+      "of": "tasks.task",
+      "pattern": "",
+      "property": "task",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The task afterwards.",
+      "event": "tasks.task_reply_noticed",
       "example": "",
       "list": false,
       "of": "tasks.task",

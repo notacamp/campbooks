@@ -17,7 +17,9 @@
 //! asked about at most once in that time. Failures are logged by kind, and
 //! the subjects and the words never are.
 
-use campbooks_ai::{ChatRequest, ChatResponse, Message, decide::signals::email::subject_words};
+use campbooks_ai::{
+    ChatRequest, ChatResponse, Message, ReasoningEffort, decide::signals::email::subject_words,
+};
 use serde::Deserialize;
 use serde_json::json;
 use sqlx::PgConnection;
@@ -77,8 +79,11 @@ pub fn request_for(subjects: &[String]) -> ChatRequest {
         }),
     );
     request.temperature = Some(0.1);
-    // The model reasons before it answers and its thinking shares the budget.
-    request.max_tokens = Some(4096);
+    // The model reasons before it answers and its thinking shares the budget:
+    // low effort and room, as for a read (crates/ai/evals/complete/
+    // 2026-10-28-read-budget.md, campbooks-cloud#375).
+    request.max_tokens = Some(8192);
+    request.reasoning_effort = Some(ReasoningEffort::Low);
     request
 }
 
@@ -256,7 +261,8 @@ mod tests {
     fn the_request_holds_the_subjects_as_data_and_a_strict_schema() {
         let subjects = vec!["Your order 12 has shipped".to_owned(), "x".repeat(300)];
         let request = request_for(&subjects);
-        assert_eq!(request.max_tokens, Some(4096));
+        assert_eq!(request.max_tokens, Some(8192));
+        assert_eq!(request.reasoning_effort, Some(ReasoningEffort::Low));
         let sent: serde_json::Value = serde_json::from_str(&content(&request, 1)).unwrap();
         assert_eq!(sent["subjects"][0], "Your order 12 has shipped");
         assert_eq!(

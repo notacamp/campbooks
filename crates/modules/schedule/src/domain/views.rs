@@ -10,7 +10,8 @@ use super::{
     rows::{CalendarRow, EventRow},
 };
 use crate::model::{
-    CalendarId, CalendarSource, EventId, EventKind, EventNotice, EventOrigin, EventStatus, Response,
+    CalendarId, CalendarRole, CalendarSource, EventId, EventKind, EventNotice, EventOrigin,
+    EventStatus, Response,
 };
 
 /// A calendar of the member.
@@ -36,6 +37,10 @@ pub struct CalendarView {
     /// Whose calendar it is, `google` or `zoho`, when known (none for your
     /// Campbooks calendar).
     pub provider: Option<String>,
+    /// What it is to you: `mine`, `following` or `off`.
+    pub role: CalendarRole,
+    /// Whether the provider says the account owns it; none when it does not say.
+    pub owned: Option<bool>,
 }
 
 impl From<&CalendarRow> for CalendarView {
@@ -54,6 +59,8 @@ impl From<&CalendarRow> for CalendarView {
             writable: row.writable,
             primary: row.is_primary,
             provider: row.provider.clone(),
+            role: row.role(),
+            owned: row.owned,
         }
     }
 }

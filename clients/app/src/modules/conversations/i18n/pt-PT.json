@@ -169,6 +169,7 @@
   },
   "scout": {
     "label": "Ponto da situação",
+    "readFailed": "O Scout não conseguiu ler esta.",
     "suggestion": "Sugere {{stream}}",
     "suggestionNote": "O Campbooks acha que isto pertence a {{stream}}. É uma sugestão: nada sai do sítio sem a sua decisão.",
     "prompt": "Mover?",
@@ -193,7 +194,11 @@
     "whyUrgent": "Urgente",
     "whySuspicious": "Suspeita",
     "whyMoney": "Pagamento",
-    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra"
+    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra",
+    "taskOpen": "A sua tarefa «{{title}}» continua aberta.",
+    "taskPrompt": "Está feita?",
+    "taskDone": "Feita",
+    "taskNotYet": "Ainda não"
   },
   "reasons": {
     "signals": {
@@ -341,7 +346,10 @@
         "filename_missing": "Não é possível anexar um ficheiro sem nome.",
         "attachment_blocked": "{{name}} não foi anexado: os fornecedores de correio bloqueiam este tipo de ficheiro.",
         "attachments_too_large": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{max}} MB.",
-        "too_many_attachments": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{files}} ficheiros."
+        "too_many_attachments": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{files}} ficheiros.",
+        "attachments_too_large_for_mailbox": "{{name}} não foi anexado: esta caixa de correio só envia {{max}} MB de anexos numa mensagem.",
+        "upload_incomplete": "{{name}} não chegou completo. Tente anexá-lo outra vez.",
+        "request_timed_out": "{{name}} demorou demasiado a carregar. Tente outra vez com uma ligação mais rápida, ou anexe um ficheiro mais pequeno."
       }
     },
     "scheduled": "Agendado para {{time}}"

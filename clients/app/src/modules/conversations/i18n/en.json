@@ -169,6 +169,7 @@
   },
   "scout": {
     "label": "Where things stand",
+    "readFailed": "Scout couldn’t read this one.",
     "suggestion": "Suggests {{stream}}",
     "suggestionNote": "Campbooks thinks this belongs in {{stream}}. It is a suggestion: nothing moves until you say so.",
     "prompt": "Move it?",
@@ -193,7 +194,11 @@
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspicious",
     "whyMoney": "Payment",
-    "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
+    "sortedTaught": "Campbooks put this in {{stream}}, by a rule",
+    "taskOpen": "Your task “{{title}}” is still open.",
+    "taskPrompt": "Is it done?",
+    "taskDone": "Done",
+    "taskNotYet": "Not yet"
   },
   "reasons": {
     "signals": {
@@ -341,7 +346,10 @@
         "filename_missing": "A file without a name can't be attached.",
         "attachment_blocked": "{{name}} wasn't attached: mail providers block this kind of file.",
         "attachments_too_large": "{{name}} wasn't attached: a message can carry {{max}} MB at most.",
-        "too_many_attachments": "{{name}} wasn't attached: a message can carry {{files}} files at most."
+        "too_many_attachments": "{{name}} wasn't attached: a message can carry {{files}} files at most.",
+        "attachments_too_large_for_mailbox": "{{name}} wasn't attached: this mailbox can send {{max}} MB of attachments in one message.",
+        "upload_incomplete": "{{name}} didn't arrive whole. Try attaching it again.",
+        "request_timed_out": "{{name}} took too long to upload. Try again on a faster connection, or attach a smaller file."
       }
     },
     "scheduled": "Scheduled for {{time}}"

@@ -499,6 +499,31 @@ pub fn event(detail: &Value, read: Option<&Value>) -> Value {
     out
 }
 
+/// A page read as text (`pages.read_text`'s answer), cut to `budget` bytes of
+/// text at a character boundary, and ended with the cut marker when cut. The
+/// text is the page's own words: displayable characters only, and read as
+/// data, never as instructions (the handbook says so).
+pub fn page(read: &Value, budget: usize) -> Value {
+    let text = clean(read["markdown"].as_str().unwrap_or_default());
+    let kept = cut(&text, budget);
+    json!({
+        "text": kept,
+        "truncated": read["truncated"] == true || kept.len() < text.len(),
+    })
+}
+
+/// A page as `find_pages` lists it: its id, title, place and when it was
+/// changed, never any of its text.
+pub fn page_row(page: &Value) -> Value {
+    json!({
+        "id": page["id"],
+        "title": short(&page["title"]),
+        "place": page["place"],
+        "edited_at": page["edited_at"],
+        "sub_page": !page["parent"].is_null(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

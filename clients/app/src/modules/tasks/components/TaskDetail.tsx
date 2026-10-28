@@ -1,13 +1,10 @@
-import { useNavigate } from "@tanstack/react-router";
-import { useState, type MouseEvent } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
 import { taskRef, useScoutChat } from "~/lib/scout-chat";
 import {
-  Avatar,
   Button,
-  ButtonLink,
   Chip,
   ChipRow,
   DatePicker,
@@ -23,13 +20,22 @@ import {
 
 import type { TaskView } from "../api/queries";
 import { holdable, type HoldSources } from "../hold";
-import { dayLabel, isLater, isoDay, laterChoices, laterOnDay, whenLabel } from "../model";
+import {
+  dayLabel,
+  isLater,
+  isoDay,
+  laterChoices,
+  laterOnDay,
+  replyWhen,
+  whenLabel,
+} from "../model";
 import type { TaskSource } from "../source";
 import { heldText } from "../task-text";
 
 import { DueChips } from "./DueChips";
 import { HandOff } from "./HandOff";
 import { HoldTime } from "./HoldTime";
+import { TaskStory } from "./TaskStory";
 import type { useTaskActions } from "./use-task-actions";
 
 export interface TaskDetailProps {
@@ -70,7 +76,6 @@ export function TaskDetail({
 }: TaskDetailProps) {
   const { t: typed, i18n } = useTranslation("tasks");
   const t = typed as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const navigate = useNavigate();
   const [title, setTitle] = useState(task.title);
   const [changingDue, setChangingDue] = useState(false);
   const [pickingDay, setPickingDay] = useState(false);
@@ -106,6 +111,22 @@ export function TaskDetail({
     });
   };
   useShortcut("scout.ask", askScout, { enabled: scout !== undefined });
+  // "You replied. Is this task done?": 1 is Done, 2 is Not yet.
+  const asking = task.asks_done && mine;
+  useShortcut(
+    "item.choice1",
+    () => {
+      actions.done(task);
+    },
+    { enabled: asking },
+  );
+  useShortcut(
+    "item.choice2",
+    () => {
+      actions.notYet(task);
+    },
+    { enabled: asking },
+  );
 
   const held = heldText(task, t, i18n.language);
   const canHold = holdSources !== undefined && holdable(task);
@@ -115,14 +136,6 @@ export function TaskDetail({
       : later && task.later_until !== null && task.later_until !== undefined
         ? t("plan.later", { date: whenLabel(task.later_until, i18n.language) })
         : undefined;
-
-  const openEmail = (event: MouseEvent<HTMLElement>) => {
-    if (source === undefined || event.metaKey || event.ctrlKey || event.shiftKey) {
-      return;
-    }
-    event.preventDefault();
-    void navigate({ to: source.href });
-  };
 
   return (
     <>
@@ -336,35 +349,46 @@ export function TaskDetail({
           </section>
         ) : null}
 
-        {source === undefined ? null : (
-          <section className="flex flex-col gap-2">
-            <Heading level={3} size="section">
-              {t("detail.source")}
-            </Heading>
-            {task.origin === "ask" ? (
-              <Text tone="secondary" size="sm">
-                {t("detail.foundByScout")}
+        {task.asks_done && task.replied !== null && task.replied !== undefined ? (
+          // You replied in the task's thread: is it done? (campbooks-cloud#396)
+          <section className="flex flex-col gap-3" aria-label={t("detail.replyQuestion.done")}>
+            <div className="flex flex-col gap-1">
+              <Text weight="medium">
+                {t("detail.replyQuestion.replied", {
+                  name: source?.name ?? t("detail.someone"),
+                  time: replyWhen(task.replied.at, i18n.language, clock),
+                })}
               </Text>
-            ) : null}
-            <div className="flex items-center gap-2">
-              <Avatar name={source.name} />
-              <div className="flex min-w-0 flex-col">
-                <Text weight="medium">{source.name}</Text>
-                <Text tone="secondary" size="sm">
-                  {t("detail.sourceLine", {
-                    subject: source.subject,
-                    date: whenLabel(source.date, i18n.language),
-                  })}
-                </Text>
+              <Text tone="secondary">{t("detail.replyQuestion.done")}</Text>
+            </div>
+            {mine ? (
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  shortcut="item.choice1"
+                  onClick={() => {
+                    actions.done(task);
+                  }}
+                >
+                  {t("detail.done")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  shortcut="item.choice2"
+                  onClick={() => {
+                    actions.notYet(task);
+                  }}
+                >
+                  {t("detail.notYet")}
+                </Button>
               </div>
-            </div>
-            <div>
-              <ButtonLink variant="link" href={source.href} onClick={openEmail}>
-                {t("detail.openEmail")}
-              </ButtonLink>
-            </div>
+            ) : null}
           </section>
-        )}
+        ) : null}
+
+        <TaskStory workspaceId={workspaceId} task={task} me={me} source={source} />
 
         <HandOff
           workspaceId={workspaceId}

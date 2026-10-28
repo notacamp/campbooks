@@ -78,7 +78,8 @@ pub fn standing(
     if row.deleted_at.is_some() || row.pushed_to.is_some() {
         return Err(InvitationClosed::Removed);
     }
-    if calendar.is_campbooks() || !calendar.syncing || row.series_id.is_some() {
+    if calendar.is_campbooks() || !calendar.syncing || calendar.following || row.series_id.is_some()
+    {
         return Err(InvitationClosed::Hidden);
     }
     let Some((on, lapses_at)) = lapse(row, zone) else {

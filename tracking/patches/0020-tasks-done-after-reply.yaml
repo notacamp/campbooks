@@ -1,0 +1,53 @@
+# "You replied. Done?" (campbooks-cloud#396, OpenSpec change
+# done-after-reply): an open Do task asks whether it is done once the member
+# replies in the conversation it came from. Two events of the tasks module:
+# the reply noticed (a fact of ids and times, no message is read) and the
+# member's Not yet. Done is the existing tasks.task_done. Never the title,
+# the sender or the reply. Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0020-tasks-done-after-reply.yaml`.
+changelog:
+  - date: "2026-10-28"
+    plan_version: 20
+    change: "You replied. Done? (campbooks-cloud#396): tasks.task_reply_noticed (a reply of the member in the conversation an open Do task came from) and tasks.task_reply_answered (the member answered Not yet); Coverage for tasks.notice_replies, tasks.answer_reply and tasks.unanswer_reply."
+    pr: "#697"
+
+events:
+  - name: "tasks.task_reply_noticed"
+    version: 1
+    module: "tasks"
+    object: "task_reply"
+    action: "noticed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "The member replied in the conversation an open Do task of theirs came from, after the task was made, so the task now asks whether it is done. Nothing of the reply is read: the task keeps when it was sent and which message it was."
+    fires_when: "tasks.notice_replies marks the task, in the transaction of the change; a task already marked with this or a newer reply tracks nothing."
+    added_in: 20
+    openspec_change: "done-after-reply"
+  - name: "tasks.task_reply_answered"
+    version: 1
+    module: "tasks"
+    object: "task_reply"
+    action: "answered"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "The member answered \"You replied. Is this done?\" with Not yet: the task stays open and the question is asked again only after a newer reply. Done is tracked as tasks.task_done."
+    fires_when: "tasks.answer_reply records the answer, in the transaction of the change."
+    added_in: 20
+    openspec_change: "done-after-reply"
+
+properties:
+  - { event: "tasks.task_reply_noticed", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task afterwards." }
+  - { event: "tasks.task_reply_answered", version: 1, property: "task", type: "record", of: "tasks.task", required: true, classification: "operational", description: "The task afterwards." }
+
+coverage:
+  - kind: "handler"
+    name: "tasks.notice_replies"
+    events: [tasks.task_reply_noticed]
+  - kind: "operation"
+    name: "tasks.answer_reply"
+    events: [tasks.task_reply_answered]
+  - kind: "operation"
+    name: "tasks.unanswer_reply"
+    exemption: "the undo of tasks.answer_reply: it puts the question back on the task, so the answer it undoes stays the one on record"

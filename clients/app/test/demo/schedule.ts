@@ -26,6 +26,7 @@ export const CAMPBOOKS: Calendar = {
   primary: false,
   syncing: true,
   writable: true,
+  role: "mine",
   color: null,
   time_zone: SCHEDULE_ZONE,
 };
@@ -37,6 +38,7 @@ const PERSONAL: Calendar = {
   primary: true,
   syncing: true,
   writable: true,
+  role: "mine",
   color: "#2b7fb8",
   time_zone: SCHEDULE_ZONE,
 };
@@ -48,6 +50,7 @@ const WORK: Calendar = {
   primary: false,
   syncing: true,
   writable: true,
+  role: "mine",
   color: "#2f9e6b",
   time_zone: SCHEDULE_ZONE,
 };
@@ -59,6 +62,7 @@ export const HOLIDAYS: Calendar = {
   primary: false,
   syncing: false,
   writable: false,
+  role: "off",
   color: "#b88a2b",
   time_zone: SCHEDULE_ZONE,
 };
@@ -416,6 +420,7 @@ const task = (n: number, over: Partial<Task>): Task => ({
   created_by: ANA.user_id,
   handed_by: null,
   source: null,
+  asks_done: false,
   revision: 1,
   created_at: "2026-10-20T09:00:00Z",
   updated_at: "2026-10-20T09:00:00Z",

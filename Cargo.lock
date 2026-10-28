@@ -798,6 +798,7 @@ dependencies = [
  "figment",
  "futures-util",
  "html5ever",
+ "http-body-util",
  "icalendar",
  "regex",
  "scraper",
