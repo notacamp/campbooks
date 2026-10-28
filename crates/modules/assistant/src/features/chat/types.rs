@@ -123,6 +123,10 @@ pub enum ChatTool {
     FreeTime,
     /// Read one event of your calendar.
     ReadEvent,
+    /// Looked for your pages (campbooks-cloud#364).
+    FindPages,
+    /// Read one of your pages as text.
+    ReadPage,
 }
 
 /// One thing Scout looked at, built by the server from the tool that ran,
@@ -340,6 +344,22 @@ pub enum ProposalAction {
     PushEvent,
     /// Take an event off a provider calendar (`event.calendar`).
     UnpushEvent,
+    /// Add a section at the end of a page (`detail.markdown`,
+    /// `detail.sources`; `page` names it).
+    AppendSection,
+    /// Make a new private page (`detail.title`, `detail.markdown`,
+    /// `detail.sources`).
+    NewPage,
+}
+
+/// A page's own facts, read from its record when the proposal was made:
+/// what a card names, never the model's words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ProposalPage {
+    /// Its title, as the member wrote it (empty when it has none yet).
+    pub title: String,
+    /// `private` or `workspace`: who will read what is added.
+    pub place: String,
 }
 
 /// A calendar event's own facts, read from its record when the proposal was
@@ -427,6 +447,15 @@ pub struct ProposalDetail {
     /// list names it: read by the server, never the model's words.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calendar_name: Option<String>,
+    /// The section, or the new page's body, as Markdown (`append_section`,
+    /// `new_page`): Scout's words, shown as the page would show them, never
+    /// as HTML.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub markdown: Option<String>,
+    /// The threads, tasks, events or pages the section draws on
+    /// (`append_section`, `new_page`), each one the member can read.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<RecordRef>,
 }
 
 /// An HTTP method a proposal's request may use.
@@ -488,6 +517,10 @@ pub struct ChatProposal {
     /// `record` is the event.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event: Option<ProposalEvent>,
+    /// The page's own facts (a page change except a new page without a
+    /// parent); its `record` is the page, or the parent of a new one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<ProposalPage>,
     /// What the change takes (a change only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<ProposalDetail>,
