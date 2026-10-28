@@ -1275,10 +1275,10 @@ fn body(world: &World, id: &str) -> Option<Value> {
         }),
         "pages.resolve_conflict" => json!({"keep": "mine"}),
         "pages.resolve_table_conflict" => json!({"keep": "ours"}),
-        // The bytes of a file: this text.
-        "pages.upload_file" => json!({"file": "matrix"}),
-        // The bytes of a file for a draft, named in the query: this text.
-        "conversations.upload_draft_attachment" => json!({"file": "matrix"}),
+        // The bytes of a file (for a draft, named in the query): this text.
+        "pages.upload_file" | "conversations.upload_draft_attachment" => {
+            json!({"file": "matrix"})
+        }
         // Tables: a table, its select property, a row and a view are seeded.
         "pages.create_table" => json!({"title": "Matrix table"}),
         "pages.add_property" => json!({"name": "Notes", "type": "text"}),
