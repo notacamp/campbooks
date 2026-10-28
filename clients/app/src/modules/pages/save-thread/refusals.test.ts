@@ -32,7 +32,12 @@ describe("refusalOf", () => {
   });
 
   it("says the file is too large without a name when it cannot tell which", () => {
-    expect(refusalOf(refused(413), [files[0]!, { name: "b.pdf", size: 5 }])).toEqual({
+    expect(
+      refusalOf(refused(413), [
+        { name: "a.pdf", size: 5 },
+        { name: "b.pdf", size: 5 },
+      ]),
+    ).toEqual({
       reason: "tooLarge",
       name: undefined,
     });
@@ -58,8 +63,8 @@ describe("tooLarge", () => {
 
 describe("refusalText", () => {
   it("says each refusal in its own words, with the file's name", () => {
-    const t = (key: string, options: Record<string, unknown> = {}) =>
-      `${key}${options["name"] === undefined ? "" : `:${String(options["name"])}`}`;
+    const t = (key: string, options: { name?: string } = {}) =>
+      `${key}${options.name === undefined ? "" : `:${options.name}`}`;
     expect(refusalText(t, { reason: "scope" })).toBe("saveToPage.refused.scope");
     expect(refusalText(t, { reason: "changed" })).toBe("saveToPage.refused.changed");
     expect(refusalText(t, { reason: "tooLarge", name: "logo-pack.zip" })).toBe(

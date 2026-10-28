@@ -7,4 +7,4 @@ export { PAGES_SHORTCUTS } from "./shortcuts";
 export { useMailScoutAvailable } from "./api/mail-scout";
 export { SaveToPageDialog } from "./save-thread/SaveToPageDialog";
 export type { SaveThread, SaveThreadMessage } from "./save-thread/thread";
-export { usePageSubject } from "./scout-subjects";
+export { usePageSubject, usePageTrail } from "./scout-subjects";

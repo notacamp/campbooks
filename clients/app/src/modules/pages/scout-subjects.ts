@@ -21,3 +21,24 @@ export function usePageSubject(workspaceId: string, pageId: string | undefined):
     failed: pages.isError || (pages.isSuccess && pageId !== undefined && page === undefined),
   };
 }
+
+/**
+ * Where a page sits, outermost first, the page itself last: "Clients",
+ * "Acme", "Kickoff notes". Read from the tree the member can open, so an
+ * ancestor they cannot open is not named.
+ */
+export function usePageTrail(workspaceId: string, pageId: string | undefined): string[] {
+  const pages = usePages(workspaceId).data ?? [];
+  const trail: string[] = [];
+  let at = pages.find((candidate) => candidate.id === pageId);
+  // A tree is finite, but never trust it to be acyclic.
+  for (let depth = 0; at !== undefined && depth < 32; depth += 1) {
+    trail.unshift(at.title);
+    const parent = at.parent;
+    at =
+      parent === null || parent === undefined
+        ? undefined
+        : pages.find((page) => page.id === parent);
+  }
+  return trail;
+}

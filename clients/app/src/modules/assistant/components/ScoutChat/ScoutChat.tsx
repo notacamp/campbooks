@@ -197,6 +197,14 @@ export function ScoutChat({
     head === undefined ? "" : head.subject === "" ? t("chat.noSubject") : head.subject;
   const firstName = inbound?.from.name?.trim().split(/\s+/u, 1)[0] ?? "";
 
+  /** A card sends the member to a page or a thread: a narrow chat is in the way. */
+  const leaveChat = () => {
+    const wide = typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
+    if (!wide) {
+      onClose();
+    }
+  };
+
   const openConversation = (summary: Pick<ConversationSummary, "id" | "stream">) => {
     const wide = typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
     if (!wide) {
@@ -424,6 +432,7 @@ export function ScoutChat({
                 onSettled={() => {
                   void cache.refresh(chat.data.id);
                 }}
+                onLeave={leaveChat}
               />
             )
           }

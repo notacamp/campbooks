@@ -398,6 +398,46 @@
         "title": "A reply to {{sender}}",
         "write": "Write the draft",
         "done": "Draft opened. You send it, or not."
+      },
+      "page": {
+        "unknown": "A change to a page",
+        "addTo": "Add to “{{title}}”",
+        "newPage": "New page",
+        "newUnder": "New page under “{{parent}}”",
+        "untitled": "Untitled",
+        "added": "Added",
+        "cannotShow": "Scout’s proposal doesn’t say what it would add or who would read it, so it can’t be added here. Nothing was changed.",
+        "add": "Add to page",
+        "edit": "Edit first",
+        "preview": "Back to preview",
+        "discard": "Discard",
+        "open": "Open page",
+        "readersLabel": "Who will read it",
+        "readers": {
+          "everyone": "Everyone in the workspace",
+          "only": "Only you",
+          "you": "You",
+          "others_one": "{{count}} other",
+          "others_other": "{{count}} others",
+          "and": "and"
+        },
+        "notion": "Sent to Notion too",
+        "editLabel": "The text to add, as Markdown",
+        "left_one": "{{count}} character left",
+        "left_other": "{{count}} characters left",
+        "tooLong": "This is over 16 KB, more than a section can hold. Shorten it.",
+        "showAll": "Show all",
+        "showLess": "Show less",
+        "sources": "What it draws on",
+        "source": {
+          "thread": "Thread",
+          "task": "Task",
+          "event": "Event",
+          "page": "Page",
+          "other": "Source"
+        },
+        "todoDone": "Done",
+        "todoOpen": "Not done"
       }
     },
     "recent": "Recent",

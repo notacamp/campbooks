@@ -631,6 +631,12 @@ export interface ChatProposalProps {
   quote?: string | undefined;
   /** Who the quote is from: "Scout’s words". */
   quoteLabel?: string | undefined;
+  /**
+   * What the member is confirming, shown in full under the title: a section
+   * as the page would show it, who will read it. Anything the card must show
+   * before Confirm belongs here, not behind a link.
+   */
+  body?: ReactNode | undefined;
   /** Where it stands; `pending` is the only state with a choice to make. */
   state: ChatProposalState;
   /** The state as a sentence once it is not pending: "Done.", "Not now.". */
@@ -651,6 +657,7 @@ export function ChatProposal({
   about,
   quote,
   quoteLabel,
+  body,
   state,
   status,
   actions,
@@ -667,6 +674,7 @@ export function ChatProposal({
         {title}
       </h3>
       {about === undefined ? null : <p className={styles["proposalAbout"]}>{about}</p>}
+      {body === undefined ? null : <div className={styles["proposalBody"]}>{body}</div>}
       {quote === undefined ? null : (
         <figure className={styles["proposalQuote"]}>
           <blockquote className={styles["proposalQuoteText"]}>

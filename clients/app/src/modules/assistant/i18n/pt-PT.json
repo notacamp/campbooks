@@ -398,6 +398,46 @@
         "title": "Uma resposta a {{sender}}",
         "write": "Escrever o rascunho",
         "done": "Rascunho aberto. É você quem o envia, ou não."
+      },
+      "page": {
+        "unknown": "Uma alteração a uma página",
+        "addTo": "Juntar a “{{title}}”",
+        "newPage": "Página nova",
+        "newUnder": "Página nova em “{{parent}}”",
+        "untitled": "Sem título",
+        "added": "Junto",
+        "cannotShow": "A proposta do Scout não diz o que juntaria nem quem a leria, por isso não pode ser junta aqui. Nada foi alterado.",
+        "add": "Juntar à página",
+        "edit": "Editar primeiro",
+        "preview": "Voltar à pré-visualização",
+        "discard": "Descartar",
+        "open": "Abrir a página",
+        "readersLabel": "Quem vai ler",
+        "readers": {
+          "everyone": "Todos no espaço de trabalho",
+          "only": "Só você",
+          "you": "Você",
+          "others_one": "mais {{count}} pessoa",
+          "others_other": "mais {{count}} pessoas",
+          "and": "e"
+        },
+        "notion": "Também é enviado para o Notion",
+        "editLabel": "O texto a juntar, em Markdown",
+        "left_one": "Resta {{count}} carácter",
+        "left_other": "Restam {{count}} caracteres",
+        "tooLong": "Isto passa os 16 KB, mais do que uma secção comporta. Encurte-o.",
+        "showAll": "Mostrar tudo",
+        "showLess": "Mostrar menos",
+        "sources": "Em que se baseia",
+        "source": {
+          "thread": "Conversa",
+          "task": "Tarefa",
+          "event": "Evento",
+          "page": "Página",
+          "other": "Fonte"
+        },
+        "todoDone": "Feito",
+        "todoOpen": "Por fazer"
       }
     },
     "recent": "Recentes",
