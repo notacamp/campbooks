@@ -216,10 +216,7 @@ type Translate = ReturnType<typeof useTranslation<"pages">>["t"];
 /** The import button: what is ticked, in words (pages, databases, or both). */
 function submitLabel(t: Translate, pages: number, databases: number, offersDatabases: boolean) {
   if (pages > 0 && databases > 0) {
-    return t("notion.import.submitBoth", {
-      pages: t("notion.import.pagesCount", { count: pages }),
-      databases: t("notion.import.databases.count", { count: databases }),
-    });
+    return t("notion.import.submitItems", { count: pages + databases });
   }
   if (databases > 0) {
     return t("notion.import.databases.submit", { count: databases });

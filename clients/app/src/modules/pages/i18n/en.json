@@ -261,7 +261,6 @@
       "pagesHeading": "Pages",
       "pagesCount_one": "{{count}} page",
       "pagesCount_other": "{{count}} pages",
-      "submitBoth": "Import {{pages}} and {{databases}}",
       "doneTables_one": "Imported {{count}} table from Notion",
       "doneTables_other": "Imported {{count}} tables from Notion",
       "doneBoth": "Imported {{pages}} and {{tables}} from Notion",
@@ -272,8 +271,6 @@
         "listLabel": "Databases from Notion",
         "columns_one": "{{count}} column",
         "columns_other": "{{count}} columns",
-        "count_one": "{{count}} database",
-        "count_other": "{{count}} databases",
         "tablesCount_one": "{{count}} table",
         "tablesCount_other": "{{count}} tables",
         "submit_one": "Import {{count}} database",
@@ -281,7 +278,9 @@
         "submitNone": "Import",
         "truncated": "Notion lists more databases than are shown here. Share fewer databases in Notion to see the rest.",
         "failed": "Databases couldn’t be listed just now. Pages can still be imported."
-      }
+      },
+      "submitItems_one": "Import {{count}} item",
+      "submitItems_other": "Import {{count}} items"
     },
     "sync": {
       "label": "Sync with Notion",

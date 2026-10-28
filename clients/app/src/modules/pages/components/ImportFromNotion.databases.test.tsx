@@ -111,7 +111,7 @@ describe("ImportFromNotion with Notion databases", () => {
     const dialog = await screen.findByRole("dialog", { name: "Import from Notion" });
     fireEvent.click(within(dialog).getByLabelText("Meeting notes"));
     fireEvent.click(within(dialog).getByLabelText("Clients"));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Import 1 page and 1 database" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Import 2 items" }));
     await waitFor(() => {
       expect(mocked.calls.some((c) => c.route === `POST ${W}/pages/notion/imports`)).toBe(true);
     });
