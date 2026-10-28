@@ -3535,37 +3535,57 @@ Messages SHALL not be asked their other questions again.
 ### Requirement: Who the caller exchanges mail with
 `GET /api/v1/w/{workspace_id}/correspondents` (`conversations.list_correspondents`,
 `conversations:read`) SHALL list the people the inboxes the caller can read
-exchange mail with: the senders of their inbound mail and the To and Cc
-recipients of their sent mail. Each person SHALL carry their address
-(lower-cased), the newest display name seen for it in either direction,
-`wrote` (sent messages that had them in To or Cc, each message once) and
-`received` (inbound messages from them); never a subject or any text. `q`
+exchange mail with: the senders of their inbound mail, the To and Cc
+recipients of their inbound mail, and the To and Cc recipients of their sent
+mail. Each person SHALL carry their address (lower-cased), the newest display
+name seen for it in any of these, `wrote` (sent messages that had them in To
+or Cc, each message once) and `received` (inbound messages from them); never
+a subject or any text. `q`
 SHALL be required, 2 to 100 characters; every one of its words (at most
 five, split on spaces and commas) SHALL be in the person's address or a
 display name seen for them, case- and accent-insensitively, and `%`, `_` and
 `\` in it SHALL match themselves. `limit` SHALL be 1 to 10 (default 10). A
 `q` or `limit` out of range SHALL get 400 `invalid_correspondents_query`.
 There SHALL be no cursor. The answer SHALL be ordered by `wrote`, then
-`received`, both most first, then by address. It SHALL read only the newest
+`received`, then the inbound messages that had them in To or Cc (each
+message once), all most first, then by address. It SHALL read only the newest
 mail of those inboxes: the last 365 days, at most 5,000 inbound messages
 (not in spam or the trash) and at most 5,000 sent messages, newest first,
 each through a partial index, so its cost doesn't grow with an inbox's
 history. The addresses of the inboxes it reads SHALL never be listed, and
 mail in inboxes the caller cannot read SHALL never count. A person the
 caller's inboxes wrote to SHALL always be listed when `q` finds them. A
-person who only wrote in SHALL be listed only when `list_senders` with
-`reachable=true` would list them: not a no-reply address, their newest mail
-in the window not failing their sender checks nor refused by their DMARC
-policy, and none of their own mail in the window reported, under review or
-holding a `suspicious` answer of `true` no member corrected. That check
-SHALL run person by person in ranking order, only until the answer is full,
-so its cost doesn't grow either. Facts only (addresses, display names, the
+person who wrote in and was never written to SHALL be listed only when
+`list_senders` with `reachable=true` would list them: not a no-reply address,
+their newest mail in the window not failing their sender checks nor refused
+by their DMARC policy, and none of their own mail in the window reported,
+under review or holding a `suspicious` answer of `true` no member corrected.
+A person only copied on inbound mail (never written to, never wrote in) SHALL
+be listed only when they are not a no-reply address, none of their own mail
+in the window is flagged as above, and the newest inbound message that had
+them in To or Cc came from a sender who may be written to: that message not
+failing its sender's checks nor refused by their DMARC policy, and none of
+that sender's mail in the window flagged as above. Those checks SHALL run
+person by person in ranking order, only until the answer is full, so their
+cost doesn't grow either. Facts only (addresses, display names, the
 provider's authentication results, stored answers, needs and corrections),
 never what the mail says.
 
 #### Scenario: By name or by domain
 - **WHEN** Sam asks with `q=okáfor`, and then with `q=northwind`
-- **THEN** both answers list maya@northwind-studio.example as "Maya Okafor", and neither lists leo@northwind-studio.example, only copied on Maya's email
+- **THEN** the first lists maya@northwind-studio.example as "Maya Okafor", and the second lists Maya first and then leo@northwind-studio.example, copied on Maya's email
+
+#### Scenario: Copied on received mail
+- **WHEN** Maya's email to Sam had Leo Park in Cc, and Sam never wrote to Leo and Leo never wrote to Sam
+- **THEN** `q=leo` lists leo@northwind-studio.example as "Leo Park" with `wrote` 0 and `received` 0
+
+#### Scenario: Copied after those who wrote
+- **WHEN** one Rivera wrote to Sam once, another was copied on three emails Sam received, and a third on one
+- **THEN** `q=rivera` lists the one who wrote first, then the one copied three times, then the one copied once
+
+#### Scenario: Copied by someone not to write to
+- **WHEN** a sender under review copied helpdesk@at3lier-sol.example and Sam never wrote to that address
+- **THEN** no `q` lists it, until Sam writes to it
 
 #### Scenario: Only written to
 - **WHEN** Sam wrote to dana@harbour-books.example and Dana never wrote back
@@ -3589,7 +3609,7 @@ never what the mail says.
 
 #### Scenario: Never yourself
 - **WHEN** Sam asks with `q=sam`
-- **THEN** sam@example.com, the inbox's own address, is not listed
+- **THEN** sam@example.com, the inbox's own address, is not listed, though it is in To of the mail Sam receives
 
 #### Scenario: Out of range
 - **WHEN** a caller asks with `q=a`, with `q` of only spaces, or with `limit=11`
@@ -3861,7 +3881,8 @@ A need that is a question about a reply or an action (`review`, trust
 `check`, question `needs_reply` or `asks_action`) on a message that went to
 people besides the inbox SHALL carry `unsure` in its summary: those people
 (`To` before `Cc`, as the headers gave them, without the inbox, the sender and
-no-reply or service addresses, at most six), whether the inbox is in `To` and whether it is in `Cc`, the
+addresses that cannot answer, at most six; a role address stays), each named
+by its display name (header name, else organisation, else address), whether the inbox is in `To` and whether it is in `Cc`, the
 one natural party (the person the model's `awaited` answer named, when its
 stored option still names that address, else the only other person in `To`;
 none when neither exists), the days since the message when none of those
@@ -3869,7 +3890,8 @@ people wrote to the inbox since (none when one did), and the model's
 confidence and the sure bar of the question in whole percent. It SHALL be
 worked out from the headers, the stored answers and the inbox's messages
 only, never from what a message says. A message that went to nobody else
-SHALL carry none.
+SHALL carry none. The person a `waiting` or `nudge` need waits on SHALL be
+named the same way.
 
 #### Scenario: Copied on mail between others
 - **WHEN** João writes to Ana Costa, copying the inbox, and the model answers `needs_reply` true at 0.97
@@ -3882,6 +3904,10 @@ SHALL carry none.
 #### Scenario: She wrote back
 - **WHEN** Ana Costa wrote to the inbox after João's message
 - **THEN** `unsure` carries no days unanswered
+
+#### Scenario: A shared mailbox
+- **WHEN** Sam wrote to "Geral" <geral@aguas-ribatejo.example>
+- **THEN** `unsure` lists it as "Aguas Ribatejo"
 
 ### Requirement: Someone else has the move
 `POST /api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve`
