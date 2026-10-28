@@ -113,6 +113,12 @@ async fn hold(
         }
         None => ensure_campbooks_calendar(tx, workspace, member).await?,
     };
+    // A calendar the member only follows is not theirs to put time on.
+    if calendar.following {
+        return Err(Error::BadRequest(
+            crate::MESSAGES.reason("calendar_followed"),
+        ));
+    }
     ensure_writable(&calendar)?;
     let settings = settings::load(tx, member).await?;
     let id = EventId::new();

@@ -22,7 +22,8 @@
           "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "The provider's colour for it." },
           "time_zone": { "type": "string", "maxLength": 64, "description": "An IANA time zone name." },
           "primary": { "type": "boolean", "description": "The account's primary calendar: the one that syncs at first." },
-          "writable": { "type": "boolean", "description": "Whether events may be created and changed on it." }
+          "writable": { "type": "boolean", "description": "Whether events may be created and changed on it." },
+          "owned": { "type": "boolean", "description": "Whether the account owns the calendar (Google accessRole owner, Zoho privilege owner); absent when the provider does not say." }
         }
       }
     }

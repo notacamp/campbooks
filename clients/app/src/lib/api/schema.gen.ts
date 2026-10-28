@@ -2066,7 +2066,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Turn a calendar on or off, or colour it. */
+        /** Set a calendar's role, turn it on or off, or colour it. */
         patch: operations["schedule.update_calendar"];
         trace?: never;
     };
@@ -3582,12 +3582,19 @@ export interface components {
         CalendarPatch: {
             /** @description Its colour as `#rrggbb`; empty goes back to the provider's. */
             color?: string | null;
+            role?: components["schemas"]["CalendarRole"] | null;
             /**
              * @description Show its events (a provider calendar only). Turning it on asks
              *     connectors to read it again from the start.
              */
             syncing?: boolean | null;
         };
+        /**
+         * @description What a calendar is to the member: their own, one they only follow, or
+         *     hidden. Derived from `syncing` and `following`.
+         * @enum {string}
+         */
+        CalendarRole: "mine" | "following" | "off";
         /**
          * @description Where a calendar lives.
          * @enum {string}
@@ -3604,6 +3611,8 @@ export interface components {
              * @example Family
              */
             name: string;
+            /** @description Whether the provider says the account owns it; none when it does not say. */
+            owned?: boolean | null;
             /** @description Whether it is the account's primary calendar. */
             primary: boolean;
             /**
@@ -3611,6 +3620,8 @@ export interface components {
              *     Campbooks calendar).
              */
             provider?: string | null;
+            /** @description What it is to you: `mine`, `following` or `off`. */
+            role: components["schemas"]["CalendarRole"];
             /** @description Their Campbooks calendar, or one of a connected provider account. */
             source: components["schemas"]["CalendarSource"];
             /** @description Whether its events are shown (the Campbooks calendar always is). */
@@ -17311,7 +17322,7 @@ export interface operations {
                     "application/json": components["schemas"]["CalendarView"];
                 };
             };
-            /** @description A colour that is not `#rrggbb` (`invalid_color`), or your Campbooks calendar turned off (`invalid_calendar`). */
+            /** @description A colour that is not `#rrggbb` (`invalid_color`), a role and `syncing` that disagree, or your Campbooks calendar turned off or made anything but `mine` (`invalid_calendar`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -20081,7 +20092,7 @@ export interface operations {
                     "application/json": components["schemas"]["TaskView"];
                 };
             };
-            /** @description A start in the past or a length outside 15 to 240 minutes (`invalid_hold`), a bill (`pay_not_held`), or a calendar that cannot be written (`calendar_read_only`). */
+            /** @description A start in the past or a length outside 15 to 240 minutes (`invalid_hold`), a bill (`pay_not_held`), a calendar you only follow (`calendar_followed`), or a calendar that cannot be written (`calendar_read_only`). */
             400: {
                 headers: {
                     [name: string]: unknown;

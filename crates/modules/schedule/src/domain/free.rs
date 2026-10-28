@@ -127,7 +127,7 @@ pub async fn free_slots(
 ) -> Result<Found> {
     let counted: Vec<&CalendarRow> = calendars
         .iter()
-        .filter(|calendar| calendar.is_campbooks() || calendar.syncing)
+        .filter(|calendar| calendar.is_mine())
         .collect();
     let filter = Filter {
         busy_only: true,
