@@ -2,8 +2,10 @@
 //! end against the fake Graph: read, flag, archive, delete and restore, spam
 //! and streams made with patches and moves, no echo of our own writes, a
 //! `changeKey` conflict read again, Graph's later change winning, a move
-//! that keeps the index (and one that does not keep its id), throttling,
-//! and never a `DELETE`.
+//! that keeps the index (and one that does not keep its id), a read Graph
+//! refuses, a patch whose move has nowhere to go, a trash move whose answer
+//! was lost, pending changes when Microsoft mail is turned off, throttling,
+//! and never a `DELETE`: checked after every write, not once per test.
 
 use campbooks_kernel::{
     clock::Clock as _,
@@ -58,6 +60,13 @@ impl Mailbox {
     /// stream's run run.
     async fn request(&self, items: &[(&str, Value)]) {
         request_through(&self.kit, self.ws, &self.inbox, items).await;
+        self.never_deleted();
+    }
+
+    /// The stream's next run; nothing was deleted.
+    async fn next_run(&self) {
+        self.kit.next_run().await;
+        self.never_deleted();
     }
 
     /// Every change announced so far, each batch checked against the
@@ -189,7 +198,7 @@ async fn read_star_and_archive_reach_outlook_without_echo(db: PgPool) {
     assert_eq!(index[0].0, id);
     assert!(index[0].1.contains(&"ARCHIVE".to_owned()));
     // No echo: neither the runs that wrote nor the next one announce it.
-    m.kit.next_run().await;
+    m.next_run().await;
     assert_eq!(m.batches().await, batches);
     assert_eq!(m.kit.microsoft.raw_fetches(&id), 1);
     m.never_deleted();
@@ -253,7 +262,7 @@ async fn streams_go_to_their_folder_else_a_category(db: PgPool) {
     m.kit
         .microsoft
         .change(&second, |msg| msg.categories = vec!["Red".to_owned()]);
-    m.kit.next_run().await;
+    m.next_run().await;
     let batches = m.batches().await;
 
     // Updates has its folder: moved there.
@@ -272,7 +281,7 @@ async fn streams_go_to_their_folder_else_a_category(db: PgPool) {
     let held = m.kit.microsoft.message(&second).unwrap();
     assert_eq!(held.folder, "fld-inbox");
     assert_eq!(held.categories, ["Campbooks/Receipts", "Red"]);
-    m.kit.next_run().await;
+    m.next_run().await;
     assert_eq!(m.batches().await, batches, "no echo");
     // Back to Primary: the category comes off, the other stays.
     m.request(&[(
@@ -363,7 +372,7 @@ async fn a_move_answering_another_id_keeps_one_message(db: PgPool) {
     m.kit.microsoft.rename_on_move(true);
     m.request(&[(id.as_str(), json!({"kind": "archive"}))])
         .await;
-    m.kit.next_run().await;
+    m.next_run().await;
     let index = m.index().await;
     assert_eq!(index.len(), 1, "{index:?}");
     let new = index[0].0.clone();
@@ -395,7 +404,7 @@ async fn throttled_while_writing_waits_then_writes(db: PgPool) {
     let due: DateTime<Utc> =
         serde_json::from_value(m.kit.stream().await["due_at"].clone()).unwrap();
     assert_eq!(due, before + TimeDelta::seconds(120));
-    m.kit.next_run().await;
+    m.next_run().await;
     assert!(m.kit.microsoft.message(&id).unwrap().read);
     assert_eq!(m.ends().await, [end("mark_read", "applied", None)]);
     m.never_deleted();
@@ -504,4 +513,139 @@ async fn microsoft_mail_off_writes_and_sends_nothing(db: PgPool) {
         m.kit.microsoft.calls()
     );
     assert_eq!(m.folder(&id), "fld-inbox");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_read_graph_refuses_ends_the_change_refused_and_shows_the_message(db: PgPool) {
+    let (m, id) = mailbox(db, |fake, at| fake.deliver("fld-inbox", &synthetic(1), at)).await;
+    let batches = m.batches().await;
+    // A 403: not "gone". Nothing is written, the change failed, the view
+    // is made right.
+    m.kit.microsoft.refuse_next_read(403);
+    m.request(&[(id.as_str(), json!({"kind": "mark_read"}))])
+        .await;
+    assert!(!m.kit.microsoft.message(&id).unwrap().read);
+    assert!(m.kit.microsoft.writes().is_empty(), "nothing written");
+    assert_eq!(
+        m.ends().await,
+        [end("mark_read", "failed", Some("refused"))]
+    );
+    assert!(m.batches().await > batches, "emitted again");
+    assert_eq!(m.last(&id).await["read"], false);
+    // An answer that is not a message is a refusal too.
+    m.kit.microsoft.garble_next_read();
+    m.request(&[(id.as_str(), json!({"kind": "star"}))]).await;
+    assert_eq!(
+        m.ends().await.last().unwrap(),
+        &end("star", "failed", Some("refused"))
+    );
+    assert!(!m.kit.microsoft.message(&id).unwrap().flagged);
+    // A 404 is the only answer that means gone.
+    m.kit.microsoft.delete(&id);
+    m.request(&[(id.as_str(), json!({"kind": "mark_read"}))])
+        .await;
+    assert_eq!(
+        m.ends().await.last().unwrap(),
+        &end("mark_read", "skipped", Some("message_gone"))
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_patch_whose_move_has_nowhere_to_go_shows_the_message_again(db: PgPool) {
+    let (m, id) = mailbox(db, |fake, at| {
+        fake.remove_folder("fld-archive");
+        fake.deliver("fld-inbox", &synthetic(1), at)
+    })
+    .await;
+    // Both changes wait out a throttled run, so one run makes them together.
+    m.kit.microsoft.throttle_next(120);
+    m.request(&[(id.as_str(), json!({"kind": "mark_read"}))])
+        .await;
+    m.request(&[(id.as_str(), json!({"kind": "archive"}))])
+        .await;
+    let batches = m.batches().await;
+    m.next_run().await;
+    // The patch was made; the move had no Archive to go to.
+    let held = m.kit.microsoft.message(&id).unwrap();
+    assert!(held.read);
+    assert_eq!(held.folder, "fld-inbox");
+    assert_eq!(
+        m.ends().await,
+        [
+            end("mark_read", "applied", None),
+            end("archive", "skipped", Some("not_movable"))
+        ]
+    );
+    // The view matches Graph: read, and still in the inbox.
+    assert!(m.batches().await > batches, "emitted again");
+    let shown = m.last(&id).await;
+    assert_eq!(shown["read"], true);
+    assert_eq!(shown["mailbox"]["in_inbox"], true);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_trash_move_whose_answer_was_lost_still_remembers_where_the_message_was(db: PgPool) {
+    let (m, filed) = mailbox(db, |fake, at| {
+        let clients = fake.add_folder("Clients", None);
+        fake.deliver(&clients, &synthetic(1), at)
+    })
+    .await;
+    let clients = m.folder(&filed);
+    // Graph moves it, and the answer is lost.
+    m.kit.microsoft.lose_next_move();
+    m.request(&[(filed.as_str(), json!({"kind": "trash"}))])
+        .await;
+    assert_eq!(m.folder(&filed), "fld-deleted", "it went through");
+    assert_eq!(m.ends().await, [end("trash", "pending", None)]);
+    // Where it was is kept already, bound to the change that is still pending.
+    let restore: Vec<Option<Vec<String>>> =
+        sqlx::query_scalar("SELECT restore_to FROM connectors.outbound_changes")
+            .fetch_all(&m.kit.db)
+            .await
+            .unwrap();
+    assert_eq!(restore, [Some(vec![format!("folder:{clients}")])]);
+    // The next run finds it in the trash: made, with no second move.
+    m.next_run().await;
+    assert_eq!(m.ends().await, [end("trash", "applied", None)]);
+    let moves = m
+        .kit
+        .microsoft
+        .writes()
+        .iter()
+        .filter(|c| c.ends_with("/move"))
+        .count();
+    assert_eq!(moves, 1);
+    // Taking it out of the trash puts it back where it was.
+    m.request(&[(filed.as_str(), json!({"kind": "untrash", "inbound": true}))])
+        .await;
+    assert_eq!(m.folder(&filed), clients);
+}
+
+/// Microsoft mail turned off with a change still waiting: it ends
+/// `unsupported` at the stream's next run, and nothing is asked of Microsoft.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn pending_changes_end_unsupported_when_microsoft_mail_is_turned_off(db: PgPool) {
+    let (m, id) = mailbox(db.clone(), |fake, at| {
+        fake.deliver("fld-inbox", &synthetic(1), at)
+    })
+    .await;
+    // Throttled, so the change is waiting when the flag goes off.
+    m.kit.microsoft.throttle_next(120);
+    m.request(&[(id.as_str(), json!({"kind": "mark_read"}))])
+        .await;
+    assert_eq!(m.ends().await, [end("mark_read", "pending", None)]);
+    m.kit.microsoft.clear_calls();
+    let off = Kit::new(db).await;
+    assert!(off.deps.microsoft.is_none());
+    off.tick(TimeDelta::hours(5)).await;
+    assert_eq!(
+        m.ends().await,
+        [end("mark_read", "skipped", Some("unsupported"))]
+    );
+    assert!(
+        m.kit.microsoft.calls().is_empty(),
+        "{:?}",
+        m.kit.microsoft.calls()
+    );
+    assert!(!m.kit.microsoft.message(&id).unwrap().read);
 }

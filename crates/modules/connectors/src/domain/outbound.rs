@@ -474,6 +474,26 @@ impl Recorded {
         binding.verify(&self.fields(workspace, at, None), self.mac.as_deref())
             || (pinned && binding.verify(&self.fields_v1(workspace), self.mac.as_deref()))
     }
+
+    /// Whether the row holds as recorded, or holds with the place its message
+    /// was before it put it in the trash, bound into it by a run whose move
+    /// ended unclearly (a timeout): the change is still pending, and the next
+    /// run must still make it.
+    fn holds_or_restored(
+        &self,
+        binding: &Binding,
+        workspace: WorkspaceId,
+        at: At<'_>,
+        pinned: bool,
+    ) -> bool {
+        self.holds(binding, workspace, at, pinned)
+            || self.restore_to.as_deref().is_some_and(|restore| {
+                binding.verify(
+                    &self.fields(workspace, at, Some(restore)),
+                    self.mac.as_deref(),
+                )
+            })
+    }
 }
 
 /// The outbound changes `ids`, as recorded.
@@ -625,7 +645,7 @@ async fn verified(
         .await?
         .into_iter()
         .filter(|row| row.stream_id == stream)
-        .filter(|row| row.holds(binding, workspace, at, pinned))
+        .filter(|row| row.holds_or_restored(binding, workspace, at, pinned))
         .map(|row| row.id)
         .collect();
     let (kept, refused): (Vec<Pending>, Vec<Pending>) =
@@ -1002,10 +1022,9 @@ async fn bind_restores(
         .map(|row| (row.id, row))
         .collect();
     for (id, tokens) in restores {
-        let Some(row) = rows
-            .get(id)
-            .filter(|row| row.stream_id == stream && row.holds(binding, workspace, at, pinned))
-        else {
+        let Some(row) = rows.get(id).filter(|row| {
+            row.stream_id == stream && row.holds_or_restored(binding, workspace, at, pinned)
+        }) else {
             tracing::warn!(
                 %workspace,
                 %stream,
@@ -1085,6 +1104,41 @@ pub async fn expire(
     }
     tx.commit().await?;
     Ok(expired.len())
+}
+
+/// End the pending changes of `stream` `skipped` (`unsupported`) and flag
+/// their messages to be re-emitted with the provider's state: the stream's
+/// provider is turned off, so they will not be made. Returns how many ended.
+pub async fn unsupported(
+    pool: &PgPool,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    now: DateTime<Utc>,
+) -> Result<usize> {
+    let mut tx = pool.begin_for(workspace).await?;
+    let ended: Vec<String> = sqlx::query_scalar(
+        "UPDATE connectors.outbound_changes
+            SET state = 'skipped', reason = 'unsupported', done_at = $2
+          WHERE stream_id = $1 AND state = 'pending'
+      RETURNING provider_message_id",
+    )
+    .bind(stream)
+    .bind(now)
+    .fetch_all(&mut *tx)
+    .await?;
+    if !ended.is_empty() {
+        sqlx::query(
+            "UPDATE connectors.messages SET reemit = true
+              WHERE stream_id = $1 AND provider_message_id = ANY($2)",
+        )
+        .bind(stream)
+        .bind(&ended)
+        .execute(&mut *tx)
+        .await?;
+        tracing::info!(%stream, ended = ended.len(), "pending outbound changes ended: provider off");
+    }
+    tx.commit().await?;
+    Ok(ended.len())
 }
 
 /// Release the finished changes of `stream` older than `before`, and close

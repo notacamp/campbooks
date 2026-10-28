@@ -163,6 +163,11 @@ impl JobHandler for SyncStream {
             // The provider is no longer configured (or the stream has no
             // adapter yet): the leased schedule row brings it back later.
             tracing::debug!(stream = %target.stream, "no adapter for this stream");
+            if target.provider == Provider::Microsoft && !configured {
+                // Microsoft mail was turned off with changes waiting: they
+                // will not be made, so they end now rather than at expiry.
+                outbound::unsupported(ctx.pool(), workspace, target.stream, now).await?;
+            }
             return Ok(());
         };
         if target.provider == Provider::Imap {

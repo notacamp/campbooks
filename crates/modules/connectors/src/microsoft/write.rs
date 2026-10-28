@@ -21,11 +21,16 @@
 //! A token the change touches that Graph changed since the last read to
 //! something other than what the member asks for is Graph's: the change is
 //! `superseded` (`changed_at_provider`). A 412 re-reads the message once.
-//! A place the cursor does not know is never guessed (`not_movable`).
+//! A place the cursor does not know is never guessed (`not_movable`), and the
+//! message is shown again as Graph has it. Only a 404 at the read means a
+//! message is gone; any other answer that is not the message ends the change
+//! `failed` (`refused`). A move into the trash that ended unclearly (a
+//! timeout) has already kept where the message was, for the change that is
+//! still pending.
 //! Nothing here deletes a message or a folder, or empties one. Logs carry
 //! counts only.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::{
     Microsoft,
@@ -291,6 +296,10 @@ enum Wrote {
 struct Stop {
     trouble: ProviderError,
     tokens: Option<Vec<String>>,
+    /// Where a message was, when the move that stopped the push puts it in
+    /// the trash and may have gone through: kept for the change, so taking
+    /// the message out of the trash later still puts it back.
+    origin: Option<Vec<String>>,
 }
 
 /// One message's change, as the push makes it.
@@ -320,8 +329,15 @@ async fn write_one(
     indexed.sort();
     let before = state::view(&indexed, cursor);
     let fallback = state::folder_of(&indexed).unwrap_or_default().to_owned();
-    let Some(mut current) = fetch(microsoft, token, one.message).await? else {
-        return Ok(Wrote::Gone);
+    let mut current = match fetch(microsoft, token, one.message).await? {
+        Read::Found(current) => current,
+        Read::Gone => return Ok(Wrote::Gone),
+        Read::Refused => {
+            return Ok(Wrote::Refused {
+                tokens: None,
+                relist: false,
+            });
+        }
     };
     let mut conflicts = 0;
     loop {
@@ -350,8 +366,14 @@ async fn write_one(
                     // again.
                     conflicts += 1;
                     current = match fetch(microsoft, token, one.message).await? {
-                        Some(current) => current,
-                        None => return Ok(Wrote::Gone),
+                        Read::Found(current) => current,
+                        Read::Gone => return Ok(Wrote::Gone),
+                        Read::Refused => {
+                            return Ok(Wrote::Refused {
+                                tokens: Some(now_tokens),
+                                relist: false,
+                            });
+                        }
                     };
                     continue;
                 }
@@ -369,6 +391,7 @@ async fn write_one(
                     return Err(Stop {
                         trouble,
                         tokens: None,
+                        origin: None,
                     });
                 }
             }
@@ -399,10 +422,13 @@ async fn write_one(
                         relist: false,
                     });
                 }
+                // Moved or not, the next run reads it again first: where it
+                // was is kept now, in case it went.
                 Err(trouble) => {
                     return Err(Stop {
                         trouble,
                         tokens: Some(tokens_of(cursor, &state, &fallback)),
+                        origin: asked.origin.clone(),
                     });
                 }
             }
@@ -418,19 +444,31 @@ async fn write_one(
     }
 }
 
-/// Message `id`'s state and version; `Ok(None)` when Graph no longer has
-/// it. A refusal reads as gone from this push's view (nothing is written);
-/// trouble stops the push.
-async fn fetch(microsoft: &Microsoft, token: &str, id: &str) -> Result<Option<Current>, Stop> {
+/// What reading a message before a change found.
+enum Read {
+    Found(Current),
+    /// Graph answered 404: it no longer has the message.
+    Gone,
+    /// Graph answered, but not with the message (a 400, a 403, an answer
+    /// that cannot be read): nothing is known of it, so nothing is written.
+    Refused,
+}
+
+/// Message `id`'s state and version. Only a 404 means the message is gone;
+/// any other answer that is not the message is a refusal (the change ends
+/// `failed`, and the message is shown again); trouble stops the push.
+async fn fetch(microsoft: &Microsoft, token: &str, id: &str) -> Result<Read, Stop> {
     match microsoft.current(token, id).await {
-        Ok(found) => Ok(found),
+        Ok(Some(found)) => Ok(Read::Found(found)),
+        Ok(None) | Err(ProviderError::NotFound) => Ok(Read::Gone),
         Err(ProviderError::Unexpected(_)) => {
             tracing::info!("Graph refused to read one message before a change");
-            Ok(None)
+            Ok(Read::Refused)
         }
         Err(trouble) => Err(Stop {
             trouble,
             tokens: None,
+            origin: None,
         }),
     }
 }
@@ -484,6 +522,8 @@ pub async fn push(
     let mut plan = Plan::merge(&viewed);
     let mut done = Results::default();
     let mut trouble = None;
+    // Where messages were, whose move into the trash may have gone through.
+    let mut unsure: HashMap<String, Vec<String>> = HashMap::new();
     'messages: for (change, messages) in plan.groups() {
         for message in messages {
             let Some(indexed) = backlog.labels.get(&message) else {
@@ -519,6 +559,9 @@ pub async fn push(
                     done.written.insert(message.clone());
                     if unmovable {
                         done.unmovable.insert(message.clone());
+                        // Part of the change was not made, whatever else was:
+                        // Graph's state is shown again.
+                        outcome.reemit.push(message.clone());
                     }
                     if let Some(origin) = origin {
                         done.restore.insert(message.clone(), origin);
@@ -551,6 +594,9 @@ pub async fn push(
                     done.gone.insert(message);
                 }
                 Err(stop) => {
+                    if let Some(origin) = stop.origin {
+                        unsure.insert(message.clone(), origin);
+                    }
                     if let Some(tokens) = stop.tokens {
                         outcome.index.push((message, tokens));
                     }
@@ -564,6 +610,15 @@ pub async fn push(
     let outcome = &mut pushed.push.outcome;
     plan.ends(&viewed, &done, outcome);
     plan.restores(&done, outcome);
+    // The change that trashed a message stays pending after a move that
+    // ended unclearly: its place is bound to it now, for the run that finds
+    // the message in the trash.
+    for (message, origin) in unsure {
+        if let Some(row) = plan.winner(&message, "TRASH") {
+            outcome.restore.push((row, origin));
+        }
+    }
+    outcome.restore.sort();
     not_movable(&viewed, &done, outcome);
     outcome.index.sort();
     outcome.reemit.sort();
