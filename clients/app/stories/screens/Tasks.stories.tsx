@@ -25,6 +25,9 @@ import {
   ASK_BILL,
   ASK_LEASE,
   ASK_LEASE_HISTORY,
+  LEASE_ASK,
+  LEASE_MESSAGE,
+  LEASE_QUOTE,
   ASK_REPLIED,
   BILL,
   INSPECTION,
@@ -580,9 +583,29 @@ export const RepliedRowInTasks: Story = {
 // "Not yet" and done.
 
 /** The API for the lease task with its history. */
-function storyApi() {
-  const lease = { ...ASK_LEASE, due_on: isoDay(addDays(new Date(), 3)) };
+function storyApi(source_ask: string | null = LEASE_ASK) {
+  const lease = { ...ASK_LEASE, due_on: isoDay(addDays(new Date(), 3)), source_ask };
   return tasks({
+    // What Scout read in Marta's email: the sender's own sentence is served here,
+    // under the conversation's access, never from the task.
+    [`GET ${W}/conversations/${MARTA.id}/messages/${LEASE_MESSAGE}/read`]: {
+      body: {
+        status: "done",
+        layers: ["model"],
+        items: [],
+        asks: [
+          {
+            key: LEASE_ASK,
+            title: "Send the signed lease",
+            quote: LEASE_QUOTE,
+            verb: "do",
+            done_by: "elsewhere",
+          },
+        ],
+        flagged: false,
+        can_read: false,
+      },
+    },
     [`GET ${W}/conversations`]: { body: { conversations: [MARTA], next_cursor: null } },
     [`GET ${W}/tasks`]: (_body, url) =>
       url.searchParams.get("whose") === "handed_off"
@@ -598,9 +621,22 @@ export const WhyAndHistory: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(await canvas.findByText("Scout made it")).toBeVisible();
+    // The sender's own sentence, quoted under their name.
+    await expect(await canvas.findByText(`“${LEASE_QUOTE}”`)).toBeVisible();
     await expect(await canvas.findByRole("heading", { name: "History" })).toBeVisible();
     await expect(await canvas.findByText(/^You marked it done$/u)).toBeVisible();
     await expect(canvas.getByText(/^The calendar moved the held time/u)).toBeVisible();
+  },
+};
+
+/** A task made before the sentence could be served (no ask on it) shows none. */
+export const WhyWithoutQuote: Story = {
+  args: { path: `${PATH}/${ASK_LEASE.id}`, api: storyApi(null) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Scout made it")).toBeVisible();
+    await canvas.findByRole("heading", { name: "History" });
+    await expect(canvas.queryByText(`“${LEASE_QUOTE}”`)).toBeNull();
   },
 };
 
@@ -611,6 +647,7 @@ export const WhyAndHistoryPhone: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByRole("heading", { name: "History" });
+    await canvas.findByText(`“${LEASE_QUOTE}”`);
     await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
       globalThis.innerWidth,
     );

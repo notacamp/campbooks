@@ -45,6 +45,8 @@ export interface TaskDetailProps {
   me: string | undefined;
   /** Where it came from, when it came from a conversation. */
   source: TaskSource | undefined;
+  /** The sender's sentence that asked for it, when the caller may read the email. */
+  quote?: string | undefined;
   actions: ReturnType<typeof useTaskActions>;
   /** Later's choices are showing (the `s` key opens them). */
   laterOpen: boolean;
@@ -65,6 +67,7 @@ export function TaskDetail({
   task,
   me,
   source,
+  quote,
   actions,
   laterOpen,
   onLaterOpen,
@@ -388,7 +391,7 @@ export function TaskDetail({
           </section>
         ) : null}
 
-        <TaskStory workspaceId={workspaceId} task={task} me={me} source={source} />
+        <TaskStory workspaceId={workspaceId} task={task} me={me} source={source} quote={quote} />
 
         <HandOff
           workspaceId={workspaceId}

@@ -2886,6 +2886,14 @@
           }
         }
       },
+      "DoneBy": {
+        "type": "string",
+        "description": "How an ask gets done (campbooks-cloud#396): by replying to the email\nthat made it, or some other way.",
+        "enum": [
+          "reply",
+          "elsewhere"
+        ]
+      },
       "DraftId": {
         "type": "string",
         "format": "uuid",
@@ -3367,6 +3375,17 @@
           "has_amount"
         ],
         "properties": {
+          "done_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DoneBy",
+                "description": "How it gets done: by replying, or some other way (an enum, no text)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "due": {
             "type": [
               "string",
