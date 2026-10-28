@@ -267,6 +267,19 @@ pub enum CalendarSource {
     Provider,
 }
 
+/// What a calendar is to the member: their own, one they only follow, or
+/// hidden. Derived from `syncing` and `following`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CalendarRole {
+    /// Shown; counts for free time, holds and invitations.
+    Mine,
+    /// Shown only.
+    Following,
+    /// Not shown.
+    Off,
+}
+
 /// Record type of a calendar (the access catalogue and `x-campbooks`).
 pub const CALENDAR_RECORD: &str = "schedule.calendar";
 /// Record type of an event.

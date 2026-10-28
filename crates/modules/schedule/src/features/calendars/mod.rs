@@ -27,7 +27,7 @@ use crate::{
         views::CalendarView,
     },
     events::CalendarSyncChanged,
-    model::CalendarId,
+    model::{CalendarId, CalendarRole},
     scopes::{ScheduleRead, ScheduleWrite},
     tracking,
 };
@@ -77,6 +77,10 @@ pub struct CalendarPatch {
     /// Show its events (a provider calendar only). Turning it on asks
     /// connectors to read it again from the start.
     pub syncing: Option<bool>,
+    /// What it is to you: `mine`, `following` or `off`. Off is the same as
+    /// `syncing: false`; the other two turn it on. Your Campbooks calendar is
+    /// always `mine`.
+    pub role: Option<CalendarRole>,
     /// Its colour as `#rrggbb`; empty goes back to the provider's.
     pub color: Option<String>,
 }
@@ -86,7 +90,7 @@ fn is_color(color: &str) -> bool {
     color.len() == 7 && color.starts_with('#') && color[1..].chars().all(|c| c.is_ascii_hexdigit())
 }
 
-/// Turn a calendar on or off, or colour it.
+/// Set a calendar's role, turn it on or off, or colour it.
 #[utoipa::path(
     patch,
     path = "/api/v1/w/{workspace_id}/schedule/calendars/{calendar_id}",
@@ -103,7 +107,8 @@ fn is_color(color: &str) -> bool {
     responses(
         (status = OK, description = "The calendar afterwards.", body = CalendarView),
         (status = BAD_REQUEST, description = "A colour that is not `#rrggbb` (`invalid_color`), \
-            or your Campbooks calendar turned off (`invalid_calendar`).",
+            a role and `syncing` that disagree, or your Campbooks calendar turned off or \
+            made anything but `mine` (`invalid_calendar`).",
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -129,75 +134,61 @@ pub async fn update(
     {
         return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_color")));
     }
-    if calendar.is_campbooks() && patch.syncing == Some(false) {
+    if calendar.is_campbooks()
+        && (patch.syncing == Some(false)
+            || matches!(
+                patch.role,
+                Some(CalendarRole::Following | CalendarRole::Off)
+            ))
+    {
         return Err(Error::BadRequest(
             crate::MESSAGES.reason("invalid_calendar"),
         ));
     }
-    let syncing = patch.syncing.unwrap_or(calendar.syncing);
+    // A role and `syncing` given together must say the same.
+    if let (Some(role), Some(syncing)) = (patch.role, patch.syncing)
+        && syncing != (role != CalendarRole::Off)
+    {
+        return Err(Error::BadRequest(
+            crate::MESSAGES.reason("invalid_calendar"),
+        ));
+    }
+    let syncing = match patch.role {
+        Some(role) => role != CalendarRole::Off,
+        None => patch.syncing.unwrap_or(calendar.syncing),
+    };
+    // Off keeps whether the calendar would come back mine or following.
+    let following = match patch.role {
+        Some(CalendarRole::Mine) => false,
+        Some(CalendarRole::Following) => true,
+        Some(CalendarRole::Off) | None => calendar.following,
+    };
     let color = match patch.color.as_deref() {
         Some("") => None,
         Some(color) => Some(color.to_ascii_lowercase()),
         None => calendar.color.clone(),
     };
     sqlx::query(
-        "UPDATE schedule.calendars SET syncing = $2, color = $3, updated_at = now() WHERE id = $1",
+        "UPDATE schedule.calendars SET syncing = $2, following = $4, color = $3, updated_at = now()
+          WHERE id = $1",
     )
     .bind(calendar.id)
     .bind(syncing)
     .bind(&color)
+    .bind(following)
     .execute(&mut *tx)
     .await?;
     // Connectors reads a calendar that was turned on from the start, and
     // stops reading one that was turned off.
-    if let Some(connection) = calendar.connection_id
-        && syncing != calendar.syncing
-    {
-        // Which calendar of the provider it is travels in a blob: its id can
-        // be an address.
-        let workspace = access.workspace.to_string();
-        let provider_calendar = match &calendar.provider_calendar_id {
-            Some(provider_id) => {
-                let document = serde_json::to_vec(&serde_json::json!({
-                    "version": 1,
-                    "provider_calendar_id": provider_id,
-                }))
-                .map_err(Error::internal)?;
-                let blob = state
-                    .blobs
-                    .put(&workspace, document, CALENDAR_REF_CONTENT_TYPE)
-                    .await?;
-                state
-                    .blobs
-                    .attach(
-                        &mut tx,
-                        &workspace,
-                        &blob,
-                        &BlobOwner::new(CALENDAR_REF_OWNER, calendar.id),
-                    )
-                    .await?;
-                Some(blob)
-            }
-            None => None,
-        };
-        state
-            .events
-            .publish(
-                &mut tx,
-                &CalendarSyncChanged {
-                    workspace,
-                    calendar: calendar.id,
-                    connection,
-                    syncing,
-                    provider_calendar,
-                },
-            )
-            .await?;
-    }
-    // Its invitations show on Home only while it syncs (campbooks-cloud#360).
     if syncing != calendar.syncing {
+        publish_sync_change(&state, &mut tx, access.workspace, &calendar, syncing).await?;
+    }
+    // Its invitations show on Home only while it is on and mine
+    // (campbooks-cloud#360, #399).
+    if syncing != calendar.syncing || following != calendar.following {
         let now = CalendarRow {
             syncing,
+            following,
             ..calendar.clone()
         };
         invitations::announce_calendar(&state, &mut tx, access.workspace, &now).await?;
@@ -209,6 +200,7 @@ pub async fn update(
         access.workspace,
         &calendar,
         syncing,
+        following,
         recoloured,
     )
     .await?;
@@ -220,17 +212,74 @@ pub async fn update(
         .ok_or(Error::NotFound)
 }
 
+/// Tell connectors that `calendar` was turned on (read it from the start) or
+/// off (stop reading it). Nothing for the Campbooks calendar.
+async fn publish_sync_change(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    calendar: &CalendarRow,
+    syncing: bool,
+) -> Result<()> {
+    let Some(connection) = calendar.connection_id else {
+        return Ok(());
+    };
+    // Which calendar of the provider it is travels in a blob: its id can
+    // be an address.
+    let workspace_text = workspace.to_string();
+    let provider_calendar = match &calendar.provider_calendar_id {
+        Some(provider_id) => {
+            let document = serde_json::to_vec(&serde_json::json!({
+                "version": 1,
+                "provider_calendar_id": provider_id,
+            }))
+            .map_err(Error::internal)?;
+            let blob = state
+                .blobs
+                .put(&workspace_text, document, CALENDAR_REF_CONTENT_TYPE)
+                .await?;
+            state
+                .blobs
+                .attach(
+                    tx,
+                    &workspace_text,
+                    &blob,
+                    &BlobOwner::new(CALENDAR_REF_OWNER, calendar.id),
+                )
+                .await?;
+            Some(blob)
+        }
+        None => None,
+    };
+    state
+        .events
+        .publish(
+            tx,
+            &CalendarSyncChanged {
+                workspace: workspace_text,
+                calendar: calendar.id,
+                connection,
+                syncing,
+                provider_calendar,
+            },
+        )
+        .await?;
+    Ok(())
+}
+
 /// Track, in `tx`, that `before` was turned on or off (`syncing` is its
-/// state now) and recoloured: each only when it changed.
+/// state now), moved between mine and following (`following`) and
+/// recoloured: each only when it changed.
 async fn track_change(
     state: &AppState,
     tx: &mut Transaction<'_, Postgres>,
     workspace: WorkspaceId,
     before: &CalendarRow,
     syncing: bool,
+    following: bool,
     recoloured: bool,
 ) -> Result<()> {
-    if syncing == before.syncing && !recoloured {
+    if syncing == before.syncing && following == before.following && !recoloured {
         return Ok(());
     }
     let Some(calendar) = tracked::calendar(tx, before.id).await? else {
@@ -263,6 +312,23 @@ async fn track_change(
         }
         _ => {}
     }
+    if following != before.following {
+        state
+            .tracker
+            .track(
+                tx,
+                &tracking::CalendarRoleChanged {
+                    workspace,
+                    calendar: calendar.clone(),
+                    role: if following {
+                        tracking::CalendarRole::Following
+                    } else {
+                        tracking::CalendarRole::Mine
+                    },
+                },
+            )
+            .await?;
+    }
     if recoloured {
         state
             .tracker
@@ -279,7 +345,10 @@ async fn track_change(
 }
 
 #[cfg(test)]
-mod tests {
+mod tests;
+
+#[cfg(test)]
+mod unit {
     use super::is_color;
 
     #[test]

@@ -536,6 +536,14 @@ mod tests {
         assert_eq!(calendars.len(), 2);
         assert!(calendars[0].writable() && calendars[0].primary);
         assert!(!calendars[1].writable());
+        assert_eq!(
+            crate::calendar::owned_by(calendars[0].access_role.as_deref()),
+            Some(true)
+        );
+        assert_eq!(
+            crate::calendar::owned_by(calendars[1].access_role.as_deref()),
+            Some(false)
+        );
         assert_eq!(calendars[1].name(), "Holidays");
     }
 

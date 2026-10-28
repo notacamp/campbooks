@@ -52,6 +52,7 @@ pub async fn list(api: &ZohoCalendar<'_>) -> Result<Vec<ListedCalendar>, Calenda
                     text(calendar, "privilege").as_deref(),
                     Some("view" | "free_busy" | "freebusy")
                 ),
+                owned: super::owned_by(text(calendar, "privilege").as_deref()),
                 provider_id: uid,
             })
         })
@@ -305,6 +306,14 @@ fn written(event: &Value) -> Option<Written> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_zoho_calendar_says_whether_it_is_owned() {
+        use super::super::owned_by;
+        assert_eq!(owned_by(Some("owner")), Some(true));
+        assert_eq!(owned_by(Some("view")), Some(false));
+        assert_eq!(owned_by(None), None);
+    }
 
     #[test]
     fn a_zoho_event_reads_like_a_google_one() {

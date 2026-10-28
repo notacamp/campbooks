@@ -410,6 +410,8 @@ async fn calendars_are_tracked_from_grant_to_removal(db: PgPool) {
         json!({ "syncing": true }),
         json!({ "syncing": true }),
         json!({ "color": "#123456" }),
+        json!({ "role": "following" }),
+        json!({ "role": "following" }),
         json!({ "syncing": false }),
     ] {
         let changed = kit.patch(&ana, &uri, patch).await;
@@ -435,6 +437,16 @@ async fn calendars_are_tracked_from_grant_to_removal(db: PgPool) {
         "ana",
         "schedule.update_calendar",
     );
+    let role = tracked(&kit, "schedule.calendar_role_changed").await;
+    assert_eq!(role.len(), 1);
+    by_user(
+        &role[0],
+        "schedule.calendar_role_changed",
+        ws,
+        "ana",
+        "schedule.update_calendar",
+    );
+    assert_eq!(role[0].body["role"], "following");
     let disabled = tracked(&kit, "schedule.calendar_disabled").await;
     assert_eq!(disabled.len(), 1);
     by_user(
