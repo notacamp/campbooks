@@ -3523,11 +3523,6 @@ export interface components {
         CalendarPatch: {
             /** @description Its colour as `#rrggbb`; empty goes back to the provider's. */
             color?: string | null;
-            /**
-             * @description What it is to you: `mine`, `following` or `off`. Off is the same as
-             *     `syncing: false`; the other two turn it on. Your Campbooks calendar is
-             *     always `mine`.
-             */
             role?: components["schemas"]["CalendarRole"] | null;
             /**
              * @description Show its events (a provider calendar only). Turning it on asks
