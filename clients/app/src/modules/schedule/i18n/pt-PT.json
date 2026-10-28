@@ -178,7 +178,7 @@
       "readOnly": "só de leitura",
       "role": "Função de {{name}}",
       "shared": "Partilhado consigo",
-      "roles": { "mine": "Meus", "following": "A seguir", "off": "Desligados" },
+      "roles": { "mine": "Meus", "following": "Seguidos", "off": "Desligados" },
       "roleHints": {
         "mine": "Deixam-no ocupado, guardam as suas tarefas e levam os convites para o Início",
         "following": "Só mostrados",
