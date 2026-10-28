@@ -928,5 +928,14 @@
       "ownAddress": "Esto espera a tu propia dirección, así que no hay nadie a quien recordar."
     },
     "askScout": "Preguntar a Scout sobre este correo"
+  },
+  "signature": {
+    "title": "Tus firmas",
+    "for": "Tu firma para {{address}}",
+    "save": "Guardar",
+    "saved": "Firma guardada",
+    "chars": "{{chars}} de {{max}} caracteres",
+    "tooLong": "Una firma puede tener {{max}} caracteres como máximo.",
+    "failed": "No se pudo guardar la firma. Inténtalo de nuevo."
   }
 }

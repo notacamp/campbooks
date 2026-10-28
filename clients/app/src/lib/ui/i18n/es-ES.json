@@ -71,6 +71,13 @@
         "past": "Esa hora ya ha pasado. Elige una posterior.",
         "tooFar": "Los envíos se pueden programar con hasta un año de antelación."
       }
+    },
+    "signature": {
+      "label": "Firma",
+      "leaveOff": "Quitar",
+      "add": "Añadir firma",
+      "edit": "Editar en los ajustes",
+      "create": "Añade una firma en los ajustes"
     }
   },
   "attachments": {

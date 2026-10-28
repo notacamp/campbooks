@@ -30,6 +30,8 @@ export {
   warningReasons,
 } from "./needs";
 export { useInboxes } from "./api/queries";
+// Settings → Mailboxes → Your signature (campbooks-cloud#393).
+export { SignatureSettings } from "./components/Signature/SignatureSettings";
 // Where tasks made from conversations came from (the Tasks place, via the app).
 export { useConversationSources } from "./api/task-sources";
 // What the search results page reuses: the reader, the inbox actions and the

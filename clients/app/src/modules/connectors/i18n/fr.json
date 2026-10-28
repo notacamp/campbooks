@@ -417,5 +417,9 @@
         "lead": "Rien n’a été modifié. Réessayez."
       }
     }
+  },
+  "signature": {
+    "title": "Votre signature",
+    "lead": "Ajoutée sous votre texte dans chaque nouveau message d’une boîte depuis laquelle vous pouvez envoyer. Chaque membre signe avec la sienne."
   }
 }

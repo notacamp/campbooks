@@ -311,3 +311,27 @@ describe("useDraftEditor.send", () => {
     expect(editor().error).toBe("send_at_invalid");
   });
 });
+
+describe("useDraftEditor.setSignature", () => {
+  it("leaves it off and adds it back, each a save naming the version and token on screen", async () => {
+    const calls = stub((seen) => {
+      const { signature } = JSON.parse(seen.text) as { signature: boolean };
+      return {
+        body: { ...draftAt(seen.method === "PATCH" ? 2 : 1), signature: signature ? "Sam" : "" },
+      };
+    });
+    const editor = mount({ ...draftAt(1), signature: "Sam" });
+    expect(editor().shown.signature).toBe("Sam");
+    await act(async () => {
+      await editor().setSignature(false);
+    });
+    expect(editor().shown.signature).toBe("");
+    await act(async () => {
+      await editor().setSignature(true);
+    });
+    expect(editor().shown.signature).toBe("Sam");
+    const bodies = calls.map((c) => JSON.parse(c.text) as Record<string, unknown>);
+    expect(bodies[0]).toEqual({ version: 1, content_token: "token-1", signature: false });
+    expect(bodies[1]).toMatchObject({ version: 2, content_token: "token-2", signature: true });
+  });
+});

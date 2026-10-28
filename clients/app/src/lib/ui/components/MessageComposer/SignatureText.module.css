@@ -1,0 +1,16 @@
+.text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+}
+
+.paragraph {
+  margin: 0 0 var(--space-1);
+}
+
+.text a {
+  color: inherit;
+  text-decoration: underline;
+}

@@ -1498,6 +1498,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/inboxes/{inbox_id}/signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your signature for an inbox. */
+        get: operations["conversations.get_signature"];
+        /** Set your signature for an inbox. */
+        put: operations["conversations.set_signature"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/invitations": {
         parameters: {
             query?: never;
@@ -4577,6 +4595,11 @@ export interface components {
             content_token?: string | null;
             /** @description The quoted history. */
             quoted?: string | null;
+            /**
+             * @description `false` leaves the signature off; `true` adds the author's current
+             *     signature for the inbox (campbooks-cloud#393). Absent keeps it as it is.
+             */
+            signature?: boolean | null;
             /** @description The subject. */
             subject?: string | null;
             /** @description Recipients. */
@@ -4651,6 +4674,12 @@ export interface components {
              * @description When a scheduled send leaves (until then it can be cancelled).
              */
             send_at?: string | null;
+            /**
+             * @description The author's signature this draft carries (campbooks-cloud#393): text
+             *     with the marks a message may carry, copied when the draft was made
+             *     or added back; empty when it carries none.
+             */
+            signature?: string;
             /** @description Where it is in its life. */
             state: components["schemas"]["DraftState"];
             /** @description The subject. */
@@ -7850,6 +7879,16 @@ export interface components {
             request?: string | null;
             /** @description Otherwise, a same-origin path to land on. */
             return_to?: string | null;
+        };
+        /** @description A member's signature for an inbox. */
+        Signature: {
+            /**
+             * @description Text with bold (`**x**`), italic (`*x*`) and links (`[words](url)`);
+             *     empty when there is none.
+             * @example **Sam Rivers**
+             *     Rivers Lettings
+             */
+            text: string;
         };
         /** @description Where to go once signed in. */
         SignedInWith: {
@@ -14689,6 +14728,123 @@ export interface operations {
                 };
             };
             /** @description No such inbox, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The inbox. */
+                inbox_id: components["schemas"]["InboxId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your signature for this inbox; empty when you have none. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Signature"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, not a member (`signature_needs_member`), or you only read the inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such inbox, or you are not in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.set_signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The inbox. */
+                inbox_id: components["schemas"]["InboxId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Signature"];
+            };
+        };
+        responses: {
+            /** @description Your signature as kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Signature"];
+                };
+            };
+            /** @description Over 2000 characters (`signature_too_long`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, not a member (`signature_needs_member`), or you only read the inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such inbox, or you are not in it. */
             404: {
                 headers: {
                     [name: string]: unknown;

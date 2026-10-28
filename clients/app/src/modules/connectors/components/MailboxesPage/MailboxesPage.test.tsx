@@ -60,6 +60,29 @@ async function row(index: number): Promise<HTMLElement> {
 }
 
 describe("MailboxesPage", () => {
+  it("gives each mailbox you can send from a signature editor (campbooks-cloud#393)", async () => {
+    const inbox = {
+      id: "0192f1a0-0000-7000-8000-0000000000b1",
+      channel: "email",
+      address: "ana@example.com",
+      role: "sender",
+      read_only: false,
+      unread_count: 0,
+      shared: false,
+    };
+    api([CONNECTION], {
+      [`GET /bff/api/v1/w/${DUARTE.id}/inboxes`]: { body: { inboxes: [inbox] } },
+      [`GET /bff/api/v1/w/${DUARTE.id}/inboxes/${inbox.id}/signature`]: {
+        body: { text: "Ana Costa" },
+      },
+    });
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Your signature" })).toBeVisible();
+    expect(
+      await screen.findByRole("textbox", { name: "Your signature for ana@example.com" }),
+    ).toHaveTextContent("Ana Costa");
+  });
+
   it("lists each mailbox with who connected it and how it is doing", async () => {
     api([CONNECTION, ZOHO_CONNECTION, SOFIA_CONNECTION]);
     renderPage();

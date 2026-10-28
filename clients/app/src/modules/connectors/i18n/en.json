@@ -417,5 +417,9 @@
         "lead": "Nothing was changed. Try again."
       }
     }
+  },
+  "signature": {
+    "title": "Your signature",
+    "lead": "Added under your text in each new message from a mailbox you can send from. Each member signs with their own."
   }
 }

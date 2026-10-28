@@ -18,6 +18,7 @@ import {
   SkeletonList,
   StatusText,
 } from "~/lib/ui";
+import { SignatureSettings } from "~/modules/conversations";
 import { useMembers, type Member, type Workspace } from "~/modules/workspaces";
 
 import {
@@ -251,6 +252,9 @@ export function MailboxesPage({
             ))}
           </List>
         )}
+      </SettingsSection>
+      <SettingsSection title={t("signature.title")} description={t("signature.lead")}>
+        <SignatureSettings workspaceId={workspace.id} />
       </SettingsSection>
       <SettingsSection title={t("connect.title")} description={t("connect.lead")}>
         <div className="flex">
