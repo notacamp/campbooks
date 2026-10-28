@@ -13,6 +13,7 @@ import { COUNTS, MARTA, MARTA_DETAIL } from "../../test/demo/attention";
 import { INBOX, STREAM_COUNTS, W } from "../../test/demo/conversations";
 import {
   BUDGET,
+  everyBlockDoc,
   HANDBOOK,
   HOLIDAYS,
   IDEAS,
@@ -54,6 +55,7 @@ interface Grant {
 function fresh() {
   const docs = new Map<string, Y.Doc>();
   docs.set(HANDBOOK.id, richDoc(MARTA.id, LEASE.id));
+  docs.set(ONBOARDING.id, everyBlockDoc(MARTA.id, LEASE.id));
   return {
     live: new Map<string, Summary>(PAGES.map((page) => [page.id, page])),
     trashed: new Map<string, Summary>([[OLD_NOTES.id, OLD_NOTES]]),
@@ -395,6 +397,18 @@ export const TrashIdle: Story = { args: { path: PATH, api: pages() }, ...at("des
 /** The tree screen on a phone. */
 export const TheTreePhoneIdle: Story = {
   args: { path: PATH, api: pages() },
+  ...at("phone", 375, 812),
+};
+
+/** Every block of the schema on one page: the block spacing on a desktop. */
+export const EveryBlockIdle: Story = {
+  args: { path: `${PATH}/${ONBOARDING.id}`, api: pages() },
+  ...at("desktop", 1440, 900),
+};
+
+/** Every block of the schema on one page, on a phone. */
+export const EveryBlockPhoneIdle: Story = {
+  args: { path: `${PATH}/${ONBOARDING.id}`, api: pages() },
   ...at("phone", 375, 812),
 };
 
