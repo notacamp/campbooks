@@ -263,7 +263,7 @@ export function ConversationReader({
   // "Make it a task": the inline form under the subject.
   const [makingTask, setMakingTask] = useState(false);
   // Save to page (campbooks-cloud#364): only while the server offers it.
-  const mailScout = useMailScoutAvailable(workspaceId) === true;
+  const mailScout = useMailScoutAvailable(workspaceId) === true && false;
   const [savingThread, setSavingThread] = useState<SaveThread | undefined>();
   const queryClient = useQueryClient();
   const undoToast = useUndoToast();
