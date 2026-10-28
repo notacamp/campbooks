@@ -7,7 +7,7 @@
 # Applied with
 # `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0026-send-later.yaml`.
 changelog:
-  - date: "2026-10-30"
+  - date: "2026-10-28"
     plan_version: 26
     change: "Send later review fixes (campbooks-cloud#392): conversations.unschedule_reason gains destination_changed (the inbox no longer sends from where the request was bound) and release_lost (a scheduled send found overdue with no release job); Coverage for the sweep job and its schedule."
     pr: "#705"

@@ -32,6 +32,10 @@ When a scheduled send is due and cannot be released, nothing SHALL be sent and t
 - **WHEN** the inbox's mail goes out from another mailbox by the time a send is due
 - **THEN** nothing is sent and the draft is failed with `destination_changed`
 
+#### Scenario: The mailbox is disconnected first
+- **WHEN** Sam has a send scheduled for tomorrow and its mailbox is disconnected, keeping its mail
+- **THEN** the draft is failed with `not_connected`, and nothing is sent
+
 ### Requirement: Overdue scheduled sends are settled
 A sweep every ten minutes SHALL mark `failed` with `release_lost` each draft still scheduled fifteen minutes past its time with no unfinished release job for its generation. It SHALL NOT queue the release again, because that job may already have sent. A draft whose release job is queued, or that is not yet late, SHALL be left alone.
 
