@@ -1,0 +1,218 @@
+//! `GET /api/v1/w/{workspace_id}/connections/{connection_id}/notion/data-sources`
+//! — the Notion databases a member's connection can see, for "Import from
+//! Notion" (notion-databases-ui, campbooks-cloud#377). Like the listing of
+//! pages: only the member whose Notion account it is may ask (anyone else is
+//! told there is no such connection), only what the member shared with
+//! Campbooks on Notion's own consent screen is there, each call takes the
+//! connection's request budget, and titles are the member's own words,
+//! returned to them and logged nowhere.
+//!
+//! With Notion databases off the list is empty, and Notion is not called:
+//! the route cannot answer 404 for its owner (the access matrix expects an
+//! answer past the access checks), and an empty list is what "nothing to
+//! offer" is.
+
+use std::collections::HashSet;
+
+use axum::{
+    Extension, Json,
+    extract::{Path, State},
+};
+use campbooks_kernel::{
+    AppState, Error, Operation, Problem, RecordRef, Result,
+    authz::{self, Action},
+    db::BeginFor as _,
+    tenancy::{Access, Workspace, WorkspaceId},
+};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+use uuid::Uuid;
+
+use crate::{
+    MESSAGES,
+    deps::Deps,
+    domain::{
+        connections,
+        credentials::{self, TokenError},
+        model::{ConnectionId, ConnectionPath, Health, Provider},
+    },
+    events::CONNECTION_RECORD,
+    features::list_notion_pages::{stopped, unavailable},
+    notion::pace::Pace,
+    scopes::ConnectorsRead,
+};
+
+/// Most databases one listing reads (two calls of a hundred).
+pub const MAX_DATA_SOURCES: usize = 200;
+
+/// How long a listing waits for the connection's request budget: a member is
+/// waiting for it.
+const PATIENCE_SECONDS: u32 = 10;
+
+/// A database the connection can see.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionDataSource {
+    /// The database's (data source's) id at Notion.
+    pub data_source: Uuid,
+    /// Its title; empty when it has none.
+    pub title: String,
+    /// When Notion last edited it.
+    pub edited_at: DateTime<Utc>,
+    /// How many columns it has. Notion does not say how many entries.
+    pub columns: u32,
+    /// It is linked to a table already, through this connection.
+    pub linked: bool,
+}
+
+/// The databases of a Notion connection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionDataSources {
+    /// The databases, newest edit first.
+    pub data_sources: Vec<NotionDataSource>,
+    /// There are more than were read.
+    pub truncated: bool,
+    /// How many requests the listing took of the connection's budget.
+    pub requests: u32,
+}
+
+/// The databases a Notion connection can see.
+#[utoipa::path(
+    get,
+    path = "/api/v1/w/{workspace_id}/connections/{connection_id}/notion/data-sources",
+    operation_id = "connectors.list_notion_data_sources",
+    tag = "connectors",
+    security(("bearer" = ["connectors:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().records(["connectors.connection"]).access("connectors.connection", campbooks_kernel::authz::Action::Disconnect)))),
+    params(
+        ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
+        ("connection_id" = ConnectionId, Path, description = "The Notion connection."),
+    ),
+    responses(
+        (status = OK, description = "The databases the connection can see; none while Notion databases are off.", body = NotionDataSources),
+        (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope, or a connection you may see but that is not yours (an admin, a client token).",
+            body = Problem, content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such Notion connection, or you may not see it.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = CONFLICT, description = "Notion needs you to connect again (`needs_reauth`), or is not set up on this instance (`provider_not_configured`).",
+            body = Problem, content_type = "application/problem+json"),
+        (status = TOO_MANY_REQUESTS, description = "The connection's request budget with Notion is spent for now.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = SERVICE_UNAVAILABLE, description = "Notion could not be reached (`provider_unavailable`).",
+            body = Problem, content_type = "application/problem+json"),
+    )
+)]
+pub async fn handler(
+    State(state): State<AppState>,
+    Extension(deps): Extension<Deps>,
+    workspace: Workspace<ConnectorsRead>,
+    Path(path): Path<ConnectionPath>,
+) -> Result<Json<NotionDataSources>> {
+    execute(&state, &deps, &workspace.access, path.connection_id)
+        .await
+        .map(Json)
+}
+
+/// The databases `connection` can see, for the member of `access` whose
+/// Notion account it is.
+pub async fn execute(
+    state: &AppState,
+    deps: &Deps,
+    access: &Access,
+    connection: ConnectionId,
+) -> Result<NotionDataSources> {
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    // Only the member whose account it is (403 for an admin or a client
+    // token who may see it); anyone who may not see it is told there is no
+    // such connection.
+    authz::require(
+        state,
+        &mut tx,
+        access,
+        Action::Disconnect,
+        &RecordRef::new(CONNECTION_RECORD, &connection),
+        || Error::Forbidden,
+    )
+    .await?;
+    let Some(notion) = deps.notion.as_ref() else {
+        return Err(Error::Conflict(MESSAGES.reason("provider_not_configured")));
+    };
+    let found = connections::load(&mut tx, connection)
+        .await?
+        .filter(|c| c.provider == Provider::Notion)
+        .ok_or(Error::NotFound)?;
+    if !deps.notion_databases {
+        return Ok(NotionDataSources {
+            data_sources: Vec::new(),
+            truncated: false,
+            requests: 0,
+        });
+    }
+    let linked: HashSet<Uuid> = sqlx::query_scalar(
+        "SELECT notion_page_id FROM connectors.notion_links \
+         WHERE connection_id = $1 AND kind = 'data_source'",
+    )
+    .bind(connection)
+    .fetch_all(&mut *tx)
+    .await?
+    .into_iter()
+    .collect();
+    tx.commit().await?;
+    if found.health == Health::NeedsReauth {
+        return Err(Error::Conflict(MESSAGES.reason("needs_reauth")));
+    }
+    let token = match credentials::access_token(&state.db, deps, access.workspace, connection).await
+    {
+        Ok(token) => token,
+        Err(TokenError::NeedsReauth(_)) => {
+            return Err(Error::Conflict(MESSAGES.reason("needs_reauth")));
+        }
+        Err(TokenError::Provider(err)) => return Err(unavailable(&err)),
+        Err(TokenError::Database(err)) => return Err(err),
+    };
+    let mut adapter = deps.config.notion.adapter();
+    adapter.patience_seconds = PATIENCE_SECONDS;
+    let mut pace = Pace::new(state.db.clone(), connection, &adapter);
+    let mut listed = Vec::new();
+    let mut cursor: Option<String> = None;
+    let mut requests = 0_u32;
+    let mut truncated = false;
+    loop {
+        pace.take().await.map_err(stopped)?;
+        requests += 1;
+        let found = notion
+            .search_data_sources(&token, cursor.as_deref())
+            .await
+            .map_err(|err| unavailable(&err))?;
+        listed.extend(found.sources);
+        match found.next {
+            Some(next) if listed.len() < MAX_DATA_SOURCES => cursor = Some(next),
+            Some(_) => {
+                truncated = true;
+                break;
+            }
+            None => break,
+        }
+    }
+    listed.truncate(MAX_DATA_SOURCES);
+    let data_sources = listed
+        .into_iter()
+        .map(|source| NotionDataSource {
+            data_source: source.id,
+            title: source.title,
+            edited_at: source.edited,
+            columns: source.columns,
+            linked: linked.contains(&source.id),
+        })
+        .collect();
+    Ok(NotionDataSources {
+        data_sources,
+        truncated,
+        requests,
+    })
+}
+
+#[cfg(test)]
+mod tests;

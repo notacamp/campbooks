@@ -232,7 +232,7 @@ pub async fn execute(
 }
 
 /// What Notion's trouble is to the member asking.
-fn unavailable(err: &ProviderError) -> Error {
+pub(crate) fn unavailable(err: &ProviderError) -> Error {
     match err {
         ProviderError::InvalidGrant | ProviderError::Unauthorized => {
             Error::Conflict(MESSAGES.reason("needs_reauth"))
@@ -247,7 +247,7 @@ fn unavailable(err: &ProviderError) -> Error {
 }
 
 /// What a stopped run is to the member asking.
-fn stopped(stop: Stop) -> Error {
+pub(crate) fn stopped(stop: Stop) -> Error {
     match stop {
         Stop::Provider(err) => unavailable(&err),
         Stop::Database(err) => err,

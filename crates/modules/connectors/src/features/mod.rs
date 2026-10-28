@@ -11,6 +11,7 @@ pub mod get_connection;
 pub mod imap_idle;
 pub mod link_notion_page;
 pub mod list_connections;
+pub mod list_notion_data_sources;
 pub mod list_notion_pages;
 pub mod member_left;
 pub mod microsoft_notifications;

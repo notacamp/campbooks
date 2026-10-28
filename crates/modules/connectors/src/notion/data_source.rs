@@ -25,6 +25,28 @@ pub struct DataSourceInfo {
     pub schema: databases::Schema,
 }
 
+/// A database the integration can see, as much of it as the import lists.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataSourceSummary {
+    /// The data source.
+    pub id: Uuid,
+    /// Its title, without control characters, at most 200 characters.
+    pub title: String,
+    /// When Notion last edited it.
+    pub edited: DateTime<Utc>,
+    /// How many properties (columns) it has.
+    pub columns: u32,
+}
+
+/// One page of a search for databases.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataSourcesPage {
+    /// The databases that are not in the trash.
+    pub sources: Vec<DataSourceSummary>,
+    /// The cursor of the next page.
+    pub next: Option<String>,
+}
+
 /// One page of a data source's entries.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntriesPage {
@@ -35,6 +57,36 @@ pub struct EntriesPage {
 }
 
 impl Notion {
+    /// The databases `token` can see (what the member shared in Notion's own
+    /// screen), most recently edited first, a hundred at a time.
+    pub async fn search_data_sources(
+        &self,
+        token: &str,
+        cursor: Option<&str>,
+    ) -> Result<DataSourcesPage, ProviderError> {
+        let mut body = json!({
+            "filter": {"property": "object", "value": "data_source"},
+            "sort": {"direction": "descending", "timestamp": "last_edited_time"},
+            "page_size": 100,
+        });
+        if let Some(cursor) = cursor {
+            body["start_cursor"] = Value::String(cursor.to_owned());
+        }
+        let url = self.api_url(&["search"])?;
+        let answer = self
+            .call(Method::POST, url, token, Some(&body), LIST_ANSWER_BYTES)
+            .await?;
+        let sources = answer
+            .get("results")
+            .and_then(Value::as_array)
+            .map(|items| items.iter().filter_map(summary_of).collect())
+            .unwrap_or_default();
+        Ok(DataSourcesPage {
+            sources,
+            next: next_cursor(&answer),
+        })
+    }
+
     /// Data source `id`.
     pub async fn data_source(
         &self,
@@ -197,4 +249,41 @@ impl Notion {
         self.call(Method::GET, url, token, None, MAX_ANSWER_BYTES)
             .await
     }
+}
+
+/// One search result as a summary; none for anything but a data source that
+/// is not in the trash.
+fn summary_of(raw: &Value) -> Option<DataSourceSummary> {
+    if raw.get("object").and_then(Value::as_str) != Some("data_source")
+        || raw
+            .get("in_trash")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        return None;
+    }
+    let id = raw
+        .get("id")
+        .and_then(Value::as_str)
+        .and_then(|id| Uuid::parse_str(id).ok())?;
+    let edited = raw
+        .get("last_edited_time")
+        .and_then(Value::as_str)
+        .and_then(|time| DateTime::parse_from_rfc3339(time).ok())?
+        .with_timezone(&Utc);
+    let title = campbooks_kernel::text::displayable(&databases::plain(raw.get("title")))
+        .trim()
+        .chars()
+        .take(200)
+        .collect();
+    let columns = raw
+        .get("properties")
+        .and_then(Value::as_object)
+        .map_or(0, |map| u32::try_from(map.len()).unwrap_or(u32::MAX));
+    Some(DataSourceSummary {
+        id,
+        title,
+        edited,
+        columns,
+    })
 }

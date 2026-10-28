@@ -177,6 +177,7 @@ pub fn module(deps: Deps) -> Module {
             .routes(routes!(features::start_connection::handler))
             .routes(routes!(features::start_notion::handler))
             .routes(routes!(features::list_notion_pages::handler))
+            .routes(routes!(features::list_notion_data_sources::handler))
             .routes(routes!(features::discover_imap::handler))
             .routes(routes!(features::connect_imap::handler))
             .routes(routes!(
