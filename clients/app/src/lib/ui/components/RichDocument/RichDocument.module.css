@@ -1,4 +1,7 @@
 .document {
+  /* One line of body text: what a checkbox or a toggle arrow lines up with. */
+  --doc-line: calc(var(--text-md) * var(--leading-relaxed));
+
   color: var(--text-primary);
   font-size: var(--text-md);
   line-height: var(--leading-relaxed);
@@ -9,46 +12,130 @@
   outline: none;
 }
 
-.document :where(.tiptap > * + *) {
-  margin-top: var(--space-2);
-}
-
-.document :where(p) {
+/* Every block starts flush; the rhythm below spaces them. */
+.document :where(p, h1, h2, h3, ul, ol, pre, blockquote, figure) {
   margin: 0;
 }
 
 .document :where(h1, h2, h3) {
-  margin: 0;
   font-family: var(--font-display);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-display);
 }
 
 .document :where(h1) {
-  margin-top: var(--space-6);
   font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
 }
 
 .document :where(h2) {
-  margin-top: var(--space-5);
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
 }
 
 .document :where(h3) {
-  margin-top: var(--space-4);
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
 }
 
+/*
+ * The rhythm. Margins between blocks collapse, so each gap is the larger of
+ * the two blocks' wishes: a line's gap between blocks, a little more around
+ * the boxed ones (callouts, quotes, code, cards), more above a heading than
+ * below it. The same holds inside callouts, quotes, toggles and list items.
+ */
+.document
+  :where(.tiptap, [data-type="callout"], blockquote, [data-node-view-content-react])
+  > *
+  + * {
+  margin-top: var(--space-2);
+}
+
+.document :where(li > * + *) {
+  margin-top: var(--space-1);
+}
+
+.document :where(li + li) {
+  margin-top: var(--space-1);
+}
+
+.document :where(pre, blockquote, [data-type="callout"], .react-renderer:not(.node-toggle), .card) {
+  margin-block: var(--space-3);
+}
+
+.document :where(* + h1) {
+  margin-top: var(--space-8);
+}
+
+.document :where(* + h2) {
+  margin-top: var(--space-6);
+}
+
+.document :where(* + h3) {
+  margin-top: var(--space-5);
+}
+
+/* What follows a big heading sits a little apart from it, still closer than the block above. */
+.document :where(:is(h1, h2) + *) {
+  margin-top: var(--space-3);
+}
+
+/* A heading right under a heading belongs to it. */
+.document :where(:is(h1, h2) + :is(h2, h3)) {
+  margin-top: var(--space-3);
+}
+
+/* A heading in a callout or a toggle needs no run-up. */
+.document
+  :where([data-type="callout"], [data-node-view-content-react])
+  :where(* + h1, * + h2, * + h3) {
+  margin-top: var(--space-3);
+}
+
+/* Nothing pushes away from the top or bottom edge of the page or a box. */
+.document
+  :where(.tiptap, [data-type="callout"], blockquote, [data-node-view-content-react])
+  > :first-child {
+  margin-top: 0;
+}
+
+.document
+  :where(.tiptap, [data-type="callout"], blockquote, [data-node-view-content-react])
+  > :last-child {
+  margin-bottom: 0;
+}
+
+/* Lists: a marker per level, in the text's own quieter colour. */
 .document :where(ul, ol) {
-  margin: 0;
   padding-left: var(--space-6);
 }
 
-.document :where(li > p) {
-  margin: 0;
+.document :where(ul) {
+  list-style: disc;
+}
+
+.document :where(ul ul) {
+  list-style: circle;
+}
+
+.document :where(ul ul ul) {
+  list-style: square;
+}
+
+.document :where(ol) {
+  list-style: decimal;
+}
+
+.document :where(ol ol) {
+  list-style: lower-alpha;
+}
+
+.document :where(ol ol ol) {
+  list-style: lower-roman;
+}
+
+.document :where(li)::marker {
+  color: var(--text-tertiary);
 }
 
 .document :where(a) {
@@ -65,7 +152,6 @@
 }
 
 .document :where(pre) {
-  margin: 0;
   padding: var(--space-3) var(--space-4);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -83,16 +169,19 @@
 }
 
 .document :where(blockquote) {
-  margin: 0;
   padding-left: var(--space-4);
   border-left: var(--space-1) solid var(--border-strong);
   color: var(--text-secondary);
 }
 
 .document :where(hr) {
-  margin: var(--space-4) 0;
+  margin: var(--space-6) 0;
   border: 0;
   border-top: var(--border-width) solid var(--border-subtle);
+}
+
+.document :where(.tiptap > hr:first-child) {
+  margin-top: 0;
 }
 
 .document :where([data-type="callout"]) {
@@ -112,7 +201,7 @@
   box-shadow: inset var(--space-1) 0 0 var(--danger);
 }
 
-/* To-dos: a checkbox, then the text. */
+/* To-dos: a checkbox on the first line, then the text, as close as a list. */
 .document :where(ul[data-type="taskList"]) {
   padding-left: 0;
   list-style: none;
@@ -122,21 +211,44 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  min-height: var(--size-hit);
 }
 
 .document :where(ul[data-type="taskList"] > li > label) {
   display: grid;
   flex: none;
   place-items: center;
-  height: var(--size-hit);
+  height: var(--doc-line);
   user-select: none;
 }
 
 .document :where(ul[data-type="taskList"] > li > div) {
   flex: 1;
   min-width: 0;
-  padding-top: var(--space-2);
+  margin-top: 0;
+}
+
+/* A nested list of to-dos starts under the text, not under the checkbox. */
+.document :where(ul[data-type="taskList"] ul[data-type="taskList"]) {
+  margin-top: var(--space-1);
+}
+
+/* On touch, each to-do is a full finger tall. */
+@media (pointer: coarse) {
+  .document :where(ul[data-type="taskList"] > li) {
+    min-height: var(--size-hit);
+  }
+
+  .document :where(ul[data-type="taskList"] > li > label) {
+    height: var(--size-hit);
+  }
+
+  .document :where(ul[data-type="taskList"] > li > div) {
+    padding-top: calc((var(--size-hit) - var(--doc-line)) / 2);
+  }
+
+  .document :where(ul[data-type="taskList"] li + li) {
+    margin-top: 0;
+  }
 }
 
 .document :where(ul[data-type="taskList"] > li[data-checked="true"] > div) {
@@ -147,6 +259,7 @@
 .document :where(ul[data-type="taskList"] input[type="checkbox"]) {
   width: var(--icon-size);
   height: var(--icon-size);
+  margin: 0;
   accent-color: var(--accent);
   cursor: pointer;
 }
@@ -278,7 +391,8 @@ a.cardLink:hover .cardTitle {
   place-items: center;
   width: var(--size-control-sm);
   height: var(--size-control-sm);
-  margin-top: var(--space-0-5);
+  /* Centred on the first line, however tall the arrow's box is. */
+  margin-top: calc((var(--doc-line) - var(--size-control-sm)) / 2);
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
@@ -297,6 +411,7 @@ a.cardLink:hover .cardTitle {
   min-width: 0;
 }
 
-.toggle[data-open="false"] [data-node-view-content] > * + * {
+/* Closed, only the first line shows (the editor wraps the content once more). */
+.toggle[data-open="false"] :is([data-node-view-content], [data-node-view-content-react]) > * + * {
   display: none;
 }

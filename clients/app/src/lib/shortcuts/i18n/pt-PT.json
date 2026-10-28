@@ -25,6 +25,12 @@
     "send": "Enviar",
     "bold": "Negrito",
     "italic": "Itálico",
+    "strike": "Rasurado",
+    "link": "Ligação",
+    "bullets": "Lista com marcas",
+    "numbers": "Lista numerada",
+    "quote": "Citação",
+    "expand": "Expandir ou reduzir o editor",
     "ask": "Perguntar"
   },
   "workspace": {

@@ -26,8 +26,22 @@
     "format": {
       "bold": "Negrito",
       "italic": "Itálico",
+      "strike": "Rasurado",
+      "link": "Ligação",
       "bullets": "Lista com marcas",
-      "numbers": "Lista numerada"
+      "numbers": "Lista numerada",
+      "quote": "Citação"
+    },
+    "moreFormatting": "Mais formatação",
+    "link": {
+      "title": "Adicionar uma ligação",
+      "words": "Texto",
+      "address": "Endereço",
+      "add": "Adicionar ligação",
+      "update": "Atualizar ligação",
+      "remove": "Remover ligação",
+      "cancel": "Cancelar",
+      "refused": "Só é possível ligar a endereços web e de correio eletrónico."
     },
     "showQuoted": "Mostrar texto citado",
     "hideQuoted": "Ocultar texto citado",
@@ -36,7 +50,9 @@
     "removeAttachment": "Remover {{name}}",
     "discard": "Descartar",
     "send": "Enviar",
-    "close": "Fechar"
+    "close": "Fechar",
+    "expand": "Expandir",
+    "shrink": "Reduzir"
   },
   "attachments": {
     "label": "Anexos",

@@ -114,12 +114,13 @@ pub const MAX_AWAITABLE: usize = 6;
 
 /// Who on `envelope` may be awaited (the `awaited` question's options): the
 /// people in `To`, then in `Cc`, in order, without the inbox's own addresses,
-/// the sender, any address a machine owns (a no-reply or service address),
-/// and duplicates (compared without regard to case), at most
-/// [`MAX_AWAITABLE`]. When the sender is itself a machine (list or automatic
-/// mail, a no-reply or service address) nobody is awaited. Like every fact
-/// it only removes: it never decides who is expected to act, and reads no
-/// text (ADR 0018).
+/// the sender, any address that cannot answer (a no-reply, bounce or
+/// mailer-daemon address), and duplicates (compared without regard to case),
+/// at most [`MAX_AWAITABLE`]. A role address (`info@`, `support@`, `geral@`)
+/// stays: someone who writes to it and waits is waiting on whoever reads it.
+/// When the sender is itself a machine (list or automatic mail, a no-reply or
+/// service address) nobody is awaited. Like every fact it only removes: it
+/// never decides who is expected to act, and reads no text (ADR 0018).
 pub fn awaitable(envelope: &Envelope) -> Vec<Party> {
     if is_machine_sender(envelope) {
         return Vec::new();
@@ -138,11 +139,11 @@ pub fn awaitable(envelope: &Envelope) -> Vec<Party> {
                 .iter()
                 .any(|a| a.trim().eq_ignore_ascii_case(&address))
         });
-        let machine = Facts {
+        let silent = Facts {
             from: address,
             ..Facts::default()
         };
-        if inbox || machine.no_reply_sender() || machine.service_sender() {
+        if inbox || silent.no_reply_sender() {
             continue;
         }
         out.push(party.clone());
@@ -151,6 +152,112 @@ pub fn awaitable(envelope: &Envelope) -> Vec<Party> {
         }
     }
     out
+}
+
+/// Generic mailbox names, in the four languages Campbooks ships in, that a
+/// shared mailbox shows instead of an organisation's name. Header strings,
+/// not email content (ADR 0018).
+const GENERIC_MAILBOX_NAMES: [&str; 16] = [
+    "geral",
+    "general",
+    "info",
+    "contact",
+    "contacto",
+    "contato",
+    "support",
+    "suporte",
+    "soporte",
+    "reservas",
+    "recepcion",
+    "accueil",
+    "secretaria",
+    "office",
+    "admin",
+    "mail",
+];
+
+/// Free mail providers: their domain names nobody's organisation.
+const WEBMAIL_DOMAINS: [&str; 16] = [
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "msn.com",
+    "yahoo.com",
+    "icloud.com",
+    "me.com",
+    "proton.me",
+    "protonmail.com",
+    "gmx.com",
+    "aol.com",
+    "zoho.com",
+    "sapo.pt",
+    "mail.com",
+];
+
+/// Lower-case `text` and fold the accents of the languages Campbooks ships
+/// in (`Recepción` → `recepcion`).
+fn fold(text: &str) -> String {
+    text.trim()
+        .chars()
+        .flat_map(char::to_lowercase)
+        .map(|c| match c {
+            'á' | 'à' | 'â' | 'ã' | 'ä' => 'a',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'í' | 'ì' | 'î' | 'ï' => 'i',
+            'ó' | 'ò' | 'ô' | 'õ' | 'ö' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' => 'u',
+            'ç' => 'c',
+            'ñ' => 'n',
+            other => other,
+        })
+        .collect()
+}
+
+/// Whether a display name is only a role: the address's own local part, a
+/// service word (`SERVICE_LOCAL_PART`) or a generic mailbox name.
+fn is_role_word(header_name: &str, address: &str) -> bool {
+    let folded = fold(header_name);
+    folded == fold(local_part(address))
+        || SERVICE_LOCAL_PART.is_match(&folded)
+        || GENERIC_MAILBOX_NAMES.contains(&folded.as_str())
+}
+
+/// The organisation an address belongs to, read from its registrable domain
+/// (`geral@aguas-ribatejo.example` → `Aguas Ribatejo`); `None` for a free
+/// mail provider or a domain with no readable first label.
+fn organisation(address: &str) -> Option<String> {
+    let domain = registrable_domain(address);
+    if WEBMAIL_DOMAINS.contains(&domain.as_str()) {
+        return None;
+    }
+    let label = domain.split('.').next().unwrap_or_default();
+    let words: Vec<String> = label
+        .split(['-', '_'])
+        .filter(|w| !w.is_empty())
+        .map(|w| {
+            let mut chars = w.chars();
+            chars.next().map_or_else(String::new, |first| {
+                first.to_uppercase().chain(chars).collect()
+            })
+        })
+        .collect();
+    (!words.is_empty() && domain.contains('.')).then(|| words.join(" "))
+}
+
+/// What to call a party in the client, from its headers alone: the header's
+/// display name when it has one that is not a role word; else the
+/// organisation its domain names; else the address. A shared mailbox that
+/// shows as "Geral" is named for its organisation, so the card reads "Nudge
+/// Aguas Ribatejo", not "Nudge Geral". Reads no text (ADR 0018).
+pub fn display_name(header_name: &str, address: &str) -> String {
+    let address = address.trim();
+    let header_name = header_name.trim();
+    if !header_name.is_empty() && !is_role_word(header_name, address) {
+        return header_name.to_owned();
+    }
+    organisation(address).unwrap_or_else(|| address.to_owned())
 }
 
 /// Whether the receiving provider's `authentication_results` say mail from
@@ -1305,17 +1412,81 @@ mod tests {
     }
 
     #[test]
-    fn machine_addresses_are_never_awaited() {
+    fn addresses_that_cannot_answer_are_never_awaited() {
         let env = with_recipient(
             &[
-                "billing@shop.example",
                 "noreply@shop.example",
+                "Mailer-Daemon@shop.example",
                 "lia@studio.example",
+                "bounces-42@shop.example",
             ],
-            &["Notifications@shop.example"],
+            &["postmaster@shop.example"],
             &[],
         );
         assert_eq!(addresses(&awaitable(&env)), ["lia@studio.example"]);
+    }
+
+    #[test]
+    fn role_addresses_stay_awaitable() {
+        let env = with_recipient(
+            &[
+                "info@waterworks.example",
+                "geral@waterworks.example",
+                "lia@studio.example",
+            ],
+            &["Support@waterworks.example", "billing@shop.example"],
+            &[],
+        );
+        assert_eq!(
+            addresses(&awaitable(&env)),
+            [
+                "info@waterworks.example",
+                "geral@waterworks.example",
+                "lia@studio.example",
+                "Support@waterworks.example",
+                "billing@shop.example"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_role_name_is_replaced_by_the_organisation() {
+        let org = "Aguas Ribatejo";
+        for (name, address) in [
+            ("Geral", "geral@aguas-ribatejo.example"),
+            ("Info", "info@aguas-ribatejo.example"),
+            ("Suporte", "suporte@aguas-ribatejo.example"),
+            ("Soporte", "ayuda@aguas-ribatejo.example"),
+            ("Recepción", "x@aguas-ribatejo.example"),
+            ("Accueil", "x@aguas-ribatejo.example"),
+            ("Secretaria", "x@aguas-ribatejo.example"),
+            ("Reservas", "reservas@aguas-ribatejo.example"),
+            ("Support", "support@aguas-ribatejo.example"),
+            ("Contato", "x@aguas-ribatejo.example"),
+            ("  OFFICE ", "x@aguas-ribatejo.example"),
+            ("", "geral@aguas-ribatejo.example"),
+            ("clientes", "clientes@aguas-ribatejo.example"),
+        ] {
+            assert_eq!(display_name(name, address), org, "{name} <{address}>");
+        }
+    }
+
+    #[test]
+    fn a_real_name_is_kept_and_the_address_is_the_last_resort() {
+        assert_eq!(
+            display_name("Ana Costa", "ana@aguas-ribatejo.example"),
+            "Ana Costa"
+        );
+        assert_eq!(
+            display_name("Águas do Ribatejo", "geral@aguas-ribatejo.example"),
+            "Águas do Ribatejo"
+        );
+        assert_eq!(display_name("Geral", "geral@gmail.com"), "geral@gmail.com");
+        assert_eq!(display_name("", "nobody"), "nobody");
+        assert_eq!(
+            display_name("", "info@mail.waterworks.example"),
+            "Waterworks"
+        );
     }
 
     #[test]
@@ -1327,6 +1498,9 @@ mod tests {
         let mut service = with_recipient(&people, &[], &[]);
         service.from = named("", "billing@shop.example");
         assert!(awaitable(&service).is_empty());
+        let mut role = with_recipient(&people, &[], &[]);
+        role.from = named("", "info@shop.example");
+        assert!(awaitable(&role).is_empty());
         let mut list = with_recipient(&people, &[], &[]);
         list.headers
             .insert("List-Id".into(), "<news.shop.example>".into());
