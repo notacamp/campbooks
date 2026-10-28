@@ -105,7 +105,9 @@ describe("NewMessage", () => {
     renderWithProviders(
       <NewMessage workspaceId={DUARTE.id} draftId={NEW.id} onLeave={vi.fn()} onReopen={vi.fn()} />,
     );
-    expect(await screen.findByRole("textbox", { name: "Message" })).toHaveTextContent("Lunch on Friday?");
+    expect(await screen.findByRole("textbox", { name: "Message" })).toHaveTextContent(
+      "Lunch on Friday?",
+    );
     expect(api.calls.some((call) => call.route === `POST ${D}`)).toBe(false);
   });
 });

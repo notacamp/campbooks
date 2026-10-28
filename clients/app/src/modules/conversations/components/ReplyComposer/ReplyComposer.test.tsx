@@ -278,7 +278,9 @@ describe("ReplyComposer", () => {
       await screen.findByText("This changed since you opened it. Check it and send again."),
     ).toBeVisible();
     // Shown as it is now, and nothing sent for the member.
-    expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent("Thursday at ten works.");
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent(
+      "Thursday at ten works.",
+    );
     expect(sends).toBe(1);
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /Send/u }));
@@ -548,7 +550,9 @@ describe("ReplyComposer", () => {
       expect(api.calls.some((c) => c.route.startsWith("DELETE"))).toBe(true);
     });
     // Still here, with the text the member typed.
-    expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent("Typed, not saved yet.");
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent(
+      "Typed, not saved yet.",
+    );
     fireEvent.click(screen.getByRole("button", { name: /Send/u }));
     await waitFor(() => {
       expect(api.calls.some((c) => c.route.endsWith("/send"))).toBe(true);

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Editor } from "@tiptap/core";
 import { useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 
@@ -230,8 +231,10 @@ export const WriteAndSend: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     const box = canvas.getByRole("textbox", { name: "Message" });
-    await userEvent.type(box, "Thursday works.");
-    await userEvent.keyboard("{Shift>}{Home}{/Shift}");
+    // Typed, then selected as a drag would (the editor sits on its element;
+    // userEvent's typing drops keys in a ProseMirror editor).
+    const editor = (box as HTMLElement & { editor: Editor }).editor;
+    editor.chain().focus().insertContent("Thursday works.").selectAll().run();
     await userEvent.click(canvas.getByRole("button", { name: "Bold" }));
     await expect(box.querySelector("strong")).toHaveTextContent("Thursday works.");
     await userEvent.click(canvas.getByRole("button", { name: "Show quoted text" }));
