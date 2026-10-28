@@ -104,14 +104,28 @@ fixed maximum. The reader's reply slot already caps the whole composer at 60%
 of the window and scrolls inside it (inbox-ui, "The reply slot"). The footer is
 `position: sticky; bottom: 0` inside that scroller.
 
-Expand renders the same `MessageComposer` in a top-layer sheet. The editor's
-state must survive Expand and Shrink: the sheet is a portal over the one
-composer, and the composer is never mounted twice.
+Expand keeps the same `MessageComposer` mounted. Inline, its parts sit in a
+plain element, so nothing announces a dialog that isn't there. Expanded,
+they sit in a native `<dialog>` opened with `showModal()`, which puts them in
+the top layer, makes the rest of the page inert and gives the sheet its
+dialog role.
 
-The app's `Dialog` stops key events from bubbling, so `onKeyDown` handlers
-inside it never fire. For that reason the sheet is a native `<dialog>` with
-`showModal()`, and the composer's shortcuts keep going through the shortcut
-registry.
+The parts move between the two, but the TipTap editor is one instance for
+the life of the composer, and `EditorContent` keeps the editor's view while
+it moves. So the cursor and the undo history stay. The focus and resize
+listeners re-attach on each move.
+
+The app's `Dialog` would swallow the composer's keys, which is why the sheet
+is a native dialog. Esc and the native `cancel` shrink the sheet, as does a
+click on its backdrop.
+
+The link form is a row under the toolbar, not a popup, so it shows over the
+sheet as well. The More menu opens when a ResizeObserver finds the composer
+narrower than 32rem; it is the shared `OverflowActions` component, which
+container queries could not drive.
+
+The body text uses the body token `--text-md` with `--leading-relaxed`, since
+the design system has no 15px step.
 
 ### 6. Shortcuts
 

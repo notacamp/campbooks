@@ -116,7 +116,7 @@ const isWide = () =>
   typeof globalThis.matchMedia !== "function" || globalThis.matchMedia(WIDE).matches;
 
 /** Whether the element is narrower than {@link COMPACT_REM}; unknown (not laid out) is not. */
-function useCompact(ref: React.RefObject<HTMLElement | null>): boolean {
+function useCompact(ref: React.RefObject<HTMLElement | null>, placement: unknown): boolean {
   const [compact, setCompact] = useState(false);
   useLayoutEffect(() => {
     const element = ref.current;
@@ -134,7 +134,7 @@ function useCompact(ref: React.RefObject<HTMLElement | null>): boolean {
     return () => {
       observer.disconnect();
     };
-  }, [ref]);
+  }, [ref, placement]);
   return compact;
 }
 
@@ -197,7 +197,7 @@ export function MessageComposer({
   const toRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<HTMLDialogElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
-  const compact = useCompact(sectionRef);
+  const compact = useCompact(sectionRef, open);
   // Where the cursor starts, read once: the composer focuses when it opens.
   const startAt = useRef(focus);
 
@@ -345,26 +345,20 @@ export function MessageComposer({
     setExpanded(false);
   }, []);
 
-  // Expand and Shrink move the one composer into the top layer and back; the
-  // editor is never remounted, so its cursor and history stay.
+  // Expand puts the composer in a modal dialog (the top layer) and Shrink
+  // puts it back inline, where it is no dialog at all. Its parts move with
+  // it; the editor is one instance for the life of the composer (TipTap
+  // keeps its view while it moves), so its cursor and history stay.
   const placed = useRef(false);
   useLayoutEffect(() => {
     const frame = frameRef.current;
-    if (frame === null) {
-      return;
-    }
-    // jsdom has no showModal / close: the open attribute does for it.
-    const native = frame as Partial<HTMLDialogElement>;
-    if (open) {
-      native.close?.();
-      if (typeof native.showModal === "function") {
-        native.showModal();
+    if (open && frame !== null) {
+      // jsdom has no showModal: the open attribute does for it.
+      if (typeof frame.showModal === "function") {
+        frame.showModal();
       } else {
         frame.setAttribute("open", "");
       }
-    } else if (placed.current) {
-      native.close?.();
-      frame.setAttribute("open", "");
     }
     if (placed.current) {
       editor.commands.focus();
@@ -394,7 +388,7 @@ export function MessageComposer({
       frame.removeEventListener("cancel", cancel);
       frame.removeEventListener("click", scrim);
     };
-  }, [shrink]);
+  }, [shrink, open]);
 
   useShortcut("compose.send", onSend, { enabled: active && !sending });
   const live = { enabled: active };
@@ -446,7 +440,7 @@ export function MessageComposer({
       section.removeEventListener("focusin", enter);
       section.removeEventListener("focusout", leave);
     };
-  }, []);
+  }, [open]);
 
   // After the listeners above, so the first focus makes the shortcuts live.
   const started = useRef(false);
@@ -483,200 +477,206 @@ export function MessageComposer({
   const numbers = toolbar("numbers", "compose.numbers", "numbers", format.numbers);
   const quote = toolbar("quote", "compose.quote", "quote", format.quote);
 
-  return (
-    <dialog
-      ref={frameRef}
-      className={styles["frame"]}
-      open={!open}
-      data-expanded={open || undefined}
-      aria-label={open ? title : undefined}
-    >
-      <section ref={sectionRef} className={styles["composer"]} aria-labelledby={`${id}-title`}>
-        <header className={styles["header"]}>
-          <h2 id={`${id}-title`} className={styles["title"]}>
-            {title}
-          </h2>
-          {wide ? (
-            <IconButton
-              label={open ? t("composer.shrink") : t("composer.expand")}
-              icon={open ? "shrink" : "expand"}
-              shortcut="compose.expand"
-              aria-pressed={open}
-              onClick={() => {
-                setExpanded(!open);
+  const composer = (
+    <section ref={sectionRef} className={styles["composer"]} aria-labelledby={`${id}-title`}>
+      <header className={styles["header"]}>
+        <h2 id={`${id}-title`} className={styles["title"]}>
+          {title}
+        </h2>
+        {wide ? (
+          <IconButton
+            label={open ? t("composer.shrink") : t("composer.expand")}
+            icon={open ? "shrink" : "expand"}
+            shortcut="compose.expand"
+            aria-pressed={open}
+            onClick={() => {
+              setExpanded(!open);
+            }}
+          />
+        ) : null}
+        <IconButton
+          label={t("composer.close")}
+          icon="close"
+          shortcut="overlay.close"
+          onClick={onClose}
+        />
+      </header>
+
+      <div className={styles["fields"]}>
+        <p className={styles["from"]}>
+          <span className={styles["fromLabel"]}>{t("composer.from")}</span>
+          <span className={styles["fromValue"]}>{from}</span>
+        </p>
+        <RecipientField
+          label={t("composer.to")}
+          recipients={to}
+          onChange={onToChange}
+          inputRef={toRef}
+          {...suggestIn("to")}
+          trailing={
+            copies ? undefined : (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setCopies(true);
+                }}
+              >
+                {t("composer.copies")}
+              </Button>
+            )
+          }
+        />
+        {copies ? (
+          <>
+            <RecipientField
+              label={t("composer.cc")}
+              recipients={cc}
+              onChange={onCcChange}
+              {...suggestIn("cc")}
+            />
+            <RecipientField
+              label={t("composer.bcc")}
+              recipients={bcc}
+              onChange={onBccChange}
+              {...suggestIn("bcc")}
+            />
+          </>
+        ) : null}
+        {subject === undefined ? null : (
+          <div className={styles["subjectRow"]}>
+            <label className={styles["fromLabel"]} htmlFor={`${id}-subject`}>
+              {t("composer.subject")}
+            </label>
+            <input
+              id={`${id}-subject`}
+              className={styles["subject"]}
+              value={subject}
+              maxLength={998}
+              onChange={(event) => {
+                onSubjectChange?.(event.target.value);
               }}
             />
-          ) : null}
-          <IconButton
-            label={t("composer.close")}
-            icon="close"
-            shortcut="overlay.close"
-            onClick={onClose}
-          />
-        </header>
+          </div>
+        )}
+      </div>
 
-        <div className={styles["fields"]}>
-          <p className={styles["from"]}>
-            <span className={styles["fromLabel"]}>{t("composer.from")}</span>
-            <span className={styles["fromValue"]}>{from}</span>
-          </p>
-          <RecipientField
-            label={t("composer.to")}
-            recipients={to}
-            onChange={onToChange}
-            inputRef={toRef}
-            {...suggestIn("to")}
-            trailing={
-              copies ? undefined : (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setCopies(true);
-                  }}
-                >
-                  {t("composer.copies")}
-                </Button>
-              )
-            }
-          />
-          {copies ? (
+      <div className={styles["toolbar"]} role="toolbar" aria-label={t("composer.formatting")}>
+        <OverflowActions
+          label={t("composer.moreFormatting")}
+          actions={
+            compact
+              ? [bold, italic, linkAction, bullets]
+              : [bold, italic, strike, linkAction, bullets, numbers, quote]
+          }
+          more={compact ? [strike, numbers, quote] : []}
+        />
+      </div>
+
+      {link === null ? null : (
+        <LinkForm
+          key={`${String(link.from)}-${String(link.to)}`}
+          initialWords={link.words}
+          initialAddress={link.href}
+          onApply={applyLink}
+          onRemove={link.href === "" ? undefined : removeLink}
+          onCancel={closeLink}
+        />
+      )}
+
+      <EditorContent editor={editor} className={styles["text"]} />
+
+      {quoted === undefined || quoted === "" ? null : (
+        <div className={styles["quoted"]}>
+          <Button
+            variant="ghost"
+            aria-expanded={showQuoted}
+            aria-controls={`${id}-quoted`}
+            onClick={() => {
+              setShowQuoted(!showQuoted);
+            }}
+          >
+            {showQuoted ? t("composer.hideQuoted") : t("composer.showQuoted")}
+          </Button>
+          {quotedNote === undefined ? null : <p className={styles["quotedNote"]}>{quotedNote}</p>}
+          {showQuoted ? (
             <>
-              <RecipientField
-                label={t("composer.cc")}
-                recipients={cc}
-                onChange={onCcChange}
-                {...suggestIn("cc")}
-              />
-              <RecipientField
-                label={t("composer.bcc")}
-                recipients={bcc}
-                onChange={onBccChange}
-                {...suggestIn("bcc")}
+              <label className={styles["hidden"]} htmlFor={`${id}-quoted`}>
+                {t("composer.quoted")}
+              </label>
+              <textarea
+                id={`${id}-quoted`}
+                className={styles["quotedText"]}
+                value={quoted}
+                onChange={(event) => {
+                  onQuotedChange?.(event.target.value);
+                }}
               />
             </>
           ) : null}
-          {subject === undefined ? null : (
-            <div className={styles["subjectRow"]}>
-              <label className={styles["fromLabel"]} htmlFor={`${id}-subject`}>
-                {t("composer.subject")}
-              </label>
-              <input
-                id={`${id}-subject`}
-                className={styles["subject"]}
-                value={subject}
-                maxLength={998}
-                onChange={(event) => {
-                  onSubjectChange?.(event.target.value);
-                }}
-              />
-            </div>
-          )}
         </div>
+      )}
 
-        <div className={styles["toolbar"]} role="toolbar" aria-label={t("composer.formatting")}>
-          <OverflowActions
-            label={t("composer.moreFormatting")}
-            actions={
-              compact
-                ? [bold, italic, linkAction, bullets]
-                : [bold, italic, strike, linkAction, bullets, numbers, quote]
-            }
-            more={compact ? [strike, numbers, quote] : []}
-          />
-        </div>
-
-        {link === null ? null : (
-          <LinkForm
-            key={`${String(link.from)}-${String(link.to)}`}
-            initialWords={link.words}
-            initialAddress={link.href}
-            onApply={applyLink}
-            onRemove={link.href === "" ? undefined : removeLink}
-            onCancel={closeLink}
-          />
-        )}
-
-        <EditorContent editor={editor} className={styles["text"]} />
-
-        {quoted === undefined || quoted === "" ? null : (
-          <div className={styles["quoted"]}>
-            <Button
-              variant="ghost"
-              aria-expanded={showQuoted}
-              aria-controls={`${id}-quoted`}
-              onClick={() => {
-                setShowQuoted(!showQuoted);
-              }}
-            >
-              {showQuoted ? t("composer.hideQuoted") : t("composer.showQuoted")}
-            </Button>
-            {quotedNote === undefined ? null : <p className={styles["quotedNote"]}>{quotedNote}</p>}
-            {showQuoted ? (
-              <>
-                <label className={styles["hidden"]} htmlFor={`${id}-quoted`}>
-                  {t("composer.quoted")}
-                </label>
-                <textarea
-                  id={`${id}-quoted`}
-                  className={styles["quotedText"]}
-                  value={quoted}
-                  onChange={(event) => {
-                    onQuotedChange?.(event.target.value);
+      {attachments.length === 0 ? null : (
+        <ul className={styles["attachments"]} aria-label={t("composer.attachments")}>
+          {attachments.map((attachment) => (
+            <li key={attachment.id} className={styles["attachment"]}>
+              <Icon name="attachment" />
+              <span className={styles["attachmentName"]}>{attachment.filename}</span>
+              <span className={styles["attachmentSize"]}>
+                {formatSize(attachment.size, i18n.language)}
+              </span>
+              {onRemoveAttachment === undefined ? null : (
+                <IconButton
+                  label={t("composer.removeAttachment", { name: attachment.filename })}
+                  icon="close"
+                  onClick={() => {
+                    onRemoveAttachment(attachment.id);
                   }}
                 />
-              </>
-            ) : null}
-          </div>
-        )}
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
 
-        {attachments.length === 0 ? null : (
-          <ul className={styles["attachments"]} aria-label={t("composer.attachments")}>
-            {attachments.map((attachment) => (
-              <li key={attachment.id} className={styles["attachment"]}>
-                <Icon name="attachment" />
-                <span className={styles["attachmentName"]}>{attachment.filename}</span>
-                <span className={styles["attachmentSize"]}>
-                  {formatSize(attachment.size, i18n.language)}
-                </span>
-                {onRemoveAttachment === undefined ? null : (
-                  <IconButton
-                    label={t("composer.removeAttachment", { name: attachment.filename })}
-                    icon="close"
-                    onClick={() => {
-                      onRemoveAttachment(attachment.id);
-                    }}
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+      {error === undefined || error === null ? null : (
+        <p className={styles["error"]} role="alert">
+          <Icon name="warning" />
+          <span>{error}</span>
+        </p>
+      )}
 
-        {error === undefined || error === null ? null : (
-          <p className={styles["error"]} role="alert">
-            <Icon name="warning" />
-            <span>{error}</span>
-          </p>
+      <footer className={styles["footer"]}>
+        {onDiscard === undefined ? null : (
+          <IconButton label={t("composer.discard")} icon="trash" onClick={onDiscard} />
         )}
+        <span className={styles["status"]} aria-live="polite">
+          {status}
+        </span>
+        <Button
+          variant="primary"
+          icon="send"
+          shortcut="compose.send"
+          disabled={sending}
+          onClick={onSend}
+        >
+          {t("composer.send")}
+        </Button>
+      </footer>
+    </section>
+  );
 
-        <footer className={styles["footer"]}>
-          {onDiscard === undefined ? null : (
-            <IconButton label={t("composer.discard")} icon="trash" onClick={onDiscard} />
-          )}
-          <span className={styles["status"]} aria-live="polite">
-            {status}
-          </span>
-          <Button
-            variant="primary"
-            icon="send"
-            shortcut="compose.send"
-            disabled={sending}
-            onClick={onSend}
-          >
-            {t("composer.send")}
-          </Button>
-        </footer>
-      </section>
+  // Inline it is no dialog; only the expanded sheet is one (modal).
+  return open ? (
+    <dialog
+      ref={frameRef}
+      className={styles["frame"]}
+      data-expanded
+      aria-labelledby={`${id}-title`}
+    >
+      {composer}
     </dialog>
+  ) : (
+    <div className={styles["frame"]}>{composer}</div>
   );
 }

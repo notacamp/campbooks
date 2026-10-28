@@ -281,10 +281,11 @@ describe("MessageComposer", () => {
       editorOf(box).commands.setTextSelection(9);
     });
     typeInto(box, "!");
-    const frame = box.closest("dialog");
-    expect(frame).not.toHaveAttribute("data-expanded");
+    // Inline it is no dialog: nothing announces one that is not there.
+    expect(box.closest("dialog")).toBeNull();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     fireEvent.keyDown(box, { key: "e", ctrlKey: true, shiftKey: true });
-    expect(frame).toHaveAttribute("data-expanded");
+    expect(box.closest("dialog")).toHaveAttribute("data-expanded");
     expect(screen.getByRole("button", { name: "Shrink" })).toBeVisible();
     // The same element, text and cursor.
     expect(screen.getByRole("textbox", { name: "Message" })).toBe(box);
@@ -292,7 +293,7 @@ describe("MessageComposer", () => {
     typeInto(box, "?");
     // Esc shrinks it (it does not close the composer).
     fireEvent.keyDown(box, { key: "Escape" });
-    expect(frame).not.toHaveAttribute("data-expanded");
+    expect(box.closest("dialog")).toBeNull();
     expect(box).toHaveTextContent("Thursday!? works.");
     expect(editorOf(box).can().undo()).toBe(true);
     act(() => {
