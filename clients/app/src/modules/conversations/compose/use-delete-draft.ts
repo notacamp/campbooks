@@ -13,6 +13,8 @@ import type { Translate } from "../model";
  * which writes the same draft again (same kind, message, recipients, subject,
  * text and quoted history). Forwarded attachments come back from the message
  * as a new forward would have them, so any the member had removed return too.
+ * Uploaded files do not: their blobs are released when the draft goes, so Undo
+ * says plainly to attach them again.
  * Resolves once it is gone; rejects if the server refused (nothing changed).
  */
 export function useDeleteDraft(workspaceId: string) {
@@ -39,6 +41,10 @@ export function useDeleteDraft(workspaceId: string) {
           body: draft.body,
           quoted: draft.quoted,
         });
+        const uploaded = draft.attachments.filter((a) => a.source === "uploaded").length;
+        if (uploaded > 0) {
+          undo.notify(t("compose.draftRestoredWithoutFiles", { count: uploaded }));
+        }
         if (back.conversation_id !== null && back.conversation_id !== undefined) {
           queryClient.setQueryData<Draft[]>(
             draftKeys.forConversation(workspaceId, back.conversation_id),

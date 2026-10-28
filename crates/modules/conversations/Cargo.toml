@@ -29,6 +29,8 @@ chrono-tz.workspace = true
 figment.workspace = true
 # Reading blob streams.
 futures-util.workspace = true
+# Telling an upload past its limit from one cut short (`upload_draft_attachment`).
+http-body-util.workspace = true
 # The image policy over ammonia's canonical output (`domain::sanitize`).
 regex.workspace = true
 scraper.workspace = true

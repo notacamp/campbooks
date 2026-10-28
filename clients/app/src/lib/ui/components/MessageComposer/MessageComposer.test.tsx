@@ -402,4 +402,122 @@ describe("MessageComposer", () => {
     });
     expect(onSend).not.toHaveBeenCalled();
   });
+
+  describe("attaching files", () => {
+    const pdf = new File(["%PDF"], "lease-4b-signed.pdf", { type: "application/pdf" });
+    const dragOf = (types: string[], files: File[] = []) => ({
+      dataTransfer: { types, files },
+    });
+
+    it("has no way to attach without onAttach", () => {
+      renderUi(<MessageComposer {...props()} />);
+      expect(screen.queryByRole("button", { name: "Attach files" })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("composer-files")).not.toBeInTheDocument();
+    });
+
+    it("opens the picker from the button and the shortcut, and hands on the files picked", () => {
+      const onAttach = vi.fn();
+      renderUi(<MessageComposer {...props({ onAttach })} />);
+      const input = screen.getByTestId<HTMLInputElement>("composer-files");
+      expect(input.multiple).toBe(true);
+      const click = vi.spyOn(input, "click");
+      fireEvent.click(screen.getByRole("button", { name: /Attach files/u }));
+      expect(click).toHaveBeenCalledTimes(1);
+      // Focus is in the text: Ctrl+Shift+U reaches the registry from there too.
+      const box = screen.getByRole("textbox", { name: "Message" });
+      act(() => {
+        box.focus();
+      });
+      fireEvent.keyDown(box, { key: "U", keyCode: 85, ctrlKey: true, shiftKey: true });
+      expect(click).toHaveBeenCalledTimes(2);
+      fireEvent.change(input, { target: { files: [pdf] } });
+      expect(onAttach).toHaveBeenCalledWith([pdf]);
+    });
+
+    it("shows each file as a tile, name, size and Remove, uploads busy, and the total", () => {
+      const onRemoveAttachment = vi.fn();
+      renderUi(
+        <MessageComposer
+          {...props({
+            onAttach: vi.fn(),
+            onRemoveAttachment,
+            attachmentBudget: 25 * 1024 * 1024,
+            attachments: [
+              { id: "a1", filename: "lease-4b-signed.pdf", size: 400 * 1024, source: "uploaded" },
+              { id: "a2", filename: "notes", size: 812, source: "forwarded" },
+            ],
+            uploading: [{ key: 1, filename: "photo.jpeg", size: 2 * 1024 * 1024 }],
+          })}
+        />,
+      );
+      const list = screen.getByRole("list", { name: "Attachments" });
+      expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+      expect(within(list).getByText("PDF")).toBeInTheDocument();
+      expect(within(list).getByText("JPEG")).toBeInTheDocument();
+      expect(within(list).getByText("lease-4b-signed.pdf")).toHaveAttribute(
+        "title",
+        "lease-4b-signed.pdf",
+      );
+      expect(within(list).getByText("400 kB")).toBeInTheDocument();
+      const busy = within(list).getByText("photo.jpeg").closest("li");
+      expect(busy).toHaveAttribute("aria-busy", "true");
+      expect(within(busy as HTMLElement).getByText("Uploading…")).toBeInTheDocument();
+      expect(
+        within(busy as HTMLElement).queryByRole("button", { name: /Remove/u }),
+      ).not.toBeInTheDocument();
+      // 400 kB + 812 B + 2 MB, of 25 MB.
+      expect(screen.getByText("2.4 MB of 25 MB")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Remove lease-4b-signed.pdf" }));
+      expect(onRemoveAttachment).toHaveBeenCalledWith("a1");
+    });
+
+    it("says nothing of the total before anything is attached", () => {
+      renderUi(
+        <MessageComposer {...props({ onAttach: vi.fn(), attachmentBudget: 25 * 1024 * 1024 })} />,
+      );
+      expect(screen.queryByText(/ of 25 MB/u)).not.toBeInTheDocument();
+    });
+
+    it("shows the drop zone only for files, without flicker over its children, and takes the drop", () => {
+      const onAttach = vi.fn();
+      renderUi(<MessageComposer {...props({ onAttach })} />);
+      const region = screen.getByRole("region", { name: "Reply to Maya" });
+      const inner = screen.getByRole("textbox", { name: "Message" });
+      fireEvent.dragEnter(region, dragOf(["text/plain"]));
+      expect(screen.queryByText("Drop to attach")).not.toBeInTheDocument();
+
+      fireEvent.dragEnter(region, dragOf(["Files"]));
+      fireEvent.dragEnter(inner, dragOf(["Files"]));
+      fireEvent.dragLeave(region, dragOf(["Files"]));
+      // Still over the composer (the pointer moved into a child).
+      expect(screen.getByText("Drop to attach")).toBeInTheDocument();
+      fireEvent.dragLeave(inner, dragOf(["Files"]));
+      expect(screen.queryByText("Drop to attach")).not.toBeInTheDocument();
+
+      fireEvent.dragEnter(region, dragOf(["Files"]));
+      fireEvent.drop(region, dragOf(["Files"], [pdf]));
+      expect(onAttach).toHaveBeenCalledWith([pdf]);
+      expect(screen.queryByText("Drop to attach")).not.toBeInTheDocument();
+    });
+
+    it("attaches files pasted into the text, and pastes everything else as text", () => {
+      const onAttach = vi.fn();
+      renderUi(<MessageComposer {...props({ onAttach })} />);
+      const box = screen.getByRole("textbox", { name: "Message" });
+      const paste = (files: File[], data: Record<string, string>) =>
+        fireEvent.paste(box, {
+          clipboardData: { files, getData: (type: string) => data[type] ?? "" },
+        });
+      // A screenshot: a file and nothing else.
+      paste([pdf], {});
+      expect(onAttach).toHaveBeenCalledWith([pdf]);
+      // A copy from a page: a picture of it beside its HTML is not a file to attach.
+      onAttach.mockClear();
+      paste([pdf], { "text/html": "<b>x</b>", "text/plain": "x" });
+      expect(onAttach).not.toHaveBeenCalled();
+      // Text alone.
+      paste([], { "text/plain": "hello" });
+      expect(onAttach).not.toHaveBeenCalled();
+    });
+  });
 });

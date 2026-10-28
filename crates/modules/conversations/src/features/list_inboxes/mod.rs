@@ -12,7 +12,7 @@ use utoipa::ToSchema;
 use crate::domain::resources;
 use crate::events::INBOX_RECORD;
 use crate::{
-    domain::access::visible_inboxes,
+    domain::{access::visible_inboxes, drafts::MAX_ATTACHMENT_BYTES},
     model::{Channel, InboxId, InboxRole},
     scopes::ConversationsRead,
 };
@@ -40,6 +40,9 @@ pub struct InboxView {
     /// Kept as read-only history after its connection was removed: no
     /// longer synced, nothing can be written or sent from it.
     pub read_only: bool,
+    /// The most bytes of attachments one message from it can carry: 25 MiB,
+    /// or less when its provider takes less (campbooks-cloud#391).
+    pub max_attachment_bytes: u64,
 }
 
 /// The inboxes, by address.
@@ -97,10 +100,24 @@ pub async fn handler(
     )
     .fetch_all(&mut *tx)
     .await?;
+    // What each one's provider can carry: a few inboxes, one indexed read each.
+    let mut limits = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let resolved = state
+            .destinations
+            .destination(&mut tx, *row.id.as_uuid())
+            .await?;
+        limits.push(
+            resolved
+                .and_then(|at| at.max_attachment_bytes)
+                .map_or(MAX_ATTACHMENT_BYTES, |max| max.min(MAX_ATTACHMENT_BYTES)),
+        );
+    }
     tx.commit().await?;
     let inboxes = rows
         .into_iter()
-        .map(|row| {
+        .zip(limits)
+        .map(|(row, max_attachment_bytes)| {
             Ok(InboxView {
                 id: row.id,
                 channel: row.channel.parse()?,
@@ -110,6 +127,7 @@ pub async fn handler(
                 unread_count: u32::try_from(row.unread_count).unwrap_or_default(),
                 shared: row.shared,
                 read_only: row.read_only,
+                max_attachment_bytes,
             })
         })
         .collect::<Result<_>>()?;

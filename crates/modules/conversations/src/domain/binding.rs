@@ -642,6 +642,7 @@ mod tests {
                 mailbox: "mailbox-1".into(),
             },
             as_at_deploy,
+            max_attachment_bytes: None,
         }
     }
 
@@ -680,6 +681,7 @@ mod tests {
         // Recorded at the deploy changes nothing for a v2 binding.
         let pinned = Resolved {
             as_at_deploy: true,
+            max_attachment_bytes: None,
             ..elsewhere(|d| d.stream = Uuid::now_v7())
         };
         assert!(!request.holds_at(&binding(), Some(&tag), Some(&pinned)));

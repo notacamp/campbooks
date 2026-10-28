@@ -61,6 +61,12 @@ pub struct Resolved {
     /// (a table the runtime role cannot write). Only then may a binding made
     /// before (which names no destination) still verify. Never bound itself.
     pub as_at_deploy: bool,
+    /// The most bytes of attachments one message from here can carry, when
+    /// the provider takes less than the asking module's own limit
+    /// (campbooks-cloud#391): an upload past it is refused, rather than a
+    /// send failing after its undo window. `None`: no lower limit known.
+    /// Never bound.
+    pub max_attachment_bytes: Option<u64>,
 }
 
 /// A future returned by [`OutboundDestinations::destination`].

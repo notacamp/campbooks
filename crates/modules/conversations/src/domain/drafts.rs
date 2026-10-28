@@ -36,11 +36,25 @@ pub const MAX_ATTACHMENT_BYTES: u64 = 25 * 1024 * 1024;
 /// Most message ids kept in `References`.
 pub const MAX_REFERENCES: usize = 20;
 
-/// A forwarded attachment, as the draft shows it.
+/// Where a draft's attachment came from.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AttachmentSource {
+    /// Carried over from the message a forward answers.
+    #[default]
+    Forwarded,
+    /// Added by the author from their device.
+    Uploaded,
+}
+
+/// An attachment, as the draft shows it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct DraftAttachment {
-    /// The original message's attachment.
+    /// The original message's attachment, or the uploaded file's own id.
     pub id: AttachmentId,
+    /// Whether it was forwarded or uploaded.
+    #[serde(default)]
+    pub source: AttachmentSource,
     /// Its file name.
     pub filename: String,
     /// Its media type, as sent (not trusted).
@@ -49,12 +63,14 @@ pub struct DraftAttachment {
     pub size: u64,
 }
 
-/// A forwarded attachment as the row keeps it: with its blob, which the
-/// draft holds.
+/// An attachment as the row keeps it: with its blob, which the draft holds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StoredAttachment {
-    /// The original message's attachment.
+    /// The original message's attachment, or the uploaded file's own id.
     pub id: AttachmentId,
+    /// Rows written before uploads existed have none: they are forwarded.
+    #[serde(default)]
+    pub source: AttachmentSource,
     /// Its file name.
     pub filename: String,
     /// Its media type.
@@ -92,7 +108,7 @@ pub struct DraftView {
     pub body: String,
     /// The quoted history under it.
     pub quoted: String,
-    /// The forwarded attachments.
+    /// The attachments, forwarded and uploaded.
     pub attachments: Vec<DraftAttachment>,
     /// Bumped by every save; name it when saving.
     pub version: u32,
@@ -154,7 +170,7 @@ impl DraftRow {
         self.state.parse()
     }
 
-    /// Its forwarded attachments, with their blobs.
+    /// Its attachments, with their blobs.
     pub fn stored_attachments(&self) -> Result<Vec<StoredAttachment>> {
         decode(self.attachments.clone())
     }
@@ -197,6 +213,7 @@ impl DraftRow {
                 .into_iter()
                 .map(|a| DraftAttachment {
                     id: a.id,
+                    source: a.source,
                     filename: a.filename,
                     content_type: a.content_type,
                     size: a.size,
