@@ -121,7 +121,7 @@ function closing(text: string, from: number, close: string): number {
 }
 
 /** `text` as inline elements: bold, italic, strike, code and links. */
-export function inline(text: string, depth = 0, key = "i"): ReactNode[] {
+function inline(text: string, depth = 0, key = "i"): ReactNode[] {
   const out: ReactNode[] = [];
   let plain = "";
   let index = 0;

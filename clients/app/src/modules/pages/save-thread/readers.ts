@@ -19,7 +19,7 @@ export interface Named {
 }
 
 /** The most readers named; the rest are counted. */
-export const NAMED_MAX = 5;
+const NAMED_MAX = 5;
 
 /**
  * The readers of a page from `pages.get_sharing`: the caller left out (they

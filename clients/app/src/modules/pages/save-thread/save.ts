@@ -25,7 +25,7 @@ export interface SaveCalls {
 }
 
 /** The attachments of one message to include. */
-export interface MessageFiles {
+interface MessageFiles {
   message: string;
   files: (Includable & { id: string })[];
 }

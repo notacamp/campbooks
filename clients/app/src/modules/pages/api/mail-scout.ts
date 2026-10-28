@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api, errorStatus, operationKey, unwrap } from "~/lib/api";
 
-import type { AttachedFile, PageSharing, PageView } from "../types";
+import type { AttachedFile, PageView } from "../types";
 
 import { usePages } from "./queries";
 
@@ -74,12 +74,6 @@ export async function readPage(workspaceId: string, pageId: string): Promise<Pag
 export function mailScoutCalls(workspaceId: string) {
   const path = { workspace_id: workspaceId };
   return {
-    sharing: async (pageId: string): Promise<PageSharing> =>
-      unwrap(
-        await api.GET("/api/v1/w/{workspace_id}/pages/{page_id}/sharing", {
-          params: { path: { ...path, page_id: pageId } },
-        }),
-      ),
     /** `pages.attach_from_message`: all of the message's attachments asked for, or none. */
     attach: async (
       pageId: string,

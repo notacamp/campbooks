@@ -6,5 +6,5 @@ export { PAGES_SHORTCUTS } from "./shortcuts";
 // Mail and Scout in pages (campbooks-cloud#364).
 export { useMailScoutAvailable } from "./api/mail-scout";
 export { SaveToPageDialog } from "./save-thread/SaveToPageDialog";
-export type { SaveThread, SaveThreadMessage } from "./save-thread/thread";
+export type { SaveThread } from "./save-thread/thread";
 export { usePageSubject, usePageTrail } from "./scout-subjects";
