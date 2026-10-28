@@ -18,5 +18,5 @@
 - [x] 3.2 Tracking plan regenerated (Coverage row for the new operation)
 - [x] 3.3 Changelog entry `changelog/unreleased/added/391-attach-files.md`
 - [ ] 3.4 Gates green in CI
-- [ ] 3.5 Recording at 375 px and desktop
+- [x] 3.5 Recording at 375 px and desktop
 - [ ] 3.6 `openspec archive draft-attachments --yes` before merge
