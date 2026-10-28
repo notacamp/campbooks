@@ -154,7 +154,7 @@ against the code on `next` (task 0.3), what differs:
 - **A file has no id of its own** (`pages.files` is keyed by page and blob
   hash), so `pages.detach_files` takes blob hashes and answers
   `{ removed, kept }`. It removes only files that came from a message (a new
-  `source_type`/`source_id` on `pages.files`, migration `20261114020000`) and
+  `source_type`/`source_id` on `pages.files`, migration `20261115020000`) and
   that no block names; a file the member uploaded is never touched.
 - **`AttachmentBlobs`** answers `{ blob, filename }` (the type and size are on
   the `BlobRef`), takes `&AppState` and plain `Uuid`s, and is implemented by
