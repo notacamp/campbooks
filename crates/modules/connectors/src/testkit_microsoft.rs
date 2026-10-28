@@ -120,6 +120,10 @@ pub struct FakeSubscription {
     pub expires: DateTime<Utc>,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "a fake's switches, each a fault turned on or off by a test"
+)]
 #[derive(Debug)]
 struct State {
     next_id: u64,
