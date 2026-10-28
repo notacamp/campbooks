@@ -187,7 +187,11 @@
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspicious",
     "whyMoney": "Payment",
-    "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
+    "sortedTaught": "Campbooks put this in {{stream}}, by a rule",
+    "taskOpen": "Your task “{{title}}” is still open.",
+    "taskPrompt": "Is it done?",
+    "taskDone": "Done",
+    "taskNotYet": "Not yet"
   },
   "reasons": {
     "signals": {

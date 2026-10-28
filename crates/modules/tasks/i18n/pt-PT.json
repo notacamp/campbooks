@@ -16,6 +16,7 @@
     "not_handed_off": "Esta tarefa não foi passada a ninguém.",
     "invalid_hold": "Reserve entre 15 e 240 minutos que ainda não tenham começado.",
     "pay_not_held": "Uma conta paga-se, não se trabalha nela: não há tempo a reservar.",
-    "not_held": "Não há tempo reservado para esta tarefa."
+    "not_held": "Não há tempo reservado para esta tarefa.",
+    "no_reply_question": "Neste momento não há nenhuma pergunta sobre esta tarefa."
   }
 }

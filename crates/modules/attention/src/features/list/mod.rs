@@ -68,7 +68,7 @@ const MAX_OFFSET_MINUTES: i32 = 14 * 60;
 const OPEN: &str = "SELECT i.id, i.record_type, i.record_id, i.container_type, i.container_id, \
             i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent, i.since, i.state, \
             i.cleared_because, i.cleared_by, i.cleared_at, NULL::timestamptz AS snoozed_until, \
-            i.warning, i.from_person, i.plan, i.plan_on \
+            i.warning, i.from_person, i.plan, i.plan_on, i.asks_done \
        FROM attention.items i \
       WHERE i.workspace_id = $1 AND i.state = 'open' AND i.reason <> 'waiting' \
         AND i.container_type || ':' || i.container_id = ANY($2) \
@@ -101,6 +101,8 @@ struct OpenRow {
     plan: Option<String>,
     /// A task's planned day.
     plan_on: Option<NaiveDate>,
+    /// Whether a task asks the member "You replied. Is this done?".
+    asks_done: bool,
 }
 
 /// Record type of a task.
@@ -280,9 +282,13 @@ fn views(rows: Vec<ItemRow>, today: NaiveDate) -> Result<Vec<ItemView>> {
 
 /// Whether a task is for today: overdue, due today or tomorrow, planned for
 /// today or a day before, or back from Later (the list only reads a Later
-/// task once its time has passed). A task projected before plans were kept
+/// task once its time has passed), or asking whether it is done after a
+/// reply of the member (campbooks-cloud#396). A task projected before plans were kept
 /// (`plan` unknown) stays as it was shown until it next changes.
 fn for_today(row: &OpenRow, today: NaiveDate) -> bool {
+    if row.asks_done {
+        return true;
+    }
     let Some(plan) = row.plan.as_deref() else {
         return true;
     };

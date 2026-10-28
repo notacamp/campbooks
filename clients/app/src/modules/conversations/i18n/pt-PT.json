@@ -187,7 +187,11 @@
     "whyUrgent": "Urgente",
     "whySuspicious": "Suspeita",
     "whyMoney": "Pagamento",
-    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra"
+    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra",
+    "taskOpen": "A sua tarefa «{{title}}» continua aberta.",
+    "taskPrompt": "Está feita?",
+    "taskDone": "Feita",
+    "taskNotYet": "Ainda não"
   },
   "reasons": {
     "signals": {

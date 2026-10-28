@@ -25,7 +25,7 @@ import {
   Visor,
   type OverflowAction,
 } from "~/lib/ui";
-import { MakeTaskForm } from "~/modules/tasks";
+import { MakeTaskForm, useReplyQuestion } from "~/modules/tasks";
 
 import {
   useConversation,
@@ -145,6 +145,9 @@ export function ConversationReader({
   const query = useConversation(workspaceId, conversationId);
   const detail = query.data;
   const conversation = detail?.conversation;
+  // A task of theirs from this thread that asks "You replied. Is it done?"
+  // (campbooks-cloud#396): the note below puts the question.
+  const replyQuestion = useReplyQuestion(workspaceId, conversationId);
   // The wait the member just asked for (campbooks-cloud#372): the nudge to that person is a
   // dialog away, and optional.
   const [nudging, setNudging] = useState<{ need: NeedView; opened: number } | undefined>();
@@ -566,6 +569,12 @@ export function ConversationReader({
   // A reply since the message Scout read answered it (campbooks-cloud#355).
   const replied = repliedSince(detail?.messages ?? []);
   const suggestedReply = suggestsReply(decisions, replied) ? noteReply : null;
+  // Scout's sentence when no need is open: where it sorted it, and whether
+  // anything here waits.
+  const standing =
+    suggestion === undefined
+      ? noteSentence(t, decisions, i18n.language, replied)
+      : `${t("scout.suggestionNote", { stream: streamName(t, suggestion.stream) })} ${noteSentence(t, decisions, i18n.language, replied)}`;
   const exists = (key: string) => i18n.exists(`conversations:${key}`);
   const unread = conversation.unread_count > 0;
   const replyButtons =
@@ -802,26 +811,44 @@ export function ConversationReader({
             how={
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }
-            {...(suggestion === undefined
-              ? {}
+            {...(replyQuestion === undefined
+              ? suggestion === undefined
+                ? {}
+                : {
+                    choice: {
+                      prompt: t("scout.prompt"),
+                      options: [
+                        {
+                          label: t("scout.accept", { stream: streamName(t, suggestion.stream) }),
+                          ...choiceKey("item.choice1"),
+                          onSelect: () => {
+                            actions.move(conversation, suggestion.stream);
+                          },
+                        },
+                      ],
+                    },
+                  }
               : {
                   choice: {
-                    prompt: t("scout.prompt"),
+                    prompt: t("scout.taskPrompt"),
                     options: [
                       {
-                        label: t("scout.accept", { stream: streamName(t, suggestion.stream) }),
+                        label: t("scout.taskDone"),
                         ...choiceKey("item.choice1"),
-                        onSelect: () => {
-                          actions.move(conversation, suggestion.stream);
-                        },
+                        onSelect: replyQuestion.done,
+                      },
+                      {
+                        label: t("scout.taskNotYet"),
+                        ...choiceKey("item.choice2"),
+                        onSelect: replyQuestion.notYet,
                       },
                     ],
                   },
                 })}
           >
-            {suggestion === undefined
-              ? noteSentence(t, decisions, i18n.language, replied)
-              : `${t("scout.suggestionNote", { stream: streamName(t, suggestion.stream) })} ${noteSentence(t, decisions, i18n.language, replied)}`}
+            {replyQuestion === undefined
+              ? standing
+              : `${standing} ${t("scout.taskOpen", { title: replyQuestion.task.title })}`}
           </Note>
         ) : (
           <Note
