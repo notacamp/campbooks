@@ -11,6 +11,6 @@
 
 - [x] 2.1 OpenAPI and client types (the ranking description)
 - [x] 2.2 Changelog entry file in `changelog/unreleased/`
-- [ ] 2.3 Gates green (CI)
-- [ ] 2.4 Recording: the tests and a copied person suggested
-- [ ] 2.5 `openspec archive suggest-copied-correspondents --yes`
+- [x] 2.3 Gates green (CI)
+- [x] 2.4 Recording: the tests and a copied person suggested
+- [x] 2.5 `openspec archive suggest-copied-correspondents --yes`
