@@ -134,7 +134,7 @@ pub struct ProviderConfig {
     #[serde(default, deserialize_with = "reasoning_effort")]
     pub reasoning_effort: Option<ReasoningEffort>,
     /// Whether the provider documents the `reasoning` object
-    /// (`CAMPBOOKS_AI__<ROLE>__REASONING=true`; OpenRouter does). Only then
+    /// (`CAMPBOOKS_AI__<ROLE>__REASONING=true`; `OpenRouter` does). Only then
     /// is the effort a feature asks for on one request
     /// ([`ChatRequest::reasoning_effort`](crate::ChatRequest::reasoning_effort))
     /// sent; a role with a `reasoning_effort` of its own counts as accepting

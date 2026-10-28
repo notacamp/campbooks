@@ -1,6 +1,6 @@
 // A reader without the send slice's composer offers no Reply: none that
 // would do nothing (campbooks-cloud#220).
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ScoutChatProvider } from "~/lib/scout-chat";
@@ -71,7 +71,9 @@ describe("ConversationReader", () => {
   it("says so when Scout could not read the message behind the need", async () => {
     routes(OPEN_NEED, { need_read_failed: true });
     renderWithProviders(<Reader />);
-    expect(await screen.findByText("Scout couldn\u2019t read this one.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Scout couldn\u2019t read this one.")).toBeInTheDocument();
+    });
   });
 
   it("says nothing of a read that did not fail", async () => {
