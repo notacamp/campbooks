@@ -32,6 +32,7 @@
     "numbers": "Lista numerada",
     "quote": "Cita",
     "expand": "Ampliar o reducir el editor",
+    "attach": "Adjuntar archivos",
     "ask": "Preguntar"
   },
   "workspace": {

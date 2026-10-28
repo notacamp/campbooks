@@ -1,9 +1,18 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MessageComposer, useUndoToast } from "~/lib/ui";
 
-import type { Draft } from "../../api/drafts";
+import { useSendingInboxes, type Draft } from "../../api/drafts";
 import type { Translate } from "../../model";
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS,
+  megabytes,
+  refusalOfCode,
+  screen,
+  type RefusalReason,
+} from "../../compose/attachment-rules";
 import { addressLine, displayName } from "../../compose/quote";
 import { useDraftEditor } from "../../compose/use-draft-editor";
 import { useRecipientSuggestions } from "../../compose/use-recipient-suggestions";
@@ -65,6 +74,63 @@ export function DraftComposer({
   // To, Cc and Bcc suggest the people you exchange mail with as you type.
   const suggest = useRecipientSuggestions(workspaceId, fields);
 
+  const kept = editor.shown.attachments.filter((a) => fields.attachments.includes(a.id));
+
+  // Why the files last added were not attached, said in the composer beside
+  // them (a toast is one line and would cut the reason at 375px).
+  const [refusals, setRefusals] = useState<string[]>([]);
+
+  // What the draft's mailbox can send in one message: 25 MiB, or less for
+  // a provider that takes less (Microsoft Graph, campbooks-cloud#391).
+  const inboxes = useSendingInboxes(workspaceId);
+  const budget = Math.min(
+    MAX_ATTACHMENT_BYTES,
+    inboxes.data?.find((inbox) => inbox.id === draft.inbox_id)?.max_attachment_bytes ??
+      MAX_ATTACHMENT_BYTES,
+  );
+
+  /** Say, naming the file, why it was not attached. */
+  function refuse(file: File, reason: RefusalReason) {
+    const said = t(`compose.attach.refused.${reason}`, {
+      name: file.name,
+      max: reason === "attachments_too_large" ? megabytes(MAX_ATTACHMENT_BYTES) : megabytes(budget),
+      files: MAX_ATTACHMENTS,
+    });
+    setRefusals((so) => [...so, said]);
+  }
+
+  /** Files from the picker, a drop or a paste: refuse what cannot go, upload the rest. */
+  function attach(files: File[]) {
+    setRefusals([]);
+    const { accepted, refused } = screen(
+      files,
+      {
+        bytes:
+          kept.reduce((sum, a) => sum + a.size, 0) +
+          editor.uploading.reduce((sum, u) => sum + u.size, 0),
+        count: kept.length + editor.uploading.length,
+      },
+      budget,
+    );
+    for (const { file, reason } of refused) {
+      refuse(file, reason);
+    }
+    if (accepted.length === 0) {
+      return;
+    }
+    void editor.attach(accepted).then((failed) => {
+      for (const { file, code } of failed) {
+        const reason = refusalOfCode(code);
+        if (reason !== undefined) {
+          refuse(file, reason);
+        } else if (code !== "content_changed" && code !== "draft_changed") {
+          // A draft changed elsewhere has its notice already.
+          undoToast.notify(t(`compose.errors.${KNOWN_ERRORS.has(code) ? code : "unknown"}`));
+        }
+      }
+    });
+  }
+
   async function send() {
     const scheduled = await editor.send();
     if (scheduled === undefined) {
@@ -105,7 +171,9 @@ export function DraftComposer({
 
   const error =
     editor.error === undefined
-      ? undefined
+      ? refusals.length === 0
+        ? undefined
+        : refusals.join(" ")
       : t(`compose.errors.${KNOWN_ERRORS.has(editor.error) ? editor.error : "unknown"}`);
 
   return (
@@ -137,7 +205,10 @@ export function DraftComposer({
         update({ quoted });
       }}
       quotedNote={quotedNote}
-      attachments={editor.shown.attachments.filter((a) => fields.attachments.includes(a.id))}
+      attachments={kept}
+      onAttach={attach}
+      uploading={editor.uploading.map((u) => ({ key: u.key, filename: u.name, size: u.size }))}
+      attachmentBudget={budget}
       onRemoveAttachment={(id) => {
         update({ attachments: fields.attachments.filter((kept) => kept !== id) });
       }}

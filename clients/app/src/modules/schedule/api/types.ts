@@ -3,6 +3,7 @@ import type { Schema } from "~/lib/api";
 export type EventView = Schema<"EventView">;
 export type EventKind = Schema<"EventKind">;
 export type CalendarView = Schema<"CalendarView">;
+export type CalendarRole = Schema<"CalendarRole">;
 export type SettingsView = Schema<"SettingsView">;
 export type Response = Schema<"Response">;
 export type MessageRead = Schema<"MessageReadView">;

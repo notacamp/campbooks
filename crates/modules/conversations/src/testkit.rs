@@ -153,6 +153,18 @@ impl Kit {
         self
     }
 
+    /// The same kit, resolving where inboxes send from through
+    /// `destinations` (campbooks-cloud#391: what a mailbox can carry).
+    #[must_use]
+    pub fn with_destinations(
+        mut self,
+        destinations: campbooks_kernel::outbound::DestinationsPort,
+    ) -> Self {
+        self.state = self.state.with_destinations(destinations);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
     /// The same kit, reading the tasks open for an email through
     /// `open_tasks` (campbooks-cloud#42).
     #[must_use]
@@ -391,6 +403,25 @@ impl Kit {
         body: Option<serde_json::Value>,
     ) -> TestResponse {
         self.call(Method::POST, token, uri, body).await
+    }
+
+    /// `POST uri` with `bytes` as the body (a file upload) and the extra
+    /// `headers`.
+    pub async fn upload(
+        &self,
+        token: &str,
+        uri: &str,
+        content_type: &str,
+        bytes: Vec<u8>,
+        headers: &[(&str, &str)],
+    ) -> TestResponse {
+        let mut request = Request::post(uri)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(header::CONTENT_TYPE, content_type);
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        testing::send(&self.app, request.body(Body::from(bytes)).unwrap()).await
     }
 
     /// `DELETE uri`.

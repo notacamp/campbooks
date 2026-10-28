@@ -1282,8 +1282,10 @@ fn body(world: &World, id: &str) -> Option<Value> {
         }),
         "pages.resolve_conflict" => json!({"keep": "mine"}),
         "pages.resolve_table_conflict" => json!({"keep": "ours"}),
-        // The bytes of a file: this text.
-        "pages.upload_file" => json!({"file": "matrix"}),
+        // The bytes of a file (for a draft, named in the query): this text.
+        "pages.upload_file" | "conversations.upload_draft_attachment" => {
+            json!({"file": "matrix"})
+        }
         // Mail and Scout in pages (campbooks-cloud#364): a section, the
         // seeded message's attachment, and the seeded file.
         "pages.append" => json!({"markdown": "Matrix section"}),
@@ -1396,6 +1398,7 @@ fn query_of(id: &str) -> &'static str {
     match id {
         "conversations.suggest_rules" => "?action=archive",
         "conversations.list_correspondents" => "?q=example",
+        "conversations.upload_draft_attachment" => "?version=1&filename=matrix.txt",
         "pages.backlinks" => "?type=person&id=matrix@example.com",
         "schedule.list_events" => "?from=2026-11-01&to=2026-11-08",
         "schedule.free_slots" => "?from=2026-11-03&to=2026-11-04&minutes=60",
