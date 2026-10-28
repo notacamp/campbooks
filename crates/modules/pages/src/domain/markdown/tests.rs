@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use campbooks_kernel::RecordRef;
 use yrs::{Any, Doc, Xml, XmlElementPrelim, XmlFragment, XmlTextPrelim};
 
-use super::{MAX_TEXT_BYTES, parse, parse_counted, render};
+use super::{MAX_DEPTH, MAX_TEXT_BYTES, parse, parse_counted, render};
 use crate::{
     domain::{
         append, document,
@@ -299,11 +299,34 @@ fn what_cannot_be_read_is_left_out() {
     );
 }
 
-/// How many steps reading `markdown` may take: a few dozen per character of
-/// it, however it is built. A scan that started over from each bracket would
-/// need the square of its length.
+/// How many steps reading `markdown` may take: a constant per character of
+/// it, however it is built. Each level of nesting reads its text once, finds
+/// its brackets once, and searches at most once to the end for each of the
+/// six delimiters before it remembers the failure; a found closer, a link's
+/// address and a code span add at most one more look at each character. So
+/// ten looks per level, and `MAX_DEPTH + 1` levels. A scan that started over
+/// from each bracket would need the square of the length instead.
 fn steps_allowed(markdown: &str) -> usize {
-    40 * markdown.chars().count()
+    10 * (MAX_DEPTH + 1) * markdown.chars().count()
+}
+
+/// Emphasis nested as deep as it goes, with openers that never close at
+/// every level, so every level searches to the end for each delimiter.
+fn nested_failing_openers() -> String {
+    let failing = "`x ~~y *v [t]( ".repeat(150);
+    let levels = [
+        ("~~", "~~"),
+        ("**", "**"),
+        ("*", "*"),
+        ("__", "__"),
+        ("_", "_"),
+        ("[", "](https://example.com)"),
+    ];
+    let mut text = failing.clone();
+    for (open, close) in levels.iter().rev() {
+        text = format!("{open}a {failing}{text} b{close}");
+    }
+    text
 }
 
 #[test]
@@ -331,6 +354,8 @@ fn brackets_and_emphasis_are_read_in_steps_proportional_to_the_text() {
         "~~a ".repeat(4000),
         "_a_b".repeat(4000),
         "`a ".repeat(5000),
+        // Failing openers at every level of nesting.
+        nested_failing_openers(),
     ];
     for markdown in cases {
         assert!(markdown.len() <= 16 * 1024, "{}", markdown.len());

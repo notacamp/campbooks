@@ -2905,6 +2905,30 @@ fn task_line(proposal: &ChatProposal, action: ProposalAction, task: &ProposalTas
     )
 }
 
+/// Who reads a proposal's page, as words for its line: never "private" when
+/// anyone else can read it. Readers who are no longer members have no name to
+/// give, so then only their count is said.
+fn readers_words(page: &ProposalPage) -> String {
+    let notion = if page.notion {
+        ", and it is kept in step with Notion"
+    } else {
+        ""
+    };
+    match page.audience {
+        ProposalAudience::OnlyYou => format!(" (only the member reads it{notion})"),
+        ProposalAudience::Everyone => format!(" (every member of the workspace reads it{notion})"),
+        ProposalAudience::Named => match (page.readers.is_empty(), page.others) {
+            (true, 1) => format!(" (readable by one other person{notion})"),
+            (true, others) => format!(" (readable by {others} other people{notion})"),
+            (false, 0) => format!(" (readable by {}{notion})", page.readers.join(", ")),
+            (false, others) => format!(
+                " (readable by {} and {others} more{notion})",
+                page.readers.join(", ")
+            ),
+        },
+    }
+}
+
 /// The line for one of a page proposal: what it does and to which page, never
 /// the Markdown.
 fn page_line(proposal: &ChatProposal, action: ProposalAction) -> String {
@@ -2916,24 +2940,10 @@ fn page_line(proposal: &ChatProposal, action: ProposalAction) -> String {
         .unwrap_or_default();
     // Who reads it, in the words the card uses: never "private" when anyone
     // else can read the page.
-    let readers = proposal.page.as_ref().map_or_else(String::new, |page| {
-        let notion = if page.notion {
-            ", and it is kept in step with Notion"
-        } else {
-            ""
-        };
-        match page.audience {
-            ProposalAudience::OnlyYou => format!(" (only the member reads it{notion})"),
-            ProposalAudience::Everyone => {
-                format!(" (every member of the workspace reads it{notion})")
-            }
-            ProposalAudience::Named => format!(
-                " (readable by {} and {} more{notion})",
-                page.readers.join(", "),
-                page.others
-            ),
-        }
-    });
+    let readers = proposal
+        .page
+        .as_ref()
+        .map_or_else(String::new, readers_words);
     let what = match action {
         ProposalAction::NewPage => format!("a new page \"{title}\"{readers}"),
         _ => format!("a section at the end of the page \"{title}\"{readers}"),
@@ -2983,6 +2993,41 @@ fn event_line(proposal: &ChatProposal, action: ProposalAction) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    fn page(readers: &[&str], others: u32) -> ProposalPage {
+        ProposalPage {
+            title: "Acme".to_owned(),
+            audience: ProposalAudience::Named,
+            readers: readers.iter().map(|r| (*r).to_owned()).collect(),
+            others,
+            notion: false,
+            parent: None,
+        }
+    }
+
+    #[test]
+    fn readers_who_are_no_longer_members_are_counted_never_left_blank() {
+        assert_eq!(
+            readers_words(&page(&[], 1)),
+            " (readable by one other person)"
+        );
+        assert_eq!(
+            readers_words(&page(&[], 3)),
+            " (readable by 3 other people)"
+        );
+        assert_eq!(readers_words(&page(&["Rui"], 0)), " (readable by Rui)");
+        assert_eq!(
+            readers_words(&page(&["Rui", "Ana"], 2)),
+            " (readable by Rui, Ana and 2 more)"
+        );
+        for words in [
+            readers_words(&page(&[], 1)),
+            readers_words(&page(&["Rui"], 0)),
+        ] {
+            assert!(!words.contains("by  "), "{words}");
+            assert!(!words.contains("private"), "{words}");
+        }
+    }
     use super::*;
 
     fn event(all_day: bool) -> SeenEvent {

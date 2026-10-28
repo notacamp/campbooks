@@ -11,7 +11,7 @@ use crate::domain::{
 };
 
 /// How deep emphasis and links may nest.
-const MAX_DEPTH: usize = 6;
+pub(super) const MAX_DEPTH: usize = 6;
 
 /// `markdown` as blocks, each with a fresh stable id. Never fails: what is
 /// not understood is text.
@@ -420,7 +420,11 @@ fn read(chars: &[char], marks: &Marks, out: &mut Vec<Run>, depth: usize, steps: 
         if depth < MAX_DEPTH {
             // `code`: no other syntax inside.
             if c == '`' && !failed.already(Delimiter::Code, at + 1) {
-                if let Some(end) = chars[at + 1..].iter().position(|x| *x == '`') {
+                // Every character this looks at is a step, as in `closer`.
+                if let Some(end) = chars[at + 1..].iter().position(|x| {
+                    steps.set(steps.get() + 1);
+                    *x == '`'
+                }) {
                     let end = at + 1 + end;
                     if end > at + 1 {
                         flush!();

@@ -146,9 +146,15 @@
       "pr": "#685"
     },
     {
-      "change": "Mail and Scout in pages (campbooks-cloud#364): 2 pages events for files saved from a message (how many) and a section appended (how many blocks and sources, in buckets); 2 assistant tools (find_pages, read_page) and 2 proposal actions (append_section, new_page); Coverage for every operation of the change.",
+      "change": "You replied. Done? (campbooks-cloud#396): tasks.task_reply_noticed (a reply of the member in the conversation an open Do task came from) and tasks.task_reply_answered (the member answered Not yet); Coverage for tasks.notice_replies, tasks.answer_reply and tasks.unanswer_reply.",
       "date": "2026-10-28",
       "plan_version": 20,
+      "pr": "#697"
+    },
+    {
+      "change": "Mail and Scout in pages (campbooks-cloud#364): 2 pages events for files saved from a message (how many) and a section appended (how many blocks and sources, in buckets); 2 assistant tools (find_pages, read_page) and 2 proposal actions (append_section, new_page); Coverage for every operation of the change.",
+      "date": "2026-10-28",
+      "plan_version": 21,
       "pr": "#690"
     }
   ],
@@ -16008,7 +16014,7 @@
       "actor_types": [
         "user"
       ],
-      "added_in": 20,
+      "added_in": 21,
       "description": "A member made attachments of a message files of a page, without copying their bytes: how many. Never their names, types or sizes, or which message.",
       "fires_when": "pages.attach_from_message has attached every file it was asked for, in the transaction that stores them; a call that attaches nothing (any attachment unreadable) tracks nothing.",
       "module": "pages",
@@ -17728,7 +17734,7 @@
       "actor_types": [
         "user"
       ],
-      "added_in": 20,
+      "added_in": 21,
       "description": "A section of Markdown was added at the end of a page, whether by the member or by Scout's proposal they confirmed: how many blocks and how many sources, in buckets. Never the Markdown, the sources or the page's title.",
       "fires_when": "pages.append has stored the blocks it made, in that transaction; an append that changes nothing tracks nothing.",
       "module": "pages",
@@ -25195,7 +25201,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-28",
-  "plan_version": 20,
+  "plan_version": 21,
   "properties": [
     {
       "classification": "operational",

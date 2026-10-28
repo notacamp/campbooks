@@ -21,6 +21,8 @@
 mod parse;
 mod render;
 
+#[cfg(test)]
+use parse::MAX_DEPTH;
 pub use parse::{parse, parse_counted};
 pub use render::{Rendered, render};
 
