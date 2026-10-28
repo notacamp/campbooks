@@ -85,7 +85,11 @@ export function scheduleApi(
 
   for (const calendar of calendars) {
     routes[`PATCH ${S}/calendars/${calendar.id}`] = (body) => {
-      const updated = { ...calendar, ...(body as Partial<Calendar>) };
+      const changes = body as Partial<Calendar>;
+      // The server derives what the member sees from the role it was given.
+      const shown = changes.role === undefined ? {} : { syncing: changes.role !== "off" };
+      const current = calendars.find((each) => each.id === calendar.id) ?? calendar;
+      const updated = { ...current, ...changes, ...shown };
       calendars = calendars.map((each) => (each.id === calendar.id ? updated : each));
       return { body: updated };
     };
