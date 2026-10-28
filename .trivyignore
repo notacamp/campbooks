@@ -1,0 +1,10 @@
+# Findings the image scans (ci.yml `image`, image.yml `publish`) accept for a
+# while, each with why and an expiry: after its date an entry stops applying
+# and the scan fails again. Remove an entry as soon as the base image ships
+# the fix. One CVE per entry; never a package or a whole severity.
+
+# libssl3 in gcr.io/distroless/cc-debian12 (3.0.20; fixed in 3.0.22-1~deb12u2).
+# campbooks-server never loads the system OpenSSL: it is built on rustls and
+# has no openssl-sys in Cargo.lock, so the library is present but unused.
+# Accepted until the distroless image ships the fix (owner, 2026-10-28).
+CVE-2026-84782 exp:2026-11-10

@@ -143,6 +143,14 @@ jobs:
           digest=$(docker buildx imagetools inspect "$REGISTRY_IMAGE:$first" --format '{{json .Manifest}}' | jq -r .digest)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "first=$first" >> "$GITHUB_OUTPUT"
+      # The scan reads the accepted findings (each with a reason and an
+      # expiry) from the commit being published; nothing else is checked out.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref }}
+          sparse-checkout: .trivyignore
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: Trivy (HIGH/CRITICAL, fixable)
         # Pinned by SHA: this action's tags have been tampered with before.
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
@@ -150,6 +158,7 @@ jobs:
           image-ref: ${{ env.REGISTRY_IMAGE }}@${{ steps.manifest.outputs.digest }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: "1"
       - name: SBOM (SPDX)
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
