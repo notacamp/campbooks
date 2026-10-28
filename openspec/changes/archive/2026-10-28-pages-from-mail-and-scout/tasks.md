@@ -32,5 +32,5 @@
 - [x] 5.2 OpenAPI and client types regenerated (CI artifacts)
 - [x] 5.3 Changelog entry `changelog/unreleased/added/364-pages-from-mail-and-scout.md`
 - [x] 5.4 Gates green in CI
-- [ ] 5.5 Recording: a vhs clip of the CI tests (server-only part)
-- [ ] 5.6 `openspec archive pages-from-mail-and-scout --yes` before merge
+- [x] 5.5 Recording: a vhs clip of the CI tests (server-only part)
+- [x] 5.6 `openspec archive pages-from-mail-and-scout --yes` before merge

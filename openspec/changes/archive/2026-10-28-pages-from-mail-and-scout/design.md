@@ -166,7 +166,8 @@ against the code on `next` (task 0.3), what differs:
   blocks reach the page through `pages.sync`, which announces the body change.
 - **`pages.list` gains no `q`.** The search index already holds pages (ADR
   0016) and answers only what the caller may read, so `find_pages` asks
-  `search.query`, keeps the `pages.page` hits and reads titles, places and
+  `search.query` with `types=pages.page` (a new limit on record types, so mail
+  hits cannot crowd pages out of the result) and reads titles, places and
   dates from `pages.list` (tables left out). `pages.list` is opted in with
   `.assistant()`.
 - **`.assistant()` on `pages.append`, `pages.unappend`, `pages.create` and
@@ -187,6 +188,23 @@ against the code on `next` (task 0.3), what differs:
   lists are one level (indentation is read but not kept), and an image, a table
   or a footnote is plain text. Blocks are made with the Notion block builder, so
   a synced page sends an append like any edit.
+- **From the security review:**
+  - `pages.attach_from_message` needs `conversations:read` as well as
+    `pages:write`. The attachments port checks the member, not the token.
+  - Bytes the store no longer holds are a 404.
+  - The Markdown reader pairs brackets and parentheses in one pass, so its
+    work is linear in the text (a step-counted test).
+  - `pages.unappend` keeps the append, trimmed to the blocks still there,
+    while edited blocks remain, so a second undo can still remove them.
+  - The `blocks` count leaves out the sources line.
+- **`pages.get_sharing`** (new, read, assistant opt-in, behind the flag)
+  answers who really reads a page: everyone for a workspace page; otherwise
+  the creators up the chain and every grant on the chain. It also says
+  whether a Notion link is syncing. Scout's page proposal carries this as
+  `audience` (`only_you`, `named` or `everyone`), `readers`, `others` and
+  `notion`; a new page takes its parent's readers. The card never says
+  "private" when anyone else can read the page, and `detail.markdown`
+  carries the full Markdown for part 2's card.
 - **`pages.read_text`** answers `{ markdown, truncated }` and 409 for a page in
   the trash. `find_pages` and `read_page` add no operation of their own.
 - **Scout's proposal** keeps its page facts in `ChatProposal.page` and the
