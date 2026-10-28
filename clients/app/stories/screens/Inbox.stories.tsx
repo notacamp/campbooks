@@ -235,32 +235,39 @@ export const ThreadReplied: Story = {
  * Scout's read of the message behind the open need failed for good: the note
  * says so in one muted line instead of staying blank (campbooks-cloud#375).
  */
+const Q4_NEEDING = {
+  ...Q4,
+  need: {
+    reason: "reply",
+    trust: "sure",
+    basis: "rules",
+    question: "needs_reply",
+    rule: "signals.question",
+    due_on: null,
+    overdue: false,
+    lapses_at: null,
+    urgent: false,
+    message_id: q4Body,
+    sent_at: "2026-10-13T12:00:00Z",
+  },
+} satisfies typeof Q4;
+
 const readFailed = {
   args: {
     path: `${PATH}/primary/${Q4.id}`,
     api: inbox({
-      [`GET ${W}/conversations/${Q4.id}`]: {
+      // The list, the thread and its read mark all carry the open need: the
+      // reader shows the need's note from the conversation it lists.
+      [`GET ${W}/conversations`]: {
         body: {
-          ...Q4_DETAIL,
-          conversation: {
-            ...Q4,
-            need: {
-              reason: "reply",
-              trust: "sure",
-              basis: "rules",
-              question: "needs_reply",
-              rule: "signals.question",
-              due_on: null,
-              overdue: false,
-              lapses_at: null,
-              urgent: false,
-              message_id: q4Body,
-              sent_at: "2026-10-13T12:00:00Z",
-            },
-          },
-          need_read_failed: true,
+          conversations: PRIMARY.map((c) => (c.id === Q4.id ? Q4_NEEDING : c)),
+          next_cursor: null,
         },
       },
+      [`GET ${W}/conversations/${Q4.id}`]: {
+        body: { ...Q4_DETAIL, conversation: Q4_NEEDING, need_read_failed: true },
+      },
+      [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4_NEEDING, unread_count: 0 } },
     }),
   },
 } satisfies Story;
