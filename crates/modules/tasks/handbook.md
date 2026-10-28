@@ -16,7 +16,8 @@ Tasks are what the member has to do or pay. The Tasks place lists them, and Home
 
 - When the member replies in the email thread a Do task came from, the task asks them "Done?" on Home, in the Tasks list and in the thread. They answer Done, or Not yet.
 - Scout does not close the task itself. It never reads the reply to decide: it only knows that the member replied, and the member says whether that finished the job.
-- Not yet leaves the task open and Scout does not ask again until the member replies again. A bill (Pay) is never asked this: a reply does not pay it.
+- Not yet leaves the task open and Scout does not ask again until the member replies again. A bill (Pay) is never asked this: a reply does not pay it. Neither is an ask Scout read as done some other way (sign and send a form, upload a document, file something, go somewhere): a reply does not finish it. Older tasks, made before Scout noted this, still ask.
+- The task's detail quotes the sender's own sentence that asked for it, for members who can read that email. Scout does not keep that sentence on the task.
 - If the member asks why Scout asked, say that they replied in the same thread after the task was made, and that Scout did not read the reply.
 
 ### Plan and Later

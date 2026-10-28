@@ -28,6 +28,8 @@ const task = (n: number, over: Partial<Task>): Task => ({
   handed_by: null,
   source: null,
   asks_done: false,
+  done_by: null,
+  source_ask: null,
   revision: 1,
   created_at: "2026-10-10T09:00:00Z",
   updated_at: "2026-10-10T09:00:00Z",
@@ -78,12 +80,20 @@ export const VENUE = task(7, {
   handed_by: ANA.user_id,
 });
 
+/** The message of Marta's email that asked for the lease, and the ask Scout read in it. */
+export const LEASE_MESSAGE = "0192f1a0-0000-7000-8000-00000000bb01";
+export const LEASE_ASK = `${LEASE_MESSAGE}:model:ask:1`;
+/** The sender's own sentence, as the message's read serves it to members who may read the email. */
+export const LEASE_QUOTE = "Could you send the signed lease back to me by Friday?";
+
 /** Scout found it in Marta's email: the signed lease, due Friday. */
 export const ASK_LEASE = task(8, {
   title: "Send the signed lease",
   origin: "ask",
   due_on: "2026-10-16",
   source: { type: "conversations.conversation", id: MARTA.id },
+  done_by: "elsewhere",
+  source_ask: LEASE_ASK,
 });
 
 /**

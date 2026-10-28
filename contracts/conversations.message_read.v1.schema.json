@@ -96,6 +96,10 @@
           "minLength": 1,
           "maxLength": 128,
           "description": "The reference of an open task this ask repeats, as the OpenTasks port gave it."
+        },
+        "done_by": {
+          "enum": ["reply", "elsewhere"],
+          "description": "How the ask gets done: `reply` when replying to the message is itself how, `elsewhere` when it is done some other way. Optional: absent from a structured read and from a read made before it was asked. An enum, no text."
         }
       }
     }

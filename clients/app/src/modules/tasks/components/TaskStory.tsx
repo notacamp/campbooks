@@ -2,7 +2,16 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Avatar, ButtonLink, Button, Dot, Heading, Text, type Signal } from "~/lib/ui";
+import {
+  Avatar,
+  ButtonLink,
+  Button,
+  Dot,
+  Heading,
+  SenderSentence,
+  Text,
+  type Signal,
+} from "~/lib/ui";
 import { useMembers } from "~/modules/workspaces";
 
 import { useTaskHistory, type TaskHistoryEntry, type TaskView } from "../api/queries";
@@ -26,10 +35,12 @@ export interface TaskStoryProps {
   me: string | undefined;
   /** Where it came from, when it came from a conversation. */
   source: TaskSource | undefined;
+  /** The sender's own sentence that asked for it, when the caller may read the email. */
+  quote?: string | undefined;
 }
 
 /** Why a task is here: who made it and when, where it came from, then what happened to it. */
-export function TaskStory({ workspaceId, task, me, source }: TaskStoryProps) {
+export function TaskStory({ workspaceId, task, me, source, quote }: TaskStoryProps) {
   const { t: typed, i18n } = useTranslation("tasks");
   const t = typed as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
@@ -108,6 +119,10 @@ export function TaskStory({ workspaceId, task, me, source }: TaskStoryProps) {
                 </Text>
               </div>
             </div>
+            {quote === undefined || quote === "" ? null : (
+              // The email's language is not known: no `lang`, the marks are the member's.
+              <SenderSentence>{t("detail.quote", { quote })}</SenderSentence>
+            )}
             {task.replied === null || task.replied === undefined ? null : (
               <Text tone="secondary" size="sm">
                 {t("detail.yourReply", { date: whenLabel(task.replied.at, locale) })}

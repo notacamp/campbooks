@@ -21,6 +21,8 @@ import {
   BILL,
   INSPECTION,
   LEASE,
+  LEASE_ASK,
+  LEASE_QUOTE,
   LONG_HISTORY,
   OPEN_TASKS,
   PHOTOS,
@@ -58,6 +60,7 @@ function Route() {
       taskId={taskId}
       creating={taskId === undefined && search.new === 1}
       useSources={() => SOURCES}
+      useQuote={(_workspace, _conversation, ask) => (ask === LEASE_ASK ? LEASE_QUOTE : undefined)}
       now={TASKS_NOW}
     />
   );
@@ -331,6 +334,24 @@ describe("Tasks", () => {
     expect(await screen.findByText("You made this")).toBeVisible();
     expect(screen.queryByText("Scout made it")).toBeNull();
     expect(screen.getByText(/Walkthrough on Thursday/u)).toBeVisible();
+  });
+
+  it("quotes the sender's own sentence under their name, and nothing for an older task", async () => {
+    const older = { ...ASK_LEASE, id: ASK_REPLIED.id, title: "Older ask", source_ask: null };
+    api([ASK_LEASE, older, BILL], [VENUE], {
+      [ASK_LEASE.id]: ASK_LEASE_HISTORY,
+      [older.id]: ASK_LEASE_HISTORY,
+    });
+    renderTasks();
+    fireEvent.click(await rowOf(ASK_LEASE.title));
+    const quote = await screen.findByText(`“${LEASE_QUOTE}”`);
+    expect(quote.tagName).toBe("BLOCKQUOTE");
+    expect(quote).not.toHaveAttribute("lang");
+    // Under the sender's line, before the link to the email.
+    expect(screen.getByText("Marta Ferreira")).toBeVisible();
+    fireEvent.click(await rowOf("Older ask"));
+    await screen.findByRole("heading", { name: "History" });
+    expect(screen.queryByText(`“${LEASE_QUOTE}”`)).toBeNull();
   });
 
   it("lists what happened to a task, oldest first, with who did it", async () => {

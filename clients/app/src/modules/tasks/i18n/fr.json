@@ -82,6 +82,7 @@
     "tomorrow": "Demain",
     "nextWeek": "La semaine prochaine",
     "sourceLine": "{{subject}} · {{date}}",
+    "quote": "« {{quote}} »",
     "openEmail": "Ouvrir l’e-mail",
     "hand": "La confier à quelqu’un",
     "handFind": "Chercher un collègue par son nom",
