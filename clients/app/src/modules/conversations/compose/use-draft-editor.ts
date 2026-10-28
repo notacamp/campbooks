@@ -390,7 +390,9 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
       await deleteWithUndo({
         ...draft,
         ...seen,
-        attachments: draft.attachments.filter((a) => seen.attachments.includes(a.id)),
+        // Uploaded files too: Undo brings the draft back without them (their
+        // blobs are released), and says so.
+        attachments: shown.attachments.filter((a) => seen.attachments.includes(a.id)),
       });
     } catch (error) {
       // Refused: the draft stays, and what was typed is still to be saved
@@ -398,7 +400,7 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
       latest.current = seen;
       throw error;
     }
-  }, [deleteWithUndo, draft]);
+  }, [deleteWithUndo, draft, shown.attachments]);
 
   return {
     fields,

@@ -4,6 +4,13 @@ import { MessageComposer, useUndoToast } from "~/lib/ui";
 
 import type { Draft } from "../../api/drafts";
 import type { Translate } from "../../model";
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS,
+  refusalOfCode,
+  screen,
+  type RefusalReason,
+} from "../../compose/attachment-rules";
 import { addressLine, displayName } from "../../compose/quote";
 import { useDraftEditor } from "../../compose/use-draft-editor";
 import { useRecipientSuggestions } from "../../compose/use-recipient-suggestions";
@@ -64,6 +71,46 @@ export function DraftComposer({
   const { fields, update } = editor;
   // To, Cc and Bcc suggest the people you exchange mail with as you type.
   const suggest = useRecipientSuggestions(workspaceId, fields);
+
+  const kept = editor.shown.attachments.filter((a) => fields.attachments.includes(a.id));
+
+  /** Say, naming the file, why it was not attached. */
+  function refuse(file: File, reason: RefusalReason) {
+    undoToast.notify(
+      t(`compose.attach.refused.${reason}`, {
+        name: file.name,
+        max: Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024)),
+        files: MAX_ATTACHMENTS,
+      }),
+    );
+  }
+
+  /** Files from the picker, a drop or a paste: refuse what cannot go, upload the rest. */
+  function attach(files: File[]) {
+    const { accepted, refused } = screen(files, {
+      bytes:
+        kept.reduce((sum, a) => sum + a.size, 0) +
+        editor.uploading.reduce((sum, u) => sum + u.size, 0),
+      count: kept.length + editor.uploading.length,
+    });
+    for (const { file, reason } of refused) {
+      refuse(file, reason);
+    }
+    if (accepted.length === 0) {
+      return;
+    }
+    void editor.attach(accepted).then((failed) => {
+      for (const { file, code } of failed) {
+        const reason = refusalOfCode(code);
+        if (reason !== undefined) {
+          refuse(file, reason);
+        } else if (code !== "content_changed" && code !== "draft_changed") {
+          // A draft changed elsewhere has its notice already.
+          undoToast.notify(t(`compose.errors.${KNOWN_ERRORS.has(code) ? code : "unknown"}`));
+        }
+      }
+    });
+  }
 
   async function send() {
     const scheduled = await editor.send();
@@ -137,7 +184,10 @@ export function DraftComposer({
         update({ quoted });
       }}
       quotedNote={quotedNote}
-      attachments={editor.shown.attachments.filter((a) => fields.attachments.includes(a.id))}
+      attachments={kept}
+      onAttach={attach}
+      uploading={editor.uploading.map((u) => ({ key: u.key, filename: u.name, size: u.size }))}
+      attachmentBudget={MAX_ATTACHMENT_BYTES}
       onRemoveAttachment={(id) => {
         update({ attachments: fields.attachments.filter((kept) => kept !== id) });
       }}
