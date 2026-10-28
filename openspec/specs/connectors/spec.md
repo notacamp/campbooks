@@ -2350,7 +2350,8 @@ are none, so the ways-in listing names no Microsoft mailbox, `start_link`
 answers `mailbox_unsupported`, `start_connection` answers
 `provider_not_configured`, and discovery answers `not_supported_yet`), even
 where the Microsoft sign-in client is configured, no stream reads or writes
-Microsoft, a Microsoft change is recorded `skipped` (`unsupported`), a send
+Microsoft, a Microsoft change is recorded `skipped` (`unsupported`) and one
+still pending when it was turned off ends so at the stream's next run, a send
 through a Microsoft connection ends `not_connected`, the notification
 callback answers 404, and the server SHALL start whatever the other
 Microsoft and connectors settings are, of any shape. While it is on,
@@ -2379,6 +2380,10 @@ SHALL add no setting. No Microsoft setting SHALL be tied to the poll bounds.
 #### Scenario: Flag off with a connected mailbox
 - **WHEN** a Microsoft mailbox was connected and the flag is now off, and a member archives one of its messages and sends from it
 - **THEN** the change is recorded `skipped` (`unsupported`), the send ends `not_connected`, and nothing is asked of Microsoft
+
+#### Scenario: Flag turned off with a change waiting
+- **WHEN** a Microsoft change is pending (waiting out throttling) and the flag is turned off
+- **THEN** the stream's next run ends the change `skipped` (`unsupported`) instead of leaving it to expire, and nothing is asked of Microsoft
 
 #### Scenario: Flag on without the client
 - **WHEN** the flag is on and no Microsoft client is configured
@@ -2621,6 +2626,13 @@ the index SHALL hold the message's tokens as Graph now has it, so the next
 read emits nothing for it. An emission SHALL show a member's change still
 waiting as they left it, and a message whose change was refused, overtaken,
 not movable or given up SHALL be emitted again with the provider's state.
+A change whose patch was made but whose move has nowhere to go SHALL not end
+without a word: the message SHALL be emitted again with Graph's state. A move
+answered by a timeout or a 5xx may have gone through, so where a message
+put in the trash was SHALL be recorded, bound into the change, before the
+move is called: the run that finds the message already in Deleted Items ends
+the change `applied` and keeps that place, so taking it out of the trash
+still puts it back.
 
 #### Scenario: Marked read and starred
 - **WHEN** a member marks a Microsoft message read and stars it
@@ -2645,6 +2657,14 @@ not movable or given up SHALL be emitted again with the provider's state.
 #### Scenario: A label change
 - **WHEN** a member adds a label to a Microsoft message
 - **THEN** the change is recorded `skipped` (`unsupported`) and nothing is written
+
+#### Scenario: A patch whose move has nowhere to go
+- **WHEN** a member marks a message read and archives it before the run, and the mailbox has no Archive folder
+- **THEN** the message is marked read at Graph, nothing is moved, and the message is emitted again with Graph's state
+
+#### Scenario: A trash move that went through unseen
+- **WHEN** a member deletes a message in the member's folder "Clients", Graph moves it but the answer is lost, and the member takes it out of the trash after the next run
+- **THEN** the delete ends `applied` without a second move, and the message is moved back to "Clients"
 
 ### Requirement: Streams in Outlook
 A move of mail in the inbox (the Inbox or a stream folder) to a stream SHALL
@@ -2680,7 +2700,11 @@ in any way since the last read SHALL be emitted again with Graph's state
 once written. A patch SHALL carry
 `If-Match` with the etag read; a 412 or 409 SHALL re-read the message once
 and apply the same rule again, and a second one SHALL end the change
-`superseded`. A message with no etag SHALL not be patched. Messages SHALL be
+`superseded`. A message with no etag SHALL not be patched. Only a 404 at the read SHALL mean
+the message is gone (`skipped`, `message_gone`); any other answer that is
+not the message (a 400, a 403, an answer that cannot be read) SHALL end the
+change `failed` (`refused`) and the message SHALL be emitted again with
+Graph's state. Messages SHALL be
 read and moved with `Prefer: IdType="ImmutableId"`, so a move keeps the
 index's row; a move whose answer names another id SHALL have the old id
 looked up by the next read, which removes it once Graph no longer has it and
@@ -2697,6 +2721,10 @@ reads the new id as new.
 #### Scenario: Graph already did it
 - **WHEN** a member marks a message read that was marked read in Outlook after the last read
 - **THEN** nothing is patched and the change ends `applied`
+
+#### Scenario: A read Graph refuses
+- **WHEN** Graph answers 403 to the read of a message before a change
+- **THEN** nothing is written, the change ends `failed` (`refused`), and the message is emitted again
 
 #### Scenario: A move answering another id
 - **WHEN** Graph answers a move with an id that is not the message's
@@ -2715,14 +2743,21 @@ Graph, and a 413 SHALL be `too_large`. Campbooks SHALL never write a copy to
 Sent Items: after Graph accepts the message, the job SHALL look its copy up
 in Sent Items by its `internetMessageId` and, when exactly one is there,
 record the send sent with that copy's id and index and announce the message
-under it, so the next sync emits nothing new; while the copy is not there,
-the attempt SHALL stay unclear (looked up again, never sent again). Every
+under it, so the next sync emits nothing new. A message Graph accepted
+(202) SHALL always end sent: when its copy is not found (not filed yet, filed
+under another `Message-ID`, or a `Message-ID` that cannot be looked up), the
+send SHALL be recorded sent under the message's own `Message-ID` as its
+provider message id (as an IMAP send is), never `unknown_outcome`, and the
+next sync announces the copy when it lists it.
+Every
 `sendMail` SHALL be preceded by an attempt
 committed on its own; an unclear one (a timeout, a 5xx, a lost answer)
 SHALL be looked up by its `internetMessageId` in Sent Items before anything
 else: found, the send is sent; otherwise it SHALL never be sent again and
-SHALL end `unknown_outcome`. 429, or 503 with `Retry-After`, SHALL retry the
-send after that wait, at most an hour.
+SHALL end `unknown_outcome`; this holds only for an attempt Graph did not
+answer 202. 429, or 503 with `Retry-After`, SHALL make the connection
+`throttled` (`rate_limited`), as for a read, and retry the send after that
+wait, at most an hour.
 
 #### Scenario: A reply
 - **WHEN** a member replies from a Microsoft inbox
@@ -2730,7 +2765,11 @@ send after that wait, at most an hour.
 
 #### Scenario: A copy filed late
 - **WHEN** Graph takes a `sendMail` but files its copy in Sent Items only after the job looked for it
-- **THEN** the send is not settled yet, the next attempt finds the copy and records the send sent, and Graph receives no second `sendMail`
+- **THEN** the send is recorded sent under its own `Message-ID`, Graph receives no second `sendMail`, and the next sync announces the copy once
+
+#### Scenario: A copy under another Message-ID
+- **WHEN** Graph takes a `sendMail` and files a copy whose `Message-ID` is not the document's
+- **THEN** the send is recorded sent under its own `Message-ID`, never `unknown_outcome`, and Graph receives no second `sendMail`
 
 #### Scenario: The next sync
 - **WHEN** the stream syncs after a send and Sent Items' delta lists the copy
@@ -2754,7 +2793,7 @@ send after that wait, at most an hour.
 
 #### Scenario: Throttled
 - **WHEN** Graph answers a `sendMail` 429 with `Retry-After: 120`
-- **THEN** the job tries again after two minutes and the message goes out once
+- **THEN** the connection is `throttled`, the job tries again after two minutes, and the message goes out once
 
 ### Requirement: A connection says what it could still be given
 The connection view (`connectors.get_connection`, `connectors.list_connections`

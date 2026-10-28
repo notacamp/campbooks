@@ -20,7 +20,9 @@
 //! told to give it another; `sendMail` takes base64 MIME (413 over 4 MB)
 //! and files the message in Sent Items with its `Message-ID`, which a
 //! `$filter` on `internetMessageId` finds. A `DELETE` of anything is refused
-//! and recorded ([`FakeMicrosoft::deletes`]).
+//! and recorded ([`FakeMicrosoft::deletes`]). Faults for the write paths: the
+//! next read of a message refused or garbled, the next move made but its
+//! answer lost, sent messages filed under another `Message-ID`.
 //!
 //! No test talks to Microsoft.
 
@@ -118,6 +120,10 @@ pub struct FakeSubscription {
     pub expires: DateTime<Utc>,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "a fake's switches, each a fault turned on or off by a test"
+)]
 #[derive(Debug)]
 struct State {
     next_id: u64,
@@ -161,6 +167,22 @@ struct State {
     delay_filing: bool,
     /// What the next `sendMail` meets.
     send_fault: Option<SendFault>,
+    /// What the next read of a message (`GET /me/messages/{id}`) meets.
+    read_fault: Option<ReadFault>,
+    /// The next move is made, but answered 504 (the answer lost).
+    lose_next_move: bool,
+    /// Sent messages are filed under another `Message-ID`, as when Exchange
+    /// rewrites it.
+    rewrite_sent_ids: bool,
+}
+
+/// What a read of a message meets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReadFault {
+    /// Answered with this status.
+    Status(u16),
+    /// Answered 200 with something that is not a message.
+    Garbled,
 }
 
 /// What a `sendMail` meets.
@@ -225,6 +247,9 @@ impl FakeMicrosoft {
             unfiled: Vec::new(),
             delay_filing: false,
             send_fault: None,
+            read_fault: None,
+            lose_next_move: false,
+            rewrite_sent_ids: false,
         }));
         Mock::given(any())
             .respond_with(Responder(state.clone()))
@@ -514,6 +539,28 @@ impl FakeMicrosoft {
         self.lock().send_fault = Some(SendFault::Refused(status));
     }
 
+    /// The next read of a message (before a change) is answered `status`.
+    pub fn refuse_next_read(&self, status: u16) {
+        self.lock().read_fault = Some(ReadFault::Status(status));
+    }
+
+    /// The next read of a message is answered 200 with something that is not
+    /// a message.
+    pub fn garble_next_read(&self) {
+        self.lock().read_fault = Some(ReadFault::Garbled);
+    }
+
+    /// The next move is made, but its answer is lost (504).
+    pub fn lose_next_move(&self) {
+        self.lock().lose_next_move = true;
+    }
+
+    /// Sent messages are filed under another `Message-ID` from now on (or
+    /// under their own again).
+    pub fn rewrite_sent_ids(&self, rewrite: bool) {
+        self.lock().rewrite_sent_ids = rewrite;
+    }
+
     /// The messages in Sent Items.
     pub fn sent_items(&self) -> Vec<FakeGraphMessage> {
         self.lock()
@@ -622,9 +669,15 @@ impl Respond for Responder {
                     None => graph_error(404, "ErrorItemNotFound"),
                 }
             }
-            ("GET", ["me", "messages", id]) => match state.messages.iter().find(|m| m.id == *id) {
-                Some(message) => json(200, &item(message)),
-                None => graph_error(404, "ErrorItemNotFound"),
+            ("GET", ["me", "messages", id]) => match state.read_fault.take() {
+                Some(ReadFault::Status(status)) => graph_error(status, "ErrorAccessDenied"),
+                Some(ReadFault::Garbled) => ResponseTemplate::new(200)
+                    .insert_header("content-type", "application/json")
+                    .set_body_string("<html>not a message</html>"),
+                None => match state.messages.iter().find(|m| m.id == *id) {
+                    Some(message) => json(200, &item(message)),
+                    None => graph_error(404, "ErrorItemNotFound"),
+                },
             },
             ("GET", ["me", "messages", id, "$value"]) => {
                 match state.messages.iter().find(|m| m.id == *id) {
@@ -907,6 +960,7 @@ fn move_message(state: &mut State, id: &str, request: &wiremock::Request) -> Res
     if !immutable(request) {
         return graph_error(400, "ImmutableIdRequired");
     }
+    let lost = std::mem::take(&mut state.lose_next_move);
     let Ok(body) = serde_json::from_slice::<serde_json::Value>(&request.body) else {
         return graph_error(400, "BadRequest");
     };
@@ -932,6 +986,9 @@ fn move_message(state: &mut State, id: &str, request: &wiremock::Request) -> Res
         moved.version = version;
         let answer = item(&moved);
         state.messages.push(moved);
+        if lost {
+            return graph_error(504, "GatewayTimeout");
+        }
         return json(201, &answer);
     }
     let message = &mut state.messages[at];
@@ -940,6 +997,9 @@ fn move_message(state: &mut State, id: &str, request: &wiremock::Request) -> Res
     let answer = item(message);
     if before != destination {
         state.departures.push((before, id.to_owned(), version));
+    }
+    if lost {
+        return graph_error(504, "GatewayTimeout");
     }
     json(201, &answer)
 }
@@ -979,6 +1039,11 @@ fn send_mail(state: &mut State, request: &wiremock::Request) -> ResponseTemplate
     state.next_id += 1;
     state.version += 1;
     let id = format!("msg-{n}");
+    let internet_id = if state.rewrite_sent_ids {
+        internet_id.map(|_| format!("rewritten-{n}@outlook.example"))
+    } else {
+        internet_id
+    };
     let message = FakeGraphMessage {
         id: id.clone(),
         folder: "fld-sent".to_owned(),
