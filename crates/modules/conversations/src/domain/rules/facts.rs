@@ -56,6 +56,9 @@ pub struct Candidate {
     /// that pretends to be its sender ([`Candidate::dmarc_refused`]), the
     /// one case it changes anything ("fails its sender checks").
     pub correspondent: bool,
+    /// None of the inbox's addresses is in the newest inbound message's
+    /// `To` ([`mark_addressing`]): what "the member is not in To" reads.
+    pub member_not_in_to: bool,
 }
 
 impl Candidate {
@@ -76,6 +79,7 @@ impl Candidate {
             impersonated: self.dmarc_refused(),
             correspondent: self.correspondent,
             authenticated: self.authenticated(),
+            member_not_in_to: self.member_not_in_to,
         }
     }
 
@@ -188,6 +192,7 @@ impl TryFrom<CandidateRow> for Candidate {
             suspicious: r.suspicious,
             sent_at: r.sent_at,
             correspondent: false,
+            member_not_in_to: false,
         })
     }
 }
@@ -245,6 +250,7 @@ pub async fn scan(
     }
     let mut candidates = rows(conn, &ids, &Prefilter::of(conditions)).await?;
     mark_correspondents(conn, inbox, &mut candidates).await?;
+    mark_addressing(conn, &mut candidates).await?;
     Ok(Window {
         candidates,
         next,
@@ -386,7 +392,44 @@ pub async fn candidate(conn: &mut PgConnection, id: ConversationId) -> Result<Op
     )
     .fetch_optional(conn)
     .await?;
-    row.map(Candidate::try_from).transpose()
+    let mut found = row.map(Candidate::try_from).transpose()?;
+    if let Some(candidate) = found.as_mut() {
+        mark_addressing(conn, std::slice::from_mut(candidate)).await?;
+    }
+    Ok(found)
+}
+
+/// Work out, for each candidate, whether its inbox is missing from the
+/// newest inbound message's `To` (only copied, blind copied or an
+/// undisclosed list): addresses compared without regard to case, one query
+/// for all. Fails closed: an empty inbox address is never "not in To".
+async fn mark_addressing(conn: &mut PgConnection, candidates: &mut [Candidate]) -> Result<()> {
+    if candidates.is_empty() {
+        return Ok(());
+    }
+    let ids: Vec<MessageId> = candidates.iter().map(|c| c.message).collect();
+    // A runtime query, so it needs no entry in the `.sqlx` offline cache.
+    let rows: Vec<(MessageId, bool)> = sqlx::query_as(
+        "SELECT m.id,
+                btrim(i.address) <> ''
+                AND NOT EXISTS (
+                    SELECT 1
+                      FROM jsonb_array_elements(
+                               CASE WHEN jsonb_typeof(m.recipients -> 'to') = 'array'
+                                    THEN m.recipients -> 'to' ELSE '[]'::jsonb END) t
+                     WHERE lower(btrim(t ->> 'address')) = lower(btrim(i.address)))
+           FROM conversations.messages m
+           JOIN conversations.inboxes i ON i.id = m.inbox_id
+          WHERE m.id = ANY($1)",
+    )
+    .bind(&ids)
+    .fetch_all(conn)
+    .await?;
+    let not_in_to: std::collections::HashMap<MessageId, bool> = rows.into_iter().collect();
+    for candidate in candidates {
+        candidate.member_not_in_to = not_in_to.get(&candidate.message).copied().unwrap_or(false);
+    }
+    Ok(())
 }
 
 /// Sent messages [`corresponds`] looks through, newest first.

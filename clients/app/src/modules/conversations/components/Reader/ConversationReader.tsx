@@ -71,6 +71,7 @@ import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 import { firstName } from "../../compose/dialog";
 import { NudgeDialog } from "../NudgeDialog/NudgeDialog";
 import { ReplyDialog } from "../ReplyDialog/ReplyDialog";
+import { useAheadOffer } from "../SmartRule/AheadOffer";
 import { SmartRuleConfirm, type SmartRuleDraft } from "../SmartRule/SmartRuleConfirm";
 
 import { MovePicker } from "./MovePicker";
@@ -147,11 +148,18 @@ export function ConversationReader({
   // The wait the member just asked for (campbooks-cloud#372): the nudge to that person is a
   // dialog away, and optional.
   const [nudging, setNudging] = useState<{ need: NeedView; opened: number } | undefined>();
+  // The same answer for the same sender a second time offers the rule that
+  // waits on them for the member (campbooks-cloud#378).
+  const ahead = useAheadOffer(workspaceId);
   const needActions = useNeedActions(workspaceId, {
+    onUndo: (summary) => {
+      ahead.cancel(summary.id);
+    },
     onWaiting: (summary) => {
       const waiting = summary.need;
       if (waiting?.reason === "waiting" && (waiting.waiting_on ?? null) !== null) {
         setNudging((current) => ({ need: waiting, opened: (current?.opened ?? 0) + 1 }));
+        ahead.offer(summary, { kind: "waiting" });
       }
     },
   });
@@ -173,7 +181,7 @@ export function ConversationReader({
   const ruleActions = useRuleActions(workspaceId);
   // While a teach-once offer or question is up, it holds the choice keys:
   // the reader's own choices stay clickable but unbound and unhinted.
-  const offering = useTeachOnce()?.offering ?? false;
+  const offering = (useTeachOnce()?.offering ?? false) || ahead.offering;
   const ruleMark = conversation?.rule ?? undefined;
   // Only whoever may change the rule (its author, a manager) may stop it.
   const stoppable = ruleMark?.may_change === true;
@@ -1080,6 +1088,8 @@ export function ConversationReader({
           }}
         />
       )}
+      {/* Not under the nudge dialog: its keys (1, Esc) are the dialog's while it is open. */}
+      {nudging === undefined ? ahead.element : null}
       <SmartRuleConfirm
         workspaceId={workspaceId}
         draft={trusting}

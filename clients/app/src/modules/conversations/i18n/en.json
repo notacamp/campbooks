@@ -452,6 +452,7 @@
   },
   "rules": {
     "sentence": "Mail {{conditions}} → {{actions}}",
+    "waitSentence": "Mail from {{sender}} to someone else with you in Cc: wait on them.",
     "when": {
       "from": "from {{value}}",
       "list": "on the {{value}} list",
@@ -461,7 +462,8 @@
       "label": "with a label",
       "stream": "in {{value}}",
       "checksFail": "that fails its sender checks",
-      "pretending": "that says it’s from {{value}} but fails its sender checks"
+      "pretending": "that says it’s from {{value}} but fails its sender checks",
+      "notInTo": "with you not in To"
     },
     "do": {
       "archive": "archived",
@@ -477,7 +479,8 @@
       "spam": "reported as spam",
       "paid": "its bills are already paid",
       "images": "its images always show",
-      "worthALook": "kept on Home until you open it"
+      "worthALook": "kept on Home until you open it",
+      "waitOnAddressed": "Scout waits on the person it was written to"
     },
     "likeness": {
       "sender": "Everything from {{address}}",
@@ -606,7 +609,8 @@
       "spam": "Campbooks reported this as spam",
       "paid": "Campbooks says this is already paid",
       "images": "Campbooks shows this sender’s images",
-      "worthALook": "Campbooks is keeping this on Home until you open it"
+      "worthALook": "Campbooks is keeping this on Home until you open it",
+      "waitOnAddressed": "Campbooks is waiting on the person this was written to"
     },
     "reader": {
       "stop": "Stop doing this"
@@ -761,6 +765,7 @@
     "titleTeach": "A rule for mail like this",
     "titleReport": "A rule for mail like this",
     "titlePaid": "A rule for {{payee}}’s invoices",
+    "titleWaiting": "A rule for when {{name}} writes to someone else",
     "titleNotice": "A rule for mail from {{sender}}",
     "whose": "Show images from",
     "imagesTitle": "Always show images from {{sender}}",
@@ -805,6 +810,11 @@
     "paidTitle": "Are {{payee}}’s invoices always paid for you?",
     "paidDetail": "If they’re on direct debit, Campbooks can mark future invoices from {{payee}} paid, without asking. The rule shows in Scout’s memory.",
     "accept": "Yes, from now on",
+    "waitingTitle": "When {{name}} writes to someone else with you in Cc, should Scout wait on them for you?",
+    "waitingDetail_one": "Scout would wait on them and suggest a nudge after {{count}} working day. It never sends anything on its own.",
+    "waitingDetail_other": "Scout would wait on them and suggest a nudge after {{count}} working days. It never sends anything on its own.",
+    "waitingAccept": "Yes, always",
+    "waitingAsk": "Ask me each time",
     "loadFailed": "Campbooks could not prepare that rule. Nothing changed."
   },
   "noticed": {

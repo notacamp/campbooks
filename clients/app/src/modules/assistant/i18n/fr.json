@@ -119,7 +119,8 @@
       },
       "label": "il porte le libellé {{value}}",
       "stream": "il est dans {{value}}",
-      "sender_checks_fail": "il échoue aux vérifications de l’expéditeur"
+      "sender_checks_fail": "il échoue aux vérifications de l’expéditeur",
+      "member_not_in_to": "vous n’êtes pas en À"
     },
     "act": {
       "move_to_stream": "le déplacer vers {{value}}",
@@ -135,7 +136,8 @@
       "trash": "le mettre à la corbeille",
       "spam": "le signaler comme spam",
       "mark_paid": "ses factures sont déjà payées",
-      "show_images": "toujours afficher ses images"
+      "show_images": "toujours afficher ses images",
+      "wait_on_addressed": "attendre la personne à qui il était adressé"
     },
     "stream": {
       "primary": "Principal",

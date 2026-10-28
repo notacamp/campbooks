@@ -692,6 +692,89 @@ export const ScoutIsntSurePhoneRecording: Story = {
   ...at("phone", 375, 812),
 };
 
+// Teach once (campbooks-cloud#378): the member has already answered "Nudge" for
+// Ana's earlier mail to someone else, so the same answer now offers the rule.
+const WAIT_PREVIEW = {
+  matching: 3,
+  would_change: 3,
+  skipped_suspicious: 0,
+  skipped_member: 0,
+  overrides: [],
+  complete: true,
+  samples: [],
+};
+
+function waitOffer(): Record<string, MockRoute> {
+  return {
+    ...copied(),
+    [`GET ${W}/conversations/${COPIED.id}/rule-suggestions`]: {
+      body: {
+        shared: false,
+        default: 0,
+        none: null,
+        wait_days: 3,
+        suggestions: [
+          {
+            likeness: "sender",
+            key: "sender|ana|wait",
+            conditions: [
+              { field: "sender_address", value: "ana@costa-arquitetos.example" },
+              { field: "member_not_in_to" },
+            ],
+            actions: [{ action: "wait_on_addressed" }],
+            preview: WAIT_PREVIEW,
+          },
+        ],
+      },
+    },
+    [`POST ${W}/inboxes/${INBOX.id}/rules/preview`]: { body: WAIT_PREVIEW },
+    [`POST ${W}/conversations/${COPIED.id}/rule-suggestions/dismiss`]: { status: 204 },
+  };
+}
+
+const WAIT_TITLE =
+  "When Ana writes to someone else with you in Cc, should Scout wait on them for you?";
+
+/** 1, then Esc on the nudge: the second answer offers to wait on them for you, and Yes opens the rule. */
+export const ScoutIsntSureWaitOffer: Story = {
+  args: { path: PATH, api: waitOffer() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByText("Ana Costa wrote to Águas do Ribatejo. You’re in Cc."),
+    );
+    await userEvent.keyboard("1");
+    const body = within(canvasElement.ownerDocument.body);
+    await body.findByRole("dialog", { name: "Nudge Águas" });
+    await userEvent.keyboard("{Escape}");
+    const offer = await body.findByRole("dialog", { name: WAIT_TITLE });
+    await expect(
+      within(offer).getByText(
+        "Scout would wait on them and suggest a nudge after 3 working days. It never sends anything on its own.",
+      ),
+    ).toBeVisible();
+    await userEvent.click(within(offer).getByRole("button", { name: /Yes, always/u }));
+    const rule = await body.findByRole("dialog", {
+      name: "A rule for when Ana writes to someone else",
+    });
+    await expect(
+      within(rule).getByText(
+        "Mail from ana@costa-arquitetos.example to someone else with you in Cc: wait on them.",
+      ),
+    ).toBeVisible();
+  },
+};
+
+// Twins for the recording (no play function).
+export const ScoutIsntSureWaitOfferRecording: Story = {
+  args: { path: PATH, api: waitOffer() },
+};
+
+export const ScoutIsntSureWaitOfferPhoneRecording: Story = {
+  args: { path: PATH, api: waitOffer() },
+  ...at("phone", 375, 812),
+};
+
 // A shared mailbox (campbooks-cloud#379): Ana wrote to "Geral"
 // <geral@aguas-ribatejo.example>. The server names a role address for its
 // organisation, so the card reads "Nudge Aguas Ribatejo", not "Nudge Geral".

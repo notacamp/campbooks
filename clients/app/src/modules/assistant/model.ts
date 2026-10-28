@@ -129,6 +129,9 @@ function conditionPhrase(condition: Condition, t: Translate, labels: Names): str
     case "sender_checks_fail": {
       return t("rule.cond.sender_checks_fail");
     }
+    case "member_not_in_to": {
+      return t("rule.cond.member_not_in_to");
+    }
     default: {
       return t(`rule.cond.${condition.field}`, { value: condition.value });
     }

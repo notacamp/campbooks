@@ -12,6 +12,7 @@ use super::{
     Before,
     apply::answers,
     effects::{self, Effects, TaughtAnswer},
+    waits,
 };
 use crate::{
     domain::flags::Flag,
@@ -155,6 +156,14 @@ pub async fn on_arrival(
         for answer in answers(outcome, rule) {
             effects::store_decision(tx, arrival.workspace, at, &answer).await?;
             ledger.of(rule).answered.push(answer.question.to_owned());
+        }
+        // "Wait on them": whose move it is, from the headers (nothing when
+        // there is no single person the message was written to).
+        if outcome.wait.as_deref() == Some(rule) {
+            for answer in waits::answers(tx, arrival.message, rule).await? {
+                effects::store_decision(tx, arrival.workspace, at, &answer).await?;
+                ledger.of(rule).answered.push(answer.question.to_owned());
+            }
         }
     }
     let kinds: BTreeSet<Change> = effects

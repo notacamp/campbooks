@@ -34,7 +34,7 @@ use campbooks_ai::decide::{
         facts::{dmarc_refused, sender_authenticated, sender_checks_failed},
     },
     strategy::{Decided, Strategy},
-    taught::{Facts, Outcome, TaughtRule, evaluate},
+    taught::{Condition, Facts, Outcome, TaughtRule, evaluate},
 };
 use campbooks_kernel::{
     AppState, EventBus, JobContext, JobError, JobHandler,
@@ -826,6 +826,28 @@ impl Apply<'_> {
         // Whether the inbox writes to them matters only for mail pretending
         // to be them ("fails its sender checks" never acts on it).
         let correspondent = impersonated && rules::corresponds(tx, self.inbox, &sender).await?;
+        // Whether the member is only copied (campbooks-cloud#378): looked up
+        // only when a rule asks, from the addresses alone.
+        let member_not_in_to = if acting
+            .iter()
+            .any(|r| r.conditions.contains(&Condition::MemberNotInTo))
+        {
+            let own: Option<String> =
+                sqlx::query_scalar("SELECT address FROM conversations.inboxes WHERE id = $1")
+                    .bind(self.inbox)
+                    .fetch_optional(&mut **tx)
+                    .await?;
+            own.is_some_and(|own| {
+                let own = own.trim();
+                !own.is_empty()
+                    && !message
+                        .to
+                        .iter()
+                        .any(|a| a.address.trim().eq_ignore_ascii_case(own))
+            })
+        } else {
+            false
+        };
         let facts = Facts {
             sender_address: &sender,
             subject: &message.subject,
@@ -841,6 +863,7 @@ impl Apply<'_> {
             impersonated,
             correspondent,
             authenticated: sender_authenticated(&sender, results),
+            member_not_in_to,
         };
         Ok(evaluate(&acting, &facts))
     }

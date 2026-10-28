@@ -408,7 +408,7 @@ const fn need_verdict(verdict: NeedVerdict) -> tracking::NeedVerdict {
 /// whom or what it matches, nor the label it puts on.
 pub fn rule(rule: &Stored) -> tracking::RuleSnapshot {
     tracking::RuleSnapshot {
-        actions: rule.actions.iter().map(rule_action).collect(),
+        actions: rule.actions.iter().filter_map(rule_action).collect(),
         applied_count: i64::from(rule.applied_count),
         condition_count: i64::try_from(rule.conditions.len()).unwrap_or(i64::MAX),
         id: *rule.id.as_uuid(),
@@ -433,8 +433,12 @@ pub async fn track_rule<E: TrackedEvent>(
     Ok(())
 }
 
-const fn rule_action(action: &RuleAction) -> tracking::RuleAction {
-    match action {
+/// The tracked kind of `action`. `WaitOnAddressed` (campbooks-cloud#378) has
+/// none yet: the plan's `conversations.rule_action` gains its value in a
+/// patch of its own (the workbook is regenerated with the tool, not by hand),
+/// so a rule's snapshot leaves it out until then.
+const fn rule_action(action: &RuleAction) -> Option<tracking::RuleAction> {
+    Some(match action {
         RuleAction::MoveToStream { .. } => tracking::RuleAction::MoveToStream,
         RuleAction::Archive => tracking::RuleAction::Archive,
         RuleAction::AddLabel { .. } => tracking::RuleAction::AddLabel,
@@ -447,7 +451,8 @@ const fn rule_action(action: &RuleAction) -> tracking::RuleAction {
         RuleAction::MarkPaid => tracking::RuleAction::MarkPaid,
         RuleAction::ShowImages => tracking::RuleAction::ShowImages,
         RuleAction::WorthALook => tracking::RuleAction::WorthALook,
-    }
+        RuleAction::WaitOnAddressed => return None,
+    })
 }
 
 pub const fn rule_state(state: RuleState) -> tracking::RuleState {

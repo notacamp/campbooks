@@ -119,7 +119,8 @@
       },
       "label": "tem a etiqueta {{value}}",
       "stream": "está em {{value}}",
-      "sender_checks_fail": "falha as verificações do remetente"
+      "sender_checks_fail": "falha as verificações do remetente",
+      "member_not_in_to": "não está em Para"
     },
     "act": {
       "move_to_stream": "movê-lo para {{value}}",
@@ -135,7 +136,8 @@
       "trash": "pô-lo no lixo",
       "spam": "denunciá-lo como spam",
       "mark_paid": "as faturas já estão pagas",
-      "show_images": "mostrar sempre as imagens"
+      "show_images": "mostrar sempre as imagens",
+      "wait_on_addressed": "ficar à espera da pessoa a quem foi escrito"
     },
     "stream": {
       "primary": "Principal",

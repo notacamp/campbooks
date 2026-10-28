@@ -119,7 +119,8 @@
       },
       "label": "it has the label {{value}}",
       "stream": "it is in {{value}}",
-      "sender_checks_fail": "it fails its sender checks"
+      "sender_checks_fail": "it fails its sender checks",
+      "member_not_in_to": "you’re not in To"
     },
     "act": {
       "move_to_stream": "move it to {{value}}",
@@ -135,7 +136,8 @@
       "trash": "put it in the trash",
       "spam": "report it as spam",
       "mark_paid": "its bills are already paid",
-      "show_images": "always show its images"
+      "show_images": "always show its images",
+      "wait_on_addressed": "wait on the person it was written to"
     },
     "stream": {
       "primary": "Primary",

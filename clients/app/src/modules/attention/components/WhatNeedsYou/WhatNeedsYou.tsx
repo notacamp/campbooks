@@ -621,10 +621,13 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
       ahead.offer(conversation, { kind: "paid" });
     },
     // Now it waits: the nudge to that person is a dialog away (it is optional).
+    // The same answer for the same sender a second time offers the rule that
+    // waits on them for the member (campbooks-cloud#378).
     onWaiting: (conversation) => {
       const waiting = conversation.need;
       if (waiting?.reason === "waiting" && (waiting.waiting_on ?? null) !== null) {
         nudge({ conversation, need: waiting, name: displayName(waiting.waiting_on) });
+        ahead.offer(conversation, { kind: "waiting" });
       }
     },
     onReported: (conversation) => {
@@ -2005,7 +2008,8 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
           {waitingList}
         </Disclosure>
       ) : null}
-      {ahead.element}
+      {/* Not under the nudge dialog: its keys (1, Esc) are the dialog's while it is open. */}
+      {nudging === undefined ? ahead.element : null}
       <Dialog
         open={snoozing !== undefined}
         onClose={() => {

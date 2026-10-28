@@ -607,12 +607,14 @@ pub fn raise(
 /// Whether the policy accepted the model's `next_move` answer, saying
 /// someone other than the recipient has the move: a model's own "needs a
 /// reply" or "asks for an action" then raises nothing (campbooks-cloud#293).
-/// The shipped policy accepts none yet.
+/// The shipped policy accepts none yet. A rule the member taught ("wait on
+/// them", campbooks-cloud#378) says the same for them: a model's ask is
+/// nothing, but a "needs a reply" the member taught still raises its Reply,
+/// which comes before a wait.
 fn moved_on(answers: &[Answer]) -> bool {
     answers.iter().any(|a| {
         a.question == moves::question::NEXT_MOVE
-            && a.basis == NeedBasis::Model
-            && a.acted
+            && (a.basis == NeedBasis::Taught || (a.basis == NeedBasis::Model && a.acted))
             && a.value.as_str() != Some(NextMove::Recipient.as_str())
     })
 }
@@ -768,10 +770,13 @@ fn waiting(
     {
         return None;
     }
+    // The answers to the move questions are the model's, or a taught rule's
+    // ("wait on them", campbooks-cloud#378), which replaced the model's
+    // ([`taught_first`]).
     let model = |question: &str| {
-        answers
-            .iter()
-            .find(|a| a.question == question && a.basis == NeedBasis::Model)
+        answers.iter().find(|a| {
+            a.question == question && matches!(a.basis, NeedBasis::Model | NeedBasis::Taught)
+        })
     };
     let next = model(moves::question::NEXT_MOVE)?;
     if !next.acted && !next.confidence.is_some_and(|c| c >= WAIT_FLOOR) {
@@ -786,7 +791,15 @@ fn waiting(
             let label = awaited.value.as_str()?;
             let person = moves::awaited_party(people, label)?;
             let asked_about = option_description(&awaited.options, label)?;
-            moves::describes(asked_about, &person).then_some(person)?
+            // What the model was shown names the person's address after a
+            // name; a rule's answer holds the address alone. Either way the
+            // stored `pN` is read only as the person it named.
+            let same = if awaited.basis == NeedBasis::Taught {
+                asked_about.eq_ignore_ascii_case(person.address.trim())
+            } else {
+                moves::describes(asked_about, &person)
+            };
+            same.then_some(person)?
         }
         NextMove::Sender | NextMove::Recipient | NextMove::Nobody => return None,
     };
@@ -811,7 +824,7 @@ fn waiting(
         } else {
             NeedTrust::Check
         },
-        basis: NeedBasis::Model,
+        basis: next.basis,
         question: NeedQuestion::NextMove,
         decision: Some(next.id),
         due_on: None,
@@ -3886,6 +3899,98 @@ mod tests {
         let mut never = wait.to_vec();
         never.push(answer(SURFACE, NeedBasis::Taught, json!("never"), true));
         assert_eq!(waits(&never, &people), None);
+    }
+
+    /// What a taught "wait on them" stores about Joao's mail to Ana: the
+    /// move, and the one person it was written to by address.
+    fn taught_wait(address: &str) -> [Answer; 2] {
+        let mut moved = answer(
+            moves::question::NEXT_MOVE,
+            NeedBasis::Taught,
+            json!("someone_else"),
+            true,
+        );
+        moved.options = json!(["recipient", "sender", "someone_else", "nobody"]);
+        let mut named = answer(
+            moves::question::AWAITED,
+            NeedBasis::Taught,
+            json!("p1"),
+            true,
+        );
+        named.options = json!([{"label": "p1", "description": address}]);
+        [moved, named]
+    }
+
+    #[test]
+    fn a_taught_wait_waits_on_the_person_it_names_whatever_the_model_asked() {
+        let people = joao_to_ana();
+        // The model reads it as asking the inbox for a reply, sure of it: the
+        // member's rule speaks for them, so the ask is nothing and a wait is
+        // raised, sure, on Ana.
+        let mut answers = vec![
+            stream(NeedBasis::Model, "primary", true),
+            confident(
+                answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
+                0.97,
+            ),
+        ];
+        answers.extend(taught_wait("ana@studio.example"));
+        let need = waits(&answers, &people).expect("a wait on Ana");
+        assert_eq!(
+            (need.reason, need.trust, need.basis, need.question),
+            (
+                NeedReason::Waiting,
+                NeedTrust::Sure,
+                NeedBasis::Taught,
+                NeedQuestion::NextMove
+            )
+        );
+        assert_eq!(
+            need.awaited.map(|a| a.address),
+            Some("ana@studio.example".to_owned())
+        );
+        // A reply another rule taught is the member's too: it comes first,
+        // never silently overridden by the wait.
+        let mut replying = answers.clone();
+        replying.push(answer(
+            triage::NEEDS_REPLY,
+            NeedBasis::Taught,
+            json!(true),
+            true,
+        ));
+        let reply = waits(&replying, &people).unwrap();
+        assert_eq!(
+            (reply.reason, reply.basis),
+            (NeedReason::Reply, NeedBasis::Taught)
+        );
+    }
+
+    #[test]
+    fn a_taught_wait_keeps_every_guard_of_a_wait() {
+        let people = joao_to_ana();
+        let mut answers = quiet();
+        answers.extend(taught_wait("ana@studio.example"));
+        assert!(waits(&answers, &people).is_some());
+        // The headers no longer name that person: no wait.
+        answers[4].options = json!([{"label": "p1", "description": "eve@elsewhere.example"}]);
+        assert_eq!(waits(&answers, &people), None);
+        // Never on the inbox itself, whoever the rule named.
+        let mut ours = joao_to_ana();
+        ours.to = vec![party("Sam", "sam@example.com")];
+        let mut answers = quiet();
+        answers.extend(taught_wait("sam@example.com"));
+        assert_eq!(waits(&answers, &ours), None);
+        // Not for list mail, and not while waits are switched off.
+        let mut machine = joao_to_ana();
+        machine.from = party("Tickets", "no-reply@tickets.example.com");
+        let mut answers = quiet();
+        answers.extend(taught_wait("ana@studio.example"));
+        assert_eq!(waits(&answers, &machine), None);
+        let off = settings().with_waits(false);
+        assert_eq!(
+            raise_with(MessageId::new(), &answers, Some(&people), &off, true),
+            None
+        );
     }
 
     #[test]
