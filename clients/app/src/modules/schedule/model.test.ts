@@ -8,6 +8,7 @@ import {
   atWallClock,
   blocksOn,
   canPush,
+  takesTime,
   cityOf,
   clock,
   dayLong,
@@ -258,9 +259,9 @@ describe("blocks of a day", () => {
 
 describe("adding an event to a provider calendar", () => {
   const calendars = [
-    { id: "own", source: "campbooks", writable: true },
-    { id: "work", source: "provider", writable: true },
-    { id: "holidays", source: "provider", writable: false },
+    { id: "own", source: "campbooks", writable: true, role: "mine" },
+    { id: "work", source: "provider", writable: true, role: "mine" },
+    { id: "holidays", source: "provider", writable: false, role: "off" },
   ];
 
   it("is offered for an event on the Campbooks calendar", () => {
@@ -276,5 +277,30 @@ describe("adding an event to a provider calendar", () => {
     const readOnly = calendars.filter((calendar) => calendar.id !== "work");
 
     expect(canPush(event({ calendar_id: "own" }), readOnly)).toBe(false);
+  });
+
+  it("is not offered when the only writable calendar is followed or off", () => {
+    for (const role of ["following", "off"]) {
+      const others = calendars.map((calendar) =>
+        calendar.id === "work" ? { ...calendar, role } : calendar,
+      );
+
+      expect(canPush(event({ calendar_id: "own" }), others)).toBe(false);
+    }
+  });
+});
+
+describe("a calendar that takes the member's time", () => {
+  const work = { source: "provider", writable: true, role: "mine" };
+
+  it("is a writable provider calendar of their own", () => {
+    expect(takesTime(work)).toBe(true);
+    expect(takesTime({ ...work, writable: false })).toBe(false);
+    expect(takesTime({ ...work, source: "campbooks" })).toBe(false);
+  });
+
+  it("is not one they follow or have turned off", () => {
+    expect(takesTime({ ...work, role: "following" })).toBe(false);
+    expect(takesTime({ ...work, role: "off" })).toBe(false);
   });
 });

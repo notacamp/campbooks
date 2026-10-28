@@ -207,6 +207,14 @@ describe("Add to my calendar", () => {
     expect(offersAdd({ ...delivery, kind: "hold" }, [own, work])).toBe(false);
   });
 
+  it("never goes to a calendar the member only follows", () => {
+    const followed: CalendarView = { ...family, role: "following" };
+    expect(pushTarget([own, followed, work], "family")?.id).toBe("work");
+    expect(pushTarget([own, { ...work, role: "following" }, followed], null)).toBeUndefined();
+    const delivery = event({ kind: "delivery", calendar_id: "own", on_provider: false });
+    expect(offersAdd(delivery, [own, { ...work, role: "following" }])).toBe(false);
+  });
+
   it("goes to the calendar added to last, else the primary one", () => {
     expect(pushTarget([own, work, family], "family")?.id).toBe("family");
     expect(pushTarget([own, family, work], null)?.id).toBe("work");

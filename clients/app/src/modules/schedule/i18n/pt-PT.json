@@ -140,7 +140,8 @@
     "kindChanged": "{{title}} passou a {{kind}}",
     "pushed": "Adicionado a {{calendar}}",
     "answered": "{{title}}: {{response}}",
-    "saved": "{{title}} guardado"
+    "saved": "{{title}} guardado",
+    "role": "{{name}}: {{role}}"
   },
   "found": {
     "label": "O Scout reparou",
@@ -173,10 +174,16 @@
       "title": "Calendários",
       "description": "O Campbooks lê e escreve nestes calendários nos dois sentidos. O seu calendário Campbooks guarda o que o Scout encontra no seu correio; só você o vê até adicionar um evento a um dos outros.",
       "campbooks": "O que o Scout encontra no seu correio · só você",
-      "alwaysOn": "Sempre ativo",
       "primary": "principal",
       "readOnly": "só de leitura",
-      "show": "Mostrar {{name}}",
+      "role": "Função de {{name}}",
+      "shared": "Partilhado consigo",
+      "roles": { "mine": "Meus", "following": "A seguir", "off": "Desligados" },
+      "roleHints": {
+        "mine": "Deixam-no ocupado, guardam as suas tarefas e levam os convites para o Início",
+        "following": "Só mostrados",
+        "off": "Escondidos"
+      },
       "colour": "Cor de {{name}}",
       "access": "Dar acesso ao calendário",
       "accessHint": "Só correio. Dê acesso ao calendário para ver aqui os calendários desta conta.",

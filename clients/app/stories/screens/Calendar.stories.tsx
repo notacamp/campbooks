@@ -25,6 +25,7 @@ import {
   READ_UNREAD,
   REVIEW,
   SCHEDULE_NOW,
+  SHARED,
   TASKS,
   WEEK_EVENTS,
   taskSources,
@@ -592,7 +593,7 @@ const ZOHO_OFFERED = { ...MAIL_ONLY, offers: ["calendar"] } as const;
 
 function settingsApi() {
   return {
-    ...scheduleApi().routes,
+    ...scheduleApi(undefined, { calendars: [...CALENDARS, SHARED] }).routes,
     "GET /bff/api/v1/identity/held-grants": { body: { items: [] } },
     "GET /bff/api/v1/identity/passkeys": { body: { items: [] } },
     "GET /bff/api/v1/identity/ways-in": {
@@ -609,8 +610,21 @@ export const Settings: Story = {
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole("heading", { name: "Calendars" })).toBeVisible();
     await expect(canvas.queryByRole("button", { name: "Add calendar access" })).toBeNull();
-    const holidays = await canvas.findByRole("switch", { name: "Show Holidays in Portugal" });
-    await expect(holidays).toHaveAttribute("aria-checked", "false");
+    // Mine, Following and Off: each provider calendar says which it is.
+    const group = (name: string) => canvas.getByRole("list", { name });
+    await expect(within(group("Mine")).getByText("Work")).toBeVisible();
+    await expect(within(group("Following")).getByText("Marta Lopes")).toBeVisible();
+    await expect(within(group("Following")).getByText(/Shared with you/)).toBeVisible();
+    await expect(within(group("Off")).getByText("Holidays in Portugal")).toBeVisible();
+    // Following a calendar the member owns moves it at once, and Undo puts it back.
+    await userEvent.click(
+      within(canvas.getByRole("group", { name: "Role of Work" })).getByRole("button", {
+        name: "Following",
+      }),
+    );
+    await waitFor(() => expect(within(group("Following")).getByText("Work")).toBeVisible());
+    await userEvent.click(await canvas.findByRole("button", { name: /Undo/u }));
+    await waitFor(() => expect(within(group("Mine")).getByText("Work")).toBeVisible());
     await userEvent.click(canvas.getByRole("switch", { name: "Scout adds Stays" }));
     await waitFor(() =>
       expect(canvas.getByRole("switch", { name: "Scout adds Stays" })).toHaveAttribute(
@@ -732,6 +746,17 @@ export const ReaderIdle: Story = {
 /** Settings → Calendar, to drive by hand. */
 export const SettingsIdle: Story = {
   args: { path: `${BASE}/settings/calendar`, api: settingsApi },
+};
+
+/** Settings → Calendar with Mine, Following (shared with you) and Off, to drive by hand. */
+export const SettingsRolesIdle: Story = {
+  args: { path: `${BASE}/settings/calendar`, api: settingsApi },
+};
+
+/** The same at 375px. */
+export const SettingsRolesIdlePhone: Story = {
+  args: { path: `${BASE}/settings/calendar`, api: settingsApi },
+  ...at("phone", 375, 812),
 };
 
 /** Settings with Add calendar access, to drive by hand. */
