@@ -1,13 +1,10 @@
-import { useNavigate } from "@tanstack/react-router";
-import { useState, type MouseEvent } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
 import { taskRef, useScoutChat } from "~/lib/scout-chat";
 import {
-  Avatar,
   Button,
-  ButtonLink,
   Chip,
   ChipRow,
   DatePicker,
@@ -38,6 +35,7 @@ import { heldText } from "../task-text";
 import { DueChips } from "./DueChips";
 import { HandOff } from "./HandOff";
 import { HoldTime } from "./HoldTime";
+import { TaskStory } from "./TaskStory";
 import type { useTaskActions } from "./use-task-actions";
 
 export interface TaskDetailProps {
@@ -78,7 +76,6 @@ export function TaskDetail({
 }: TaskDetailProps) {
   const { t: typed, i18n } = useTranslation("tasks");
   const t = typed as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const navigate = useNavigate();
   const [title, setTitle] = useState(task.title);
   const [changingDue, setChangingDue] = useState(false);
   const [pickingDay, setPickingDay] = useState(false);
@@ -139,14 +136,6 @@ export function TaskDetail({
       : later && task.later_until !== null && task.later_until !== undefined
         ? t("plan.later", { date: whenLabel(task.later_until, i18n.language) })
         : undefined;
-
-  const openEmail = (event: MouseEvent<HTMLElement>) => {
-    if (source === undefined || event.metaKey || event.ctrlKey || event.shiftKey) {
-      return;
-    }
-    event.preventDefault();
-    void navigate({ to: source.href });
-  };
 
   return (
     <>
@@ -399,40 +388,7 @@ export function TaskDetail({
           </section>
         ) : null}
 
-        {source === undefined ? null : (
-          <section className="flex flex-col gap-2">
-            <Heading level={3} size="section">
-              {t("detail.source")}
-            </Heading>
-            {task.origin === "ask" ? (
-              <Text tone="secondary" size="sm">
-                {t("detail.foundByScout")}
-              </Text>
-            ) : null}
-            <div className="flex items-center gap-2">
-              <Avatar name={source.name} />
-              <div className="flex min-w-0 flex-col">
-                <Text weight="medium">{source.name}</Text>
-                <Text tone="secondary" size="sm">
-                  {t("detail.sourceLine", {
-                    subject: source.subject,
-                    date: whenLabel(source.date, i18n.language),
-                  })}
-                </Text>
-              </div>
-            </div>
-            {task.replied === null || task.replied === undefined ? null : (
-              <Text tone="secondary" size="sm">
-                {t("detail.yourReply", { date: whenLabel(task.replied.at, i18n.language) })}
-              </Text>
-            )}
-            <div>
-              <ButtonLink variant="link" href={source.href} onClick={openEmail}>
-                {t("detail.openEmail")}
-              </ButtonLink>
-            </div>
-          </section>
-        )}
+        <TaskStory workspaceId={workspaceId} task={task} me={me} source={source} />
 
         <HandOff
           workspaceId={workspaceId}

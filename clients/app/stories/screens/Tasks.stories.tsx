@@ -24,6 +24,7 @@ import {
   ACCOUNTANT,
   ASK_BILL,
   ASK_LEASE,
+  ASK_LEASE_HISTORY,
   ASK_REPLIED,
   BILL,
   INSPECTION,
@@ -207,9 +208,9 @@ export const TaskOpen: Story = {
   args: { path: `${PATH}/${LEASE.id}`, api: tasks() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByText("Where it came from")).toBeVisible();
+    await expect(await canvas.findByText("Why it’s here")).toBeVisible();
     await expect(await canvas.findByText("When will you do it?")).toBeVisible();
-    await expect(canvas.getByRole("link", { name: "Open the email" })).toBeVisible();
+    await expect(await canvas.findByRole("link", { name: "Open the email" })).toBeVisible();
   },
 };
 
@@ -465,8 +466,8 @@ export const FoundByScout: Story = {
   args: { path: `${PATH}/${ASK_BILL.id}`, api: foundApi() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByText("Scout found this in the email")).toBeVisible();
-    await expect(canvas.getByRole("link", { name: "Open the email" })).toBeVisible();
+    await expect(await canvas.findByText("Scout made it")).toBeVisible();
+    await expect(await canvas.findByRole("link", { name: "Open the email" })).toBeVisible();
   },
 };
 
@@ -572,6 +573,57 @@ export const RepliedRowInTasks: Story = {
     const canvas = within(canvasElement);
     await expect(await canvas.findByText("You replied · Done?")).toBeVisible();
   },
+};
+
+// "Why it's here" and the history (campbooks-cloud#397): the lease task Scout
+// made from Marta's email, planned, held, moved by the calendar, replied to,
+// "Not yet" and done.
+
+/** The API for the lease task with its history. */
+function storyApi() {
+  const lease = { ...ASK_LEASE, due_on: isoDay(addDays(new Date(), 3)) };
+  return tasks({
+    [`GET ${W}/conversations`]: { body: { conversations: [MARTA], next_cursor: null } },
+    [`GET ${W}/tasks`]: (_body, url) =>
+      url.searchParams.get("whose") === "handed_off"
+        ? { body: { tasks: [] } }
+        : { body: { tasks: [lease] } },
+    [`GET ${W}/tasks/${lease.id}`]: { body: { task: lease, history: ASK_LEASE_HISTORY } },
+  });
+}
+
+/** The detail says why the task is here, and lists what happened to it. */
+export const WhyAndHistory: Story = {
+  args: { path: `${PATH}/${ASK_LEASE.id}`, api: storyApi() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Scout made it")).toBeVisible();
+    await expect(await canvas.findByRole("heading", { name: "History" })).toBeVisible();
+    await expect(await canvas.findByText(/^You marked it done$/u)).toBeVisible();
+    await expect(canvas.getByText(/^The calendar moved the held time/u)).toBeVisible();
+  },
+};
+
+/** The same on a phone: nothing scrolls sideways. */
+export const WhyAndHistoryPhone: Story = {
+  args: { path: `${PATH}/${ASK_LEASE.id}`, api: storyApi() },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole("heading", { name: "History" });
+    await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
+      globalThis.innerWidth,
+    );
+  },
+};
+
+/** The detail, idle (for the recording). */
+export const WhyAndHistoryIdle: Story = { args: WhyAndHistory.args };
+
+/** The detail on a phone, idle. */
+export const WhyAndHistoryPhoneIdle: Story = {
+  args: WhyAndHistoryPhone.args,
+  ...at("phone", 375, 812),
 };
 
 /** The detail asks above where it came from, and the source lists your reply. */

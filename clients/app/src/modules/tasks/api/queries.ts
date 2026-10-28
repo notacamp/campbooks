@@ -6,6 +6,7 @@ export type TaskView = Schema<"TaskView">;
 export type TaskList = Schema<"TaskList">;
 export type TaskVerb = Schema<"TaskVerb">;
 export type NewTask = Schema<"NewTask">;
+export type TaskHistoryEntry = Schema<"TaskHistoryEntry">;
 
 // Keyed by operationId, so the change feed refetches them when a
 // `tasks.task` changes.
@@ -87,6 +88,26 @@ export function useTasksByIds(workspaceId: string, ids: readonly string[]) {
         }),
       ),
     select: (list: TaskList) => list.tasks,
+  });
+}
+
+/**
+ * `tasks.get`: what changed in task `id`, oldest first, and by whom. Keyed by
+ * its operation, so the change feed refetches it when the task changes.
+ */
+export function useTaskHistory(workspaceId: string, id: string) {
+  return useQuery({
+    queryKey: operationKey("tasks.get", { workspace_id: workspaceId, task_id: id }),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/tasks/{task_id}", {
+          params: {
+            path: { workspace_id: workspaceId, task_id: id },
+            query: { utc_offset: utcOffset() },
+          },
+          signal,
+        }),
+      ).history,
   });
 }
 
