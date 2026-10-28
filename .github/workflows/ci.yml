@@ -297,7 +297,10 @@ jobs:
         run: pnpm test
 
   clients-stories:
-    runs-on: ubuntu-latest
+    # 24.04, not -latest: on the 26.04 images (rolling out from 2026-10-28) the
+    # second, dark pass fails to load story modules ("Failed to fetch
+    # dynamically imported module"), a different file each run.
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 30
@@ -325,7 +328,9 @@ jobs:
         run: pnpm --filter @campbooks/app test:fit
 
   clients-webkit:
-    runs-on: ubuntu-latest
+    # 24.04, not -latest: 26.04 has no webkit2gtk-driver, and Playwright's
+    # WebKit does not support it yet (runner image 20261025).
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 30
@@ -354,7 +359,9 @@ jobs:
   tauri:
     # The native shell is its own Cargo workspace so GUI system libraries never
     # enter the server build; it still gets fmt + clippy on every PR.
-    runs-on: ubuntu-latest
+    # 24.04, not -latest: 26.04 has no webkit2gtk-driver, and Playwright's
+    # WebKit does not support it yet (runner image 20261025).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run: { working-directory: clients/app/src-tauri }
@@ -388,7 +395,9 @@ jobs:
     # build driven by tauri-driver and WebKitWebDriver under a virtual display,
     # against a mock API serving hostile HTML mail. Its own job, in parallel
     # with the rest, and not a required check.
-    runs-on: ubuntu-latest
+    # 24.04, not -latest: 26.04 has no webkit2gtk-driver, and Playwright's
+    # WebKit does not support it yet (runner image 20261025).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run: { working-directory: clients }
@@ -446,6 +455,7 @@ jobs:
           image-ref: campbooks:ci
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: "1"
 
   # On a push to next, build both images once, on both architectures, scan
