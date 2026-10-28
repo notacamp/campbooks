@@ -12,7 +12,10 @@
 //! (`domain::roles`). Deleted pages wait 30 days in the trash. The module
 //! publishes `pages.page_changed`, ids and enums only, and uses no model.
 //!
-//! Off by default: `CAMPBOOKS_PAGES__ENABLED` (see `config`).
+//! Off by default: `CAMPBOOKS_PAGES__ENABLED` (see `config`). Mail and Scout
+//! in pages (files saved from a message, a page read as text, sections
+//! appended, Scout's reading and proposing) are a switch of their own,
+//! `CAMPBOOKS_PAGES__MAIL_SCOUT__ENABLED`, also off by default.
 
 #![forbid(unsafe_code)]
 
@@ -44,6 +47,12 @@ pub const NAME: &str = "pages";
 
 /// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
 pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
+
+/// This module's section of Scout's handbook (campbooks-cloud#364): what a
+/// page is, who reads it, and how Scout reads pages and proposes additions.
+/// The server composes it into the assistant's handbook while mail and Scout
+/// work with pages (`CAMPBOOKS_PAGES__MAIL_SCOUT__ENABLED`); at most 8 KiB.
+pub const HANDBOOK: &str = include_str!("../handbook.md");
 
 /// The `pages` module, composed with `deps`, ready for the server to mount.
 /// While pages are off, every endpoint answers 404 as for a route that does
@@ -90,6 +99,9 @@ pub fn module(deps: Deps) -> Module {
                     request
                         .extensions_mut()
                         .insert(config::DatabasesOn(deps.databases));
+                    request
+                        .extensions_mut()
+                        .insert(config::MailScoutOn(deps.mail_scout));
                     next.run(request).await
                 } else {
                     Error::NotFound.into_response()
@@ -105,12 +117,12 @@ pub fn module(deps: Deps) -> Module {
 /// Every route of the module, one per feature.
 fn router(deps: Deps) -> OpenApiRouter<AppState> {
     use features::{
-        add_property, add_row, backlinks, create, create_table, create_view, file, get, get_table,
-        get_table_sync, import_from_notion, list, list_notion_links, move_page, query_table,
-        remove_property, remove_view, resolve_conflict, resolve_table_conflict, restore_property,
-        set_cells, set_options, share, stop_sync, stop_table_sync, sync, trash,
-        undo_resolve_conflict, undo_resolve_table_conflict, update, update_property, update_view,
-        upload,
+        add_property, add_row, append, attach_from_message, backlinks, create, create_table,
+        create_view, detach_files, file, get, get_table, get_table_sync, import_from_notion, list,
+        list_notion_links, move_page, query_table, read_text, remove_property, remove_view,
+        resolve_conflict, resolve_table_conflict, restore_property, set_cells, set_options, share,
+        stop_sync, stop_table_sync, sync, trash, unappend, undo_resolve_conflict,
+        undo_resolve_table_conflict, update, update_property, update_view, upload,
     };
     // A file is up to 20 MiB; everything else is small.
     let uploads = OpenApiRouter::new()
@@ -153,9 +165,27 @@ fn router(deps: Deps) -> OpenApiRouter<AppState> {
                 }
             },
         ));
+    // Mail and Scout in pages are a fourth switch: off, these routes are not
+    // there.
+    let mail_scout = OpenApiRouter::new()
+        .routes(routes!(attach_from_message::handler))
+        .routes(routes!(detach_files::handler))
+        .routes(routes!(read_text::handler))
+        .routes(routes!(append::handler))
+        .routes(routes!(unappend::handler))
+        .layer(middleware::from_fn(
+            move |request: Request, next: Next| async move {
+                if deps.mail_scout {
+                    next.run(request).await
+                } else {
+                    Error::NotFound.into_response()
+                }
+            },
+        ));
     OpenApiRouter::new()
         .merge(tables)
         .merge(databases)
+        .merge(mail_scout)
         .routes(routes!(list::handler, create::handler))
         .routes(routes!(backlinks::handler))
         .routes(routes!(import_from_notion::handler))
@@ -194,6 +224,12 @@ mod tests {
     }
 
     #[test]
+    fn the_handbook_section_fits() {
+        assert!(HANDBOOK.len() <= 8 * 1024, "{}", HANDBOOK.len());
+        assert!(HANDBOOK.starts_with("## Pages"));
+    }
+
+    #[test]
     fn catalogue_is_at_parity() {
         assert_eq!(MESSAGES.check(), Vec::<String>::new());
     }
@@ -225,6 +261,7 @@ mod tests {
             enabled: false,
             tables: false,
             databases: false,
+            mail_scout: false,
         };
         let registry = campbooks_kernel::jobs::Registry::build(&[module(off)]).unwrap();
         assert!(

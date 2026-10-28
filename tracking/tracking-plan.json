@@ -144,6 +144,12 @@
       "date": "2026-10-27",
       "plan_version": 19,
       "pr": "#685"
+    },
+    {
+      "change": "Mail and Scout in pages (campbooks-cloud#364): 2 pages events for files saved from a message (how many) and a section appended (how many blocks and sources, in buckets); 2 assistant tools (find_pages, read_page) and 2 proposal actions (append_section, new_page); Coverage for every operation of the change.",
+      "date": "2026-10-28",
+      "plan_version": 20,
+      "pr": "#690"
     }
   ],
   "coverage": [
@@ -1628,6 +1634,22 @@
     },
     {
       "events": [
+        "pages.section_appended"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.append"
+    },
+    {
+      "events": [
+        "pages.files_attached"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.attach_from_message"
+    },
+    {
+      "events": [
         "pages.page_created"
       ],
       "exemption": "",
@@ -1650,6 +1672,12 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.create_view"
+    },
+    {
+      "events": [],
+      "exemption": "takes back files that pages.attach_from_message made files of the page, for the ones no block names; nothing new is made, and the files were tracked when they were attached (pages.files_attached)",
+      "kind": "operation",
+      "name": "pages.detach_files"
     },
     {
       "events": [],
@@ -1689,6 +1717,12 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.query_table"
+    },
+    {
+      "events": [],
+      "exemption": "reads a page as Markdown for Scout; it changes nothing, and the text is the page's own words, never tracked",
+      "kind": "operation",
+      "name": "pages.read_text"
     },
     {
       "events": [],
@@ -1783,6 +1817,12 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.trash"
+    },
+    {
+      "events": [],
+      "exemption": "takes back the blocks of an append that nobody has changed since; nothing new is made, and the section was tracked when it was appended (pages.section_appended)",
+      "kind": "operation",
+      "name": "pages.unappend"
     },
     {
       "events": [
@@ -2385,6 +2425,11 @@
       "value": "find_conversations"
     },
     {
+      "description": "Looked for the member's pages.",
+      "enum": "assistant.chat_tool",
+      "value": "find_pages"
+    },
+    {
       "description": "Looked for people who write to the member.",
       "enum": "assistant.chat_tool",
       "value": "find_people"
@@ -2418,6 +2463,11 @@
       "description": "Read one event of the member's calendar.",
       "enum": "assistant.chat_tool",
       "value": "read_event"
+    },
+    {
+      "description": "Read one of the member's pages as text.",
+      "enum": "assistant.chat_tool",
+      "value": "read_page"
     },
     {
       "description": "Read one task and what changed in it.",
@@ -2458,6 +2508,11 @@
       "description": "Its Pay need: Already paid.",
       "enum": "assistant.proposal_action",
       "value": "already_paid"
+    },
+    {
+      "description": "Add a section at the end of a page.",
+      "enum": "assistant.proposal_action",
+      "value": "append_section"
     },
     {
       "description": "Archive the conversation.",
@@ -2508,6 +2563,11 @@
       "description": "Move it to another stream.",
       "enum": "assistant.proposal_action",
       "value": "move_to_stream"
+    },
+    {
+      "description": "Make a new private page.",
+      "enum": "assistant.proposal_action",
+      "value": "new_page"
     },
     {
       "description": "Its need: Not needed.",
@@ -5085,6 +5145,7 @@
                   "enum": [
                     "conversation_history",
                     "find_conversations",
+                    "find_pages",
                     "find_people",
                     "free_time",
                     "my_calendar",
@@ -5092,6 +5153,7 @@
                     "my_tasks",
                     "read_conversation",
                     "read_event",
+                    "read_page",
                     "read_task",
                     "what_needs_me"
                   ],
@@ -5506,6 +5568,7 @@
                 "enum": [
                   "add_label",
                   "already_paid",
+                  "append_section",
                   "archive",
                   "create_event",
                   "delete_event",
@@ -5516,6 +5579,7 @@
                   "mark_read",
                   "mark_unread",
                   "move_to_stream",
+                  "new_page",
                   "not_needed",
                   "not_spam",
                   "plan_day",
@@ -5643,6 +5707,7 @@
                 "enum": [
                   "add_label",
                   "already_paid",
+                  "append_section",
                   "archive",
                   "create_event",
                   "delete_event",
@@ -5653,6 +5718,7 @@
                   "mark_read",
                   "mark_unread",
                   "move_to_stream",
+                  "new_page",
                   "not_needed",
                   "not_spam",
                   "plan_day",
@@ -5780,6 +5846,7 @@
                 "enum": [
                   "add_label",
                   "already_paid",
+                  "append_section",
                   "archive",
                   "create_event",
                   "delete_event",
@@ -5790,6 +5857,7 @@
                   "mark_read",
                   "mark_unread",
                   "move_to_stream",
+                  "new_page",
                   "not_needed",
                   "not_spam",
                   "plan_day",
@@ -15908,6 +15976,89 @@
       "version": 1
     },
     {
+      "action": "attached",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 20,
+      "description": "A member made attachments of a message files of a page, without copying their bytes: how many. Never their names, types or sizes, or which message.",
+      "fires_when": "pages.attach_from_message has attached every file it was asked for, in the transaction that stores them; a call that attaches nothing (any attachment unreadable) tracks nothing.",
+      "module": "pages",
+      "name": "pages.files_attached",
+      "object": "files",
+      "openspec_change": "pages-from-mail-and-scout",
+      "rust_type": "FilesAttached",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.files_attached:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member made attachments of a message files of a page, without copying their bytes: how many. Never their names, types or sizes, or which message.",
+        "properties": {
+          "files": {
+            "description": "How many attachments were attached: those of the call.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "files",
+          "page"
+        ],
+        "title": "pages.files_attached",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
       "action": "raised",
       "actor_types": [
         "user",
@@ -17538,6 +17689,109 @@
           "table"
         ],
         "title": "pages.rows_queried",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "appended",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 20,
+      "description": "A section of Markdown was added at the end of a page, whether by the member or by Scout's proposal they confirmed: how many blocks and how many sources, in buckets. Never the Markdown, the sources or the page's title.",
+      "fires_when": "pages.append has stored the blocks it made, in that transaction; an append that changes nothing tracks nothing.",
+      "module": "pages",
+      "name": "pages.section_appended",
+      "object": "section",
+      "openspec_change": "pages-from-mail-and-scout",
+      "rust_type": "SectionAppended",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.section_appended:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A section of Markdown was added at the end of a page, whether by the member or by Scout's proposal they confirmed: how many blocks and how many sources, in buckets. Never the Markdown, the sources or the page's title.",
+        "properties": {
+          "blocks": {
+            "description": "How many blocks the section added.",
+            "enum": [
+              "few",
+              "many",
+              "none",
+              "one",
+              "some"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "page": {
+            "additionalProperties": false,
+            "description": "The page afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          },
+          "sources": {
+            "description": "How many sources the section named.",
+            "enum": [
+              "few",
+              "many",
+              "none",
+              "one",
+              "some"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "blocks",
+          "page",
+          "sources"
+        ],
+        "title": "pages.section_appended",
         "type": "object"
       },
       "scope": "workspace",
@@ -24540,8 +24794,8 @@
     }
   ],
   "generated_by": "campbooks-tracking-plan",
-  "plan_date": "2026-10-27",
-  "plan_version": 19,
+  "plan_date": "2026-10-28",
+  "plan_version": 20,
   "properties": [
     {
       "classification": "operational",
@@ -27535,6 +27789,32 @@
     },
     {
       "classification": "operational",
+      "description": "How many attachments were attached: those of the call.",
+      "event": "pages.files_attached",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "files",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.files_attached",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
       "description": "How many blocks are in conflict now that were not before.",
       "event": "pages.notion_conflict_raised",
       "example": "",
@@ -28063,6 +28343,45 @@
       "pattern": "",
       "property": "view_type",
       "required": false,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many blocks the section added.",
+      "event": "pages.section_appended",
+      "example": "",
+      "list": false,
+      "of": "pages.count_bucket",
+      "pattern": "",
+      "property": "blocks",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The page afterwards.",
+      "event": "pages.section_appended",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "page",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many sources the section named.",
+      "event": "pages.section_appended",
+      "example": "",
+      "list": false,
+      "of": "pages.count_bucket",
+      "pattern": "",
+      "property": "sources",
+      "required": true,
       "type": "enum",
       "version": 1
     },

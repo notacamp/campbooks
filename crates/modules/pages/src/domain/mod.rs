@@ -5,9 +5,11 @@
 use std::str::FromStr;
 
 pub mod access;
+pub mod append;
 pub mod body;
 pub mod cells;
 pub mod document;
+pub mod markdown;
 pub mod notion;
 pub mod position;
 pub mod purge;

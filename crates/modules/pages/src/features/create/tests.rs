@@ -212,3 +212,80 @@ async fn writing_needs_the_write_scope_a_member_and_the_flag(db: PgPool) {
     assert_eq!(kit.get(&ana, &uri).await.status, StatusCode::NOT_FOUND);
     assert_eq!(kit.page_count(workspace).await, 0);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_page_made_from_markdown_has_its_blocks_and_passes_the_same_checks(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let task = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c33";
+    let made = kit
+        .post(
+            &ana,
+            &Kit::pages(workspace),
+            Some(json!({
+                "title": "Kickoff notes",
+                "markdown": "## Plan\n\n- send the agenda\n- [ ] book the room\n\n[bad](javascript:alert(1)) <b>x</b>",
+                "sources": [{"type": "tasks.task", "id": task}],
+            })),
+        )
+        .await;
+    assert_eq!(made.status, StatusCode::CREATED, "{:?}", made.json);
+    assert_eq!(made.json["place"], "private");
+    assert_eq!(made.json["revision"], 2);
+    let id = made.json["id"].as_str().unwrap();
+    let read = kit.page_text(&ana, workspace, id).await;
+    assert!(
+        read.starts_with(
+            "# Kickoff notes\n\n## Plan\n\n- send the agenda\n\n- [ ] book the room\n\n"
+        ),
+        "{read}"
+    );
+    assert!(read.contains("bad <b>x</b>"), "{read}");
+    assert!(!read.contains("javascript"), "{read}");
+    assert!(read.ends_with(&format!("[tasks.task:{task}]")), "{read}");
+    // No word of it in the event.
+    let events = kit.events("pages.page_changed").await;
+    assert!(events.iter().all(|e| !e.to_string().contains("agenda")));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn markdown_and_a_document_are_not_both_taken_and_sources_need_markdown(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let client = docs::client(81);
+    let update = docs::paragraph(&client, "Hi");
+    let both = kit
+        .post(
+            &ana,
+            &Kit::pages(workspace),
+            Some(json!({
+                "markdown": "x",
+                "document": base64::Engine::encode(&base64::engine::general_purpose::STANDARD, update),
+            })),
+        )
+        .await;
+    assert_eq!(both.status, StatusCode::BAD_REQUEST);
+    assert_eq!(both.json["code"], "markdown_with_document");
+    let orphan = kit
+        .post(
+            &ana,
+            &Kit::pages(workspace),
+            Some(json!({"sources": [{"type": "tasks.task", "id": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c33"}]})),
+        )
+        .await;
+    assert_eq!(orphan.status, StatusCode::BAD_REQUEST);
+    assert_eq!(orphan.json["code"], "sources_without_markdown");
+    for markdown in ["", "   \n\n", &"x".repeat(16 * 1024 + 1)] {
+        let refused = kit
+            .post(
+                &ana,
+                &Kit::pages(workspace),
+                Some(json!({"markdown": markdown})),
+            )
+            .await;
+        assert!(refused.status.is_client_error(), "{:?}", refused.json);
+    }
+    assert_eq!(kit.page_count(workspace).await, 0);
+}
