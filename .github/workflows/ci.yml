@@ -446,6 +446,7 @@ jobs:
           image-ref: campbooks:ci
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: "1"
 
   # On a push to next, build both images once, on both architectures, scan
