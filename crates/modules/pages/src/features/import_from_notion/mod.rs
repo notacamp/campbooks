@@ -164,11 +164,11 @@ pub async fn handler(
     if asked == 0 || asked > MAX_IMPORT {
         return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_import")));
     }
-    let mut table_titles = Vec::with_capacity(request.data_sources.len());
+    let mut table_titles = Vec::new();
     for database in &request.data_sources {
         table_titles.push(clean_title(database.title.as_deref().unwrap_or_default())?);
     }
-    let mut titles = Vec::with_capacity(request.pages.len());
+    let mut titles = Vec::new();
     for page in &request.pages {
         titles.push(clean_title(page.title.as_deref().unwrap_or_default())?);
     }
