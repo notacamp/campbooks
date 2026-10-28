@@ -4270,7 +4270,7 @@ export interface components {
         };
         /** @description People, written to most first. */
         CorrespondentList: {
-            /** @description Written to most first, then written by most, then by address. */
+            /** @description Written to most first, then written by most, then copied most, then by address. */
             correspondents: components["schemas"]["CorrespondentView"][];
         };
         /** @description Someone the caller's inboxes exchange mail with. */

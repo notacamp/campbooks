@@ -2,7 +2,8 @@
 //! the caller can read exchange mail with, for suggesting them in the
 //! composer's To, Cc and Bcc as the member types (campbooks-cloud#304).
 //! Both directions: who writes to those inboxes (the sender of inbound mail)
-//! and who they wrote to (To and Cc of sent mail). Addresses, display names
+//! and who they wrote to (To and Cc of sent mail), and who else was on the
+//! mail they received (its To and Cc). Addresses, display names
 //! and counts only: never a subject or any text. Bounded (at most ten, no
 //! cursor, `q` required), and it reads only the newest mail ([`WINDOW_DAYS`],
 //! at most [`MAX_SCANNED`] received and as many sent messages, through
@@ -13,7 +14,9 @@
 //! own choice. Someone who only writes in is suggested only when it is safe
 //! to write to them, as `list_senders` with `reachable` judges it
 //! ([`crate::domain::reachable`]): facts only (ADR 0018), never what the mail
-//! says.
+//! says. Someone only copied on received mail is suggested when they are not
+//! a no-reply address, none of their own mail is flagged, and the newest
+//! message that copied them came from someone who may be written to.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -81,18 +84,30 @@ pub struct CorrespondentView {
 /// People, written to most first.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct CorrespondentList {
-    /// Written to most first, then written by most, then by address.
+    /// Written to most first, then written by most, then copied most, then by address.
     pub correspondents: Vec<CorrespondentView>,
 }
 
-/// One person as the query reads them: address, name, wrote, received, and
-/// their newest received mail's authentication results.
-type Row = (String, Option<String>, i32, i32, Option<String>);
+/// One person as the query reads them.
+#[derive(sqlx::FromRow)]
+struct Row {
+    address: String,
+    name: Option<String>,
+    wrote: i32,
+    received: i32,
+    /// The authentication results of their newest received mail.
+    newest_results: Option<String>,
+    /// Who sent the newest received message that copied them, and its
+    /// authentication results.
+    copier: Option<String>,
+    copier_results: Option<String>,
+}
 
 /// The newest received and sent mail of the inboxes `$1` within `$4` days,
-/// at most `$5` of each; every person in it whose address or names hold
+/// at most `$5` of each; every person in it (the sender and the To and Cc of
+/// received mail, the To and Cc of sent mail) whose address or names hold
 /// each word of `$2`, without the inboxes' own addresses; ranked, then
-/// those only received from are checked best first, only until `$3` pass
+/// those not written to are checked best first, only until `$3` pass
 /// ([`flagged_sender_sql`]); the facts of their newest mail are read in
 /// Rust ([`may_write_to`]).
 const CORRESPONDENTS: &str = concat!(
@@ -101,9 +116,10 @@ const CORRESPONDENTS: &str = concat!(
         SELECT i.address FROM conversations.inboxes i WHERE i.id = ANY($1)
     ),
     received AS (
-        SELECT m.sender_address AS address,
+        SELECT m.id, m.sender_address AS address,
                m.sender->>'name' AS name,
                m.headers->>'authentication_results' AS results,
+               m.recipients,
                m.sent_at
           FROM conversations.messages m
          WHERE m.inbox_id = ANY($1) AND m.direction = 'inbound'
@@ -122,24 +138,37 @@ const CORRESPONDENTS: &str = concat!(
     ),
     seen AS (
         SELECT lower(trim(r.address)) AS address, nullif(trim(r.name), '') AS name,
-               r.sent_at, NULL::uuid AS sent_id, r.results
+               r.sent_at, 'received' AS kind, r.id AS message_id, r.results,
+               NULL::text AS copier, NULL::text AS copier_results
           FROM received r
         UNION ALL
         SELECT lower(trim(p->>'address')), nullif(trim(p->>'name'), ''),
-               s.sent_at, s.id, NULL
+               s.sent_at, 'sent', s.id, NULL, NULL, NULL
           FROM sent s
          CROSS JOIN LATERAL jsonb_array_elements(
                coalesce(s.recipients->'to', '[]'::jsonb)
                || coalesce(s.recipients->'cc', '[]'::jsonb)) AS p
+        UNION ALL
+        SELECT lower(trim(p->>'address')), nullif(trim(p->>'name'), ''),
+               r.sent_at, 'copied', r.id, NULL, lower(trim(r.address)), r.results
+          FROM received r
+         CROSS JOIN LATERAL jsonb_array_elements(
+               coalesce(r.recipients->'to', '[]'::jsonb)
+               || coalesce(r.recipients->'cc', '[]'::jsonb)) AS p
     ),
     people AS (
         SELECT address,
                (array_agg(name ORDER BY sent_at DESC) FILTER (WHERE name IS NOT NULL))[1]
                  AS name,
-               count(DISTINCT sent_id)::int AS wrote,
-               (count(*) FILTER (WHERE sent_id IS NULL))::int AS received,
-               (array_agg(results ORDER BY sent_at DESC) FILTER (WHERE sent_id IS NULL))[1]
-                 AS newest_results
+               (count(DISTINCT message_id) FILTER (WHERE kind = 'sent'))::int AS wrote,
+               (count(*) FILTER (WHERE kind = 'received'))::int AS received,
+               (count(DISTINCT message_id) FILTER (WHERE kind = 'copied'))::int AS copied,
+               (array_agg(results ORDER BY sent_at DESC) FILTER (WHERE kind = 'received'))[1]
+                 AS newest_results,
+               (array_agg(copier ORDER BY sent_at DESC) FILTER (WHERE kind = 'copied'))[1]
+                 AS copier,
+               (array_agg(copier_results ORDER BY sent_at DESC) FILTER (WHERE kind = 'copied'))[1]
+                 AS copier_results
           FROM seen
          WHERE address <> '' AND address NOT IN (SELECT o.address FROM own o)
          GROUP BY address
@@ -152,20 +181,25 @@ const CORRESPONDENTS: &str = concat!(
     -- the flag check runs person by person, best first, only until `$3`
     -- pass.
     ranked AS (
-        SELECT address, name, wrote, received, newest_results
+        SELECT address, name, wrote, received, copied, newest_results, copier, copier_results
           FROM people
-         ORDER BY wrote DESC, received DESC, address
+         ORDER BY wrote DESC, received DESC, copied DESC, address
         OFFSET 0
     )
-    SELECT address, name, wrote, received, newest_results
+    SELECT address, name, wrote, received, newest_results, copier, copier_results
       FROM ranked k
-     -- Written to: the member's own choice. Only received from: none of
-     -- their own mail was reported, is under review or was found
-     -- suspicious.
-     WHERE k.wrote > 0 OR NOT ",
+     -- Written to: the member's own choice. Otherwise none of their own
+     -- mail was reported, is under review or was found suspicious; and when
+     -- they only were copied, nor any of the newest sender who copied them.
+     WHERE k.wrote > 0
+        OR (NOT ",
     flagged_sender_sql!(),
     r"
-     ORDER BY wrote DESC, received DESC, address
+            AND (k.received > 0
+                 OR (k.copier IS NOT NULL AND NOT ",
+    flagged_sender_sql!("k.copier"),
+    r")))
+     ORDER BY wrote DESC, received DESC, copied DESC, address
      LIMIT $3
     "
 );
@@ -219,15 +253,26 @@ pub async fn handler(
     tx.commit().await?;
     let correspondents = rows
         .into_iter()
-        .filter(|(address, _, wrote, _, results)| {
-            *wrote > 0 || may_write_to(address, results.as_deref())
+        .filter(|row| {
+            row.wrote > 0
+                || if row.received > 0 {
+                    may_write_to(&row.address, row.newest_results.as_deref())
+                } else {
+                    // Only copied: not a no-reply address, and the newest
+                    // message that copied them came from someone who may be
+                    // written to.
+                    may_write_to(&row.address, None)
+                        && row.copier.as_deref().is_some_and(|copier| {
+                            may_write_to(copier, row.copier_results.as_deref())
+                        })
+                }
         })
         .take(usize::try_from(limit).unwrap_or(usize::MAX))
-        .map(|(address, name, wrote, received, _)| CorrespondentView {
-            address,
-            name,
-            wrote: u32::try_from(wrote).unwrap_or_default(),
-            received: u32::try_from(received).unwrap_or_default(),
+        .map(|row| CorrespondentView {
+            address: row.address,
+            name: row.name,
+            wrote: u32::try_from(row.wrote).unwrap_or_default(),
+            received: u32::try_from(row.received).unwrap_or_default(),
         })
         .collect();
     Ok(Json(CorrespondentList { correspondents }))
