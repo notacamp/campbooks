@@ -7,7 +7,7 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { W } from "../../../test/demo/conversations";
 import { CONNECTION, ZOHO_CONNECTION } from "../../../test/demo/identity";
@@ -298,6 +298,13 @@ describe("the Calendar place", () => {
   });
 
   it("moves a week with J and K, and back to today with T", async () => {
+    // Today is pinned outside the weeks it walks: going back to today's week
+    // drops `date`, so a real today inside them would end the walk early.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-12-02T12:00:00+00:00"));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     api();
     const { router } = renderAt(`${PATH}?view=week&date=2026-10-27`);
     await screen.findByRole("region", { name: "Week" });

@@ -55,6 +55,7 @@ pub fn module(deps: Deps) -> Module {
         .publishes::<events::NotionLinkRequested>()
         .publishes::<events::NotionLinkEnded>()
         .publishes::<events::NotionChangesRequested>()
+        .publishes::<events::NotionTableChangesRequested>()
         .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
         .on_event::<features::forget_member::ForgetMember>()
         .on_event::<features::apply_notion_snapshot::ApplyNotionSnapshot>()
@@ -65,6 +66,14 @@ pub fn module(deps: Deps) -> Module {
         .job::<features::purge_workspace::PurgeWorkspace>()
         .job::<features::compact::Compact>()
         .job::<features::purge_trash::PurgeTrash>();
+    if deps.databases {
+        // Notion databases as tables (campbooks-cloud#377): off, none of
+        // this exists.
+        background = background
+            .on_event::<features::apply_notion_table_snapshot::ApplyNotionTableSnapshot>()
+            .on_event::<features::complete_notion_table_changes::CompleteNotionTableChanges>()
+            .job::<features::push_table_to_notion::PushTableToNotion>();
+    }
     if deps.enabled {
         background = background
             .schedule::<features::purge_trash::DispatchPurgeTrash>(features::purge_trash::EVERY);
@@ -78,6 +87,9 @@ pub fn module(deps: Deps) -> Module {
                     request
                         .extensions_mut()
                         .insert(config::TablesOn(deps.tables));
+                    request
+                        .extensions_mut()
+                        .insert(config::DatabasesOn(deps.databases));
                     next.run(request).await
                 } else {
                     Error::NotFound.into_response()
@@ -94,9 +106,11 @@ pub fn module(deps: Deps) -> Module {
 fn router(deps: Deps) -> OpenApiRouter<AppState> {
     use features::{
         add_property, add_row, backlinks, create, create_table, create_view, file, get, get_table,
-        import_from_notion, list, list_notion_links, move_page, query_table, remove_property,
-        remove_view, resolve_conflict, restore_property, set_cells, set_options, share, stop_sync,
-        sync, trash, undo_resolve_conflict, update, update_property, update_view, upload,
+        get_table_sync, import_from_notion, list, list_notion_links, move_page, query_table,
+        remove_property, remove_view, resolve_conflict, resolve_table_conflict, restore_property,
+        set_cells, set_options, share, stop_sync, stop_table_sync, sync, trash,
+        undo_resolve_conflict, undo_resolve_table_conflict, update, update_property, update_view,
+        upload,
     };
     // A file is up to 20 MiB; everything else is small.
     let uploads = OpenApiRouter::new()
@@ -124,8 +138,24 @@ fn router(deps: Deps) -> OpenApiRouter<AppState> {
                 }
             },
         ));
+    // Notion databases are a third switch: off, these routes are not there.
+    let databases = OpenApiRouter::new()
+        .routes(routes!(get_table_sync::handler))
+        .routes(routes!(resolve_table_conflict::handler))
+        .routes(routes!(undo_resolve_table_conflict::handler))
+        .routes(routes!(stop_table_sync::handler))
+        .layer(middleware::from_fn(
+            move |request: Request, next: Next| async move {
+                if deps.tables && deps.databases {
+                    next.run(request).await
+                } else {
+                    Error::NotFound.into_response()
+                }
+            },
+        ));
     OpenApiRouter::new()
         .merge(tables)
+        .merge(databases)
         .routes(routes!(list::handler, create::handler))
         .routes(routes!(backlinks::handler))
         .routes(routes!(import_from_notion::handler))
@@ -149,6 +179,8 @@ mod access_tests;
 mod testkit;
 #[cfg(test)]
 mod testkit_notion;
+#[cfg(test)]
+mod testkit_notion_tables;
 #[cfg(test)]
 mod tracking_tests;
 
@@ -192,6 +224,7 @@ mod tests {
         let off = Deps {
             enabled: false,
             tables: false,
+            databases: false,
         };
         let registry = campbooks_kernel::jobs::Registry::build(&[module(off)]).unwrap();
         assert!(

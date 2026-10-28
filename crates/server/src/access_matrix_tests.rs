@@ -1274,6 +1274,7 @@ fn body(world: &World, id: &str) -> Option<Value> {
             "pages": [{"notion_page": Uuid::now_v7().to_string()}],
         }),
         "pages.resolve_conflict" => json!({"keep": "mine"}),
+        "pages.resolve_table_conflict" => json!({"keep": "ours"}),
         // The bytes of a file: this text.
         "pages.upload_file" => json!({"file": "matrix"}),
         // Tables: a table, its select property, a row and a view are seeded.
@@ -1402,6 +1403,7 @@ fn fill(world: &World, path: &str, id: &str) -> String {
         .replace("{property_id}", &world.instances["pages.property"])
         .replace("{view_id}", &world.instances["pages.view"])
         .replace("{block}", &Uuid::now_v7().to_string())
+        .replace("{conflict}", &Uuid::now_v7().to_string())
         .replace("{resolution}", &Uuid::now_v7().to_string())
         .replace("{member_id}", &world.users[&Who::Reader].to_string())
         .replace("{conversation_id}", message_conversation)

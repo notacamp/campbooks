@@ -1,0 +1,109 @@
+# Notion databases as tables (campbooks-cloud#377, OpenSpec change
+# notion-databases, part 1: the server side): a Notion database imported as a
+# table and kept in step both ways, columns and values. Four events of the
+# pages module, and Coverage for every operation, job and handler the change
+# adds. Stopping a link is tracked by the existing pages.notion_sync_stopped.
+# Never a column's name, an option, a value, a table's title or a Notion id:
+# ids, enums and counts only.
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0019-notion-databases.yaml`.
+changelog:
+  - date: "2026-10-27"
+    plan_version: 19
+    change: "Notion databases as tables (campbooks-cloud#377): 4 pages events for databases imported as tables (how many), a table's changes crossing to or from Notion (direction, how many), a column or cell changed on both sides (what kind, how many) and a member's choice for one (what kind, what choice); Coverage for every operation, job and handler of the change."
+    pr: "#685"
+
+events:
+  - name: "pages.notion_databases_imported"
+    version: 1
+    module: "pages"
+    object: "notion_databases"
+    action: "imported"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member picked databases in their Notion account to bring into Pages as tables: how many were made, linked to their Notion databases. Never their titles or ids at Notion."
+    fires_when: "pages.import_from_notion makes the tables and their links, in the transaction that stores them; databases already linked from this connection make none and track nothing."
+    added_in: 19
+    openspec_change: "notion-databases"
+  - name: "pages.notion_table_synced"
+    version: 1
+    module: "pages"
+    object: "notion_table"
+    action: "synced"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, system]
+    description: "A change crossed between a table and its Notion database, in one direction: how many columns, rows and cells it moved. Never their names or values."
+    fires_when: "A Notion snapshot is applied to the table (inbound), or the connector reports changes written to Notion (outbound), in the transaction that stores the result; a run that moves nothing tracks nothing."
+    added_in: 19
+    openspec_change: "notion-databases"
+  - name: "pages.notion_table_conflict_raised"
+    version: 1
+    module: "pages"
+    object: "notion_table_conflict"
+    action: "raised"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user, system]
+    description: "The same column or the same cell changed in Campbooks and in Notion between two syncs: neither change is sent until the member chooses. How many are newly in conflict, and of what kind."
+    fires_when: "Applying a Notion snapshot, or undoing a choice, opens conflicts for the table, in that transaction."
+    added_in: 19
+    openspec_change: "notion-databases"
+  - name: "pages.notion_table_conflict_resolved"
+    version: 1
+    module: "pages"
+    object: "notion_table_conflict"
+    action: "resolved"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member chose between Campbooks' version and Notion's for a column or a cell in conflict."
+    fires_when: "pages.resolve_table_conflict applies the choice, in the transaction that changes the table."
+    added_in: 19
+    openspec_change: "notion-databases"
+
+properties:
+  - { event: "pages.notion_databases_imported", version: 1, property: "databases", type: "int", required: true, classification: "operational", description: "How many tables were made." }
+  - { event: "pages.notion_databases_imported", version: 1, property: "connection", type: "id", required: true, classification: "id", description: "The Notion connection they were imported through." }
+  - { event: "pages.notion_table_synced", version: 1, property: "table", type: "record", of: "pages.page", required: true, classification: "operational", description: "The table afterwards." }
+  - { event: "pages.notion_table_synced", version: 1, property: "direction", type: "enum", of: "pages.sync_direction", required: true, classification: "operational", description: "Which way the changes moved." }
+  - { event: "pages.notion_table_synced", version: 1, property: "changes", type: "int", required: true, classification: "operational", description: "How many columns, rows and cells moved." }
+  - { event: "pages.notion_table_conflict_raised", version: 1, property: "table", type: "record", of: "pages.page", required: true, classification: "operational", description: "The table afterwards." }
+  - { event: "pages.notion_table_conflict_raised", version: 1, property: "kind", type: "enum", of: "pages.table_conflict_kind", required: true, classification: "operational", description: "Whether columns or cells are in conflict." }
+  - { event: "pages.notion_table_conflict_raised", version: 1, property: "conflicts", type: "int", required: true, classification: "operational", description: "How many are in conflict now that were not before." }
+  - { event: "pages.notion_table_conflict_resolved", version: 1, property: "table", type: "record", of: "pages.page", required: true, classification: "operational", description: "The table afterwards." }
+  - { event: "pages.notion_table_conflict_resolved", version: 1, property: "kind", type: "enum", of: "pages.table_conflict_kind", required: true, classification: "operational", description: "Whether it was a column or a cell." }
+  - { event: "pages.notion_table_conflict_resolved", version: 1, property: "choice", type: "enum", of: "pages.table_conflict_choice", required: true, classification: "operational", description: "What the member chose." }
+
+enums:
+  - { enum: "pages.table_conflict_kind", value: "column", description: "A column changed on both sides." }
+  - { enum: "pages.table_conflict_kind", value: "cell", description: "A cell changed on both sides." }
+  - { enum: "pages.table_conflict_choice", value: "ours", description: "Keep Campbooks' version." }
+  - { enum: "pages.table_conflict_choice", value: "theirs", description: "Use Notion's version." }
+
+coverage:
+  - kind: "operation"
+    name: "pages.get_table_sync"
+    exemption: "reads a table's link to its Notion database and the conflicts waiting for a choice; it changes nothing"
+  - kind: "operation"
+    name: "pages.resolve_table_conflict"
+    events: [pages.notion_table_conflict_resolved]
+  - kind: "operation"
+    name: "pages.undo_resolve_table_conflict"
+    events: [pages.notion_table_conflict_raised]
+  - kind: "operation"
+    name: "pages.stop_table_sync"
+    events: [pages.notion_sync_stopped]
+  - kind: "handler"
+    name: "pages.apply_notion_table_snapshot"
+    events: [pages.notion_table_synced, pages.notion_table_conflict_raised, pages.page_created]
+  - kind: "handler"
+    name: "pages.complete_notion_table_changes"
+    events: [pages.notion_table_synced]
+  - kind: "job"
+    name: "pages.push_table_to_notion"
+    exemption: "records the columns, rows and cells a member changed as a request for the connector to write to Notion; the writes are tracked when the connector reports them (pages.notion_table_synced)"
+  - kind: "handler"
+    name: "connectors.record_notion_table_changes"
+    exemption: "records the table changes pages asked for, once pages confirms them, for the stream's next run, which reports how each ended; tracked there as pages.notion_table_synced"

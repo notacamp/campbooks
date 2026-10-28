@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/notion-data-source-snapshot.v1.schema.json",
+  "title": "notion-data-source-snapshot v1 (blob)",
+  "description": "A Notion database (data source) as the connector read it, in neutral form (`application/vnd.campbooks.notion-data-source-snapshot+json; version=1`): its properties when they changed (or on a first read), the entries edited since the last read with each cell's value in the neutral form of its property's kind and a hash of that value, and, on a sweep, the ids of every live entry. Values: title/rich_text are runs, number a JSON number, select/status `{id,name}`, multi_select a list of those, date `{start,end?,time_zone?}`, checkbox a boolean, url/email/phone_number text, people/created_by/last_edited_by a list of names, formula/rollup/created_time/last_edited_time/unique_id/files text; relations and the rest are null.",
+  "type": "object",
+  "required": [
+    "version",
+    "data_source",
+    "title",
+    "read_at",
+    "entries"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "data_source": {
+      "$ref": "#/$defs/uuid"
+    },
+    "title": {
+      "type": "string"
+    },
+    "read_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "schema": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "hash",
+            "properties"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "properties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name",
+                  "kind",
+                  "hash"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "title",
+                      "rich_text",
+                      "number",
+                      "select",
+                      "multi_select",
+                      "status",
+                      "date",
+                      "checkbox",
+                      "url",
+                      "email",
+                      "phone_number",
+                      "people",
+                      "formula",
+                      "rollup",
+                      "files",
+                      "relation",
+                      "created_time",
+                      "created_by",
+                      "last_edited_time",
+                      "last_edited_by",
+                      "unique_id",
+                      "verification",
+                      "button",
+                      "place",
+                      "other"
+                    ]
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name",
+                        "color"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "group": {
+                          "enum": [
+                            "todo",
+                            "doing",
+                            "done"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "format": {
+                    "type": "string"
+                  },
+                  "hash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "edited",
+          "cells"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/uuid"
+          },
+          "edited": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "property",
+                "value",
+                "hash"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "property": {
+                  "type": "string"
+                },
+                "value": {},
+                "hash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "sweep": {
+      "type": "boolean"
+    },
+    "present": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/uuid"
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

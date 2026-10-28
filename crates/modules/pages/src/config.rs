@@ -21,11 +21,21 @@ pub struct Deps {
     /// Whether tables are on (`CAMPBOOKS_PAGES__TABLES__ENABLED`, default
     /// false). They need pages on too.
     pub tables: bool,
+    /// Whether Notion databases are brought in as tables
+    /// (`CAMPBOOKS_CONNECTORS__NOTION__DATABASES__ENABLED`, default false).
+    /// Effective only with Notion (`CAMPBOOKS_CONNECTORS__NOTION__ENABLED`),
+    /// pages and tables on; the connectors module reads the same switches.
+    pub databases: bool,
 }
 
 /// Whether tables are on, for a handler to read from the request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TablesOn(pub bool);
+
+/// Whether Notion databases are on (a switch of its own, effective only with
+/// pages and tables on), for a handler to read from the request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DatabasesOn(pub bool);
 
 /// The catalogues (OpenAPI, events, scopes) and tests compose the module
 /// switched on; a server reads the setting with [`Deps::from_env`].
@@ -34,6 +44,7 @@ impl Default for Deps {
         Self {
             enabled: true,
             tables: true,
+            databases: true,
         }
     }
 }
@@ -47,9 +58,15 @@ impl Deps {
 
     /// Read the `pages` section of any figment source. Never fails.
     pub fn from_figment(figment: &Figment) -> Self {
+        let enabled = switch(figment, "pages.enabled");
+        let tables = switch(figment, "pages.tables.enabled");
         Self {
-            enabled: switch(figment, "pages.enabled"),
-            tables: switch(figment, "pages.tables.enabled"),
+            enabled,
+            tables,
+            databases: enabled
+                && tables
+                && switch(figment, "connectors.notion.enabled")
+                && switch(figment, "connectors.notion.databases.enabled"),
         }
     }
 }
@@ -99,6 +116,37 @@ mod tests {
         let only_tables =
             Deps::from_figment(&figment(json!({"pages": {"tables": {"enabled": 1}}})));
         assert!(!only_tables.enabled && only_tables.tables);
+    }
+
+    #[test]
+    fn notion_databases_need_notion_pages_and_tables_and_their_own_switch() {
+        let on = |connectors: Value, pages: Value| {
+            Deps::from_figment(&figment(json!({"connectors": connectors, "pages": pages})))
+        };
+        let all = json!({"enabled": true, "tables": {"enabled": true}});
+        let asked = json!({"notion": {"enabled": true, "databases": {"enabled": "true"}}});
+        assert!(on(asked.clone(), all.clone()).databases);
+        // Each of the four is needed.
+        assert!(!on(json!({"notion": {"enabled": true}}), all.clone()).databases);
+        assert!(
+            !on(
+                json!({"notion": {"databases": {"enabled": true}}}),
+                all.clone()
+            )
+            .databases
+        );
+        assert!(!on(asked.clone(), json!({"enabled": true})).databases);
+        assert!(!on(asked, json!({"tables": {"enabled": true}})).databases);
+        assert!(!Deps::from_figment(&Figment::new()).databases);
+        // Stray shapes never stop the server.
+        for stray in [
+            json!({"notion": "nope"}),
+            json!({"notion": {"databases": 7}}),
+            json!({"notion": {"enabled": true, "databases": {"enabled": ["yes"]}}}),
+            json!({"notion": {"enabled": {"a": 1}, "databases": {"enabled": {"b": 2}}}}),
+        ] {
+            assert!(!on(stray, all.clone()).databases);
+        }
     }
 
     #[test]

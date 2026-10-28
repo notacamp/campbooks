@@ -453,6 +453,9 @@ pub enum NotionReason {
     TooManyAttempts,
     /// A kind of block that is never written.
     Unsupported,
+    /// Removing a column at Notion needs the member's confirmation, and the
+    /// change did not carry it.
+    ConfirmationRequired,
 }
 
 /// How one block change of a request ended.
@@ -510,8 +513,23 @@ pub struct NotionLinkRequested {
     pub page: uuid::Uuid,
     /// The Notion connection it is read through.
     pub connection: ConnectionId,
-    /// The Notion page.
+    /// The Notion page, or the Notion database (data source) when `kind` says
+    /// so.
     pub notion_page: uuid::Uuid,
+    /// What is linked: a page (the default) or a database as a table.
+    #[serde(default)]
+    pub kind: LinkKind,
+}
+
+/// What a Notion link links.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkKind {
+    /// A page, kept in step block by block.
+    #[default]
+    Page,
+    /// A Notion database (a data source), kept in step as a table.
+    DataSource,
 }
 
 impl DomainEvent for NotionLinkRequested {
@@ -571,6 +589,148 @@ pub struct NotionChangesRequested {
 
 impl DomainEvent for NotionChangesRequested {
     const NAME: &'static str = "pages.notion_changes_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `connectors.notion_data_source_read` v1
+/// (`contracts/connectors.notion_data_source_read.v1.schema.json`): a Notion
+/// database was read, and the pages module applies the snapshot to the table
+/// linked to it. Ids, a blob reference and a time; never a name or a value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionDataSourceRead {
+    /// The workspace.
+    pub workspace: String,
+    /// The Notion connection.
+    pub connection: ConnectionId,
+    /// The data source at Notion.
+    pub data_source: uuid::Uuid,
+    /// The pages module's table it is linked to.
+    pub table: uuid::Uuid,
+    /// The `notion-data-source-snapshot` v1 document, a blob of the
+    /// workspace.
+    #[schema(value_type = BlobSchema)]
+    pub snapshot: BlobRef,
+    /// When it was read: a later read has a later time.
+    pub read_at: DateTime<Utc>,
+}
+
+impl DomainEvent for NotionDataSourceRead {
+    const NAME: &'static str = "connectors.notion_data_source_read";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// What a table change of a request did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NotionTableChange {
+    /// A column added.
+    SchemaAdd,
+    /// A column renamed, retyped or given options.
+    SchemaUpdate,
+    /// A column removed.
+    SchemaRemove,
+    /// A row added.
+    RowCreate,
+    /// A cell set.
+    CellUpdate,
+    /// A row moved to Notion's trash.
+    RowTrash,
+}
+
+impl NotionTableChange {
+    /// The kind kept in the database as `name`, when it is one.
+    pub fn of(name: &str) -> Option<Self> {
+        Some(match name {
+            "schema_add" => Self::SchemaAdd,
+            "schema_update" => Self::SchemaUpdate,
+            "schema_remove" => Self::SchemaRemove,
+            "row_create" => Self::RowCreate,
+            "cell_update" => Self::CellUpdate,
+            "row_trash" => Self::RowTrash,
+            _ => return None,
+        })
+    }
+}
+
+/// How one table change of a request ended.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionTableItemResult {
+    /// The column or row (an id of the pages module).
+    pub subject: uuid::Uuid,
+    /// The kind of change.
+    pub kind: NotionTableChange,
+    /// How it ended.
+    pub outcome: NotionOutcome,
+    /// The column's or the row's id at Notion (applied).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external: Option<String>,
+    /// When Notion last edited it after the write (applied).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edited_at: Option<DateTime<Utc>>,
+    /// A hash of what Notion holds now (applied).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+    /// Why it did not apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<NotionReason>,
+}
+
+/// A request of table changes ended
+/// (`contracts/connectors.notion_table_changes_completed.v1.schema.json`):
+/// every item of the pages module's request has an end.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotionTableChangesCompleted {
+    /// The workspace.
+    pub workspace: String,
+    /// The request (an id of the pages module).
+    pub request: uuid::Uuid,
+    /// The table (an id of the pages module).
+    pub table: uuid::Uuid,
+    /// How each item ended, in the request's order.
+    pub results: Vec<NotionTableItemResult>,
+}
+
+impl DomainEvent for NotionTableChangesCompleted {
+    const NAME: &'static str = "connectors.notion_table_changes_completed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `pages.notion_table_changes_requested` v1, as this module reads it
+/// (`contracts/pages.notion_table_changes_requested.v1.schema.json`): table
+/// changes a member's edits asked for. Not proof that anyone asked: the pages
+/// module is asked through the kernel's page-requests port before anything is
+/// recorded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NotionTableChangesRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The request: recorded once.
+    pub request: uuid::Uuid,
+    /// The table (an id of the pages module).
+    pub table: uuid::Uuid,
+    /// The Notion connection whose grant makes the changes.
+    pub connection: ConnectionId,
+    /// The data source at Notion.
+    pub data_source: uuid::Uuid,
+    /// The `notion-table-changes` v1 document. Not trusted: the connector
+    /// writes the document the pages module stored for the request.
+    pub body: BlobRef,
+}
+
+impl DomainEvent for NotionTableChangesRequested {
+    const NAME: &'static str = "pages.notion_table_changes_requested";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

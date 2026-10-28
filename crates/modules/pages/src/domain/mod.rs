@@ -392,6 +392,28 @@ pub async fn announce(
         row: row.kind == "row",
     };
     state.events.publish(tx, &event).await?;
+    // A table kept in step with a Notion database looks at what differs from
+    // what the last sync agreed, a few seconds after a change of its
+    // columns, rows or cells.
+    let looked_at = event.kinds.iter().any(|kind| {
+        matches!(
+            kind,
+            PageChangeKind::Schema
+                | PageChangeKind::Values
+                | PageChangeKind::Meta
+                | PageChangeKind::Trash
+        )
+    });
+    if looked_at {
+        let table = match row.kind.as_str() {
+            "table" => Some(id),
+            "row" => row.parent_id,
+            _ => None,
+        };
+        if let Some(table) = table {
+            notion::tables::schedule_push(tx, access.workspace, table).await?;
+        }
+    }
     Ok(())
 }
 

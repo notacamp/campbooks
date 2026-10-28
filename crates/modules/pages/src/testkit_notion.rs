@@ -59,6 +59,13 @@ impl Rig {
         }
     }
 
+    /// The same rig with Notion databases switched off.
+    #[must_use]
+    pub fn databases_off(mut self) -> Self {
+        self.kit = self.kit.with_databases(false);
+        self
+    }
+
     /// Import Notion pages through Marta's connection.
     pub async fn import_response(
         &self,

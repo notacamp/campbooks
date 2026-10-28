@@ -15466,6 +15466,442 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/notion": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "How a table is kept in step with Notion.",
+        "operationId": "pages.get_table_sync",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sync and its conflicts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotionTableSync"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table, Notion databases are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/notion/conflicts/{conflict}": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Settle a conflict with Notion.",
+        "operationId": "pages.resolve_table_conflict",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "conflict",
+            "in": "path",
+            "description": "The conflict.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveNotionTableConflict"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The conflict is settled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvedNotionTableConflict"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not change it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table, Notion databases are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`), in the trash (`page_trashed`), no such conflict (`no_table_conflict`), or the conflict was settled already (`conflict_settled`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.undo_resolve_table_conflict"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/notion/conflicts/{conflict}/undo": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Take back a choice for a conflict with Notion.",
+        "operationId": "pages.undo_resolve_table_conflict",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          },
+          {
+            "name": "conflict",
+            "in": "path",
+            "description": "The conflict.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conflict waits again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UndoneNotionTableConflict"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not change it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table, Notion databases are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`), in the trash (`page_trashed`), no such conflict (`no_table_conflict`), or there is no choice to take back (`nothing_to_undo`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low",
+          "undo": "pages.resolve_table_conflict"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/tables/{table_id}/notion/stop": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Stop syncing a table with Notion.",
+        "operationId": "pages.stop_table_sync",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "description": "The table.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The link, stopped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotionTableLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may read the table but not change it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such table, Notion databases are off, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a table (`not_a_table`), not linked to Notion, or the link has ended already (`not_syncing`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "pages:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "pages.page"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "pages.page"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/tables/{table_id}/properties": {
       "post": {
         "tags": [
@@ -15622,6 +16058,15 @@
             "schema": {
               "$ref": "#/components/schemas/PropertyId"
             }
+          },
+          {
+            "name": "confirm_remote_delete",
+            "in": "query",
+            "description": "For a table kept in step with a Notion database: the member confirms\nthat the column is removed in Notion too. Without it, removing a\ncolumn of such a table is refused (`confirmation_required`) and\nnothing changes anywhere.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -15631,6 +16076,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PropertyView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The table is kept in step with a Notion database, the column is Notion's too, and the removal was not confirmed with `confirm_remote_delete` (`confirmation_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -25554,8 +26009,7 @@
         "type": "object",
         "description": "What to import.",
         "required": [
-          "connection",
-          "pages"
+          "connection"
         ],
         "properties": {
           "connection": {
@@ -25563,12 +26017,19 @@
             "format": "uuid",
             "description": "Your Notion connection."
           },
+          "data_sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotionDatabaseToImport"
+            },
+            "description": "The Notion databases (data sources) to bring in as tables, kept in\nstep both ways. Only while Notion databases are on (otherwise the\nanswer is 404). At most 100 pages and databases together, at least\none."
+          },
           "pages": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NotionPageToImport"
             },
-            "description": "The Notion pages, 1 to 100."
+            "description": "The Notion pages."
           },
           "parent": {
             "oneOf": [
@@ -25604,6 +26065,13 @@
             "format": "int32",
             "description": "How many were left alone: already linked through the connection, or\nnamed twice.",
             "minimum": 0
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportedTable"
+            },
+            "description": "The tables made from databases, in the order asked."
           }
         }
       },
@@ -25623,6 +26091,25 @@
           "page": {
             "$ref": "#/components/schemas/PageId",
             "description": "The new page."
+          }
+        }
+      },
+      "ImportedTable": {
+        "type": "object",
+        "description": "A table made.",
+        "required": [
+          "table",
+          "data_source"
+        ],
+        "properties": {
+          "data_source": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Its database at Notion."
+          },
+          "table": {
+            "$ref": "#/components/schemas/PageId",
+            "description": "The new table."
           }
         }
       },
@@ -27228,6 +27715,28 @@
           "phrase"
         ]
       },
+      "NotionDatabaseToImport": {
+        "type": "object",
+        "description": "One Notion database to bring in as a table.",
+        "required": [
+          "data_source"
+        ],
+        "properties": {
+          "data_source": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The database at Notion (its data source)."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The title to show until Notion's is read (0 to 200 characters)."
+          }
+        },
+        "additionalProperties": false
+      },
       "NotionKeep": {
         "type": "string",
         "description": "What to keep.",
@@ -27437,6 +27946,96 @@
           "member_left",
           "notion_unavailable"
         ]
+      },
+      "NotionTableLink": {
+        "type": "object",
+        "description": "A table's link to its Notion database.",
+        "required": [
+          "connection",
+          "data_source",
+          "state",
+          "owner",
+          "conflicts"
+        ],
+        "properties": {
+          "conflicts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many conflicts wait for a choice."
+          },
+          "connection": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The Notion connection it is read through."
+          },
+          "data_source": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The database at Notion (its data source)."
+          },
+          "last_inbound_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a change from Notion was last applied."
+          },
+          "last_outbound_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a change here was last written to Notion."
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member whose Notion account it is."
+          },
+          "state": {
+            "$ref": "#/components/schemas/NotionLinkState",
+            "description": "Where the link is."
+          },
+          "stopped_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NotionStopReason",
+                "description": "Why it ended, when it did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "NotionTableSync": {
+        "type": "object",
+        "description": "A table's sync with Notion.",
+        "required": [
+          "conflicts"
+        ],
+        "properties": {
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableConflict"
+            },
+            "description": "The conflicts waiting for a choice, oldest first."
+          },
+          "link": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NotionTableLink",
+                "description": "The link; none for a table that is not kept in step with Notion."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "OptionsUpdate": {
         "type": "object",
@@ -29622,6 +30221,20 @@
         },
         "additionalProperties": false
       },
+      "ResolveNotionTableConflict": {
+        "type": "object",
+        "description": "The choice.",
+        "required": [
+          "keep"
+        ],
+        "properties": {
+          "keep": {
+            "$ref": "#/components/schemas/TableConflictKeep",
+            "description": "What to keep."
+          }
+        },
+        "additionalProperties": false
+      },
       "Resolved": {
         "type": "object",
         "description": "The conflict settled.",
@@ -29645,6 +30258,26 @@
             "type": "integer",
             "format": "int64",
             "description": "The page's revision afterwards."
+          }
+        }
+      },
+      "ResolvedNotionTableConflict": {
+        "type": "object",
+        "description": "The conflict settled.",
+        "required": [
+          "conflict",
+          "conflicts"
+        ],
+        "properties": {
+          "conflict": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The conflict, which `pages.undo_resolve_table_conflict` takes back."
+          },
+          "conflicts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many conflicts still wait."
           }
         }
       },
@@ -32038,6 +32671,88 @@
           }
         }
       },
+      "TableConflict": {
+        "type": "object",
+        "description": "A conflict, as the API shows it.",
+        "required": [
+          "id",
+          "kind",
+          "property",
+          "ours",
+          "theirs",
+          "ours_at",
+          "theirs_at"
+        ],
+        "properties": {
+          "choice": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TableConflictKeep",
+                "description": "What was chosen, once it was."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The conflict."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TableConflictKind",
+            "description": "Column or cell."
+          },
+          "ours": {
+            "description": "Campbooks' version: a cell's value, or a column's name, type and\nconfig."
+          },
+          "ours_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Campbooks' version was made."
+          },
+          "property": {
+            "$ref": "#/components/schemas/PropertyId",
+            "description": "The column."
+          },
+          "row": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PageId",
+                "description": "The row, for a cell."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "theirs": {
+            "description": "Notion's version."
+          },
+          "theirs_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Notion's was."
+          }
+        }
+      },
+      "TableConflictKeep": {
+        "type": "string",
+        "description": "Which side a member keeps.",
+        "enum": [
+          "ours",
+          "theirs"
+        ]
+      },
+      "TableConflictKind": {
+        "type": "string",
+        "description": "What a conflict is about.",
+        "enum": [
+          "column",
+          "cell"
+        ]
+      },
       "TableDetail": {
         "type": "object",
         "description": "A table: its page, its properties and its views.",
@@ -32835,6 +33550,20 @@
             "type": "integer",
             "format": "int64",
             "description": "The page's revision afterwards."
+          }
+        }
+      },
+      "UndoneNotionTableConflict": {
+        "type": "object",
+        "description": "The choice taken back.",
+        "required": [
+          "conflicts"
+        ],
+        "properties": {
+          "conflicts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many conflicts wait now."
           }
         }
       },

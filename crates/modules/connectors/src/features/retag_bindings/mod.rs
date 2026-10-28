@@ -45,6 +45,10 @@ impl Job for RetagBindings {
         let (notion_retagged, notion_left) =
             crate::notion::changes::retag(tx, &key, workspace).await?;
         let (retagged, left) = (retagged + notion_retagged, left + notion_left);
+        // And the table changes members asked of Notion databases.
+        let (table_retagged, table_left) =
+            crate::notion::table_changes::retag(tx, &key, workspace).await?;
+        let (retagged, left) = (retagged + table_retagged, left + table_left);
         if left == 0 {
             tracing::info!(
                 %workspace,

@@ -138,6 +138,12 @@
       "date": "2026-10-26",
       "plan_version": 18,
       "pr": "#681"
+    },
+    {
+      "change": "Notion databases as tables (campbooks-cloud#377): 4 pages events for databases imported as tables (how many), a table's changes crossing to or from Notion (direction, how many), a column or cell changed on both sides (what kind, how many) and a member's choice for one (what kind, what choice); Coverage for every operation, job and handler of the change.",
+      "date": "2026-10-27",
+      "plan_version": 19,
+      "pr": "#685"
     }
   ],
   "coverage": [
@@ -236,6 +242,12 @@
       "exemption": "records the block changes pages asked for, once pages confirms them, for the stream's next run, which reports how each ended; tracked there as pages.notion_sync_applied",
       "kind": "handler",
       "name": "connectors.record_notion_changes"
+    },
+    {
+      "events": [],
+      "exemption": "records the table changes pages asked for, once pages confirms them, for the stream's next run, which reports how each ended; tracked there as pages.notion_table_synced",
+      "kind": "handler",
+      "name": "connectors.record_notion_table_changes"
     },
     {
       "events": [],
@@ -373,11 +385,29 @@
     },
     {
       "events": [
+        "pages.notion_table_synced",
+        "pages.notion_table_conflict_raised",
+        "pages.page_created"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.apply_notion_table_snapshot"
+    },
+    {
+      "events": [
         "pages.notion_sync_applied"
       ],
       "exemption": "",
       "kind": "handler",
       "name": "pages.complete_notion_changes"
+    },
+    {
+      "events": [
+        "pages.notion_table_synced"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "pages.complete_notion_table_changes"
     },
     {
       "events": [],
@@ -736,6 +766,12 @@
       "exemption": "maintenance: a deleted workspace's pages and history deleted; the deletion is tracked by workspaces",
       "kind": "job",
       "name": "pages.purge_workspace"
+    },
+    {
+      "events": [],
+      "exemption": "records the columns, rows and cells a member changed as a request for the connector to write to Notion; the writes are tracked when the connector reports them (pages.notion_table_synced)",
+      "kind": "job",
+      "name": "pages.push_table_to_notion"
     },
     {
       "events": [],
@@ -1616,6 +1652,12 @@
       "name": "pages.create_view"
     },
     {
+      "events": [],
+      "exemption": "reads a table's link to its Notion database and the conflicts waiting for a choice; it changes nothing",
+      "kind": "operation",
+      "name": "pages.get_table_sync"
+    },
+    {
       "events": [
         "pages.notion_pages_imported",
         "pages.page_created"
@@ -1670,6 +1712,14 @@
     },
     {
       "events": [
+        "pages.notion_table_conflict_resolved"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.resolve_table_conflict"
+    },
+    {
+      "events": [
         "pages.page_restored"
       ],
       "exemption": "",
@@ -1713,6 +1763,14 @@
       "name": "pages.stop_sync"
     },
     {
+      "events": [
+        "pages.notion_sync_stopped"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.stop_table_sync"
+    },
+    {
       "events": [],
       "exemption": "a page's body is written by typing: many small edits, each carrying what the member wrote; the page's meta changes are tracked by the operations above",
       "kind": "operation",
@@ -1733,6 +1791,14 @@
       "exemption": "",
       "kind": "operation",
       "name": "pages.undo_resolve_conflict"
+    },
+    {
+      "events": [
+        "pages.notion_table_conflict_raised"
+      ],
+      "exemption": "",
+      "kind": "operation",
+      "name": "pages.undo_resolve_table_conflict"
     },
     {
       "events": [
@@ -4012,6 +4078,26 @@
       "description": "The page was trashed in Notion.",
       "enum": "pages.sync_stop_reason",
       "value": "trashed_in_notion"
+    },
+    {
+      "description": "Keep Campbooks' version.",
+      "enum": "pages.table_conflict_choice",
+      "value": "ours"
+    },
+    {
+      "description": "Use Notion's version.",
+      "enum": "pages.table_conflict_choice",
+      "value": "theirs"
+    },
+    {
+      "description": "A cell changed on both sides.",
+      "enum": "pages.table_conflict_kind",
+      "value": "cell"
+    },
+    {
+      "description": "A column changed on both sides.",
+      "enum": "pages.table_conflict_kind",
+      "value": "column"
     },
     {
       "description": "Cards in a column per option.",
@@ -15998,6 +16084,48 @@
       "actor_types": [
         "user"
       ],
+      "added_in": 19,
+      "description": "A member picked databases in their Notion account to bring into Pages as tables: how many were made, linked to their Notion databases. Never their titles or ids at Notion.",
+      "fires_when": "pages.import_from_notion makes the tables and their links, in the transaction that stores them; databases already linked from this connection make none and track nothing.",
+      "module": "pages",
+      "name": "pages.notion_databases_imported",
+      "object": "notion_databases",
+      "openspec_change": "notion-databases",
+      "rust_type": "NotionDatabasesImported",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_databases_imported:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member picked databases in their Notion account to bring into Pages as tables: how many were made, linked to their Notion databases. Never their titles or ids at Notion.",
+        "properties": {
+          "connection": {
+            "description": "The Notion connection they were imported through.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "id"
+          },
+          "databases": {
+            "description": "How many tables were made.",
+            "type": "integer",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "connection",
+          "databases"
+        ],
+        "title": "pages.notion_databases_imported",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "imported",
+      "actor_types": [
+        "user"
+      ],
       "added_in": 17,
       "description": "A member picked pages in their Notion account to bring into Pages: how many were made, linked to their Notion pages. Never their titles or ids at Notion.",
       "fires_when": "pages.import_from_notion makes the pages and their links, in the transaction that stores them; pages already linked from this connection make none and track nothing.",
@@ -16216,6 +16344,291 @@
           "reason"
         ],
         "title": "pages.notion_sync_stopped",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "raised",
+      "actor_types": [
+        "user",
+        "system"
+      ],
+      "added_in": 19,
+      "description": "The same column or the same cell changed in Campbooks and in Notion between two syncs: neither change is sent until the member chooses. How many are newly in conflict, and of what kind.",
+      "fires_when": "Applying a Notion snapshot, or undoing a choice, opens conflicts for the table, in that transaction.",
+      "module": "pages",
+      "name": "pages.notion_table_conflict_raised",
+      "object": "notion_table_conflict",
+      "openspec_change": "notion-databases",
+      "rust_type": "NotionTableConflictRaised",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_table_conflict_raised:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "The same column or the same cell changed in Campbooks and in Notion between two syncs: neither change is sent until the member chooses. How many are newly in conflict, and of what kind.",
+        "properties": {
+          "conflicts": {
+            "description": "How many are in conflict now that were not before.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "kind": {
+            "description": "Whether columns or cells are in conflict.",
+            "enum": [
+              "cell",
+              "column"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "table": {
+            "additionalProperties": false,
+            "description": "The table afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "conflicts",
+          "kind",
+          "table"
+        ],
+        "title": "pages.notion_table_conflict_raised",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "resolved",
+      "actor_types": [
+        "user"
+      ],
+      "added_in": 19,
+      "description": "A member chose between Campbooks' version and Notion's for a column or a cell in conflict.",
+      "fires_when": "pages.resolve_table_conflict applies the choice, in the transaction that changes the table.",
+      "module": "pages",
+      "name": "pages.notion_table_conflict_resolved",
+      "object": "notion_table_conflict",
+      "openspec_change": "notion-databases",
+      "rust_type": "NotionTableConflictResolved",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_table_conflict_resolved:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member chose between Campbooks' version and Notion's for a column or a cell in conflict.",
+        "properties": {
+          "choice": {
+            "description": "What the member chose.",
+            "enum": [
+              "ours",
+              "theirs"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "kind": {
+            "description": "Whether it was a column or a cell.",
+            "enum": [
+              "cell",
+              "column"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "table": {
+            "additionalProperties": false,
+            "description": "The table afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "choice",
+          "kind",
+          "table"
+        ],
+        "title": "pages.notion_table_conflict_resolved",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "synced",
+      "actor_types": [
+        "user",
+        "system"
+      ],
+      "added_in": 19,
+      "description": "A change crossed between a table and its Notion database, in one direction: how many columns, rows and cells it moved. Never their names or values.",
+      "fires_when": "A Notion snapshot is applied to the table (inbound), or the connector reports changes written to Notion (outbound), in the transaction that stores the result; a run that moves nothing tracks nothing.",
+      "module": "pages",
+      "name": "pages.notion_table_synced",
+      "object": "notion_table",
+      "openspec_change": "notion-databases",
+      "rust_type": "NotionTableSynced",
+      "schema": {
+        "$id": "urn:campbooks:tracking:pages.notion_table_synced:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A change crossed between a table and its Notion database, in one direction: how many columns, rows and cells it moved. Never their names or values.",
+        "properties": {
+          "changes": {
+            "description": "How many columns, rows and cells moved.",
+            "type": "integer",
+            "x-classification": "operational"
+          },
+          "direction": {
+            "description": "Which way the changes moved.",
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "table": {
+            "additionalProperties": false,
+            "description": "The table afterwards.",
+            "properties": {
+              "created_by": {
+                "description": "The member who made it: their user id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "pseudonymous"
+              },
+              "id": {
+                "description": "The page's id.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "parent": {
+                "description": "The page it is under, if any.",
+                "format": "uuid",
+                "type": "string",
+                "x-classification": "id"
+              },
+              "place": {
+                "description": "Private or the workspace's.",
+                "enum": [
+                  "private",
+                  "workspace"
+                ],
+                "type": "string",
+                "x-classification": "operational"
+              },
+              "revision": {
+                "description": "Grows with every change of the page.",
+                "type": "integer",
+                "x-classification": "operational"
+              }
+            },
+            "required": [
+              "created_by",
+              "id",
+              "place",
+              "revision"
+            ],
+            "title": "pages.page",
+            "type": "object",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "changes",
+          "direction",
+          "table"
+        ],
+        "title": "pages.notion_table_synced",
         "type": "object"
       },
       "scope": "workspace",
@@ -24127,8 +24540,8 @@
     }
   ],
   "generated_by": "campbooks-tracking-plan",
-  "plan_date": "2026-10-26",
-  "plan_version": 18,
+  "plan_date": "2026-10-27",
+  "plan_version": 19,
   "properties": [
     {
       "classification": "operational",
@@ -27175,6 +27588,32 @@
     {
       "classification": "id",
       "description": "The Notion connection they were imported through.",
+      "event": "pages.notion_databases_imported",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "connection",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many tables were made.",
+      "event": "pages.notion_databases_imported",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "databases",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The Notion connection they were imported through.",
       "event": "pages.notion_pages_imported",
       "example": "",
       "list": false,
@@ -27261,6 +27700,123 @@
       "property": "reason",
       "required": true,
       "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many are in conflict now that were not before.",
+      "event": "pages.notion_table_conflict_raised",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "conflicts",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether columns or cells are in conflict.",
+      "event": "pages.notion_table_conflict_raised",
+      "example": "",
+      "list": false,
+      "of": "pages.table_conflict_kind",
+      "pattern": "",
+      "property": "kind",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The table afterwards.",
+      "event": "pages.notion_table_conflict_raised",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "table",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "What the member chose.",
+      "event": "pages.notion_table_conflict_resolved",
+      "example": "",
+      "list": false,
+      "of": "pages.table_conflict_choice",
+      "pattern": "",
+      "property": "choice",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether it was a column or a cell.",
+      "event": "pages.notion_table_conflict_resolved",
+      "example": "",
+      "list": false,
+      "of": "pages.table_conflict_kind",
+      "pattern": "",
+      "property": "kind",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The table afterwards.",
+      "event": "pages.notion_table_conflict_resolved",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "table",
+      "required": true,
+      "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many columns, rows and cells moved.",
+      "event": "pages.notion_table_synced",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "changes",
+      "required": true,
+      "type": "int",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Which way the changes moved.",
+      "event": "pages.notion_table_synced",
+      "example": "",
+      "list": false,
+      "of": "pages.sync_direction",
+      "pattern": "",
+      "property": "direction",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "The table afterwards.",
+      "event": "pages.notion_table_synced",
+      "example": "",
+      "list": false,
+      "of": "pages.page",
+      "pattern": "",
+      "property": "table",
+      "required": true,
+      "type": "record",
       "version": 1
     },
     {

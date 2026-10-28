@@ -19,6 +19,7 @@ pub mod notion_hook;
 pub mod queue_send;
 pub mod record_calendar_change;
 pub mod record_notion_changes;
+pub mod record_notion_table_changes;
 pub mod request_changes;
 pub mod retag_bindings;
 pub mod send_address_check;

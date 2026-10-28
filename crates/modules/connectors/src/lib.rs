@@ -124,6 +124,51 @@ pub fn notion_router(state: campbooks_kernel::AppState, deps: Deps) -> axum::Rou
 /// The connectors module, composed with `deps`, ready for the server to
 /// mount.
 pub fn module(deps: Deps) -> Module {
+    let background = Background::new()
+        .publishes::<events::ConnectionAdded>()
+        .publishes::<events::CapabilityGranted>()
+        .publishes::<events::ConnectionNeedsReauth>()
+        .publishes::<events::ConnectionRemoved>()
+        .publishes::<events::MessagesChanged>()
+        .publishes::<events::CalendarChanged>()
+        .publishes::<events::CalendarChangeCompleted>()
+        .publishes::<events::NotionPageRead>()
+        .publishes::<events::NotionLinkStopped>()
+        .publishes::<events::NotionChangesCompleted>()
+        .publishes::<events::NotionDataSourceRead>()
+        .publishes::<events::NotionTableChangesCompleted>()
+        .publishes::<events::SendCompleted>()
+        .handler(features::sync_stream::SyncStream::new(deps.clone()))
+        .handler(features::send_message::SendMessage::new(deps.clone()))
+        .handler(features::send_address_check::SendAddressCheck::new(
+            deps.clone(),
+        ))
+        .consumer(features::queue_send::QueueSend)
+        .schedule::<features::dispatch_due::DispatchDue>(features::dispatch_due::EVERY)
+        .rekey::<features::retag_bindings::RetagBindings>()
+        .consumer(features::member_left::RevokeDepartedGrants::new(
+            deps.clone(),
+        ))
+        .consumer(features::request_changes::RequestChanges::new(deps.clone()))
+        .consumer(features::record_calendar_change::RecordCalendarChange::new(
+            deps.clone(),
+        ))
+        .consumer(features::apply_calendar_sync::ApplyCalendarSync::new(
+            deps.clone(),
+        ))
+        .consumer(features::link_notion_page::LinkNotionPage::new(
+            deps.clone(),
+        ))
+        .consumer(features::unlink_notion_page::UnlinkNotionPage)
+        .consumer(features::record_notion_changes::RecordNotionChanges::new(
+            deps.clone(),
+        ))
+        .consumer(features::workspace_deleting::RevokeWorkspaceGrants::new(
+            deps.clone(),
+        ));
+    let background = background.consumer(
+        features::record_notion_table_changes::RecordNotionTableChanges::new(deps.clone()),
+    );
     Module {
         name: NAME,
         scopes: scopes::ALL,
@@ -140,50 +185,11 @@ pub fn module(deps: Deps) -> Module {
             ))
             .routes(routes!(features::sync_now::handler))
             .routes(routes!(features::check_address::handler))
-            .layer(Extension(deps.clone())),
+            .layer(Extension(deps)),
         admin_router: Some(
             OpenApiRouter::new().routes(routes!(features::admin_list_connections::handler)),
         ),
-        background: Background::new()
-            .publishes::<events::ConnectionAdded>()
-            .publishes::<events::CapabilityGranted>()
-            .publishes::<events::ConnectionNeedsReauth>()
-            .publishes::<events::ConnectionRemoved>()
-            .publishes::<events::MessagesChanged>()
-            .publishes::<events::CalendarChanged>()
-            .publishes::<events::CalendarChangeCompleted>()
-            .publishes::<events::NotionPageRead>()
-            .publishes::<events::NotionLinkStopped>()
-            .publishes::<events::NotionChangesCompleted>()
-            .publishes::<events::SendCompleted>()
-            .handler(features::sync_stream::SyncStream::new(deps.clone()))
-            .handler(features::send_message::SendMessage::new(deps.clone()))
-            .handler(features::send_address_check::SendAddressCheck::new(
-                deps.clone(),
-            ))
-            .consumer(features::queue_send::QueueSend)
-            .schedule::<features::dispatch_due::DispatchDue>(features::dispatch_due::EVERY)
-            .rekey::<features::retag_bindings::RetagBindings>()
-            .consumer(features::member_left::RevokeDepartedGrants::new(
-                deps.clone(),
-            ))
-            .consumer(features::request_changes::RequestChanges::new(deps.clone()))
-            .consumer(features::record_calendar_change::RecordCalendarChange::new(
-                deps.clone(),
-            ))
-            .consumer(features::apply_calendar_sync::ApplyCalendarSync::new(
-                deps.clone(),
-            ))
-            .consumer(features::link_notion_page::LinkNotionPage::new(
-                deps.clone(),
-            ))
-            .consumer(features::unlink_notion_page::UnlinkNotionPage)
-            .consumer(features::record_notion_changes::RecordNotionChanges::new(
-                deps.clone(),
-            ))
-            .consumer(features::workspace_deleting::RevokeWorkspaceGrants::new(
-                deps,
-            )),
+        background,
         resources: domain::resources::resources(),
     }
 }

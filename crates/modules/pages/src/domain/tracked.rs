@@ -565,3 +565,131 @@ pub async fn cells_edited(
         .await?;
     Ok(())
 }
+
+/// What a table's conflict is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictKind {
+    /// A column.
+    Column,
+    /// A cell.
+    Cell,
+}
+
+const fn conflict_kind_of(kind: ConflictKind) -> tracking::TableConflictKind {
+    match kind {
+        ConflictKind::Column => tracking::TableConflictKind::Column,
+        ConflictKind::Cell => tracking::TableConflictKind::Cell,
+    }
+}
+
+/// Databases were imported from Notion as tables through `connection`.
+pub async fn notion_databases_imported(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    connection: Uuid,
+    databases: usize,
+) -> Result<()> {
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionDatabasesImported {
+                workspace,
+                connection,
+                databases: counted(databases),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// `changes` columns, rows and cells crossed between `table` and its Notion
+/// database.
+pub async fn notion_table_synced(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    table: PageId,
+    direction: Direction,
+    changes: usize,
+) -> Result<()> {
+    let Some(table) = snapshot(tx, table).await? else {
+        return Ok(());
+    };
+    let direction = match direction {
+        Direction::Inbound => tracking::SyncDirection::Inbound,
+        Direction::Outbound => tracking::SyncDirection::Outbound,
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionTableSynced {
+                workspace,
+                table,
+                direction,
+                changes: counted(changes),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// `conflicts` of `table` are in conflict with Notion's version, newly.
+pub async fn notion_table_conflict_raised(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    table: PageId,
+    kind: ConflictKind,
+    conflicts: usize,
+) -> Result<()> {
+    let Some(table) = snapshot(tx, table).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionTableConflictRaised {
+                workspace,
+                table,
+                kind: conflict_kind_of(kind),
+                conflicts: counted(conflicts),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// A member settled a conflict of `table`.
+pub async fn notion_table_conflict_resolved(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    table: PageId,
+    kind: ConflictKind,
+    keep_ours: bool,
+) -> Result<()> {
+    let Some(table) = snapshot(tx, table).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::NotionTableConflictResolved {
+                workspace,
+                table,
+                kind: conflict_kind_of(kind),
+                choice: if keep_ours {
+                    tracking::TableConflictChoice::Ours
+                } else {
+                    tracking::TableConflictChoice::Theirs
+                },
+            },
+        )
+        .await?;
+    Ok(())
+}

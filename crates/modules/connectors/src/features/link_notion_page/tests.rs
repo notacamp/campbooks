@@ -27,6 +27,7 @@ async fn request(
                 page,
                 connection,
                 notion_page,
+                kind: crate::events::LinkKind::default(),
             },
         )
         .await

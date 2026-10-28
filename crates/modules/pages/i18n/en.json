@@ -49,6 +49,12 @@
     "last_view": "A table keeps at least one view.",
     "view_exists": "A view with that id already exists.",
     "title_property": "The title property stays: rename it instead.",
-    "nothing_to_restore": "There is nothing to take back for this property."
+    "nothing_to_restore": "There is nothing to take back for this property.",
+    "confirmation_required": "This column is in Notion too. Confirm that it is removed there as well.",
+    "conflict_settled": "That conflict is settled already.",
+    "nothing_to_undo": "There is no choice to take back for that conflict.",
+    "conflict_gone": "That conflict is not about a column of this table any more.",
+    "not_a_database": "That is not a Notion database you can import.",
+    "no_table_conflict": "That table has no such conflict."
   }
 }

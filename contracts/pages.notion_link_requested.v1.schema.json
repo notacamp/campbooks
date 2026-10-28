@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://campbooks.example.com/contracts/pages.notion_link_requested.v1.schema.json",
   "title": "pages.notion_link_requested v1 (event payload)",
-  "description": "Published by the pages module when a page is linked to a page in a member's Notion account (an import, or a sub-page found): the connectors module makes the stream that reads it, after asking this module through the kernel's page-requests port whether the link stands. Ids only. Workspace-scoped; also listed in openapi/events.json.",
+  "description": "Published by the pages module when a page is linked to a page in a member's Notion account (an import, or a sub-page found): the connectors module makes the stream that reads it, after asking this module through the kernel's page-requests port whether the link stands. Ids only. Workspace-scoped; also listed in openapi/events.json. Also published for a table linked to a Notion database (`kind` data_source).",
   "type": "object",
   "required": [
     "workspace",
@@ -23,6 +23,14 @@
     },
     "notion_page": {
       "$ref": "#/$defs/uuid"
+    },
+    "kind": {
+      "enum": [
+        "page",
+        "data_source"
+      ],
+      "default": "page",
+      "description": "What is linked: a page (the default) or a Notion database (data source) as a table; for a database `page` is the table and `notion_page` the data source."
     }
   },
   "$defs": {

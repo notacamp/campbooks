@@ -32,6 +32,7 @@
 
 mod calendar;
 mod notion;
+mod notion_table;
 
 use campbooks_kernel::{
     JobContext, JobError,
@@ -2298,6 +2299,8 @@ mod imap_write_tests;
 mod microsoft_tests;
 #[cfg(test)]
 mod microsoft_write_tests;
+#[cfg(test)]
+mod notion_table_tests;
 #[cfg(test)]
 mod notion_tests;
 #[cfg(test)]

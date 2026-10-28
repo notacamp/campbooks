@@ -29,6 +29,11 @@
 //!   workspaces in the maintenance scope (`FOR SELECT` on
 //!   `connectors.notion_links` only: ids), and each is made due now in its own
 //!   workspace unless it is paused or waiting for the member. 202.
+//!   While Notion databases are offered (`…__NOTION__DATABASES__ENABLED`, with
+//!   pages and tables on) the two data source events,
+//!   `data_source.content_updated` and `data_source.schema_updated`, do the
+//!   same for the stream of that database (found by its id in the same table);
+//!   otherwise they are answered 200 and mark nothing due.
 //!
 //! It calls no provider and reads no page: the run reads the blocks, so an
 //! event can only make a stream read early. Neither the secret, the
@@ -82,6 +87,10 @@ const PAGE_EVENTS: [&str; 5] = [
     "page.deleted",
     "page.undeleted",
 ];
+
+/// The data source events that make a database's stream read, while Notion
+/// databases are offered: its entries or its properties changed.
+const DATA_SOURCE_EVENTS: [&str; 2] = ["data_source.content_updated", "data_source.schema_updated"];
 
 /// Posts one address may make.
 pub const PER_ADDRESS: Limit =
@@ -293,10 +302,13 @@ async fn receive(
         tracing::info!("a Notion webhook event of another API version was ignored");
         return StatusCode::OK.into_response();
     }
+    let databases = hook.deps.notion_databases;
     let page = posted
         .get("type")
         .and_then(Value::as_str)
-        .filter(|kind| PAGE_EVENTS.contains(kind))
+        .filter(|kind| {
+            PAGE_EVENTS.contains(kind) || (databases && DATA_SOURCE_EVENTS.contains(kind))
+        })
         .and_then(|_| posted.pointer("/entity/id"))
         .and_then(Value::as_str)
         .and_then(|id| Uuid::parse_str(id).ok());

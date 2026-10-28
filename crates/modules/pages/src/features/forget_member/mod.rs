@@ -54,6 +54,16 @@ impl EventHandler for ForgetMember {
         for page in linked {
             notion::stop(&state, tx, workspace, page, notion::StopReason::MemberLeft).await?;
         }
+        let tables: Vec<PageId> = sqlx::query_scalar(
+            "SELECT table_id FROM pages.external_tables
+              WHERE created_by = $1 AND state <> 'stopped' ORDER BY table_id",
+        )
+        .bind(left.user)
+        .fetch_all(&mut **tx)
+        .await?;
+        for table in tables {
+            notion::stop(&state, tx, workspace, table, notion::StopReason::MemberLeft).await?;
+        }
         Ok(())
     }
 }

@@ -27,6 +27,18 @@ impl EventHandler for StopNotionLink {
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
         let Some(link) = notion::lock_link(tx, stopped.page).await? else {
+            // A table kept in step with a Notion database.
+            if let Some(table) = notion::tables::lock_external(tx, stopped.page).await?
+                && table.connection_id == stopped.connection
+                && table.notion_data_source_id == stopped.notion_page
+            {
+                let reason = match stopped.reason {
+                    NotionStop::NotShared => StopReason::NotShared,
+                    NotionStop::TrashedInNotion => StopReason::TrashedInNotion,
+                    NotionStop::NotionUnavailable => StopReason::NotionUnavailable,
+                };
+                notion::stop(&state, tx, workspace, stopped.page, reason).await?;
+            }
             return Ok(());
         };
         // Only the link the event is about.

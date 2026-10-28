@@ -49,6 +49,12 @@
     "last_view": "Una tabla conserva al menos una vista.",
     "view_exists": "Ya existe una vista con ese identificador.",
     "title_property": "La propiedad del título se queda: cámbiele el nombre.",
-    "nothing_to_restore": "No hay nada que recuperar para esta propiedad."
+    "nothing_to_restore": "No hay nada que recuperar para esta propiedad.",
+    "confirmation_required": "Esta columna también está en Notion. Confirma que se elimina allí también.",
+    "conflict_settled": "Ese conflicto ya está resuelto.",
+    "nothing_to_undo": "No hay ninguna elección que deshacer en ese conflicto.",
+    "conflict_gone": "Ese conflicto ya no se refiere a una columna de esta tabla.",
+    "not_a_database": "Esa no es una base de datos de Notion que puedas importar.",
+    "no_table_conflict": "Esa tabla no tiene ese conflicto."
   }
 }

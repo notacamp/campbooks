@@ -27,6 +27,9 @@ use url::Url;
 use uuid::Uuid;
 use wiremock::{Mock, MockServer, Respond, ResponseTemplate, matchers::any};
 
+mod tables;
+pub use tables::value as data_value;
+
 /// The integration's client id.
 pub const CLIENT_ID: &str = "notion-client-1";
 
@@ -95,6 +98,8 @@ struct State {
     base: String,
     /// Codes are exchanged for an access token only.
     withhold_refresh: bool,
+    /// The fake's databases.
+    tables: tables::Tables,
 }
 
 /// Notion, faked.
@@ -129,6 +134,7 @@ impl FakeNotion {
             page_size: None,
             base: server.uri(),
             withhold_refresh: false,
+            tables: tables::Tables::default(),
         }));
         Mock::given(any())
             .respond_with(Responder(state.clone()))
@@ -575,11 +581,24 @@ impl Respond for Responder {
         let segments: Vec<&str> = rest.split('/').collect();
         let query: HashMap<String, String> = request.url.query_pairs().into_owned().collect();
         let body: Value = serde_json::from_slice(&request.body).unwrap_or(Value::Null);
+        if let Some(answer) = tables::respond(
+            &mut state,
+            request.method.as_str(),
+            &segments,
+            &query,
+            request.url.query().unwrap_or_default(),
+            &body,
+        ) {
+            return answer;
+        }
         match (request.method.as_str(), segments.as_slice()) {
             ("POST", ["search"]) => search(&state, &body),
             ("GET", ["pages", id]) => match shared_page(&state, id) {
                 Some(id) => json_response(200, &page_json(&state, id)),
-                None => error(404, "object_not_found"),
+                None => match tables::page_of_entry(&state, id) {
+                    Some(page) => json_response(200, &page),
+                    None => error(404, "object_not_found"),
+                },
             },
             ("GET", ["blocks", id, "children"]) => children(&state, id, &query),
             ("GET", ["blocks", id]) => match visible_block(&state, id) {
@@ -831,7 +850,10 @@ fn delete(state: &mut State, id: &str) -> ResponseTemplate {
 use campbooks_kernel::{
     blobs::BlobRef,
     db::BeginFor as _,
-    outbound::{PageItemKind, StoredPageChanges, StoredPageItem},
+    outbound::{
+        PageItemKind, StoredPageChanges, StoredPageItem, StoredTableChanges, StoredTableItem,
+        TableItemKind,
+    },
     tenancy::WorkspaceId,
 };
 
@@ -867,6 +889,7 @@ impl Kit {
                     page,
                     connection,
                     notion_page,
+                    kind: crate::events::LinkKind::default(),
                 },
             )
             .await
@@ -874,6 +897,96 @@ impl Kit {
         tx.commit().await.unwrap();
         self.run_jobs().await;
         self.notion_stream(notion_page).await
+    }
+
+    /// The pages module links `table` to the Notion database `data_source`
+    /// through `connection` (its port confirms the link) and asks for a
+    /// stream; the jobs run: the stream's id.
+    pub async fn link_notion_table(
+        &self,
+        workspace: WorkspaceId,
+        connection: &serde_json::Value,
+        table: Uuid,
+        data_source: Uuid,
+    ) -> Uuid {
+        let connection: ConnectionId = connection["id"].as_str().unwrap().parse().unwrap();
+        self.pages
+            .link_table(table, *connection.as_uuid(), data_source);
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        self.state
+            .events
+            .publish(
+                &mut tx,
+                &NotionLinkRequested {
+                    workspace: workspace.to_string(),
+                    page: table,
+                    connection,
+                    notion_page: data_source,
+                    kind: crate::events::LinkKind::DataSource,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        self.run_jobs().await;
+        self.notion_stream(data_source).await
+    }
+
+    /// The pages module stored a request of `items` for `table` (bound to
+    /// `connection` and the database `data_source`) with `document` as what
+    /// to write, and asks for it to be made. Returns the request.
+    pub async fn ask_notion_table_changes(
+        &self,
+        workspace: WorkspaceId,
+        connection: &serde_json::Value,
+        (table, data_source): (Uuid, Uuid),
+        items: Vec<StoredTableItem>,
+        document: &serde_json::Value,
+        standing: bool,
+    ) -> Uuid {
+        let connection: ConnectionId = connection["id"].as_str().unwrap().parse().unwrap();
+        let request = Uuid::now_v7();
+        let body: BlobRef = self
+            .state
+            .blobs
+            .put(
+                &workspace.to_string(),
+                serde_json::to_vec(document).unwrap(),
+                TABLE_CHANGE_TYPE,
+            )
+            .await
+            .unwrap();
+        if standing {
+            self.pages.release_table(
+                request,
+                StoredTableChanges {
+                    table,
+                    connection: *connection.as_uuid(),
+                    external: data_source,
+                    items,
+                    body: body.clone(),
+                },
+            );
+        }
+        let mut tx = self.state.db.begin_for(workspace).await.unwrap();
+        self.state
+            .events
+            .publish(
+                &mut tx,
+                &crate::events::NotionTableChangesRequested {
+                    workspace: workspace.to_string(),
+                    request,
+                    table,
+                    connection,
+                    data_source,
+                    body,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        self.run_jobs().await;
+        request
     }
 
     /// The pages module ended the link of `page`: its stream goes.
@@ -986,6 +1099,27 @@ impl Kit {
         tx.commit().await.unwrap();
         self.run_jobs().await;
         request
+    }
+}
+
+/// A table change document's content type.
+pub const TABLE_CHANGE_TYPE: &str =
+    "application/vnd.campbooks.notion-table-changes+json; version=1";
+
+/// An item of `kind` about `subject` (a column or row of the pages module),
+/// at place `seq`.
+pub fn table_item(seq: u32, kind: TableItemKind, subject: Uuid) -> StoredTableItem {
+    StoredTableItem {
+        seq,
+        kind,
+        subject,
+        property: None,
+        external_property: None,
+        external_page: None,
+        base_hash: None,
+        schema_hash: None,
+        base_edited_at: None,
+        confirmed: false,
     }
 }
 
