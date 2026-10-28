@@ -96,3 +96,46 @@ client.
   and Notion; long Markdown), and for "Ask Scout" on a page. Unit tests for
   the copy builder (headings, quoted history dropped, sanitised), the
   audience wording and the Undo path.
+
+## Deviations while building
+
+- **The flag is probed, not advertised.** The server does not say that mail and
+  Scout in pages is on: `pages.list` carries only `tables`, and part 1 added no
+  field. With the switch off every one of its routes is a 404, so the client
+  asks `pages.get_sharing` for a page the caller can open (`useMailScoutAvailable`
+  in `~/modules/pages`): the page on screen for "Ask Scout", the first page of
+  the tree for the reader. A 200 means on, a 404 means off, anything else
+  means not known yet (and nothing is offered). With no page to ask about, it
+  is not known, so a workspace with no pages yet is not offered "Save to page"
+  until it has one. A flag on `pages.list` (like `tables`) would make this one
+  request instead of a probe, and is the follow-up if that matters.
+- **"Scout unavailable" is the chat panel not being mounted.** The client has
+  no read of the `complete` role: a screen learns that Scout is configured only
+  when a chat starts (`chat_unavailable`). So "Scout's summary" and "Ask Scout"
+  are hidden when no panel is mounted (`useScoutChat()` is `undefined`: stories,
+  tests, a shell without it), and when the model is not configured the chat
+  itself says so, as it does for every other "Ask Scout".
+- **`RUNNABLE` gains exactly `pages.append` and `pages.create`.** Their undos
+  (`pages.unappend`, `pages.trash`) are in a separate `PAGE_UNDOS` list, passed
+  by `PageChangeCard` alone, so no other card can send them and `RUNNABLE`
+  keeps its rule of listing what a card may confirm.
+- **The summary hand-off closes the dialog, then opens Scout.** The opener has
+  no "stay open" option, so Preview summary closes "Save to page" and opens the
+  chat about the conversation with the question already asked (naming the page,
+  or the new title). Scout's card is the preview.
+- **The copy is text only.** Each message becomes a heading-3 "Sender — date"
+  and paragraphs of its words, built as the page's own blocks (no HTML is read,
+  so there is nothing to sanitise beyond control and bidirectional characters,
+  which are removed). The quoted history is dropped by the reader, which hands
+  the dialog each message's own words (`saveThreadOf`, with `splitQuoted`); a
+  message whose words had not been read yet (`text_unread`) is read first.
+- **Blocks are added to the Yjs document without the editor.** The dialog reads
+  the page, appends the blocks to a copy of its document (the page's schema,
+  through `prosemirrorJSONToYXmlFragment`) and sends one `pages.sync`. Undo
+  reads the page again and removes the top-level blocks that still read the
+  same (a block someone changed since stays), then detaches the files.
+- **A shortcut in the `item` scope.** `pages.save_thread` is Shift P (free), with
+  its hint; "Ask Scout" on a page uses the existing `scout.ask` key (`.`).
+- **Not done: client events.** `thread_saved_to_page` and `page_proposal_settled`
+  (named in part 1) are not emitted: settling a card is already tracked by the
+  existing proposal event, and no patch 0024 was needed.
