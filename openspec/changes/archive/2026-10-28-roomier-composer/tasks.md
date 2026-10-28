@@ -21,5 +21,5 @@
 - [ ] 3.2 Tracking plan regenerated (no change expected)
 - [x] 3.3 Changelog entry `changelog/unreleased/changed/390-roomier-composer.md`
 - [ ] 3.4 Gates green in CI
-- [ ] 3.5 Recording at 375 px and desktop
+- [x] 3.5 Recording at 375 px and desktop
 - [ ] 3.6 `openspec archive roomier-composer --yes` before merge
