@@ -572,6 +572,8 @@ async fn an_unusable_answer_is_recorded_and_tried_once_more_then_never(db: PgPoo
     let shown = detail(&kit, &sam, workspace, "needs-1", "en").await;
     assert_eq!(shown["need_summary"], Value::Null);
     assert!(!shown["messages"].as_array().unwrap().is_empty());
+    // It may still be tried once more, so the reader does not say it failed.
+    assert!(shown.get("need_read_failed").is_none());
 
     // One retry later, then no more.
     requeue(&kit, workspace, "needs-1").await;
@@ -583,6 +585,9 @@ async fn an_unusable_answer_is_recorded_and_tried_once_more_then_never(db: PgPoo
     let path = read_path(&kit, workspace, "needs-1").await;
     let asked = kit.post(&sam, &path, None).await;
     assert_eq!(asked.json["outcome"], "failed");
+    // Both calls are spent: the reader says Scout could not read it.
+    let shown = detail(&kit, &sam, workspace, "needs-1", "en").await;
+    assert_eq!(shown["need_read_failed"], true);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

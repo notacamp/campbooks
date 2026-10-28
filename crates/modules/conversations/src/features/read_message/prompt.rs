@@ -21,7 +21,7 @@
 
 use std::{collections::BTreeMap, str::FromStr as _};
 
-use campbooks_ai::{ChatRequest, Message};
+use campbooks_ai::{ChatRequest, Message, ReasoningEffort};
 use campbooks_kernel::i18n::Locale;
 use chrono::{DateTime, NaiveDate, TimeDelta, Utc};
 use chrono_tz::Tz;
@@ -35,6 +35,9 @@ use crate::{
     },
     model::{ItemKind, MessageId, ReadLayer, Verb},
 };
+
+/// The token budget of a read: room for the thinking and the answer.
+pub const MAX_TOKENS: u32 = 8192;
 
 /// Longest summary kept, per language, in characters.
 pub const MAX_CHARS: usize = 400;
@@ -294,7 +297,13 @@ pub fn request_for(input: &Input, waiting: bool) -> ChatRequest {
     );
     request.temperature = Some(0.2);
     // The model reasons before it answers and its thinking shares the budget.
-    request.max_tokens = Some(4096);
+    // At the default amount of thinking 3 of 50 reads in a measurement wrote
+    // nothing at 4096 tokens; at low effort none did, at either budget, and
+    // they cost less and ran sooner (crates/ai/evals/complete/
+    // 2026-10-28-read-budget.md, campbooks-cloud#375). The budget is a cap
+    // for the odd long answer, not a cost.
+    request.max_tokens = Some(MAX_TOKENS);
+    request.reasoning_effort = Some(ReasoningEffort::Low);
     request
 }
 
@@ -760,7 +769,8 @@ mod tests {
     #[test]
     fn it_asks_for_room_to_think_and_a_strict_answer() {
         let request = request(&input("Hello"));
-        assert_eq!(request.max_tokens, Some(4096));
+        assert_eq!(request.max_tokens, Some(MAX_TOKENS));
+        assert_eq!(request.reasoning_effort, Some(ReasoningEffort::Low));
         let format = serde_json::to_value(request.response_format).unwrap();
         let schema = &format["json_schema"]["schema"];
         let required: Vec<&str> = schema["required"]

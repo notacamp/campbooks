@@ -221,7 +221,7 @@ impl JobHandler for ReadMessage {
         };
         let usage = Scope::workspace(ctx.state().db.clone(), workspace, FEATURE);
         let answer = match usage
-            .run(gateway.chat(
+            .run(gateway.chat_with_room(
                 Role::Complete,
                 prompt::request_for(&read.input, read.waiting),
             ))

@@ -23859,6 +23859,10 @@
             },
             "description": "Up to the 100 newest messages, oldest first."
           },
+          "need_read_failed": {
+            "type": "boolean",
+            "description": "Scout's read of the email behind the open need failed for good (the\nmodel gave no usable answer on every try), so there is no summary and\nthere will not be one: the reader says so instead of staying blank\n(campbooks-cloud#375). False when there is no open need, the read is\npending or done, or the need is a phishing warning."
+          },
           "need_summary": {
             "type": [
               "string",

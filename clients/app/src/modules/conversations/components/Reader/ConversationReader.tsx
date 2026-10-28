@@ -21,6 +21,7 @@ import {
   ReaderBody,
   ReaderFooter,
   SkeletonList,
+  Text,
   Visor,
   type OverflowAction,
 } from "~/lib/ui";
@@ -845,6 +846,15 @@ export function ConversationReader({
                   },
                 })}
             chips={<NeedChips need={need} now={now} />}
+            {...(detail?.need_read_failed === true
+              ? {
+                  after: (
+                    <Text as="span" tone="tertiary" size="sm">
+                      {t("scout.readFailed")}
+                    </Text>
+                  ),
+                }
+              : {})}
             {...(question
               ? {
                   choice: bill
