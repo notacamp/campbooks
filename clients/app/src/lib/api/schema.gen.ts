@@ -14615,7 +14615,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again. */
+            /** @description `rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again. Or `send_at_busy`: too many sends of yours are scheduled for that minute. */
             429: {
                 headers: {
                     [name: string]: unknown;

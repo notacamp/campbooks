@@ -29,7 +29,9 @@
     "editScheduled": "This send is scheduled. Cancel it to edit the draft.",
     "cancelAndEdit": "Cancel send and edit",
     "keepScheduled": "Keep it scheduled",
-    "sendCancelled": "Send cancelled"
+    "sendCancelled": "Send cancelled",
+    "shouldHaveLeft": "Should have left {{time}}",
+    "notSent": "Not sent"
   },
   "list": {
     "label": "Conversations",
@@ -330,7 +332,11 @@
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
       "content_changed": "This changed since you opened it. Check it and send again.",
       "quote": "Couldn’t read the email to quote it. Nothing was started. Try again.",
-      "send_at_invalid": "This time can’t be used. Pick a later one, up to a year ahead."
+      "send_at_invalid": "This time can’t be used. Pick a later one, up to a year ahead.",
+      "destination_changed": "Not sent: this mailbox changed after you scheduled it. Check it and send it again.",
+      "sender_may_not_send": "Not sent: you can no longer send from this mailbox.",
+      "release_lost": "We couldn’t confirm this was sent. Check your Sent folder before sending it again.",
+      "send_at_busy": "Too many of your sends are scheduled for that minute. Pick another time."
     },
     "shortcuts": {
       "newMessage": "New message"

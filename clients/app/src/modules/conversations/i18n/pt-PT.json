@@ -29,7 +29,9 @@
     "editScheduled": "Este envio está agendado. Cancele-o para editar o rascunho.",
     "cancelAndEdit": "Cancelar envio e editar",
     "keepScheduled": "Manter agendado",
-    "sendCancelled": "Envio cancelado"
+    "sendCancelled": "Envio cancelado",
+    "shouldHaveLeft": "Devia ter saído {{time}}",
+    "notSent": "Não enviado"
   },
   "list": {
     "label": "Conversas",
@@ -330,7 +332,11 @@
       "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
       "content_changed": "Isto mudou desde que o abriu. Verifique-o e envie de novo.",
       "quote": "Não foi possível ler o email para o citar. Nada foi iniciado. Tente novamente.",
-      "send_at_invalid": "Esta hora não pode ser usada. Escolha uma mais tarde, até um ano de antecedência."
+      "send_at_invalid": "Esta hora não pode ser usada. Escolha uma mais tarde, até um ano de antecedência.",
+      "destination_changed": "Não enviado: esta caixa de correio mudou depois de agendar. Verifique e envie de novo.",
+      "sender_may_not_send": "Não enviado: já não pode enviar a partir desta caixa de correio.",
+      "release_lost": "Não conseguimos confirmar que foi enviado. Verifique a pasta Enviados antes de o enviar de novo.",
+      "send_at_busy": "Tem demasiados envios agendados para esse minuto. Escolha outra hora."
     },
     "shortcuts": {
       "newMessage": "Nova mensagem"

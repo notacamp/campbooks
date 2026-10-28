@@ -92,6 +92,45 @@ describe("the drafts list", () => {
     expect(screen.queryByRole("region", { name: "Scheduled" })).toBeNull();
   });
 
+  it("lists a send past its time, saying it should have left, with Cancel send", () => {
+    const onCancelSend = vi.fn();
+    const overdue = later(-3);
+    show([overdue, later(5)], { onCancelSend });
+    expect(screen.getByText(/^Should have left /u)).toBeVisible();
+    expect(screen.getAllByText(/^Leaves /u)).toHaveLength(1);
+    // The overdue one is first: it is the soonest.
+    const group = screen.getByRole("region", { name: "Scheduled" });
+    expect(group.querySelector("[id^=scheduled-]")?.textContent).toContain("Should have left");
+    const [first] = screen.getAllByRole("button", { name: "Cancel send: Figures for the board" });
+    fireEvent.click(first ?? document.body);
+    expect(onCancelSend).toHaveBeenCalledWith(overdue);
+  });
+
+  it("leaves out a send only just past its time (it is being released)", () => {
+    show([
+      { ...TO_MARTA, state: "scheduled", send_at: new Date(NOW.getTime() - 30_000).toISOString() },
+    ]);
+    expect(screen.queryByRole("region", { name: "Scheduled" })).toBeNull();
+  });
+
+  it("says under the row why a send stopped", () => {
+    show([
+      { ...REPLY_WRITTEN, state: "failed", failure_reason: "sender_may_not_send" },
+      { ...TO_MARTA, state: "failed", failure_reason: "release_lost" },
+      { ...BLANK, state: "failed", failure_reason: "destination_changed" },
+    ]);
+    expect(screen.getAllByText("Not sent")).toHaveLength(3);
+    expect(screen.getByText("Not sent: you can no longer send from this mailbox.")).toBeVisible();
+    expect(
+      screen.getByText(
+        "We couldn’t confirm this was sent. Check your Sent folder before sending it again.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/this mailbox changed after you scheduled it/u)).toBeVisible();
+    // Its words are still there.
+    expect(screen.getByText(/^Thanks, Maya/u)).toBeVisible();
+  });
+
   it("cancels a scheduled send, and asks before editing one", () => {
     const onCancelSend = vi.fn();
     const onCancelAndEdit = vi.fn();

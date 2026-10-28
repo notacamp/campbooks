@@ -14,6 +14,7 @@ import {
   type RefusalReason,
 } from "../../compose/attachment-rules";
 import { addressLine, displayName } from "../../compose/quote";
+import { KNOWN_ERRORS } from "../../compose/errors";
 import { useDraftEditor } from "../../compose/use-draft-editor";
 import { useRecipientSuggestions } from "../../compose/use-recipient-suggestions";
 
@@ -35,22 +36,6 @@ export interface DraftComposerProps {
   /** Said beside the quoted history (that it holds only the start of a long email). */
   quotedNote?: string | undefined;
 }
-
-const KNOWN_ERRORS = new Set([
-  "not_saved",
-  "content_changed",
-  "no_recipients",
-  "invalid_address",
-  "attachments_too_large",
-  "send_at_invalid",
-  "draft_not_editable",
-  "not_connected",
-  "needs_reauth",
-  "rejected",
-  "too_large",
-  "unavailable",
-  "unknown_outcome",
-]);
 
 /**
  * A draft in the message composer: saved as you type, sent with an undo

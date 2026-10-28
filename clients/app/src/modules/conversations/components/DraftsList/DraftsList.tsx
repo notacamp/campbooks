@@ -14,6 +14,7 @@ import {
 } from "~/lib/ui";
 
 import { DRAFTS_MAX, type Draft } from "../../api/drafts";
+import { errorKey } from "../../compose/errors";
 
 import { displayName, listTime, type Translate } from "../../model";
 
@@ -25,14 +26,19 @@ function editable(draft: Draft): boolean {
 /** How far ahead a scheduled send must be to be listed: not one in its undo window. */
 const SCHEDULED_AHEAD_MS = 2 * 60_000;
 
-/** A send scheduled for later (campbooks-cloud#392), soonest first. */
+/**
+ * A send scheduled for later (campbooks-cloud#392), soonest first: one more
+ * than two minutes ahead, and one more than two minutes past its time (it
+ * should have left and has not: it stays listed, to cancel, until it is
+ * settled). One in its undo window is neither.
+ */
 function scheduledLater(drafts: readonly Draft[], now: Date): Draft[] {
   return drafts
     .filter(
       (draft) =>
         draft.state === "scheduled" &&
         typeof draft.send_at === "string" &&
-        new Date(draft.send_at).getTime() > now.getTime() + SCHEDULED_AHEAD_MS,
+        Math.abs(new Date(draft.send_at).getTime() - now.getTime()) > SCHEDULED_AHEAD_MS,
     )
     .toSorted((a, b) => (a.send_at ?? "").localeCompare(b.send_at ?? ""));
 }
@@ -118,7 +124,9 @@ export function DraftsList({
           {later.map((draft) => {
             const first = draft.to[0];
             const title = draft.subject === "" ? t("reader.noSubject") : draft.subject;
-            const leaves = t("drafts.leaves", {
+            const overdue =
+              new Date(draft.send_at ?? "").getTime() <= (now ?? new Date()).getTime();
+            const leaves = t(overdue ? "drafts.shouldHaveLeft" : "drafts.leaves", {
               time: sendTimeLabel(draft.send_at ?? "", i18n.language),
             });
             return (
@@ -191,33 +199,45 @@ export function DraftsList({
       {shown.map((draft) => {
         const first = draft.to[0];
         const title = draft.subject === "" ? t("reader.noSubject") : draft.subject;
+        // A send that stopped says why under its row.
+        const reason = draft.failure_reason ?? undefined;
         return (
-          <div key={draft.id} className="flex items-start gap-1">
-            <div className="min-w-0 flex-1">
-              <ConversationRow
-                id={`draft-${draft.id}`}
-                from={toLine(t, draft)}
-                chips={<Tag>{t("drafts.tag")}</Tag>}
-                avatar={{
-                  kind: "person",
-                  ...(first === undefined ? {} : { initials: initialsOf(displayName(first)) }),
-                }}
-                time={listTime(draft.updated_at, i18n.language, now)}
-                dateTime={draft.updated_at}
-                subject={title}
-                snippet={snippetOf(draft)}
-                onSelect={() => {
-                  onOpen(draft);
+          <div key={draft.id} className="flex flex-col">
+            <div className="flex items-start gap-1">
+              <div className="min-w-0 flex-1">
+                <ConversationRow
+                  id={`draft-${draft.id}`}
+                  from={toLine(t, draft)}
+                  chips={<Tag>{reason === undefined ? t("drafts.tag") : t("drafts.notSent")}</Tag>}
+                  avatar={{
+                    kind: "person",
+                    ...(first === undefined ? {} : { initials: initialsOf(displayName(first)) }),
+                  }}
+                  time={listTime(draft.updated_at, i18n.language, now)}
+                  dateTime={draft.updated_at}
+                  subject={title}
+                  snippet={snippetOf(draft)}
+                  onSelect={() => {
+                    onOpen(draft);
+                  }}
+                />
+              </div>
+              <IconButton
+                label={t("compose.deleteDraftNamed", { title })}
+                icon="trash"
+                onClick={() => {
+                  onDelete(draft);
                 }}
               />
             </div>
-            <IconButton
-              label={t("compose.deleteDraftNamed", { title })}
-              icon="trash"
-              onClick={() => {
-                onDelete(draft);
-              }}
-            />
+            {reason === undefined ? null : (
+              // Said in full, wrapping: a stopped send's reason is never cut.
+              <p className="m-0 px-2 pb-1">
+                <Text tone="danger" size="sm">
+                  {t(errorKey(reason))}
+                </Text>
+              </p>
+            )}
           </div>
         );
       })}

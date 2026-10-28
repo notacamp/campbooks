@@ -30,3 +30,14 @@ opens the draft in the composer.
 #### Scenario: Cancel from the list
 - **WHEN** the user presses Cancel send on a scheduled row
 - **THEN** it moves to the drafts with "Send cancelled", and nothing is sent
+
+### Requirement: Sends that did not leave
+Drafts SHALL list a scheduled send more than two minutes past its time in the "Scheduled" group as "Should have left <time>", with Cancel send. A draft that stopped SHALL show "Not sent" and its reason in words on its row, and in the composer when opened. The reasons SHALL include that the author can no longer send from the mailbox, that the mailbox changed, and that the send could not be confirmed.
+
+#### Scenario: Past its time
+- **WHEN** a send scheduled for 08:00 is still scheduled at 08:10
+- **THEN** it shows under Scheduled as "Should have left" with Cancel send
+
+#### Scenario: Could not be confirmed
+- **WHEN** a draft failed with `release_lost`
+- **THEN** its row says "We couldn't confirm this was sent. Check your Sent folder before sending it again."
