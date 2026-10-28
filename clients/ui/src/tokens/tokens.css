@@ -371,6 +371,8 @@
   --dialog-result-width: 380px;
   /* The composer opened as a sheet over the page (Expand). */
   --composer-sheet-width: 820px;
+  /* Ten lines of the composer text. */
+  --composer-text-min-height: calc(10 * var(--leading-relaxed) * var(--text-md));
   --dialog-sheet-max-height: 88dvh;
   --dialog-drain-height: 3px;
   --actions-divider-height: 18px;

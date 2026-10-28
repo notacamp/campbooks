@@ -22,7 +22,7 @@
   position: fixed;
   inset: 0;
   width: min(var(--composer-sheet-width), calc(100% - var(--space-8)));
-  max-height: calc(100dvh - var(--space-8));
+  max-height: var(--dialog-sheet-max-height);
   height: fit-content;
   margin: auto;
   border-radius: var(--overlay-radius);
@@ -175,7 +175,7 @@
 
 .editor {
   min-width: 0;
-  min-height: calc(10 * var(--leading-relaxed) * 1em);
+  min-height: var(--composer-text-min-height);
   outline: 0;
   color: var(--text-primary);
   font-size: var(--text-md);
