@@ -10,5 +10,5 @@
 ## 2. Before merge
 
 - [x] 2.1 Changelog entry file (`changelog/unreleased/added/399-calendar-roles-settings.md`)
-- [ ] 2.2 `openspec validate calendar-roles-settings --strict`; CI green
-- [ ] 2.3 Recording at 375px and on desktop, then archive this change
+- [x] 2.2 `openspec validate calendar-roles-settings --strict`; CI green
+- [x] 2.3 Recording at 375px and on desktop, then archive this change
