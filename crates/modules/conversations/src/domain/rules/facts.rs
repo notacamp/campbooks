@@ -390,7 +390,7 @@ pub async fn candidate(conn: &mut PgConnection, id: ConversationId) -> Result<Op
         "#,
         id as ConversationId,
     )
-    .fetch_optional(conn)
+    .fetch_optional(&mut *conn)
     .await?;
     let mut found = row.map(Candidate::try_from).transpose()?;
     if let Some(candidate) = found.as_mut() {
