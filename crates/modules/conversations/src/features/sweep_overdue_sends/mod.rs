@@ -5,11 +5,14 @@
 //! died), the draft would stay `scheduled` with a past `send_at`, and the
 //! member would never hear.
 //!
-//! - `conversations.dispatch_overdue_sends`, every ten minutes, reads which
-//!   workspaces have an inbox (the maintenance scope: workspace ids only,
-//!   read only, through `needs_backfills`' maintenance policy) and enqueues
+//! - `conversations.dispatch_overdue_sends`, every ten minutes, asks which
+//!   workspaces have a send still scheduled past [`OVERDUE`]
+//!   (`conversations.workspaces_with_overdue_sends`, a `SECURITY DEFINER`
+//!   function that answers workspace ids only and may read three columns
+//!   of the drafts, nothing else) and enqueues
 //!   `conversations.sweep_overdue_sends` in each, one pending job per
-//!   workspace. It reads nothing else and writes nothing.
+//!   workspace: only workspaces with work to do. It reads nothing else and
+//!   writes nothing.
 //! - `conversations.sweep_overdue_sends`, in the workspace (row-level
 //!   security applies), finds the drafts still scheduled fifteen minutes
 //!   past their time with no unfinished release job for their generation,
@@ -39,7 +42,11 @@ use crate::{
 pub const EVERY: Duration = Duration::from_mins(10);
 
 /// Workspaces looked at per tick.
-const DISPATCH_BATCH: i64 = 5000;
+const DISPATCH_BATCH: i32 = 5000;
+
+/// How long past its time a scheduled send is left to its release job
+/// before it counts as overdue.
+const OVERDUE_MINUTES: i32 = 15;
 
 /// Drafts settled per job; the next tick takes the rest.
 const PER_JOB: i64 = 200;
@@ -54,14 +61,16 @@ impl Job for DispatchOverdueSends {
     const MAX_ATTEMPTS: u32 = 1;
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
-        // Across workspaces, through a table's maintenance policy (ids only,
-        // read only): the maintenance scope, allowed for this file in
-        // `architecture.toml`. Each job is enqueued in its workspace.
+        // Across workspaces, ids only, through the definer function (no
+        // policy lets this transaction read a draft): the maintenance scope,
+        // allowed for this file in `architecture.toml`. Each job is enqueued
+        // in its workspace.
         let tx = ctx.maintenance_tx().await?;
         let workspaces: Vec<Uuid> = sqlx::query_scalar(
-            "SELECT DISTINCT workspace_id FROM conversations.needs_backfills
-              ORDER BY workspace_id LIMIT $1",
+            "SELECT conversations.workspaces_with_overdue_sends(
+                 now() - make_interval(mins => $1), $2)",
         )
+        .bind(OVERDUE_MINUTES)
         .bind(DISPATCH_BATCH)
         .fetch_all(&mut **tx)
         .await?;
@@ -104,10 +113,11 @@ impl JobHandler for SweepOverdueSends {
         let tx = ctx.tx().await?;
         let overdue: Vec<(DraftId, i32)> = sqlx::query_as(
             "SELECT id, send_generation FROM conversations.drafts
-              WHERE state = 'scheduled' AND send_at < now() - interval '15 minutes'
+              WHERE state = 'scheduled' AND send_at < now() - make_interval(mins => $2)
               ORDER BY send_at LIMIT $1",
         )
         .bind(PER_JOB)
+        .bind(OVERDUE_MINUTES)
         .fetch_all(&mut **tx)
         .await?;
         let mut lost = 0_u32;
