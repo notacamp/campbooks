@@ -181,6 +181,86 @@ export function richDoc(threadId: string, taskId: string): Y.Doc {
   return doc;
 }
 
+/**
+ * A page with every block of the schema, one after another, as people write
+ * them: the page the block spacing is checked against.
+ */
+export function everyBlockDoc(threadId: string, taskId: string): Y.Doc {
+  const doc = new Y.Doc();
+  const para = (...inline: (string | Y.XmlElement)[]) => block("paragraph", {}, ...inline);
+  const item = (...inline: (string | Y.XmlElement)[]) => wrap("listItem", {}, para(...inline));
+  const todo = (text: string, checked: boolean, ...inside: Y.XmlElement[]) =>
+    wrap("taskItem", { checked }, para(text), ...inside);
+  doc
+    .getXmlFragment("default")
+    .push([
+      para(
+        "Every new client gets the same first week. This page is the checklist, and Scout ticks what it can.",
+      ),
+      block("heading", { level: 1 }, "Before the kickoff"),
+      para("Three things have to be true before anyone books a room."),
+      para("Questions go to ", mention("workspaces.member", JONAS.user_id), " first."),
+      block("heading", { level: 2 }, "What we send"),
+      wrap(
+        "bulletList",
+        {},
+        item("The welcome pack"),
+        wrap(
+          "listItem",
+          {},
+          para("The contract, with"),
+          wrap("bulletList", {}, item("the rate card"), item("the payment terms")),
+        ),
+        item("The first invoice"),
+      ),
+      block("heading", { level: 3 }, "In this order"),
+      wrap(
+        "orderedList",
+        {},
+        item("Contract signed"),
+        item("Deposit received"),
+        item("Kickoff booked"),
+      ),
+      block("heading", { level: 2 }, "To do"),
+      wrap(
+        "taskList",
+        {},
+        todo("Book the venue", true),
+        todo(
+          "Send the agenda",
+          false,
+          wrap("taskList", {}, todo("Draft it", true), todo("Ask Jonas to read it", false)),
+        ),
+        todo("Confirm the budget", false),
+      ),
+      wrap("callout", { tone: "info" }, para("The kickoff is on Thursday at 10:00.")),
+      wrap(
+        "callout",
+        { tone: "warning" },
+        para("Never send the contract before the rate card is signed off."),
+        para("Legal reads it first."),
+      ),
+      wrap("blockquote", {}, para("Keep it short, and send it the same day.")),
+      block("horizontalRule", {}),
+      block("heading", { level: 2 }, "Linked from here"),
+      para("The thread with the client: ", mention("conversations.conversation", threadId)),
+      block("embed", { ref_type: "tasks.task", ref_id: taskId }),
+      block("pageLink", { page: "0192f1a0-0000-7000-8000-000000000903" }),
+      block("file", { blob: "brand-guide", name: "brand-guide.pdf", size: 2_400_000 }),
+      wrap(
+        "toggle",
+        { open: true },
+        para("How we price"),
+        para("Day rate, billed weekly. Expenses at cost."),
+      ),
+      wrap("toggle", { open: false }, para("Old rates"), para("Hidden until opened.")),
+      block("heading", { level: 3 }, "The invoice line"),
+      block("codeBlock", {}, "Kickoff workshop · 1 day · €1,200"),
+      para("Notes from the kickoff go below."),
+    ]);
+  return doc;
+}
+
 /** The page as `pages.get` returns it, with `doc` as its body. */
 export function viewOfDoc(summary: Summary, doc: Y.Doc, extra: Partial<View> = {}): View {
   return {
