@@ -1,0 +1,1 @@
+- **A task says why it's here, and what happened to it.** Open a task and "Why it's here" says who made it and when (Scout from an email, you, or a teammate who handed it to you), and "History" lists what happened since, in plain sentences: planned, held, moved by the calendar, replied to, handed over, done.

@@ -168,9 +168,13 @@ impl Composition {
         let (gateway, ai_usage) = ai_gateway(ai, tracker.clone())?;
         let connectors = campbooks_connectors::Deps::from_env(config)?;
         let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
+        // Mail and Scout in pages (campbooks-cloud#364): Scout's tools and
+        // its handbook for pages exist while the pages module offers them.
+        let pages = campbooks_pages::Deps::from_env();
         let assistant = campbooks_assistant::AssistantDeps {
             ai: gateway.clone(),
-            handbook: handbook(),
+            handbook: handbook_for(pages.mail_scout),
+            pages: pages.mail_scout,
         };
         let system = campbooks_system::Deps {
             ai: gateway.clone(),
@@ -188,7 +192,7 @@ impl Composition {
             ),
             system,
             assistant,
-            pages: campbooks_pages::Deps::from_env(),
+            pages,
         })
     }
 }
@@ -268,7 +272,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_attention::module(),
         campbooks_search::module(),
         campbooks_assistant::module(campbooks_assistant::AssistantDeps {
-            handbook: handbook(),
+            handbook: handbook_for(composition.assistant.pages),
             ..composition.assistant.clone()
         }),
         campbooks_tasks::module(),
@@ -282,8 +286,15 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// then each module's own section, in this order. A module Scout should
 /// explain adds its `HANDBOOK` here.
 pub fn handbook() -> campbooks_assistant::Handbook {
+    handbook_for(false)
+}
+
+/// [`handbook`], with the pages module's section while `pages` (mail and
+/// Scout work with pages, `CAMPBOOKS_PAGES__MAIL_SCOUT__ENABLED`): Scout is
+/// never told about tools it was not given.
+pub fn handbook_for(pages: bool) -> campbooks_assistant::Handbook {
     use campbooks_assistant::Section;
-    campbooks_assistant::Handbook::new(vec![
+    let mut sections = vec![
         Section {
             module: campbooks_conversations::NAME,
             text: campbooks_conversations::HANDBOOK,
@@ -300,7 +311,14 @@ pub fn handbook() -> campbooks_assistant::Handbook {
             module: campbooks_schedule::NAME,
             text: campbooks_schedule::HANDBOOK,
         },
-    ])
+    ];
+    if pages {
+        sections.push(Section {
+            module: campbooks_pages::NAME,
+            text: campbooks_pages::HANDBOOK,
+        });
+    }
+    campbooks_assistant::Handbook::new(sections)
 }
 
 /// `state` with the ports modules implement for the kernel registered: the
@@ -330,6 +348,7 @@ pub fn with_ports(state: AppState) -> AppState {
             ],
         )))
         .with_open_tasks(campbooks_tasks::open_tasks())
+        .with_attachment_blobs(campbooks_conversations::attachment_blobs())
         .with_preferences(campbooks_assistant::preferences())
         .with_kept_mail(campbooks_conversations::kept_mail())
         .with_outbound(campbooks_conversations::outbound_requests())
@@ -853,6 +872,19 @@ mod tests {
                 "schedule"
             ]
         );
+        // With mail and Scout in pages, the pages section comes last.
+        let with_pages = handbook_for(true);
+        let modules: Vec<&str> = with_pages.sections().iter().map(|s| s.module).collect();
+        assert_eq!(modules.last(), Some(&"pages"));
+        assert_ne!(handbook.version(), with_pages.version());
+        for section in with_pages.sections() {
+            assert!(
+                section.text.len() <= campbooks_assistant::handbook::MAX_SECTION_BYTES,
+                "{}: {} bytes",
+                section.module,
+                section.text.len()
+            );
+        }
         for section in handbook.sections() {
             assert!(
                 section.text.len() <= campbooks_assistant::handbook::MAX_SECTION_BYTES,

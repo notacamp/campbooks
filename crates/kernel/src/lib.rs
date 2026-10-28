@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 pub mod admin;
+pub mod attachments;
 pub mod auth;
 pub mod authz;
 pub mod binding;

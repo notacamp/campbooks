@@ -1,0 +1,73 @@
+# Mail and Scout in pages (campbooks-cloud#364, OpenSpec change
+# pages-from-mail-and-scout, part 1: the server side and Scout): two events of
+# the pages module, for files saved from a message and a section appended, the
+# two tools Scout reads pages with, the two actions it can propose for a page,
+# and Coverage for every operation the change adds. Never a file's name, a
+# page's title or any of its text, a section's Markdown or a source: ids,
+# enums and counts only.
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0021-pages-mail-scout.yaml`.
+changelog:
+  - date: "2026-10-28"
+    plan_version: 21
+    change: "Mail and Scout in pages (campbooks-cloud#364): 2 pages events for files saved from a message (how many) and a section appended (how many blocks and sources, in buckets); 2 assistant tools (find_pages, read_page) and 2 proposal actions (append_section, new_page); Coverage for every operation of the change."
+    pr: "#690"
+
+events:
+  - name: "pages.files_attached"
+    version: 1
+    module: "pages"
+    object: "files"
+    action: "attached"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A member made attachments of a message files of a page, without copying their bytes: how many. Never their names, types or sizes, or which message."
+    fires_when: "pages.attach_from_message has attached every file it was asked for, in the transaction that stores them; a call that attaches nothing (any attachment unreadable) tracks nothing."
+    added_in: 21
+    openspec_change: "pages-from-mail-and-scout"
+  - name: "pages.section_appended"
+    version: 1
+    module: "pages"
+    object: "section"
+    action: "appended"
+    scope: "workspace"
+    status: "live"
+    actor_types: [user]
+    description: "A section of Markdown was added at the end of a page, whether by the member or by Scout's proposal they confirmed: how many blocks and how many sources, in buckets. Never the Markdown, the sources or the page's title."
+    fires_when: "pages.append has stored the blocks it made, in that transaction; an append that changes nothing tracks nothing."
+    added_in: 21
+    openspec_change: "pages-from-mail-and-scout"
+
+properties:
+  - { event: "pages.files_attached", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page afterwards." }
+  - { event: "pages.files_attached", version: 1, property: "files", type: "int", required: true, classification: "operational", description: "How many attachments were attached: those of the call." }
+  - { event: "pages.section_appended", version: 1, property: "page", type: "record", of: "pages.page", required: true, classification: "operational", description: "The page afterwards." }
+  - { event: "pages.section_appended", version: 1, property: "blocks", type: "enum", of: "pages.count_bucket", required: true, classification: "operational", description: "How many blocks the section added." }
+  - { event: "pages.section_appended", version: 1, property: "sources", type: "enum", of: "pages.count_bucket", required: true, classification: "operational", description: "How many sources the section named." }
+
+enums:
+  - { enum: "assistant.chat_tool", value: "find_pages", description: "Looked for the member's pages." }
+  - { enum: "assistant.chat_tool", value: "read_page", description: "Read one of the member's pages as text." }
+  - { enum: "assistant.proposal_action", value: "append_section", description: "Add a section at the end of a page." }
+  - { enum: "assistant.proposal_action", value: "new_page", description: "Make a new private page." }
+
+coverage:
+  - kind: "operation"
+    name: "pages.attach_from_message"
+    events: [pages.files_attached]
+  - kind: "operation"
+    name: "pages.detach_files"
+    exemption: "takes back files that pages.attach_from_message made files of the page, for the ones no block names; nothing new is made, and the files were tracked when they were attached (pages.files_attached)"
+  - kind: "operation"
+    name: "pages.read_text"
+    exemption: "reads a page as Markdown for Scout; it changes nothing, and the text is the page's own words, never tracked"
+  - kind: "operation"
+    name: "pages.get_sharing"
+    exemption: "reads who can read a page and whether Notion keeps a copy, for Scout's card; it changes nothing"
+  - kind: "operation"
+    name: "pages.append"
+    events: [pages.section_appended]
+  - kind: "operation"
+    name: "pages.unappend"
+    exemption: "takes back the blocks of an append that nobody has changed since; nothing new is made, and the section was tracked when it was appended (pages.section_appended)"

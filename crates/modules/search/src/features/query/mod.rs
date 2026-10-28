@@ -82,6 +82,12 @@ pub struct SearchParams {
     pub cursor: Option<String>,
     /// The caller's time zone for `before:` and `after:` (IANA, default UTC).
     pub tz: Option<String>,
+    /// Only these kinds of record, as a comma-separated list of record types
+    /// (`pages.page`, `conversations.conversation`): the others are not
+    /// searched at all, so they cannot crowd out the page of results. What
+    /// the caller may read is decided as ever; a type nobody can search for
+    /// them finds nothing. Default: everything they may search.
+    pub types: Option<String>,
 }
 
 /// One result: a record the caller may open, with what a list row shows.
@@ -267,7 +273,8 @@ pub async fn handler(
     };
 
     let access = &workspace.access;
-    let mut scope = scope(&state, &workspace).await?;
+    let only = only_types(params.types.as_deref());
+    let mut scope = scope(&state, &workspace, only.as_deref()).await?;
 
     let mut tx = state.db.begin_for(access.workspace).await?;
     for group_type in &scope.group_types {
@@ -306,7 +313,11 @@ pub async fn handler(
 
 /// Where the caller may look: the sources they hold a read scope for, and
 /// the containers the visibility port lists for them, asked now.
-async fn scope(state: &AppState, workspace: &Workspace<SearchRead>) -> Result<Scope> {
+async fn scope(
+    state: &AppState,
+    workspace: &Workspace<SearchRead>,
+    only: Option<&[&str]>,
+) -> Result<Scope> {
     let rules = ReadRules::from_state(state);
     let access = &workspace.access;
     let mut scope = Scope {
@@ -316,7 +327,9 @@ async fn scope(state: &AppState, workspace: &Workspace<SearchRead>) -> Result<Sc
         tz: "UTC".to_owned(),
     };
     for source in state.search_sources.iter() {
-        if !rules.allows(&workspace.principal, source.group_type()) {
+        if !rules.allows(&workspace.principal, source.group_type())
+            || only.is_some_and(|only| !only.contains(&source.group_type()))
+        {
             continue;
         }
         scope.group_types.push(source.group_type().to_owned());
@@ -577,15 +590,28 @@ impl Cursor {
 /// The signing context of cursors.
 const CURSOR_CONTEXT: &[u8] = b"search.cursor";
 
+/// The record types a query is limited to: the `types` list, cleaned; `None`
+/// for no limit. A list with nothing in it limits to nothing.
+fn only_types(types: Option<&str>) -> Option<Vec<&str>> {
+    types.map(|list| {
+        list.split(',')
+            .map(str::trim)
+            .filter(|kind| !kind.is_empty())
+            .take(8)
+            .collect()
+    })
+}
+
 /// What a cursor is bound to besides its caller: the workspace, the query
 /// text, prefix mode, time zone and order. (Bound to the workspace too: the
 /// same caller's cursor from one workspace never pages another.)
 fn binding(params: &SearchParams, sort: Sort, workspace: WorkspaceId) -> String {
     format!(
-        "{workspace}\0{}\0{}\0{}\0{}",
+        "{workspace}\0{}\0{}\0{}\0{}\0{}",
         params.q.trim(),
         params.prefix,
         params.tz.as_deref().unwrap_or_default(),
+        params.types.as_deref().unwrap_or_default(),
         if sort == Sort::Newest {
             "newest"
         } else {

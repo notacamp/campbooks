@@ -205,3 +205,7 @@ screen each to-do SHALL be at least a finger tall.
 #### Scenario: A closed toggle
 - **WHEN** a toggle with two lines is closed
 - **THEN** only its first line shows
+
+#### Scenario: Two paragraphs in a row
+- **WHEN** a page has two paragraphs one after the other
+- **THEN** there is a gap between them, smaller than the gap above a heading

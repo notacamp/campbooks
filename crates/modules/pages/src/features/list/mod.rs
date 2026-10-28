@@ -60,7 +60,7 @@ pub struct PageList {
     operation_id = "pages.list",
     tag = "pages",
     security(("bearer" = ["pages:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["pages.page"]).access("pages.page", campbooks_kernel::authz::Action::Read)))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["pages.page"]).access("pages.page", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), ListParams),
     responses(
         (status = OK, description = "The pages the caller may open.", body = PageList),

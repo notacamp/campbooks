@@ -81,8 +81,6 @@
     "tonight": "Esta noite",
     "tomorrow": "Amanhã",
     "nextWeek": "Na próxima semana",
-    "source": "De onde veio",
-    "foundByScout": "O Scout encontrou isto no email",
     "sourceLine": "{{subject}} · {{date}}",
     "openEmail": "Abrir o email",
     "hand": "Passar a alguém",
@@ -102,6 +100,106 @@
     "replyQuestion": {
       "replied": "Respondeu a {{name}} ({{time}}).",
       "done": "Esta tarefa está feita?"
+    },
+    "why": "Porque está aqui",
+    "history": "Histórico"
+  },
+  "why": {
+    "scout": "O Scout criou-a",
+    "scoutRest": "a {{date}} às {{time}}, a partir de um email que leu na sua caixa de entrada.",
+    "you": "Criou esta tarefa",
+    "member": "{{name}} criou esta tarefa",
+    "madeRest": "a {{date}} às {{time}}.",
+    "handed": "{{name}} passou-lha a {{date}}.",
+    "handedNoDate": "{{name}} passou-lha."
+  },
+  "history": {
+    "teammate": "Um colega",
+    "scout": "O Scout",
+    "calendar": "O calendário",
+    "dueSuffix": ", para {{date}}",
+    "showAll": "Mostrar tudo ({{total}})",
+    "replied": "Respondeu na conversa. O Scout perguntou se estava feita.",
+    "field": {
+      "title": "o título",
+      "task_verb": "o tipo",
+      "due": "a data"
+    },
+    "created": {
+      "you": "Criou a tarefa",
+      "other": "{{who}} criou a tarefa",
+      "scoutFrom": "O Scout criou-a a partir do email de {{name}}"
+    },
+    "edited": {
+      "you": "Alterou {{fields}}",
+      "other": "{{who}} alterou {{fields}}"
+    },
+    "dueSet": {
+      "you": "Definiu a data para {{date}}",
+      "other": "{{who}} definiu a data para {{date}}"
+    },
+    "dueRemoved": {
+      "you": "Retirou a data",
+      "other": "{{who}} retirou a data"
+    },
+    "planned": {
+      "you": "Planeou-a para {{day}}",
+      "other": "{{who}} planeou-a para {{day}}"
+    },
+    "later": {
+      "you": "Adiou-a até {{date}}",
+      "other": "{{who}} adiou-a até {{date}}"
+    },
+    "unplanned": {
+      "you": "Tirou-a do plano",
+      "other": "{{who}} tirou-a do plano"
+    },
+    "done": {
+      "you": "Marcou-a como feita",
+      "other": "{{who}} marcou-a como feita"
+    },
+    "paid": {
+      "you": "Marcou-a como paga",
+      "other": "{{who}} marcou-a como paga"
+    },
+    "notNeeded": {
+      "you": "Marcou-a como não necessária",
+      "other": "{{who}} marcou-a como não necessária"
+    },
+    "reopened": {
+      "you": "Voltou a abri-la",
+      "other": "{{who}} voltou a abri-la"
+    },
+    "handedOff": {
+      "you": "Passou-a a {{member}}",
+      "other": "{{who}} passou-a a {{member}}",
+      "toYou": "{{who}} passou-lha"
+    },
+    "takenBack": {
+      "you": "Retomou-a de {{member}}",
+      "other": "{{who}} retomou-a de {{member}}",
+      "fromYou": "{{who}} retomou-a de si"
+    },
+    "held": {
+      "you": "Reservou tempo {{when}}",
+      "other": "{{who}} reservou tempo {{when}}",
+      "moved": "O calendário mudou o tempo reservado para {{when}}"
+    },
+    "released": {
+      "you": "Libertou o tempo reservado",
+      "other": "{{who}} libertou o tempo reservado"
+    },
+    "replyAnswered": {
+      "you": "Disse que ainda não está feita",
+      "other": "{{who}} disse que ainda não está feita"
+    },
+    "replyUnanswered": {
+      "you": "Anulou o “Ainda não”",
+      "other": "{{who}} anulou o “Ainda não”"
+    },
+    "changed": {
+      "you": "Alterou a tarefa",
+      "other": "{{who}} alterou a tarefa"
     }
   },
   "toast": {

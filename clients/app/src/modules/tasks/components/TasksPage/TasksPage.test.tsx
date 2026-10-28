@@ -16,10 +16,12 @@ import { W } from "../../../../../test/demo/conversations";
 import {
   ACCOUNTANT,
   ASK_LEASE,
+  ASK_LEASE_HISTORY,
   ASK_REPLIED,
   BILL,
   INSPECTION,
   LEASE,
+  LONG_HISTORY,
   OPEN_TASKS,
   PHOTOS,
   PROPOSAL,
@@ -112,9 +114,19 @@ const NOT_YET = { ...ASK_REPLIED, asks_done: false, revision: 3 };
 const ASKING_AGAIN = { ...ASK_REPLIED, revision: 4 };
 
 /** The tasks API over a list the calls below change, as the server would. */
-function api(start = OPEN_TASKS, handedOff = [VENUE]) {
+function api(
+  start = OPEN_TASKS,
+  handedOff = [VENUE],
+  histories: Record<string, (typeof ASK_LEASE_HISTORY)[number][]> = {},
+) {
   let tasks = [...start];
   return mockApi({
+    ...Object.fromEntries(
+      Object.entries(histories).map(([id, history]) => [
+        `GET ${W}/tasks/${id}`,
+        () => ({ body: { task: tasks.find((task) => task.id === id), history } }),
+      ]),
+    ),
     [`GET ${W}/members`]: { body: { members: TEAM } },
     [`GET ${W}/tasks`]: (request) =>
       new URL(request.url).searchParams.get("whose") === "handed_off"
@@ -267,7 +279,7 @@ describe("Tasks", () => {
 
     fireEvent.click(await rowOf(LEASE.title));
 
-    expect(await screen.findByText("Where it came from")).toBeVisible();
+    expect(await screen.findByText("Why it’s here")).toBeVisible();
     expect(screen.queryByRole("form", { name: "New task" })).toBeNull();
   });
 
@@ -286,7 +298,7 @@ describe("Tasks", () => {
     const calls = api();
     renderTasks();
     fireEvent.click(await rowOf(LEASE.title));
-    expect(await screen.findByText("Where it came from")).toBeVisible();
+    expect(await screen.findByText("Why it’s here")).toBeVisible();
     expect(screen.getByText(/Walkthrough on Thursday/u)).toBeVisible();
     fireEvent.click(await screen.findByRole("button", { name: /^Later/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Tomorrow" }));
@@ -299,18 +311,59 @@ describe("Tasks", () => {
     });
   });
 
-  it("says Scout found a task in the email, and says nothing for the member's own", async () => {
+  it("says Scout made a task and when, and that the member made their own", async () => {
     api([ASK_LEASE, BILL, PROPOSAL, { ...LEASE, title: "Return Marta’s lease copy" }]);
     renderTasks();
     fireEvent.click(await rowOf(ASK_LEASE.title));
-    expect(await screen.findByText("Scout found this in the email")).toBeVisible();
-    expect(screen.getByText("Where it came from")).toBeVisible();
+    expect(await screen.findByText("Scout made it")).toBeVisible();
+    expect(
+      screen.getByText(
+        (_text, element) =>
+          element?.tagName === "P" &&
+          /^Scout made it on Oct 10 at .*, from an email it read in your inbox\.$/u.test(
+            element.textContent,
+          ),
+      ),
+    ).toBeVisible();
+    expect(screen.getByText("Why it’s here")).toBeVisible();
 
     fireEvent.click(await rowOf("Return Marta’s lease copy"));
-    await waitFor(() => {
-      expect(screen.queryByText("Scout found this in the email")).toBeNull();
-    });
+    expect(await screen.findByText("You made this")).toBeVisible();
+    expect(screen.queryByText("Scout made it")).toBeNull();
     expect(screen.getByText(/Walkthrough on Thursday/u)).toBeVisible();
+  });
+
+  it("lists what happened to a task, oldest first, with who did it", async () => {
+    api([ASK_LEASE, BILL], [VENUE], { [ASK_LEASE.id]: ASK_LEASE_HISTORY });
+    renderTasks();
+    fireEvent.click(await rowOf(ASK_LEASE.title));
+    const heading = await screen.findByRole("heading", { name: "History" });
+    const lines = within(heading.closest("section") ?? document.body)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent);
+    expect(lines).toHaveLength(7);
+    expect(lines[0]).toMatch(/Scout made it from Marta Ferreira’s email, due Fri 16$/u);
+    expect(lines[1]).toMatch(/You planned it for Wed 14$/u);
+    expect(lines[2]).toMatch(/You held time Wed /u);
+    expect(lines[3]).toMatch(/The calendar moved the held time to Wed /u);
+    expect(lines[4]).toMatch(/You replied in the thread\. Scout asked if it was done\.$/u);
+    expect(lines[5]).toMatch(/You said it isn’t done yet$/u);
+    expect(lines[6]).toMatch(/You marked it done$/u);
+  });
+
+  it("folds a long history to the first entry and the latest six", async () => {
+    api([ASK_LEASE, BILL], [VENUE], { [ASK_LEASE.id]: LONG_HISTORY });
+    renderTasks();
+    fireEvent.click(await rowOf(ASK_LEASE.title));
+    const show = await screen.findByRole("button", { name: "Show all 10" });
+    const section = show.closest("section") ?? document.body;
+    expect(within(section).getAllByRole("listitem")).toHaveLength(7);
+    expect(within(section).getByText(/Sofia Pessoa made it$/u)).toBeVisible();
+    fireEvent.click(show);
+    await waitFor(() => {
+      expect(within(section).getAllByRole("listitem")).toHaveLength(10);
+    });
+    expect(screen.queryByRole("button", { name: /^Show all/u })).toBeNull();
   });
 
   it("marks a task that asks Done? after a reply, in its row and with the question in its detail", async () => {
@@ -453,7 +506,7 @@ describe("Tasks", () => {
     const calls = api();
     renderTasks();
     fireEvent.click(await rowOf(LEASE.title));
-    await screen.findByText("Where it came from");
+    await screen.findByText("Why it’s here");
     fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "e" });
     await waitFor(() => {
