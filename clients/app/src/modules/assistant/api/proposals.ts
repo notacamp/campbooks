@@ -8,6 +8,7 @@ const CONVERSATION = "conversations.conversation";
 const ITEM = "attention.item";
 const TASK = "tasks.task";
 const EVENT = "schedule.event";
+const PAGE = "pages.page";
 
 /**
  * A request this client runs for one of Scout's proposals: its method, its
@@ -42,6 +43,12 @@ const event = (tail: string, method: Runnable["method"] = "POST"): Runnable => (
   method,
   path: `schedule/events${tail}`,
   records: [EVENT],
+});
+
+const pages = (tail: string): Runnable => ({
+  method: "POST",
+  path: `pages${tail}`,
+  records: [PAGE],
 });
 
 /**
@@ -84,6 +91,19 @@ export const RUNNABLE: Readonly<Record<string, Runnable>> = {
   "schedule.respond_event": event("/{event_id}/response"),
   "schedule.push_event": event("/{event_id}/push"),
   "schedule.unpush_event": event("/{event_id}/push", "DELETE"),
+  // A section at the end of a page, or a new private page (the page change card).
+  "pages.append": pages("/{page_id}/append"),
+  "pages.create": pages(""),
+};
+
+/**
+ * What the page change card runs to take its change back: a section off the
+ * page, or the new page into the trash. Apart from {@link RUNNABLE}: only
+ * that card sends them, for the page it just changed.
+ */
+export const PAGE_UNDOS: Readonly<Record<string, Runnable>> = {
+  "pages.unappend": pages("/{page_id}/unappend"),
+  "pages.trash": pages("/{page_id}/trash"),
 };
 
 /** One plain id in a path. */

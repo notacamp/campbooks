@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { mockApi } from "../../../../test/render";
 
 import {
+  PAGE_UNDOS,
   RUNNABLE,
   runnable,
   runRequest,
@@ -50,6 +51,8 @@ describe("the client's own actions", () => {
         "conversations.unarchive",
         "conversations.unstar",
         "conversations.untrash",
+        "pages.append",
+        "pages.create",
         "schedule.create_event",
         "schedule.delete_event",
         "schedule.push_event",
@@ -66,6 +69,23 @@ describe("the client's own actions", () => {
         "tasks.update",
       ].toSorted(),
     );
+  });
+
+  it("gain exactly the two page changes; their undos are the page card's own", () => {
+    expect(Object.keys(RUNNABLE).filter((name) => name.startsWith("pages."))).toEqual([
+      "pages.append",
+      "pages.create",
+    ]);
+    expect(Object.keys(PAGE_UNDOS)).toEqual(["pages.unappend", "pages.trash"]);
+    // A page's undo is not something any other card may send.
+    const unappend: ProposalRequest = {
+      operation: "pages.unappend",
+      method: "POST",
+      path: `pages/${C}/unappend`,
+      body: null,
+    };
+    expect(runnable(unappend)).toBeUndefined();
+    expect(runnable(unappend, PAGE_UNDOS)?.params).toEqual({ page_id: C });
   });
 
   it("run only their own operation, method and path, under the workspace", () => {

@@ -102,7 +102,8 @@
     "trash": {
       "title": "Esta conversación está en la Papelera.",
       "lead": "Tu proveedor de correo vacía la papelera cuando le toca."
-    }
+    },
+    "saveToPageFailed": "No se pudieron leer los mensajes. No se guardó nada."
   },
   "actions": {
     "star": "Fijar",
@@ -136,7 +137,8 @@
     "reportSpam": "Marcar como spam",
     "notSpam": "No es spam",
     "toInbox": "Mover a la bandeja de entrada",
-    "askScout": "Preguntar a Scout"
+    "askScout": "Preguntar a Scout",
+    "saveToPage": "Guardar en una página"
   },
   "toast": {
     "done": "Hecho · {{subject}}",

@@ -373,7 +373,7 @@
   --composer-sheet-width: 820px;
   /* Ten lines of the composer text. */
   --composer-text-min-height: calc(10 * var(--leading-relaxed) * var(--text-md));
-  --dialog-sheet-max-height: 88dvh;
+  --dialog-sheet-max-height: calc(100dvh - var(--space-8));
   --dialog-drain-height: 3px;
   --actions-divider-height: 18px;
   /* Long content opened in place (an email on Home) shows this deep, then a fade. */
