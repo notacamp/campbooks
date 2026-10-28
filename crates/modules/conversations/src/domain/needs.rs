@@ -2245,8 +2245,9 @@ pub struct NeedView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Unsure {
     /// Who else the email went to, `To` before `Cc`, as the headers gave
-    /// them: without the inbox, the sender, and no-reply or service
-    /// addresses; at most six.
+    /// them: without the inbox, the sender and addresses that cannot answer
+    /// (no-reply, bounce); at most six. A role address stays. Each is named
+    /// by its header name, else its organisation, else its address.
     pub others: Vec<Address>,
     /// Whether the inbox is in `To`; `false` when it is only copied, or not
     /// named at all.
@@ -2412,7 +2413,7 @@ async fn unsure(
         .filter(|_| !answered)
         .map(|sent| u32::try_from((now - sent).num_days().max(0)).unwrap_or(u32::MAX));
     let to_address = |p: &Party| Address {
-        name: Some(p.name.trim().to_owned()).filter(|n| !n.is_empty()),
+        name: Some(facts::display_name(&p.name, &p.address)),
         address: p.address.trim().to_owned(),
     };
     Ok(Some(Unsure {
@@ -2500,7 +2501,10 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
                 .awaited_address
                 .filter(|_| matches!(reason, NeedReason::Waiting | NeedReason::Nudge))
                 .map(|address| Address {
-                    name: row.awaited_name.filter(|name| !name.trim().is_empty()),
+                    name: Some(facts::display_name(
+                        row.awaited_name.as_deref().unwrap_or_default(),
+                        &address,
+                    )),
                     address,
                 }),
             nudges: matches!(reason, NeedReason::Waiting | NeedReason::Nudge)

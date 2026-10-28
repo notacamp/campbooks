@@ -22,6 +22,7 @@ use utoipa::ToSchema;
 use crate::{
     domain::{
         drafts::{self, DraftView, check_limits, shown_to_author, tidy},
+        format,
         paths::DraftPath,
         tracked,
     },
@@ -127,7 +128,13 @@ pub async fn update(
         changes.bcc.unwrap_or(bcc),
     ]);
     let subject = changes.subject.unwrap_or_else(|| row.subject.clone());
-    let body = changes.body.unwrap_or_else(|| row.body.clone());
+    // The assistant's words never carry a link whose words hide where it
+    // goes: only the member's own request writes `[words](url)`.
+    let body = match changes.body {
+        Some(text) if workspace.invoked_by.is_some() => format::literal_links(&text),
+        Some(text) => text,
+        None => row.body.clone(),
+    };
     let quoted = changes.quoted.unwrap_or_else(|| row.quoted.clone());
     check_limits(to.len() + cc.len() + bcc.len(), &subject, &body, &quoted)?;
 

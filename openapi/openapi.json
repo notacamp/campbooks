@@ -33849,7 +33849,7 @@
             "items": {
               "$ref": "#/components/schemas/Address"
             },
-            "description": "Who else the email went to, `To` before `Cc`, as the headers gave\nthem: without the inbox, the sender, and no-reply or service\naddresses; at most six."
+            "description": "Who else the email went to, `To` before `Cc`, as the headers gave\nthem: without the inbox, the sender and addresses that cannot answer\n(no-reply, bounce); at most six. A role address stays. Each is named\nby its header name, else its organisation, else its address."
           },
           "party": {
             "oneOf": [
