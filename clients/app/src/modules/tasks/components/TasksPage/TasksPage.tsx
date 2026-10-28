@@ -22,7 +22,12 @@ import { useMembers } from "~/modules/workspaces";
 import { useHandedOff, useTasks, type TaskView } from "../../api/queries";
 import { holdable as canHold, type HoldSources } from "../../hold";
 import { dueThisWeek, GROUPS, groupTasks, listOrder, type Group } from "../../model";
-import { CONVERSATION, type TaskSource, type UseTaskSources } from "../../source";
+import {
+  CONVERSATION,
+  type TaskSource,
+  type UseTaskQuote,
+  type UseTaskSources,
+} from "../../source";
 import { dueText, heldText, planText } from "../../task-text";
 import { memberName } from "../HandOff";
 import { NewTaskForm } from "../NewTaskForm";
@@ -49,11 +54,16 @@ export interface TasksPageProps {
   creating?: boolean | undefined;
   /** Where tasks made from conversations came from. */
   useSources: UseTaskSources;
+  /** The sender's sentence that asked for the open task (none: it is not shown). */
+  useQuote?: UseTaskQuote | undefined;
   /** The member's free time and calendars, for Hold time (none: no Hold time). */
   holdSources?: HoldSources | undefined;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
 }
+
+/** No quote: the page shows none. */
+const noQuote: UseTaskQuote = () => "";
 
 const ROW_PREFIX = "task-";
 const rowId = (id: string) => `${ROW_PREFIX}${id}`;
@@ -82,6 +92,7 @@ export function TasksPage({
   taskId,
   creating = false,
   useSources,
+  useQuote = noQuote,
   holdSources,
   now,
 }: TasksPageProps) {
@@ -120,6 +131,11 @@ export function TasksPage({
   const sources = useSources(workspaceId, sourceIds);
   const sourceOf = (task: TaskView): TaskSource | undefined =>
     task.source?.type === CONVERSATION ? sources.get(task.source.id) : undefined;
+  const quote = useQuote(
+    workspaceId,
+    open?.source?.type === CONVERSATION ? open.source.id : undefined,
+    open?.source_ask,
+  );
   const nameOf = (id: string | null | undefined) => {
     const member = members.find((candidate) => candidate.user_id === id);
     return member === undefined ? t("detail.someone") : memberName(member);
@@ -453,6 +469,7 @@ export function TasksPage({
             task={open}
             me={me}
             source={sourceOf(open)}
+            quote={quote}
             actions={actions}
             laterOpen={offerLater}
             onLaterOpen={setOfferLater}

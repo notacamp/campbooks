@@ -1049,7 +1049,7 @@ async fn the_asks_scout_reads_give_do_and_pay_needs_their_due_date(db: PgPool) {
         "asks": [
             {"title": "Sign and return the lease", "quote": "send it back by Friday 16 October",
              "due": "2026-10-16", "verb": "do", "amount_minor": null, "amount_currency": null,
-             "same_as": null},
+             "done_by": "elsewhere", "same_as": null},
             {"title": "Pay Acme Hosting", "quote": "Payment due by 30 October",
              "due": "2026-10-30", "verb": "pay", "amount_minor": 4900, "amount_currency": "eur",
              "same_as": null},
@@ -1060,7 +1060,7 @@ async fn the_asks_scout_reads_give_do_and_pay_needs_their_due_date(db: PgPool) {
     });
     let server = complete(&answer).await;
     let kit = kit(db, &server).await;
-    sams_needs(&kit).await;
+    let (workspace, _, sam, leo) = sams_needs(&kit).await;
 
     // Pedro's lease: a `do` need, due when the first `do` ask says.
     let (state, _, due_on, _) = need_of(&kit, "needs-2").await;
@@ -1094,6 +1094,15 @@ async fn the_asks_scout_reads_give_do_and_pay_needs_their_due_date(db: PgPool) {
     assert_eq!(by("needs-2").as_array().unwrap().len(), 1);
     assert_eq!(by("needs-3")[0]["amount"]["minor"], 4900);
     assert_eq!(by("needs-3")[0]["amount"]["currency"], "EUR");
+    // How each gets done is kept (a payment is done elsewhere, and the one
+    // read from before it was asked has none), with the sender's sentence in
+    // the read only.
+    assert_eq!(by("needs-2")[0]["done_by"], "elsewhere");
+    assert_eq!(
+        by("needs-2")[0]["quote"],
+        "send it back by Friday 16 October"
+    );
+    assert_eq!(by("needs-3")[0]["done_by"], "elsewhere");
     let published = kit.events("conversations.message_read").await;
     let bill = published
         .iter()
@@ -1101,6 +1110,31 @@ async fn the_asks_scout_reads_give_do_and_pay_needs_their_due_date(db: PgPool) {
         .unwrap();
     assert_eq!(bill["asks"][0]["has_amount"], true);
     assert!(!bill.to_string().contains("Acme"));
+    // The event says how it gets done (an enum) and none of the sender's
+    // words (campbooks-cloud#396); it validates against its contract.
+    let (schemas, index) = contract("conversations.message_read.v1.schema.json");
+    let lease = published
+        .iter()
+        .find(|e| e["asks"][0]["verb"] == "do")
+        .unwrap();
+    schemas.validate(lease, index).unwrap();
+    assert_eq!(lease["asks"][0]["done_by"], "elsewhere");
+    for event in &published {
+        let text = event.to_string();
+        assert!(!text.contains("send it back"), "{text}");
+        assert!(!text.contains("quote"), "{text}");
+    }
+    // The sentence is served by the read, under the conversation's own
+    // access: a member who may not read the inbox gets 404 and no word.
+    let path = read_path(&kit, workspace, "needs-2").await;
+    let seen = kit.get(&sam, &path).await;
+    assert_eq!(
+        seen.json["asks"][0]["quote"],
+        "send it back by Friday 16 October"
+    );
+    let denied = kit.get(&leo, &path).await;
+    assert_eq!(denied.status, StatusCode::NOT_FOUND);
+    assert!(!denied.json.to_string().contains("send it back"));
 }
 
 #[test]

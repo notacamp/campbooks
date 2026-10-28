@@ -703,6 +703,17 @@ vocabulary!(
 );
 
 vocabulary!(
+    /// How an ask gets done (campbooks-cloud#396): by replying to the email
+    /// that made it, or some other way.
+    DoneBy {
+        /// A reply is itself how it is done (an answer, an approval, a choice).
+        Reply => "reply",
+        /// Done some other way (sign, send a document, file, book, go).
+        Elsewhere => "elsewhere",
+    }
+);
+
+vocabulary!(
     /// Which reader produced a read: the sender's own machine-readable data,
     /// or Scout's one `complete` call.
     ReadLayer {

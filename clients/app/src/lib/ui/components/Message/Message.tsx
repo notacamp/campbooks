@@ -201,6 +201,15 @@ export function QuotedText({ showLabel, hideLabel, children }: QuotedTextProps) 
   );
 }
 
+/**
+ * A sentence quoted from someone's message, as plain text set in under a
+ * rule: "the sender's own sentence that asked for this task". Its direction
+ * is isolated, so a right-to-left quote does not reorder what is around it.
+ */
+export function SenderSentence({ children }: { children: string }) {
+  return <blockquote className={styles["sentence"]}>{children}</blockquote>;
+}
+
 /** A file attached to a message; long names are cut with an ellipsis. */
 export function Attachment({ name }: { name: string }) {
   return (

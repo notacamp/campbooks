@@ -79,6 +79,16 @@ words!(
 );
 
 words!(
+    /// How an ask gets done (campbooks-cloud#396).
+    TaskDoneBy {
+        /// A reply is itself how: an answer, an approval, a choice.
+        Reply => "reply",
+        /// Some other way: sign and send a form, file, upload, go.
+        Elsewhere => "elsewhere",
+    }
+);
+
+words!(
     /// How the task came to be.
     TaskOrigin {
         /// The member wrote it.
@@ -323,6 +333,13 @@ pub struct TaskView {
     /// open, a Do, replied to, and the question was not answered (Not yet)
     /// since the newest reply.
     pub asks_done: bool,
+    /// How it gets done, when Scout's read said: by a reply, or some other
+    /// way. Absent for a task made without it.
+    pub done_by: Option<TaskDoneBy>,
+    /// The key of the ask in the email's read that made it (ids only: the
+    /// message id and a position). The sender's own sentence is not here; the
+    /// conversation serves it to members who may read the email.
+    pub source_ask: Option<String>,
     /// Grows with every change: send the one you saw with a change.
     pub revision: i64,
     /// When it was made.
@@ -354,7 +371,7 @@ macro_rules! columns {
         "id, title, verb, origin, due_on, due_at, plan, plan_on, later_until, state, closed_at, \
          assignee, created_by, handed_by, source_type, source_id, source_container, revision, \
          created_at, updated_at, hold_event, hold_calendar, held_from, held_to, replied_at, \
-         replied_message, reply_answered_at"
+         replied_message, reply_answered_at, done_by, ask_key"
     };
 }
 
@@ -400,6 +417,8 @@ pub struct TaskRow {
     pub replied_at: Option<DateTime<Utc>>,
     pub replied_message: Option<Uuid>,
     pub reply_answered_at: Option<DateTime<Utc>>,
+    pub done_by: Option<String>,
+    pub ask_key: Option<String>,
 }
 
 impl TaskRow {
@@ -476,6 +495,8 @@ impl TaskRow {
             hold: self.hold(),
             replied: self.reply(),
             asks_done: self.asks_done(),
+            done_by: self.done_by.as_deref().map(str::parse).transpose()?,
+            source_ask: self.ask_key.clone(),
             revision: self.revision,
             created_at: self.created_at,
             updated_at: self.updated_at,

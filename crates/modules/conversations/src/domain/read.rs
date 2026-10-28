@@ -13,7 +13,7 @@ use chrono::{DateTime, FixedOffset, NaiveDate, SecondsFormat, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::model::{ItemKind, MessageId, ReadLayer, Verb};
+use crate::model::{DoneBy, ItemKind, MessageId, ReadLayer, Verb};
 
 /// Most items a read keeps.
 pub const MAX_ITEMS: usize = 5;
@@ -183,6 +183,10 @@ pub struct ReadAsk {
     /// The reference of an open task this ask repeats.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub same_as: Option<String>,
+    /// How it gets done, when the read says (a model read only; absent from
+    /// reads made before it was asked).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_by: Option<DoneBy>,
 }
 
 /// The key of item or ask number `position` (from 1) of `message`'s `layer`.

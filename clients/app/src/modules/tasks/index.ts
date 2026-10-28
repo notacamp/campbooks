@@ -16,6 +16,6 @@ export {
   type HoldPick,
   type HoldSources,
 } from "./hold";
-export { CONVERSATION, type TaskSource, type UseTaskSources } from "./source";
+export { CONVERSATION, type TaskSource, type UseTaskQuote, type UseTaskSources } from "./source";
 export { replyWhen } from "./model";
 export { heldText } from "./task-text";
