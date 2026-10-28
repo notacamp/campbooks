@@ -10,6 +10,8 @@ use crate::{
 };
 
 const MESSAGE: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9e01";
+/// The sender's own sentence, as a read quotes it.
+const SENTENCE: &str = "Could you confirm Thursday works for the walkthrough?";
 
 fn ask(key: &str, verb: &str, due: Option<&str>, same_as: Option<&str>) -> ReadAsk {
     ReadAsk {
@@ -459,8 +461,10 @@ async fn how_an_ask_gets_done_is_kept_and_a_payment_is_always_elsewhere(db: PgPo
     let kit = Kit::new(db).await.tracking();
     let workspace = WorkspaceId::new();
     let (ana_token, ana) = kit.member("ana", workspace);
+    // The sender's sentence rides along as a read could carry it; the tasks
+    // module must keep none of it, so the checks below look for these words.
     let texts = json!({"asks": [
-        {"key": format!("{MESSAGE}:model:ask:1"), "title": "Confirm Thursday"},
+        {"key": format!("{MESSAGE}:model:ask:1"), "title": "Confirm Thursday", "quote": SENTENCE},
         {"key": format!("{MESSAGE}:model:ask:2"), "title": "Sign the lease"},
         {"key": format!("{MESSAGE}:model:ask:3"), "title": "Pay the deposit"},
     ]});
@@ -500,19 +504,24 @@ async fn how_an_ask_gets_done_is_kept_and_a_payment_is_always_elsewhere(db: PgPo
         .to_string();
     assert!(list.contains(r#""done_by":"reply""#), "{list}");
     assert!(list.contains(&format!("{MESSAGE}:model:ask:1")), "{list}");
-    assert!(!list.contains("quote"), "{list}");
+    assert!(!list.contains(SENTENCE), "{list}");
+    let rows: Vec<String> = sqlx::query_scalar("SELECT row_to_json(t)::text FROM tasks.tasks t")
+        .fetch_all(&kit.db)
+        .await
+        .unwrap();
+    assert!(rows.iter().all(|row| !row.contains(SENTENCE)), "{rows:?}");
     let events = kit.events("tasks.task_changed").await;
     assert_eq!(events.len(), 3);
     assert!(
         events
             .iter()
-            .all(|event| !event.to_string().contains("quote"))
+            .all(|event| !event.to_string().contains(SENTENCE))
     );
     assert!(
         campbooks_kernel::testing::tracked_events(&kit.db, "tasks.task_created")
             .await
             .iter()
-            .all(|event| !event.body.to_string().contains("quote"))
+            .all(|event| !event.body.to_string().contains(SENTENCE))
     );
 }
 

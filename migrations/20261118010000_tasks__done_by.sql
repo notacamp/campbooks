@@ -8,5 +8,16 @@
 -- Catalog-only: a nullable column and a check.
 SET LOCAL lock_timeout = '10s';
 
-ALTER TABLE tasks.tasks
-    ADD COLUMN done_by text CHECK (done_by IN ('reply', 'elsewhere'));
+-- Idempotent: a self-hosted server may run it again.
+ALTER TABLE tasks.tasks ADD COLUMN IF NOT EXISTS done_by text;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                    WHERE conname = 'tasks_done_by_check'
+                      AND conrelid = 'tasks.tasks'::regclass) THEN
+        ALTER TABLE tasks.tasks
+            ADD CONSTRAINT tasks_done_by_check CHECK (done_by IN ('reply', 'elsewhere'));
+    END IF;
+END
+$$;
