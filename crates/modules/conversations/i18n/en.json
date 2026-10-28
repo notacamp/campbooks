@@ -51,6 +51,7 @@
     "images_need_you": "Only you can choose to always show a sender's images. Open one of their messages and choose it there.",
     "person_note_invalid": "A note needs a plain email address and 1 to {{max}} characters about the person.",
     "person_notes_full": "You keep {{max}} notes about people already. Remove one to add another.",
-    "person_notes_need_member": "Only a member of this workspace keeps notes about people."
+    "person_notes_need_member": "Only a member of this workspace keeps notes about people.",
+    "send_at_busy": "Too many of your sends are scheduled for that minute (the most is {{max}}). Pick another time."
   }
 }

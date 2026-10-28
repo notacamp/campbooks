@@ -51,6 +51,7 @@
     "images_need_you": "Solo tú puedes elegir mostrar siempre las imágenes de un remitente. Abre uno de sus mensajes y elígelo allí.",
     "person_note_invalid": "Una nota necesita una dirección de correo simple y de 1 a {{max}} caracteres sobre la persona.",
     "person_notes_full": "Ya tienes {{max}} notas sobre personas. Quita una para añadir otra.",
-    "person_notes_need_member": "Solo un miembro de este espacio de trabajo guarda notas sobre personas."
+    "person_notes_need_member": "Solo un miembro de este espacio de trabajo guarda notas sobre personas.",
+    "send_at_busy": "Tienes demasiados envíos programados para ese minuto (el máximo es {{max}}). Elige otra hora."
   }
 }

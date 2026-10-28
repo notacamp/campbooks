@@ -122,7 +122,7 @@ pub struct SendSettings {
             body = Problem, content_type = "application/problem+json"),
         (status = CONFLICT, description = "Already on its way (`draft_not_editable`), saved since that version (`draft_changed`), or not what you were shown (`content_changed`): read it again, check it, and send again.",
             body = Problem, content_type = "application/problem+json"),
-        (status = TOO_MANY_REQUESTS, description = "`rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again.",
+        (status = TOO_MANY_REQUESTS, description = "`rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again. Or `send_at_busy`: too many sends of yours are scheduled for that minute.",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -185,6 +185,9 @@ pub async fn send(
                 .arg("max", MAX_ATTACHMENT_BYTES / (1024 * 1024)),
         ));
     }
+    if body.send_at.is_some() {
+        send_slot_free(&state, &mut tx, access, id, send_at).await?;
+    }
     let generation = sqlx::query_scalar!(
         r#"
         UPDATE conversations.drafts
@@ -221,6 +224,59 @@ pub async fn send(
     .await?;
     tx.commit().await?;
     Ok((StatusCode::ACCEPTED, Json(draft)))
+}
+
+/// Sends scheduled for a chosen time count against the send rate when they
+/// are asked for, not when they leave, so many for the same minute would
+/// burst past it at release. Past what the Send class allows in a minute
+/// (its count over its window, at least one), the author's sends for the same
+/// minute of `send_at` are refused: 429 `send_at_busy`. Counted for this
+/// workspace and author, under a lock so two at once cannot both take the
+/// last place.
+async fn send_slot_free(
+    state: &AppState,
+    tx: &mut sqlx::PgConnection,
+    access: &campbooks_kernel::tenancy::Access,
+    draft: DraftId,
+    send_at: chrono::DateTime<Utc>,
+) -> Result<()> {
+    let Some((max, window)) = state
+        .api_limits
+        .limit(campbooks_kernel::rate_limit::api::Class::Send)
+    else {
+        return Ok(());
+    };
+    let per_minute = (u64::from(max) * 60)
+        .div_ceil(window.as_secs().max(1))
+        .max(1);
+    let author = access.user.map(|user| *user.as_uuid());
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(format!(
+            "conversations.send_at:{}:{author:?}",
+            access.workspace
+        ))
+        .execute(&mut *tx)
+        .await?;
+    let taken: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.drafts
+          WHERE workspace_id = $1 AND author IS NOT DISTINCT FROM $2 AND id <> $3
+            AND state = 'scheduled'
+            AND date_trunc('minute', send_at) = date_trunc('minute', $4::timestamptz)",
+    )
+    .bind(access.workspace.as_uuid())
+    .bind(author)
+    .bind(draft)
+    .bind(send_at)
+    .fetch_one(&mut *tx)
+    .await?;
+    if u64::try_from(taken).unwrap_or(u64::MAX) >= per_minute {
+        return Err(Error::TooManyRequests(
+            crate::MESSAGES
+                .reason("send_at_busy")
+                .arg("max", per_minute),
+        ));
+    }
+    Ok(())
 }
 
 /// 403 `send_needs_you` unless the request is the member's own
