@@ -425,11 +425,8 @@ mod tests {
         assert_eq!(clean_upload_name(""), None);
         let long = format!("{}.pdf", "é".repeat(300));
         let cut = clean_upload_name(&long).unwrap();
-        assert!(
-            cut.len() <= MAX_NAME_BYTES && cut.ends_with(".pdf"),
-            "{}",
-            cut.len()
-        );
+        assert!(cut.len() <= MAX_NAME_BYTES, "{}", cut.len());
+        assert_eq!(cut.rsplit('.').next(), Some("pdf"), "{cut}");
         assert!(clean_upload_name(&"a".repeat(400)).unwrap().len() <= MAX_NAME_BYTES);
     }
 
