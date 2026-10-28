@@ -60,9 +60,10 @@ export function composerExtensions(): Extensions {
   const escape = () => {
     // Replaced by the composer, as `send` is.
   };
-  // ⌘↵ would split the block here (TipTap binds it): it sends instead. Esc
-  // never reaches the shortcut registry from the text (ProseMirror prevents
-  // its default), so the editor hands it to the composer itself.
+  // ⌘↵ would split the block here (TipTap binds it): it sends instead. Esc,
+  // ⌘B and ⌘I never reach the shortcut registry from the text (ProseMirror
+  // prevents their default), so the editor handles them itself: Esc goes to
+  // the composer, ⌘B and ⌘I format, as the registry's keys do elsewhere.
   const Send = Extension.create({
     name: "composerSend",
     priority: 1000,
@@ -79,6 +80,8 @@ export function composerExtensions(): Extensions {
           this.storage.escape();
           return true;
         },
+        "Mod-b": () => this.editor.commands.toggleBold(),
+        "Mod-i": () => this.editor.commands.toggleItalic(),
       };
     },
   });

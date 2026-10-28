@@ -302,6 +302,20 @@ describe("MessageComposer", () => {
     expect(box).not.toHaveTextContent("?");
   });
 
+  // ProseMirror prevents the default of ⌘B and ⌘I in the text (a real key
+  // event carries its keyCode), so the editor formats them itself.
+  it("formats with the keys as a real key event sends them", () => {
+    renderUi(<MessageComposer {...props({ body: "Thursday works." })} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    act(() => {
+      editorOf(box).chain().focus().setTextSelection({ from: 1, to: 9 }).run();
+    });
+    fireEvent.keyDown(box, { key: "b", keyCode: 66, ctrlKey: true });
+    expect(editorOf(box).isActive("bold")).toBe(true);
+    fireEvent.keyDown(box, { key: "i", keyCode: 73, ctrlKey: true });
+    expect(editorOf(box).isActive("italic")).toBe(true);
+  });
+
   // ProseMirror prevents Esc's default in the text, so the shortcut registry
   // never sees it there: the editor hands it to the composer itself.
   it("Esc in the text shrinks the sheet, then closes the composer", () => {

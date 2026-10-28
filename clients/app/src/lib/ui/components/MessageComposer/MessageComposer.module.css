@@ -193,6 +193,15 @@
   padding-inline-start: var(--space-6);
 }
 
+/* The base styles strip list markers; the text shows them as they are sent. */
+.editor ul {
+  list-style: disc;
+}
+
+.editor ol {
+  list-style: decimal;
+}
+
 .editor li p {
   margin: 0;
 }

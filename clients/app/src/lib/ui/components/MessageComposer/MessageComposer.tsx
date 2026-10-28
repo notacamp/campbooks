@@ -585,6 +585,7 @@ export function MessageComposer({
       <div className={styles["toolbar"]} role="toolbar" aria-label={t("composer.formatting")}>
         <OverflowActions
           label={t("composer.moreFormatting")}
+          layer="top"
           actions={
             compact
               ? [bold, italic, linkAction, bullets]
