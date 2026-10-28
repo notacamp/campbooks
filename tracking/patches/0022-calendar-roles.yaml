@@ -3,10 +3,10 @@
 # between mine and following. Turning a calendar on or off stays
 # schedule.calendar_enabled / schedule.calendar_disabled. Never a name.
 # Applied with
-# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0020-calendar-roles.yaml`.
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0022-calendar-roles.yaml`.
 changelog:
   - date: "2026-10-28"
-    plan_version: 20
+    plan_version: 22
     change: "Calendar roles (campbooks-cloud#399): schedule.calendar_role_changed for a calendar a member set to mine or following (which); schedule.update_calendar's Coverage names it."
     pr: "#696"
 
@@ -21,7 +21,7 @@ events:
     actor_types: [user]
     description: "A member made a provider calendar their own (mine) or one they only follow. Never its name."
     fires_when: "schedule.update_calendar stores another following than the calendar had, in that transaction."
-    added_in: 20
+    added_in: 22
     openspec_change: "calendar-roles"
 
 properties:

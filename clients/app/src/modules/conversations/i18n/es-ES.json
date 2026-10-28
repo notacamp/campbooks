@@ -162,6 +162,7 @@
   },
   "scout": {
     "label": "Cómo está la cosa",
+    "readFailed": "Scout no pudo leer este.",
     "suggestion": "Sugiere {{stream}}",
     "suggestionNote": "Campbooks cree que esto va en {{stream}}. Es una sugerencia: nada se mueve hasta que tú lo digas.",
     "prompt": "¿Moverla?",
@@ -186,7 +187,11 @@
     "whyUrgent": "Urgente",
     "whySuspicious": "Sospechosa",
     "whyMoney": "Pago",
-    "sortedTaught": "Campbooks la puso en {{stream}}, por una regla"
+    "sortedTaught": "Campbooks la puso en {{stream}}, por una regla",
+    "taskOpen": "Tu tarea «{{title}}» sigue abierta.",
+    "taskPrompt": "¿Está hecha?",
+    "taskDone": "Hecha",
+    "taskNotYet": "Todavía no"
   },
   "reasons": {
     "signals": {

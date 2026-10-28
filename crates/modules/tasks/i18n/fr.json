@@ -16,6 +16,7 @@
     "not_handed_off": "Cette tâche n’a été confiée à personne.",
     "invalid_hold": "Réservez de 15 à 240 minutes qui n’ont pas encore commencé.",
     "pay_not_held": "Une facture se paie, on n’y travaille pas : il n’y a pas de temps à réserver.",
-    "not_held": "Aucun temps n’est réservé pour cette tâche."
+    "not_held": "Aucun temps n’est réservé pour cette tâche.",
+    "no_reply_question": "Aucune question n’est posée pour l’instant sur cette tâche."
   }
 }

@@ -40,7 +40,8 @@
     "fromEmail": "From {{name}} · email",
     "with": "With {{name}}",
     "markDone": "Mark done: {{title}}",
-    "markPaid": "Mark paid: {{title}}"
+    "markPaid": "Mark paid: {{title}}",
+    "repliedAsk": "You replied · Done?"
   },
   "due": {
     "overdue_one": "Overdue · {{count}} day",
@@ -95,7 +96,13 @@
     "notNeeded": "Not needed",
     "payNote": "Campbooks never pays for you. This only marks it paid.",
     "holdTime": "Hold time",
-    "release": "Release"
+    "release": "Release",
+    "notYet": "Not yet",
+    "yourReply": "Your reply · {{date}}",
+    "replyQuestion": {
+      "replied": "You replied to {{name}} at {{time}}.",
+      "done": "Is this task done?"
+    }
   },
   "toast": {
     "done": "Done · {{title}}",
@@ -111,7 +118,8 @@
     "failed": "Couldn’t change {{title}}. It is as it was.",
     "changed": "{{title}} changed in the meantime. Take another look.",
     "held": "Held {{when}} · {{title}}",
-    "released": "Released · {{title}}"
+    "released": "Released · {{title}}",
+    "stillOpen": "Okay, still open · {{title}}"
   },
   "make": {
     "button": "Make it a task",
@@ -141,5 +149,15 @@
   "holdDialog": {
     "title": "Hold time",
     "description": "A busy block on your calendar, in your free time."
+  },
+  "ask": {
+    "replied": "You replied",
+    "meta": "Task · {{kind}} · from {{name}}",
+    "line": "You answered {{name}}’s email. Is this task done?",
+    "whyTitle": "Why Scout asks",
+    "whyText": "You replied in the same thread at {{time}}, after the task was made. Scout didn’t read your reply.",
+    "whyNote": "Nothing changes until you answer.",
+    "openThread": "Open the thread",
+    "openTask": "Open the task"
   }
 }

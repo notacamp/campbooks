@@ -8,7 +8,8 @@
 //! by that member only), so a hand-off moves it to the new assignee. A task
 //! planned Later keeps its item hidden until `later_until`; the list leaves
 //! it out until then and shows it again by itself. Its plan and planned day
-//! are kept too: Home shows a task only when it is for today.
+//! are kept too: Home shows a task only when it is for today, or when it
+//! asks "You replied. Is this done?" (`asks_done`, campbooks-cloud#396).
 
 use campbooks_kernel::{
     Event, EventHandler, JobContext, JobError, RecordRef, tenancy::WorkspaceId,
@@ -128,16 +129,16 @@ async fn open(
         INSERT INTO attention.items
             (id, workspace_id, record_type, record_id, container_type, container_id,
              cause_type, cause_id, reason, trust, due_on, urgent, since, state,
-             producer_revision, hidden_until, plan, plan_on)
+             producer_revision, hidden_until, plan, plan_on, asks_done)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'sure', $10, false, $11, 'open', $12, $13,
-                $14, $15)
+                $14, $15, $16)
         ON CONFLICT (workspace_id, record_type, record_id) DO UPDATE
            SET container_type = EXCLUDED.container_type,
                container_id = EXCLUDED.container_id,
                cause_type = EXCLUDED.cause_type, cause_id = EXCLUDED.cause_id,
                reason = EXCLUDED.reason, trust = EXCLUDED.trust, due_on = EXCLUDED.due_on,
                hidden_until = EXCLUDED.hidden_until, plan = EXCLUDED.plan,
-               plan_on = EXCLUDED.plan_on, state = 'open',
+               plan_on = EXCLUDED.plan_on, asks_done = EXCLUDED.asks_done, state = 'open',
                cleared_because = NULL, cleared_by = NULL, cleared_at = NULL,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
          WHERE attention.items.producer_revision < EXCLUDED.producer_revision
@@ -159,6 +160,7 @@ async fn open(
     .bind(hidden_until)
     .bind(&task.plan)
     .bind(task.plan_on)
+    .bind(task.asks_done)
     .fetch_optional(&mut **tx)
     .await?;
     Ok(written.map(|(id,)| id))
@@ -188,7 +190,7 @@ async fn clear(
            SET container_type = EXCLUDED.container_type,
                container_id = EXCLUDED.container_id,
                state = 'cleared', cleared_because = EXCLUDED.cleared_because,
-               cleared_at = now(), hidden_until = NULL,
+               cleared_at = now(), hidden_until = NULL, asks_done = false,
                producer_revision = EXCLUDED.producer_revision, updated_at = now()
          WHERE attention.items.producer_revision < EXCLUDED.producer_revision
         RETURNING id

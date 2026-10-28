@@ -40,7 +40,8 @@
     "fromEmail": "De {{name}} · email",
     "with": "Com {{name}}",
     "markDone": "Marcar como feita: {{title}}",
-    "markPaid": "Marcar como paga: {{title}}"
+    "markPaid": "Marcar como paga: {{title}}",
+    "repliedAsk": "Respondeu · Feita?"
   },
   "due": {
     "overdue_one": "Em atraso · {{count}} dia",
@@ -95,7 +96,13 @@
     "notNeeded": "Não é preciso",
     "payNote": "O Campbooks nunca paga por si. Isto só a marca como paga.",
     "holdTime": "Reservar tempo",
-    "release": "Libertar"
+    "release": "Libertar",
+    "notYet": "Ainda não",
+    "yourReply": "A sua resposta · {{date}}",
+    "replyQuestion": {
+      "replied": "Respondeu a {{name}} ({{time}}).",
+      "done": "Esta tarefa está feita?"
+    }
   },
   "toast": {
     "done": "Feita · {{title}}",
@@ -111,7 +118,8 @@
     "failed": "Não foi possível alterar {{title}}. Ficou como estava.",
     "changed": "{{title}} mudou entretanto. Veja de novo.",
     "held": "Reservado {{when}} · {{title}}",
-    "released": "Libertado · {{title}}"
+    "released": "Libertado · {{title}}",
+    "stillOpen": "Certo, continua aberta · {{title}}"
   },
   "make": {
     "button": "Criar uma tarefa",
@@ -141,5 +149,15 @@
   "holdDialog": {
     "title": "Reservar tempo",
     "description": "Um bloco ocupado no seu calendário, no seu tempo livre."
+  },
+  "ask": {
+    "replied": "Respondeu",
+    "meta": "Tarefa · {{kind}} · de {{name}}",
+    "line": "Respondeu ao email de {{name}}. Esta tarefa está feita?",
+    "whyTitle": "Porque é que o Scout pergunta",
+    "whyText": "Respondeu na mesma conversa ({{time}}), depois de a tarefa ser criada. O Scout não leu a sua resposta.",
+    "whyNote": "Nada muda até responder.",
+    "openThread": "Abrir a conversa",
+    "openTask": "Abrir a tarefa"
   }
 }
