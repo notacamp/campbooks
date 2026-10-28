@@ -1282,8 +1282,20 @@ fn body(world: &World, id: &str) -> Option<Value> {
         }),
         "pages.resolve_conflict" => json!({"keep": "mine"}),
         "pages.resolve_table_conflict" => json!({"keep": "ours"}),
-        // The bytes of a file: this text.
-        "pages.upload_file" => json!({"file": "matrix"}),
+        // The bytes of a file (for a draft, named in the query): this text.
+        "pages.upload_file" | "conversations.upload_draft_attachment" => {
+            json!({"file": "matrix"})
+        }
+        // Mail and Scout in pages (campbooks-cloud#364): a section, the
+        // seeded message's attachment, and the seeded file.
+        "pages.append" => json!({"markdown": "Matrix section"}),
+        "pages.unappend" => json!({"append_id": Uuid::now_v7().to_string()}),
+        "pages.attach_from_message" => json!({
+            "conversation": world.instances["conversations.conversation"],
+            "message": world.instances["conversations.message"],
+            "attachments": [world.instances["conversations.attachment"]],
+        }),
+        "pages.detach_files" => json!({"files": [world.instances["pages.file"]]}),
         // Tables: a table, its select property, a row and a view are seeded.
         "pages.create_table" => json!({"title": "Matrix table"}),
         "pages.add_property" => json!({"name": "Notes", "type": "text"}),
@@ -1386,6 +1398,7 @@ fn query_of(id: &str) -> &'static str {
     match id {
         "conversations.suggest_rules" => "?action=archive",
         "conversations.list_correspondents" => "?q=example",
+        "conversations.upload_draft_attachment" => "?version=1&filename=matrix.txt",
         "pages.backlinks" => "?type=person&id=matrix@example.com",
         "schedule.list_events" => "?from=2026-11-01&to=2026-11-08",
         "schedule.free_slots" => "?from=2026-11-03&to=2026-11-04&minutes=60",
@@ -1469,6 +1482,15 @@ fn expected(
     // One of Scout's suggestions reads as the list shows it: a member who
     // only reads its inbox is never shown it, so it is not there for them.
     if id == "conversations.get_rule_notice" && decision == Decision::Forbidden {
+        return Decision::NotFound;
+    }
+    // Saving a message's attachment to a page needs the right to write the
+    // page and to read the message: a caller who may not read that inbox is
+    // answered as for an attachment that does not exist.
+    if id == "pages.attach_from_message"
+        && decision == Decision::Allow
+        && who.inbox_role().is_none()
+    {
         return Decision::NotFound;
     }
     // Importing from Notion goes through a Notion connection of the caller's
@@ -2430,4 +2452,54 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
         }
     }
     tx.rollback().await.unwrap();
+}
+
+/// Saving a message's attachment to a page needs the mail scope as well as
+/// the pages scope: a token without `conversations:read` is refused, even for
+/// a member who may read the message and write the page (campbooks-cloud#364).
+#[sqlx::test(migrations = "../../migrations")]
+async fn saving_an_attachment_needs_the_mail_scope_as_well_as_the_pages_scope(db: PgPool) {
+    let mut world = World::new(db).await;
+    world.seed().await;
+    let id = "pages.attach_from_message";
+    let path = "/api/v1/w/{workspace_id}/pages/{page_id}/files/from-message";
+    let uri = fill(&world, path, id);
+    let payload = body(&world, id);
+    let token_with = |scopes: &str| {
+        let mut claims = world.idp.claims(scopes);
+        claims["sub"] = json!(format!("{}-{}", Who::Connector.subject(), world.run));
+        world.idp.token(&claims)
+    };
+    let (status, bytes, _) = world
+        .call(
+            Some(&token_with("pages:read pages:write")),
+            "POST",
+            &uri,
+            payload.as_ref(),
+        )
+        .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "{}",
+        String::from_utf8_lossy(&bytes)
+    );
+    assert!(String::from_utf8_lossy(&bytes).contains("insufficient_scope"));
+    // The same member with the mail scope as well is let through.
+    let (status, bytes, _) = world
+        .call(
+            Some(&token_with("pages:read pages:write conversations:read")),
+            "POST",
+            &uri,
+            payload.as_ref(),
+        )
+        .await;
+    assert!(
+        !matches!(
+            status,
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::NOT_FOUND
+        ),
+        "{status}: {}",
+        String::from_utf8_lossy(&bytes)
+    );
 }

@@ -8,6 +8,7 @@ import type { Recipient, RecipientSuggestion } from "../RecipientField/Recipient
 import {
   MessageComposer,
   type ComposerAttachment,
+  type ComposerUpload,
   type RecipientFieldName,
   type RecipientSuggester,
 } from "./MessageComposer";
@@ -20,6 +21,9 @@ interface DemoProps {
   body?: string;
   quoted?: string | undefined;
   attachments?: ComposerAttachment[];
+  uploading?: ComposerUpload[];
+  attachmentBudget?: number;
+  onAttach?: (files: File[]) => void;
   status?: string;
   error?: string;
   sending?: boolean;
@@ -243,6 +247,69 @@ export const WriteAndSend: Story = {
     // ⌘↵ on Apple platforms, Ctrl+↵ elsewhere: exactly one of them sends.
     await userEvent.keyboard("{Meta>}{Enter}{/Meta}{Control>}{Enter}{/Control}");
     await expect(args.onSend).toHaveBeenCalledOnce();
+  },
+};
+
+const MB = 1024 * 1024;
+
+/** A reply with files from the device: the type tile, the name, the size, Remove; the total under them. */
+export const WithAttachments: Story = {
+  args: {
+    body: "The signed lease and the parking form are attached.",
+    attachmentBudget: 25 * MB,
+    onAttach: fn(),
+    attachments: [
+      { id: "u1", filename: "lease-4b-signed.pdf", size: 412_000, source: "uploaded" },
+      {
+        id: "u2",
+        filename: "parking-form-P2-14-with-a-very-long-name-that-gets-cut.docx",
+        size: 38_400,
+        source: "uploaded",
+      },
+      { id: "u3", filename: "entrance.jpeg", size: 2_900_000, source: "uploaded" },
+    ],
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("3.2 MB of 25 MB")).toBeVisible();
+    const file = new File(["%PDF"], "receipt.pdf", { type: "application/pdf" });
+    await userEvent.upload(canvas.getByTestId("composer-files"), file);
+    await expect(args.onAttach).toHaveBeenCalledWith([file]);
+    await userEvent.click(canvas.getByRole("button", { name: "Remove entrance.jpeg" }));
+    await expect(canvas.queryByText("entrance.jpeg")).toBeNull();
+  },
+};
+
+/** A file on its way: "Uploading…" with no Remove, counted in the total. */
+export const Uploading: Story = {
+  args: {
+    body: "Here is the photo.",
+    attachmentBudget: 25 * MB,
+    onAttach: fn(),
+    attachments: [{ id: "u1", filename: "lease-4b-signed.pdf", size: 412_000, source: "uploaded" }],
+    uploading: [{ key: 1, filename: "boiler-photo.heic", size: 6 * MB }],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const busy = canvas.getByText("boiler-photo.heic").closest("li");
+    await expect(busy).toHaveAttribute("aria-busy", "true");
+    await expect(within(busy as HTMLElement).getByText("Uploading…")).toBeVisible();
+  },
+};
+
+/** Close to the 25 MB a message may carry. */
+export const NearTheLimit: Story = {
+  args: {
+    body: "The full scan is attached.",
+    attachmentBudget: 25 * MB,
+    onAttach: fn(),
+    attachments: [
+      { id: "u1", filename: "scan-part-1.pdf", size: 12 * MB, source: "uploaded" },
+      { id: "u2", filename: "scan-part-2.pdf", size: 12.4 * MB, source: "uploaded" },
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText("24.4 MB of 25 MB")).toBeVisible();
   },
 };
 

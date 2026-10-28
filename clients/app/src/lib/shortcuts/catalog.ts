@@ -192,6 +192,14 @@ export const DEFAULT_SHORTCUTS = [
     allowInInputs: true,
   },
   {
+    id: "compose.attach",
+    keys: "mod+shift+u",
+    scope: "compose",
+    group: "compose",
+    label: "shortcuts:compose.attach",
+    allowInInputs: true,
+  },
+  {
     // Asking in a chat (Scout's): Enter asks, Shift+Enter is a new line.
     id: "chat.send",
     keys: "enter",

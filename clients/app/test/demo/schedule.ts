@@ -66,6 +66,20 @@ export const HOLIDAYS: Calendar = {
   color: "#b88a2b",
   time_zone: SCHEDULE_ZONE,
 };
+/** A colleague's calendar shared with Ana and followed, not hers (`owned: false`). */
+export const SHARED: Calendar = {
+  id: id(5),
+  name: "Marta Lopes",
+  source: "provider",
+  provider: "google",
+  primary: false,
+  syncing: true,
+  writable: false,
+  role: "following",
+  owned: false,
+  color: "#8a5bb8",
+  time_zone: SCHEDULE_ZONE,
+};
 export const CALENDARS = [CAMPBOOKS, PERSONAL, WORK, HOLIDAYS];
 
 export const SETTINGS: Schema<"SettingsView"> = {

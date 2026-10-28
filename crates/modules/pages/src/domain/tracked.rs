@@ -566,6 +566,62 @@ pub async fn cells_edited(
     Ok(())
 }
 
+/// `files` attachments of a message were made files of `page`.
+pub async fn files_attached(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    files: usize,
+) -> Result<()> {
+    if files == 0 {
+        return Ok(());
+    }
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::FilesAttached {
+                workspace,
+                page,
+                files: counted(files),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// A section of `blocks` blocks naming `sources` sources was appended to
+/// `page`.
+pub async fn section_appended(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    page: PageId,
+    blocks: usize,
+    sources: usize,
+) -> Result<()> {
+    let Some(page) = snapshot(tx, page).await? else {
+        return Ok(());
+    };
+    state
+        .tracker
+        .track(
+            tx,
+            &tracking::SectionAppended {
+                workspace,
+                page,
+                blocks: bucket(blocks),
+                sources: bucket(sources),
+            },
+        )
+        .await?;
+    Ok(())
+}
+
 /// What a table's conflict is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConflictKind {

@@ -9,6 +9,7 @@ import {
   isShown,
   lastDay,
   minutesOf,
+  takesTime,
   type Ymd,
 } from "./model";
 
@@ -151,9 +152,7 @@ export function pushTarget(
   calendars: readonly CalendarView[],
   lastUsed: string | null | undefined,
 ): CalendarView | undefined {
-  const writable = calendars.filter(
-    (calendar) => calendar.source === "provider" && calendar.writable,
-  );
+  const writable = calendars.filter(takesTime);
   return (
     writable.find((calendar) => calendar.id === lastUsed) ??
     writable.find((calendar) => calendar.primary) ??

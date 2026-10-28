@@ -3,7 +3,7 @@
 //! still be current), and `DELETE` — discard it.
 //!
 //! Saving publishes no event: drafts are private, and autosave would fill
-//! the retained event log. Dropping a forwarded attachment releases its blob.
+//! the retained event log. Dropping an attachment releases the draft's hold on its blob.
 
 use std::collections::HashSet;
 
@@ -64,7 +64,7 @@ pub struct DraftChanges {
     /// The quoted history.
     #[serde(default)]
     pub quoted: Option<String>,
-    /// The forwarded attachments to keep (the others are dropped).
+    /// The attachments to keep, forwarded or uploaded (the others are dropped).
     #[serde(default)]
     pub attachments: Option<Vec<AttachmentId>>,
 }

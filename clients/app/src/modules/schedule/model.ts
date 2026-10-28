@@ -352,17 +352,22 @@ export function hoursFor(blocks: readonly Placed[]): { from: number; to: number 
 /** An event's own place in a month's cells: up to three shown, the rest as "+N". */
 export const MONTH_SHOWN = 3;
 
+/**
+ * Whether a calendar can take something the member puts on it (Hold time,
+ * "Add to my calendar", "Also add to"): a provider calendar they can write
+ * that is their own (Mine), not one they only follow or have turned off.
+ */
+export function takesTime(calendar: { source: string; writable: boolean; role: string }): boolean {
+  return calendar.source === "provider" && calendar.writable && calendar.role === "mine";
+}
+
 /** Whether the member could add this event to a provider calendar of theirs. */
 export function canPush(
   event: EventView,
-  calendars: readonly { id: string; source: string; writable: boolean }[],
+  calendars: readonly { id: string; source: string; writable: boolean; role: string }[],
 ): boolean {
   const own = calendars.find((calendar) => calendar.id === event.calendar_id);
-  return (
-    own?.source === "campbooks" &&
-    !event.on_provider &&
-    calendars.some((calendar) => calendar.source === "provider" && calendar.writable)
-  );
+  return own?.source === "campbooks" && !event.on_provider && calendars.some(takesTime);
 }
 
 /* Writing times back to the server. */

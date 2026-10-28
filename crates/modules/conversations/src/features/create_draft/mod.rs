@@ -25,7 +25,10 @@ use crate::domain::resources;
 use crate::{
     domain::{
         access::visible_inboxes,
-        drafts::{self, DraftView, MAX_REFERENCES, StoredAttachment, check_limits, decode, tidy},
+        drafts::{
+            self, AttachmentSource, DraftView, MAX_REFERENCES, StoredAttachment, check_limits,
+            decode, tidy,
+        },
         format, tracked,
     },
     events::DRAFT_RECORD,
@@ -394,6 +397,7 @@ async fn forwarded(
         .map(|row| {
             Ok(StoredAttachment {
                 id: row.id,
+                source: AttachmentSource::Forwarded,
                 filename: row.filename,
                 content_type: row.content_type,
                 size: u64::try_from(row.size).unwrap_or_default(),
