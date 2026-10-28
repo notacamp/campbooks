@@ -54,7 +54,7 @@ async function lookAtTheTable(page: Page, phone: boolean) {
   await caption(page, "Threads is Campbooks only: it is never sent to Notion", LONG);
   await threads.click();
   await settle();
-  await page.getByText(/Threads is Campbooks only/u).waitFor();
+  await page.locator("p", { hasText: "Threads is Campbooks only" }).waitFor();
   await caption(page, "The column’s menu says it too", SHORT);
   await page.keyboard.press("Escape");
   await settle();

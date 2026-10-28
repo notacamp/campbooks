@@ -19,6 +19,6 @@
 
 - [x] 3.1 OpenAPI and client types regenerated (locally)
 - [x] 3.2 Changelog entry `changelog/unreleased/added/377-notion-databases-ui.md`
-- [ ] 3.3 Gates green in CI
-- [ ] 3.4 Recording at 375 px and desktop
-- [ ] 3.5 `openspec archive notion-databases-ui --yes` before merge
+- [x] 3.3 Gates green in CI
+- [x] 3.4 Recording at 375 px and desktop
+- [x] 3.5 `openspec archive notion-databases-ui --yes` before merge
