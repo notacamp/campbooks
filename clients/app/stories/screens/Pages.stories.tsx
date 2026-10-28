@@ -400,6 +400,56 @@ export const TheTreePhoneIdle: Story = {
   ...at("phone", 375, 812),
 };
 
+/**
+ * The block spacing, measured in the editor itself: paragraphs and boxed
+ * blocks have their gaps, headings more above than below, a closed toggle
+ * hides its content. (The editor's class names are global; a rule naming
+ * them in a CSS module without `:global()` would silently never match.)
+ */
+export const EveryBlockSpacing: Story = {
+  args: { path: `${PATH}/${ONBOARDING.id}`, api: pages() },
+  ...at("desktop", 1440, 900),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const editor = await canvas.findByRole("textbox", { name: "Page text" });
+    const body = within(editor);
+    const blockOf = (text: string | RegExp) => {
+      const found = body.getByText(text).closest(".tiptap > *");
+      if (!(found instanceof HTMLElement)) {
+        throw new TypeError(`no block holds ${String(text)}`);
+      }
+      return found;
+    };
+    const gap = (above: HTMLElement, below: HTMLElement) =>
+      Math.round(below.getBoundingClientRect().top - above.getBoundingClientRect().bottom);
+    await body.findByText("Notes from the kickoff go below.");
+
+    const first = blockOf("Three things have to be true before anyone books a room.");
+    const second = blockOf(/^Questions go to/u);
+    const heading = blockOf("Before the kickoff");
+    // Two paragraphs: a gap, not touching.
+    await expect(gap(first, second)).toBe(8);
+    // A heading: further from the block above than from its own text.
+    const intro = blockOf(
+      "Every new client gets the same first week. This page is the checklist, and Scout ticks what it can.",
+    );
+    await expect(gap(intro, heading)).toBe(32);
+    await expect(gap(heading, first)).toBe(12);
+    // Two callouts and two cards: a box's gap.
+    const info = blockOf("The kickoff is on Thursday at 10:00.");
+    const warning = blockOf("Legal reads it first.");
+    await expect(gap(info, warning)).toBe(12);
+    const task = blockOf("Send the signed lease to Marta");
+    const subPage = blockOf("Holiday calendar");
+    await expect(gap(task, subPage)).toBe(12);
+    // The page starts flush with its first block.
+    await expect(getComputedStyle(intro).marginTop).toBe("0px");
+    // A closed toggle shows only its first line.
+    await expect(body.getByText("Old rates")).toBeVisible();
+    await expect(body.getByText("Hidden until opened.")).not.toBeVisible();
+  },
+};
+
 /** Every block of the schema on one page: the block spacing on a desktop. */
 export const EveryBlockIdle: Story = {
   args: { path: `${PATH}/${ONBOARDING.id}`, api: pages() },
