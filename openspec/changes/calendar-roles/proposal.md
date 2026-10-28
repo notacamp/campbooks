@@ -48,15 +48,14 @@ Tracking: https://github.com/notacamp/campbooks-cloud/issues/399
   refused as `calendar_followed`. An invitation awaits an answer only on a Mine
   calendar. Making a calendar Following or Off closes its open invitations as
   `hidden`, and making it Mine again re-announces them.
-- Settings → Calendar groups calendars under Mine, Following and Off, with a
-  three-way control on each provider calendar. The calendar pickers for Hold
-  time, "Add to my calendar" and "Also add to" offer only writable Mine
-  calendars.
 - Scout's schedule handbook explains the roles, and says free time counts only
   the member's own calendars.
 
-Modules touched: `connectors` (calendar list), `schedule` (migration, role,
-free time, holds, invitations, API, handbook), `calendar-ui` (client).
+Modules touched: `connectors` (calendar list) and `schedule` (migration, role,
+free time, holds, invitations, API, handbook). This is the server half. The
+screens (Settings → Calendar and the calendar pickers) are the change
+`calendar-roles-settings`, in its own PR. Until it lands, the client keeps
+showing the on/off switch, which still works through `syncing`.
 Contract: `calendar-list` v1 gains an optional field. Nothing in `attention`
 changes: it already closes an invitation announced `hidden`.
 

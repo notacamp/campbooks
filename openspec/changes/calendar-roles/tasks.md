@@ -17,15 +17,8 @@
 - [ ] 2.8 Integration tests: grant defaults, repeated grant, PATCH role transitions and refusals, free slots skip a Following calendar, hold refused, invitation closed and re-announced on a role change
 - [ ] 2.9 `crates/modules/schedule/handbook.md`: Mine / Following / Off, free time counts only Mine
 
-## 3. Settings and pickers
+## 3. Before merge
 
-- [ ] 3.1 Settings → Calendar: Mine / Following / Off groups with descriptions; three-way segmented control per provider calendar; "Shared with you" when `owned === false`; Undo on a role change
-- [ ] 3.2 Hold time, "Add to my calendar" and "Also add to" offer only writable Mine calendars; an "Also add to" target that is no longer Mine shows as unset
-- [ ] 3.3 Strings in en, pt-PT, es-ES and fr; `pnpm test:fit` at 375px and 1280px
-- [ ] 3.4 Stories: Settings → Calendar with Mine, Following (shared) and Off calendars; a play-less story for the recording
-
-## 4. Before merge
-
-- [ ] 4.1 Changelog entry files (`changelog/unreleased/added/399-calendar-roles.md`, `changelog/unreleased/fixed/399-followed-invitations.md`)
-- [ ] 4.2 `openspec validate calendar-roles --strict`; CI green
-- [ ] 4.3 Recording at 375px and on desktop, then archive this change
+- [ ] 3.1 Changelog entry files (`changelog/unreleased/added/399-calendar-roles.md`, `changelog/unreleased/fixed/399-followed-invitations.md`)
+- [ ] 3.2 `openspec validate calendar-roles --strict`; CI green
+- [ ] 3.3 Terminal recording (vhs) of the API: a calendar's role, a PATCH to following, free slots without it; then archive this change
