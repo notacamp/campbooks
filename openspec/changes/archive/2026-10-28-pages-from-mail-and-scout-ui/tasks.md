@@ -24,6 +24,6 @@
 - [x] 3.1 i18n en, pt-PT, es-ES and fr; `pnpm test:fit`
 - [x] 3.2 Stories and unit tests
 - [x] 3.3 Changelog entry `changelog/unreleased/added/364-pages-from-mail-and-scout-ui.md`
-- [ ] 3.4 Gates green in CI
-- [ ] 3.5 Recording at 375 px and desktop (Storybook)
-- [ ] 3.6 `openspec archive pages-from-mail-and-scout-ui --yes` before merge
+- [x] 3.4 Gates green in CI
+- [x] 3.5 Recording at 375 px and desktop (Storybook)
+- [x] 3.6 `openspec archive pages-from-mail-and-scout-ui --yes` before merge
