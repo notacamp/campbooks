@@ -22,7 +22,14 @@
     "cap": "Your {{count}} newest drafts.",
     "readerTitle": "Pick a draft",
     "readerBody": "Choose one from the list to keep writing it.",
-    "errorTitle": "Could not load your drafts"
+    "errorTitle": "Could not load your drafts",
+    "scheduled": "Scheduled",
+    "leaves": "Leaves {{time}}",
+    "cancelSendNamed": "Cancel send: {{title}}",
+    "editScheduled": "This send is scheduled. Cancel it to edit the draft.",
+    "cancelAndEdit": "Cancel send and edit",
+    "keepScheduled": "Keep it scheduled",
+    "sendCancelled": "Send cancelled"
   },
   "list": {
     "label": "Conversations",

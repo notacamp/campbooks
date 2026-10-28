@@ -22,7 +22,14 @@
     "cap": "Vos {{count}} brouillons les plus récents.",
     "readerTitle": "Choisissez un brouillon",
     "readerBody": "Choisissez-en un dans la liste pour continuer à l’écrire.",
-    "errorTitle": "Impossible de charger les brouillons"
+    "errorTitle": "Impossible de charger les brouillons",
+    "scheduled": "Programmés",
+    "leaves": "Part {{time}}",
+    "cancelSendNamed": "Annuler l’envoi : {{title}}",
+    "editScheduled": "Cet envoi est programmé. Annulez-le pour modifier le brouillon.",
+    "cancelAndEdit": "Annuler l’envoi et modifier",
+    "keepScheduled": "Garder la programmation",
+    "sendCancelled": "Envoi annulé"
   },
   "list": {
     "label": "Conversations",

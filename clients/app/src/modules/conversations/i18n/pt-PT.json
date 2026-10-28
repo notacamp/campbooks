@@ -22,7 +22,14 @@
     "cap": "Os seus {{count}} rascunhos mais recentes.",
     "readerTitle": "Escolha um rascunho",
     "readerBody": "Escolha um na lista para continuar a escrevê-lo.",
-    "errorTitle": "Não foi possível carregar os rascunhos"
+    "errorTitle": "Não foi possível carregar os rascunhos",
+    "scheduled": "Agendados",
+    "leaves": "Sai {{time}}",
+    "cancelSendNamed": "Cancelar envio: {{title}}",
+    "editScheduled": "Este envio está agendado. Cancele-o para editar o rascunho.",
+    "cancelAndEdit": "Cancelar envio e editar",
+    "keepScheduled": "Manter agendado",
+    "sendCancelled": "Envio cancelado"
   },
   "list": {
     "label": "Conversas",

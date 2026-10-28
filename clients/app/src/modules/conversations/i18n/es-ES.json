@@ -22,7 +22,14 @@
     "cap": "Tus {{count}} borradores más recientes.",
     "readerTitle": "Elige un borrador",
     "readerBody": "Elige uno de la lista para seguir escribiéndolo.",
-    "errorTitle": "No se han podido cargar los borradores"
+    "errorTitle": "No se han podido cargar los borradores",
+    "scheduled": "Programados",
+    "leaves": "Sale {{time}}",
+    "cancelSendNamed": "Cancelar envío: {{title}}",
+    "editScheduled": "Este envío está programado. Cancélalo para editar el borrador.",
+    "cancelAndEdit": "Cancelar envío y editar",
+    "keepScheduled": "Mantener programado",
+    "sendCancelled": "Envío cancelado"
   },
   "list": {
     "label": "Conversaciones",
