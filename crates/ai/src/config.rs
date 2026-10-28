@@ -212,6 +212,7 @@ impl ProviderConfig {
 
     /// Whether the provider takes the `reasoning` object, so a request's
     /// own effort is sent.
+    #[must_use]
     pub fn accepts_reasoning(&self) -> bool {
         self.reasoning || self.reasoning_effort.is_some()
     }
