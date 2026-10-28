@@ -2,7 +2,16 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Avatar, ButtonLink, Button, Dot, Heading, Text, type Signal } from "~/lib/ui";
+import {
+  Avatar,
+  ButtonLink,
+  Button,
+  Dot,
+  Heading,
+  SenderSentence,
+  Text,
+  type Signal,
+} from "~/lib/ui";
 import { useMembers } from "~/modules/workspaces";
 
 import { useTaskHistory, type TaskHistoryEntry, type TaskView } from "../api/queries";
@@ -11,7 +20,6 @@ import { clockTime, shortDay, whenLabel } from "../model";
 import type { TaskSource } from "../source";
 
 import { memberName } from "./HandOff";
-import styles from "./TaskStory.module.css";
 
 /** The dot of who made a change: a member is plain, Scout and the calendar have a colour. */
 const DOT: Record<TaskHistoryEntry["actor"], Signal | undefined> = {
@@ -113,7 +121,7 @@ export function TaskStory({ workspaceId, task, me, source, quote }: TaskStoryPro
             </div>
             {quote === undefined || quote === "" ? null : (
               // The email's language is not known: no `lang`, the marks are the member's.
-              <blockquote className={styles["quote"]}>{t("detail.quote", { quote })}</blockquote>
+              <SenderSentence>{t("detail.quote", { quote })}</SenderSentence>
             )}
             {task.replied === null || task.replied === undefined ? null : (
               <Text tone="secondary" size="sm">
