@@ -24,6 +24,7 @@ import {
   ACCOUNTANT,
   ASK_BILL,
   ASK_LEASE,
+  ASK_REPLIED,
   BILL,
   INSPECTION,
   LEASE,
@@ -478,3 +479,116 @@ export const FoundOnHomeIdle: Story = {
 export const FoundByScoutIdle: Story = {
   args: { path: `${PATH}/${ASK_BILL.id}`, api: foundApi() },
 };
+
+// "You replied. Is this done?" (campbooks-cloud#396): the lease task Scout made
+// from Marta's email, after Ana replied in that thread. Not yet is stateful,
+// as the server keeps it: the question is gone, and Undo brings it back.
+
+/** A viewport the story test runs at (the addon reads `globals.viewport`). */
+function at(name: string, width: number, height: number) {
+  return {
+    parameters: {
+      viewport: {
+        options: {
+          [name]: { name, styles: { width: `${String(width)}px`, height: `${String(height)}px` } },
+        },
+      },
+    },
+    globals: { viewport: { value: name } },
+  };
+}
+
+/** The API for the replied-to task, on Home, in the list and in its detail. */
+function repliedApi() {
+  const asking = { ...ASK_REPLIED, due_on: isoDay(addDays(new Date(), 3)) };
+  let current: typeof asking = asking;
+  return tasks({
+    [`GET ${W}/tasks`]: (_body, url) =>
+      url.searchParams.get("whose") === "handed_off"
+        ? { body: { tasks: [] } }
+        : { body: { tasks: [current] } },
+    [`GET ${W}/attention`]: (_body, url) =>
+      url.searchParams.get("state") === "open"
+        ? { body: { items: [taskItem(current)], counts: COUNTS } }
+        : { body: { items: [], counts: [] } },
+    [`POST ${W}/tasks/${asking.id}/reply_answered`]: () => {
+      current = { ...asking, asks_done: false, revision: asking.revision + 1 };
+      return { body: current };
+    },
+    [`POST ${W}/tasks/${asking.id}/reply_unanswered`]: () => {
+      current = { ...asking, revision: asking.revision + 2 };
+      return { body: current };
+    },
+    [`POST ${W}/tasks/${asking.id}/done`]: () => {
+      current = { ...asking, state: "done", asks_done: false, revision: asking.revision + 1 };
+      return { body: current };
+    },
+  });
+}
+
+/** Home asks: the reply and when, the task, the question, Done and Not yet. */
+export const RepliedAsksDoneOnHome: Story = {
+  args: { path: `/w/${DUARTE.id}`, api: repliedApi() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Send the signed lease")).toBeVisible();
+    await expect(
+      canvas.getByText("You answered Marta Ferreira’s email. Is this task done?"),
+    ).toBeVisible();
+    await expect(canvas.getByRole("button", { name: /^Done/u })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: /^Not yet/u })).toBeVisible();
+  },
+};
+
+/** Not yet (2): the row folds, the toast says it stays open and offers Undo. */
+export const RepliedNotYetOnHome: Story = {
+  args: { path: `/w/${DUARTE.id}`, api: repliedApi() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("You answered Marta Ferreira’s email. Is this task done?");
+    await userEvent.keyboard("2");
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByText("Okay, still open · Send the signed lease")).toBeVisible();
+  },
+};
+
+/** The same on a phone: Done and Not yet side by side, nothing scrolls sideways. */
+export const RepliedAsksDonePhone: Story = {
+  args: { path: `/w/${DUARTE.id}`, api: repliedApi() },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText("You answered Marta Ferreira’s email. Is this task done?");
+    await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
+      globalThis.innerWidth,
+    );
+  },
+};
+
+/** The Tasks list: the row says "You replied · Done?" under its title. */
+export const RepliedRowInTasks: Story = {
+  args: { path: PATH, api: repliedApi() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("You replied · Done?")).toBeVisible();
+  },
+};
+
+/** The detail asks above where it came from, and the source lists your reply. */
+export const RepliedQuestionInDetail: Story = {
+  args: { path: `${PATH}/${ASK_REPLIED.id}`, api: repliedApi() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Is this task done?")).toBeVisible();
+    await expect(await canvas.findByText(/^Your reply · /u)).toBeVisible();
+  },
+};
+
+/** Home asking, idle (for the recording). */
+export const RepliedOnHomeIdle: Story = { args: RepliedAsksDoneOnHome.args };
+
+/** The list row, idle. */
+export const RepliedRowIdle: Story = { args: RepliedRowInTasks.args };
+
+/** The detail question, idle. */
+export const RepliedDetailIdle: Story = { args: RepliedQuestionInDetail.args };

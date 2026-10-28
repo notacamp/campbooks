@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ScoutChatProvider } from "~/lib/scout-chat";
 
 import { INBOX, Q4, Q4_BODY, Q4_DETAIL, W } from "../../../../../test/demo/conversations";
+import { ASK_REPLIED } from "../../../../../test/demo/tasks";
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../../../../test/render";
 import { useInboxActions } from "../InboxScreen/use-inbox-actions";
@@ -183,6 +184,39 @@ describe("ConversationReader", () => {
     expect(note).toHaveTextContent("You replied on");
     expect(note).not.toHaveTextContent("it needs a reply");
     expect(within(note).queryByRole("button", { name: "Reply" })).toBeNull();
+  });
+
+  it("asks whether a task from this thread is done once the member replied, and answers with Done or Not yet", async () => {
+    // campbooks-cloud#396: the task Scout made from this email, replied to.
+    const asking = { ...ASK_REPLIED, source: { type: "conversations.conversation", id: Q4.id } };
+    const calls = mockApi({
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`GET ${W}/conversations/${Q4.id}`]: {
+        body: { ...Q4_DETAIL, conversation: { ...Q4, need: null } },
+      },
+      [`GET ${W}/conversations/${Q4.id}/messages/${NEWEST}/body`]: { body: Q4_BODY },
+      [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4, unread_count: 0 } },
+      [`GET ${W}/drafts`]: { body: { drafts: [] } },
+      [`GET ${W}/tasks`]: { body: { tasks: [asking] } },
+      [`POST ${W}/tasks/${asking.id}/reply_answered`]: {
+        body: { ...asking, asks_done: false, revision: 3 },
+      },
+      [`POST ${W}/tasks/${asking.id}/done`]: { body: { ...asking, state: "done", revision: 3 } },
+    });
+    renderWithProviders(<Reader slot={vi.fn<RenderReplySlot>(() => null)} />);
+    await screen.findByRole("heading", { name: Q4.subject });
+    const note = await screen.findByRole("region", { name: "Where things stand" });
+    expect(
+      await within(note).findByText(/Your task “Send the signed lease” is still open\./u),
+    ).toBeVisible();
+    expect(within(note).getByText("Is it done?")).toBeVisible();
+
+    fireEvent.click(within(note).getByRole("button", { name: /^Not yet/u }));
+    await vi.waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/reply_answered"))?.body).toEqual({
+        revision: 2,
+      });
+    });
   });
 
   it("says an ask that lapsed has expired, and offers nothing to resolve", async () => {

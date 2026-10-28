@@ -40,7 +40,8 @@
     "fromEmail": "De {{name}} · correo",
     "with": "Con {{name}}",
     "markDone": "Marcar como hecha: {{title}}",
-    "markPaid": "Marcar como pagada: {{title}}"
+    "markPaid": "Marcar como pagada: {{title}}",
+    "repliedAsk": "Respondiste · ¿Hecha?"
   },
   "due": {
     "overdue_one": "Vencida · {{count}} día",
@@ -95,7 +96,13 @@
     "notNeeded": "No hace falta",
     "payNote": "Campbooks nunca paga por ti. Esto solo la marca como pagada.",
     "holdTime": "Reservar tiempo",
-    "release": "Liberar"
+    "release": "Liberar",
+    "notYet": "Todavía no",
+    "yourReply": "Tu respuesta · {{date}}",
+    "replyQuestion": {
+      "replied": "Respondiste a {{name}} ({{time}}).",
+      "done": "¿Está hecha esta tarea?"
+    }
   },
   "toast": {
     "done": "Hecha · {{title}}",
@@ -111,7 +118,8 @@
     "failed": "No se pudo cambiar {{title}}. Queda como estaba.",
     "changed": "{{title}} ha cambiado mientras tanto. Míralo de nuevo.",
     "held": "Reservado {{when}} · {{title}}",
-    "released": "Liberado · {{title}}"
+    "released": "Liberado · {{title}}",
+    "stillOpen": "De acuerdo, sigue abierta · {{title}}"
   },
   "make": {
     "button": "Convertir en tarea",
@@ -141,5 +149,15 @@
   "holdDialog": {
     "title": "Reservar tiempo",
     "description": "Un bloque ocupado en tu calendario, en tu tiempo libre."
+  },
+  "ask": {
+    "replied": "Respondiste",
+    "meta": "Tarea · {{kind}} · de {{name}}",
+    "line": "Respondiste al correo de {{name}}. ¿Está hecha esta tarea?",
+    "whyTitle": "Por qué pregunta Scout",
+    "whyText": "Respondiste en el mismo hilo ({{time}}), después de crear la tarea. Scout no leyó tu respuesta.",
+    "whyNote": "Nada cambia hasta que respondas.",
+    "openThread": "Abrir el hilo",
+    "openTask": "Abrir la tarea"
   }
 }

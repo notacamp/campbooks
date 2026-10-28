@@ -18,7 +18,8 @@
     "choice2": "Segunda opção",
     "choice3": "Terceira opção",
     "nextAction": "Ação seguinte do item",
-    "previousAction": "Ação anterior do item"
+    "previousAction": "Ação anterior do item",
+    "open": "Abrir a conversa"
   },
   "compose": {
     "draft": "Escrever por mim",

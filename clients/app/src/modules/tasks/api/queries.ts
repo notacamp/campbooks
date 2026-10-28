@@ -251,6 +251,26 @@ export function useTaskCalls(workspaceId: string) {
           }),
         ),
       ),
+    /** Not yet: the task stays open and the "Done?" question waits for a newer reply. */
+    replyAnswered: async (task: TaskView): Promise<TaskView> =>
+      keep(
+        unwrap(
+          await api.POST("/api/v1/w/{workspace_id}/tasks/{task_id}/reply_answered", {
+            ...at(workspaceId, task.id),
+            body: { revision: task.revision },
+          }),
+        ),
+      ),
+    /** Takes Not yet back: the question is asked again. */
+    replyUnanswered: async (task: TaskView): Promise<TaskView> =>
+      keep(
+        unwrap(
+          await api.POST("/api/v1/w/{workspace_id}/tasks/{task_id}/reply_unanswered", {
+            ...at(workspaceId, task.id),
+            body: { revision: task.revision },
+          }),
+        ),
+      ),
     handOff: async (task: TaskView, to: string): Promise<TaskView> =>
       keep(
         unwrap(

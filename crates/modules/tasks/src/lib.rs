@@ -51,6 +51,7 @@ pub fn module() -> Module {
         background: Background::new()
             .publishes::<events::TaskChanged>()
             .on_event::<features::add_read_asks::AddReadAsks>()
+            .on_event::<features::notice_replies::NoticeReplies>()
             .on_event::<features::follow_holds::FollowHoldCreated>()
             .on_event::<features::follow_holds::FollowHoldChanged>()
             .on_event::<features::follow_holds::FollowHoldCancelled>()
@@ -62,7 +63,7 @@ pub fn module() -> Module {
 
 /// Every route of the module, one per feature.
 fn router() -> OpenApiRouter<AppState> {
-    use features::{create, get, hand_off, hold, list, plan, status, update};
+    use features::{answer_reply, create, get, hand_off, hold, list, plan, status, update};
     OpenApiRouter::new()
         .routes(routes!(list::handler, create::handler))
         .routes(routes!(get::handler, update::handler))
@@ -70,6 +71,8 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(status::done))
         .routes(routes!(status::not_needed))
         .routes(routes!(status::reopen))
+        .routes(routes!(answer_reply::answer))
+        .routes(routes!(answer_reply::unanswer))
         .routes(routes!(hand_off::hand_off))
         .routes(routes!(hand_off::take_back))
         .routes(routes!(hold::hold))
@@ -102,6 +105,7 @@ mod tests {
         for kind in [
             "tasks.schedule_workspace_purge",
             "tasks.purge_workspace",
+            "tasks.notice_replies",
             "tasks.follow_hold_created",
             "tasks.follow_hold_changed",
             "tasks.follow_hold_cancelled",

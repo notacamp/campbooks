@@ -16,6 +16,7 @@ import { W } from "../../../../../test/demo/conversations";
 import {
   ACCOUNTANT,
   ASK_LEASE,
+  ASK_REPLIED,
   BILL,
   INSPECTION,
   LEASE,
@@ -106,6 +107,10 @@ const dayName = (day: string) =>
 const rowOf = (title: string) =>
   screen.findByRole("button", { name: new RegExp(String.raw`^(Do|Pay)\s+${title}`, "u") });
 
+/** The replied-to task after Not yet, and after Not yet is taken back. */
+const NOT_YET = { ...ASK_REPLIED, asks_done: false, revision: 3 };
+const ASKING_AGAIN = { ...ASK_REPLIED, revision: 4 };
+
 /** The tasks API over a list the calls below change, as the server would. */
 function api(start = OPEN_TASKS, handedOff = [VENUE]) {
   let tasks = [...start];
@@ -137,6 +142,18 @@ function api(start = OPEN_TASKS, handedOff = [VENUE]) {
       body: { ...LEASE, title: (body as { title: string }).title, revision: 2 },
     }),
     [`POST ${W}/tasks/${LEASE.id}/done`]: { body: { ...LEASE, state: "done", revision: 3 } },
+    [`POST ${W}/tasks/${ASK_REPLIED.id}/reply_answered`]: () => {
+      tasks = tasks.map((task) => (task.id === ASK_REPLIED.id ? NOT_YET : task));
+      return { body: NOT_YET };
+    },
+    [`POST ${W}/tasks/${ASK_REPLIED.id}/reply_unanswered`]: () => {
+      tasks = tasks.map((task) => (task.id === ASK_REPLIED.id ? ASKING_AGAIN : task));
+      return { body: ASKING_AGAIN };
+    },
+    [`POST ${W}/tasks/${ASK_REPLIED.id}/done`]: () => {
+      tasks = tasks.filter((task) => task.id !== ASK_REPLIED.id);
+      return { body: { ...ASK_REPLIED, state: "done", asks_done: false, revision: 3 } };
+    },
     [`POST ${W}/tasks/${VENUE.id}/take_back`]: {
       body: { ...VENUE, assignee: ANA.user_id, handed_by: null, revision: 2 },
     },
@@ -294,6 +311,53 @@ describe("Tasks", () => {
       expect(screen.queryByText("Scout found this in the email")).toBeNull();
     });
     expect(screen.getByText(/Walkthrough on Thursday/u)).toBeVisible();
+  });
+
+  it("marks a task that asks Done? after a reply, in its row and with the question in its detail", async () => {
+    const calls = api([ASK_REPLIED, BILL]);
+    renderTasks();
+    // The row says so under the title.
+    const row = await rowOf(ASK_REPLIED.title);
+    expect(within(row).getByText("You replied · Done?")).toBeVisible();
+    expect(within(await rowOf(BILL.title)).queryByText("You replied · Done?")).toBeNull();
+
+    fireEvent.click(row);
+    // The question, above where it came from, with the reply in the source.
+    expect(await screen.findByText(/^You replied to Marta Ferreira at /u)).toBeVisible();
+    expect(screen.getByText("Is this task done?")).toBeVisible();
+    expect(screen.getByText(/^Your reply · /u)).toBeVisible();
+
+    // Not yet: the task stays open and the question is gone, with an Undo.
+    fireEvent.click(screen.getByRole("button", { name: /^Not yet/u }));
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/reply_answered"))?.body).toEqual({
+        revision: 2,
+      });
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Is this task done?")).toBeNull();
+    });
+    expect(await screen.findByText(`Okay, still open · ${ASK_REPLIED.title}`)).toBeVisible();
+    fireEvent.keyDown(document, { key: "z" });
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/reply_unanswered"))?.body).toEqual({
+        revision: 3,
+      });
+    });
+  });
+
+  it("answers the question with Done from the task's detail", async () => {
+    const calls = api([ASK_REPLIED, BILL]);
+    renderTasks(`tasks/${ASK_REPLIED.id}`);
+    expect(await screen.findByText("Is this task done?")).toBeVisible();
+    fireEvent.keyDown(document, { key: "1" });
+    await waitFor(() => {
+      expect(
+        calls.calls.find((c) => c.route.endsWith(`/tasks/${ASK_REPLIED.id}/done`))?.body,
+      ).toEqual({
+        revision: 2,
+      });
+    });
   });
 
   it("takes back a task handed to a teammate from its row, and it stays as mine at once", async () => {

@@ -152,6 +152,44 @@ fn reassigned(
     }
 }
 
+async fn track_done(
+    tracker: &campbooks_kernel::tracking::Tracker,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    task: tracking::TaskSnapshot,
+) -> Result<()> {
+    tracker
+        .track(tx, &tracking::TaskDone { workspace, task })
+        .await?;
+    Ok(())
+}
+
+/// Track a change about the question "You replied. Is this done?": the reply
+/// noticed, or Not yet. The undo of Not yet tracks nothing, so the answer on
+/// record stays the one given. Whether `change` is one of the three.
+async fn reply(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: WorkspaceId,
+    change: TaskChange,
+    task: &tracking::TaskSnapshot,
+) -> Result<bool> {
+    let task = task.clone();
+    match change {
+        TaskChange::Replied => {
+            let noticed = tracking::TaskReplyNoticed { workspace, task };
+            state.tracker.track(tx, &noticed).await?;
+        }
+        TaskChange::ReplyAnswered => {
+            let answered = tracking::TaskReplyAnswered { workspace, task };
+            state.tracker.track(tx, &answered).await?;
+        }
+        TaskChange::ReplyUnanswered => {}
+        _ => return Ok(false),
+    }
+    Ok(true)
+}
+
 /// Track, in `tx`, the change `outcome` of the task that was `before` (none
 /// for a new one) and is `after` now. What did not change tracks nothing: a
 /// plan set again to the one the task had, an update whose values it had.
@@ -192,6 +230,9 @@ pub async fn track(
         return Ok(());
     };
     let tracker = &state.tracker;
+    if reply(state, tx, workspace, change, &task).await? {
+        return Ok(());
+    }
     let Some(before) = before.filter(|_| change != TaskChange::Created) else {
         tracker
             .track(tx, &tracking::TaskCreated { workspace, task })
@@ -238,15 +279,10 @@ pub async fn track(
             };
             tracker.track(tx, &planned).await?;
         }
-        TaskChange::Done => {
-            tracker
-                .track(tx, &tracking::TaskDone { workspace, task })
-                .await?;
-        }
+        TaskChange::Done => track_done(tracker, tx, workspace, task).await?,
         TaskChange::NotNeeded => {
-            tracker
-                .track(tx, &tracking::TaskNotNeeded { workspace, task })
-                .await?;
+            let closed = tracking::TaskNotNeeded { workspace, task };
+            tracker.track(tx, &closed).await?;
         }
         TaskChange::Reopened => {
             let reopened = tracking::TaskReopened {
@@ -260,8 +296,11 @@ pub async fn track(
             let reassigned = reassigned(workspace, task, change, before);
             tracker.track(tx, &reassigned).await?;
         }
-        // Handled above.
-        TaskChange::Created => {}
+        // Handled above, or the undo of Not yet (see [`reply`]).
+        TaskChange::Created
+        | TaskChange::Replied
+        | TaskChange::ReplyAnswered
+        | TaskChange::ReplyUnanswered => {}
     }
     Ok(())
 }

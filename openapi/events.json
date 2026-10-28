@@ -837,6 +837,51 @@
       }
     },
     {
+      "name": "conversations.member_replied",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "The member sent a message in a conversation of their personal inbox\n(`contracts/conversations.member_replied.v1.schema.json`,\ncampbooks-cloud#396): published once for each outbound message stored for\nthe first time, whether it was sent from Campbooks or from the provider's\nown client. A fact for the tasks module, which asks \"Done?\" of the open\ntasks that came from the conversation. Ids and a time only: never the\nmessage, its addresses or its subject. None for a shared inbox, which has\nno one member who replied.",
+        "required": [
+          "workspace",
+          "inbox",
+          "conversation",
+          "message",
+          "sent_at",
+          "owner"
+        ],
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation the message belongs to."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox."
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message the member sent."
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The inbox's personal owner: the member who sent it."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was sent."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "conversations.message_read",
       "module": "conversations",
       "version": 1,
@@ -2246,6 +2291,10 @@
           "assignee"
         ],
         "properties": {
+          "asks_done": {
+            "type": "boolean",
+            "description": "Whether the member is asked \"You replied. Is this done?\"\n(campbooks-cloud#396). Absent from events written before."
+          },
           "assignee": {
             "$ref": "#/components/schemas/UserId",
             "description": "The member it is with."
@@ -2326,6 +2375,14 @@
                 "type": "null"
               }
             ]
+          },
+          "replied_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the member's newest reply in the task's conversation was sent,\nwhile the task is an open Do with one. Absent from events written\nbefore."
           },
           "revision": {
             "type": "integer",
@@ -3818,7 +3875,10 @@
           "not_needed",
           "reopened",
           "handed_off",
-          "taken_back"
+          "taken_back",
+          "replied",
+          "reply_answered",
+          "reply_unanswered"
         ]
       },
       "TaskId": {
