@@ -1010,3 +1010,86 @@ async fn the_assistants_words_carry_no_worded_link(db: PgPool) {
         .unwrap();
     assert_eq!(saved.body["body"], plain, "{}", saved.body);
 }
+
+/// A send the member chose to leave later (campbooks-cloud#392): scheduled
+/// at that time, its release queued for then, and taken back by
+/// `cancel_send` into an editable draft.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_leaves_at_the_time_chosen_and_can_be_taken_back(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let shown = kit.get(&sam, &draft).await.json;
+    let tomorrow = (chrono::Utc::now() + chrono::TimeDelta::days(1))
+        .format("%Y-%m-%dT08:00:00Z")
+        .to_string();
+    let sent = kit
+        .post(
+            &sam,
+            &format!("{draft}/send"),
+            Some(
+                json!({"version": shown["version"], "content_token": shown["content_token"],
+                "send_at": tomorrow}),
+            ),
+        )
+        .await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    assert_eq!(sent.json["state"], "scheduled");
+    let at: chrono::DateTime<chrono::Utc> = sent.json["send_at"].as_str().unwrap().parse().unwrap();
+    assert_eq!(
+        at,
+        tomorrow.parse::<chrono::DateTime<chrono::Utc>>().unwrap()
+    );
+    // Its release waits for then: running the due jobs now sends nothing.
+    let run_at: chrono::DateTime<chrono::Utc> = sqlx::query_scalar(
+        "SELECT run_at FROM kernel.jobs WHERE kind = 'conversations.release_send'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(run_at, at);
+    kit.run_jobs().await;
+    assert_eq!(kit.get(&sam, &draft).await.json["state"], "scheduled");
+    // Taken back the evening before: a draft again.
+    let undone = kit.post(&sam, &format!("{draft}/cancel_send"), None).await;
+    assert_eq!(undone.status, StatusCode::OK, "{:?}", undone.json);
+    assert_eq!(undone.json["state"], "draft");
+    assert!(undone.json["send_at"].is_null());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_time_in_the_past_or_too_far_is_refused(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let shown = kit.get(&sam, &draft).await.json;
+    let now = chrono::Utc::now();
+    for at in [
+        now - chrono::TimeDelta::hours(1),
+        now,
+        now + chrono::TimeDelta::days(367),
+    ] {
+        let refused = kit
+            .post(
+                &sam,
+                &format!("{draft}/send"),
+                Some(
+                    json!({"version": shown["version"], "content_token": shown["content_token"],
+                    "send_at": at.to_rfc3339()}),
+                ),
+            )
+            .await;
+        assert_eq!(
+            refused.status,
+            StatusCode::BAD_REQUEST,
+            "{:?}",
+            refused.json
+        );
+        assert_eq!(
+            refused.json["code"], "send_at_invalid",
+            "{:?}",
+            refused.json
+        );
+        nothing_scheduled(&kit, &draft).await;
+    }
+}

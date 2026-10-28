@@ -40,6 +40,7 @@
     "invalid_senders_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} senders.",
     "invalid_correspondents_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} people.",
     "images_already_trusted": "A smart rule already covers this sender's images, even if it is paused or waiting for a yes. Find it in Scout's memory.",
+    "send_at_invalid": "A send can be scheduled from a minute after the undo window up to {{days}} days ahead.",
     "send_needs_you": "Only you can send mail or take a send back. Scout can write a draft: check it and send it yourself.",
     "images_need_you": "Only you can choose to always show a sender's images. Open one of their messages and choose it there.",
     "person_note_invalid": "A note needs a plain email address and 1 to {{max}} characters about the person.",

@@ -8413,7 +8413,7 @@
             }
           },
           "400": {
-            "description": "No recipient (`no_recipients`), a malformed address (`invalid_address`) or too many attachments (`attachments_too_large`).",
+            "description": "No recipient (`no_recipients`), a malformed address (`invalid_address`), too many attachments (`attachments_too_large`), or a `send_at` too soon or too far ahead (`send_at_invalid`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -31856,6 +31856,14 @@
               "null"
             ],
             "description": "The `content_token` that came with the draft on screen (its last\nsave's answer, or the draft as read). Missing, another member's, or\nnot the draft as it is now: 409 `content_changed`, and nothing is\nsent (campbooks-cloud#242)."
+          },
+          "send_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it leaves (campbooks-cloud#392): at least a minute after the\nundo window ends and at most [`MAX_SEND_AHEAD_DAYS`] days ahead, else\n400 `send_at_invalid`. Without it, it leaves when the undo window\nends. Until then `cancel_send` takes it back."
           },
           "version": {
             "type": "integer",

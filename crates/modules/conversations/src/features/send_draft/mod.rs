@@ -2,7 +2,8 @@
 //! `POST …/drafts/{draft_id}/cancel_send` — take it back within the window.
 //!
 //! Sending checks the draft, then schedules it: `conversations.release_send`
-//! runs when the window ends and hands it to the connector, unless it was
+//! runs when the window ends (or at the `send_at` the member chose,
+//! campbooks-cloud#392) and hands it to the connector, unless it was
 //! cancelled, deleted or sent again meanwhile (each send has a generation,
 //! and a release acts only at its own).
 //!
@@ -21,7 +22,7 @@ use campbooks_kernel::{
     operations::RateLimit,
     tenancy::{Workspace, WorkspaceId},
 };
-use chrono::{TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 
@@ -51,6 +52,35 @@ pub struct SendDraft {
     /// sent (campbooks-cloud#242).
     #[serde(default)]
     pub content_token: Option<String>,
+    /// When it leaves (campbooks-cloud#392): at least a minute after the
+    /// undo window ends and at most [`MAX_SEND_AHEAD_DAYS`] days ahead, else
+    /// 400 `send_at_invalid`. Without it, it leaves when the undo window
+    /// ends. Until then `cancel_send` takes it back.
+    #[serde(default)]
+    pub send_at: Option<DateTime<Utc>>,
+}
+
+/// The furthest ahead a send may be scheduled, in days.
+pub const MAX_SEND_AHEAD_DAYS: i64 = 366;
+
+/// When a send asked to leave at `asked` (none: when the undo window ends)
+/// leaves, seen at `now`; `None` when `asked` is out of range.
+pub fn leaves_at(
+    now: DateTime<Utc>,
+    undo: TimeDelta,
+    asked: Option<DateTime<Utc>>,
+) -> Option<DateTime<Utc>> {
+    let soonest = now + undo;
+    match asked {
+        None => Some(soonest),
+        Some(at)
+            if at >= soonest + TimeDelta::minutes(1)
+                && at <= now + TimeDelta::days(MAX_SEND_AHEAD_DAYS) =>
+        {
+            Some(at)
+        }
+        Some(_) => None,
+    }
 }
 
 /// How sending behaves, from the module's settings.
@@ -82,7 +112,7 @@ pub struct SendSettings {
     responses(
         (status = ACCEPTED, description = "Scheduled: it leaves at `send_at` unless cancelled.",
             body = DraftView),
-        (status = BAD_REQUEST, description = "No recipient (`no_recipients`), a malformed address (`invalid_address`) or too many attachments (`attachments_too_large`).",
+        (status = BAD_REQUEST, description = "No recipient (`no_recipients`), a malformed address (`invalid_address`), too many attachments (`attachments_too_large`), or a `send_at` too soon or too far ahead (`send_at_invalid`).",
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -116,6 +146,13 @@ pub async fn send(
     if i64::from(body.version) != i64::from(row.version) {
         return Err(Error::Conflict(crate::MESSAGES.reason("draft_changed")));
     }
+    let Some(send_at) = leaves_at(Utc::now(), settings.undo, body.send_at) else {
+        return Err(Error::BadRequest(
+            crate::MESSAGES
+                .reason("send_at_invalid")
+                .arg("days", MAX_SEND_AHEAD_DAYS),
+        ));
+    };
     if !state.binding.is_enabled() {
         tracing::warn!(
             workspace = %access.workspace,
@@ -148,7 +185,6 @@ pub async fn send(
                 .arg("max", MAX_ATTACHMENT_BYTES / (1024 * 1024)),
         ));
     }
-    let send_at = Utc::now() + settings.undo;
     let generation = sqlx::query_scalar!(
         r#"
         UPDATE conversations.drafts
@@ -332,3 +368,25 @@ pub async fn cancel(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod leaves_at_tests {
+    use super::{TimeDelta, Utc, leaves_at};
+
+    #[test]
+    fn a_send_leaves_when_the_window_ends_or_at_a_time_in_range() {
+        let now = Utc::now();
+        let undo = TimeDelta::seconds(10);
+        assert_eq!(leaves_at(now, undo, None), Some(now + undo));
+        let tomorrow = now + TimeDelta::days(1);
+        assert_eq!(leaves_at(now, undo, Some(tomorrow)), Some(tomorrow));
+        // Inside the window plus a minute, or past a year and a day: refused.
+        assert_eq!(
+            leaves_at(now, undo, Some(now + TimeDelta::seconds(30))),
+            None
+        );
+        assert_eq!(leaves_at(now, undo, Some(now - TimeDelta::hours(1))), None);
+        assert_eq!(leaves_at(now, undo, Some(now + TimeDelta::days(367))), None);
+        assert!(leaves_at(now, undo, Some(now + TimeDelta::days(366))).is_some());
+    }
+}

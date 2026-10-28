@@ -40,6 +40,7 @@
     "invalid_senders_query": "Busca con 2 a 100 caracteres y pide entre 1 y {{max}} remitentes.",
     "invalid_correspondents_query": "Busca con 2 a 100 caracteres y pide entre 1 y {{max}} personas.",
     "images_already_trusted": "Ya hay una regla inteligente para las imágenes de este remitente, aunque esté en pausa o esperando un sí. La encontrarás en la memoria de Scout.",
+    "send_at_invalid": "Un envío se puede programar desde un minuto después del plazo para deshacer hasta {{days}} días después.",
     "send_needs_you": "Solo tú puedes enviar correo o deshacer un envío. Scout puede escribir un borrador: revísalo y envíalo tú.",
     "images_need_you": "Solo tú puedes elegir mostrar siempre las imágenes de un remitente. Abre uno de sus mensajes y elígelo allí.",
     "person_note_invalid": "Una nota necesita una dirección de correo simple y de 1 a {{max}} caracteres sobre la persona.",
