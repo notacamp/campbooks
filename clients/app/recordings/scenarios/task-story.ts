@@ -17,6 +17,9 @@ export default async function taskStory({ page }: ScenarioContext): Promise<void
   await history.scrollIntoViewIfNeeded();
   await page.getByText("You marked it done").first().waitFor();
   await caption(page, "Its history: every change, who made it, and when", 3000);
-  await page.getByText(/^The calendar moved the held time/u).first().scrollIntoViewIfNeeded();
+  await page
+    .getByText(/^The calendar moved the held time/u)
+    .first()
+    .scrollIntoViewIfNeeded();
   await caption(page, "Scout and the calendar are named too", 2400);
 }
