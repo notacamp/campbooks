@@ -7,6 +7,7 @@ import {
   ButtonLink,
   Checkbox,
   Dialog,
+  Icon,
   Panel,
   Select,
   SkeletonList,
@@ -19,7 +20,7 @@ import type { UseNotionSource } from "../notion-source";
 
 import { useNotionActions } from "./use-notion-actions";
 
-/** Most pages one import takes (the server's cap). */
+/** Most pages and databases together one import takes (the server's cap). */
 export const MAX_IMPORT = 100;
 
 const INDENT = ["pl-0", "pl-6", "pl-12", "pl-12"] as const;
@@ -54,6 +55,7 @@ export function ImportFromNotion({
   const actions = useNotionActions(workspaceId);
   const [chosen, setChosen] = useState<string | undefined>();
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
+  const [tickedDatabases, setTickedDatabases] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const source = useSource(workspaceId, open ? chosen : undefined);
@@ -73,31 +75,54 @@ export function ImportFromNotion({
   const choice = choiceOf(tree, ticked);
   const request = importRequest(tree, ticked);
   const count = choice.included.size;
+  const databases = source.databases;
+  const offered = databases?.status === "ready" ? databases.items : [];
+  const databaseCount = offered.filter(
+    (database) => tickedDatabases.has(database.data_source) && !database.linked,
+  ).length;
+  const asked = request.length + databaseCount;
   const connection = connections?.find((candidate) => candidate.id === chosen);
   const me = members.data?.find((member) => member.you);
   const who = [me?.display_name ?? me?.email, connection?.name].filter(Boolean).join(" · ");
 
   const close = () => {
     setTicked(new Set());
+    setTickedDatabases(new Set());
     setFailed(false);
     onClose();
   };
   const submit = () => {
-    if (chosen === undefined || request.length === 0) {
+    if (chosen === undefined || asked === 0) {
       return;
     }
     setBusy(true);
     setFailed(false);
-    void actions.importPages({ connection: chosen, pages: request }, count).then((imported) => {
-      setBusy(false);
-      if (imported === undefined) {
-        setFailed(true);
-        return;
-      }
-      setTicked(new Set());
-      onClose();
-      onImported(imported.pages[0]?.page);
-    });
+    const dataSources = offered
+      .filter((database) => tickedDatabases.has(database.data_source) && !database.linked)
+      .map((database) => ({
+        data_source: database.data_source,
+        title: database.title.slice(0, 200),
+      }));
+    void actions
+      .importPages(
+        {
+          connection: chosen,
+          pages: request,
+          ...(dataSources.length > 0 ? { data_sources: dataSources } : {}),
+        },
+        count,
+      )
+      .then((imported) => {
+        setBusy(false);
+        if (imported === undefined) {
+          setFailed(true);
+          return;
+        }
+        setTicked(new Set());
+        setTickedDatabases(new Set());
+        onClose();
+        onImported(imported.pages[0]?.page ?? imported.tables?.[0]?.table);
+      });
   };
 
   const ready = source.list.status === "ready" && connection?.needsReauth !== true;
@@ -114,16 +139,23 @@ export function ImportFromNotion({
           </Button>
           <Button
             variant="primary"
-            disabled={!ready || request.length === 0 || request.length > MAX_IMPORT || busy}
+            disabled={!ready || asked === 0 || asked > MAX_IMPORT || busy}
             onClick={submit}
           >
-            {count === 0 ? t("notion.import.submitNone") : t("notion.import.submit", { count })}
+            {submitLabel(
+              t,
+              count,
+              databaseCount,
+              databases !== undefined && databases.status !== "off",
+            )}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-3">
-        <Text tone="secondary">{t("notion.import.lead")}</Text>
+        <Text tone="secondary">
+          {t(offered.length > 0 ? "notion.import.databases.lead" : "notion.import.lead")}
+        </Text>
         {connections !== undefined && connections.length > 1 ? (
           <Select
             label={t("notion.import.account")}
@@ -132,6 +164,7 @@ export function ImportFromNotion({
             onChange={(next) => {
               setChosen(next);
               setTicked(new Set());
+              setTickedDatabases(new Set());
             }}
           />
         ) : null}
@@ -145,12 +178,22 @@ export function ImportFromNotion({
           tree={tree}
           included={choice.included}
           ticked={ticked}
+          tickedDatabases={tickedDatabases}
           settingsHref={settingsHref}
           onToggle={(id) => {
             setTicked((current) => toggle(tree, current, id));
           }}
+          onToggleDatabase={(id) => {
+            setTickedDatabases((current) => {
+              const next = new Set(current);
+              if (!next.delete(id)) {
+                next.add(id);
+              }
+              return next;
+            });
+          }}
         />
-        {request.length > MAX_IMPORT ? (
+        {asked > MAX_IMPORT ? (
           <Banner
             tone="danger"
             role="alert"
@@ -160,12 +203,31 @@ export function ImportFromNotion({
         {failed ? <Banner tone="danger" role="alert" title={t("notion.import.failed")} /> : null}
         <Panel>
           <Text tone="secondary" size="sm">
-            {t("notion.import.info")}
+            {t(offered.length > 0 ? "notion.import.databases.info" : "notion.import.info")}
           </Text>
         </Panel>
       </div>
     </Dialog>
   );
+}
+
+type Translate = ReturnType<typeof useTranslation<"pages">>["t"];
+
+/** The import button: what is ticked, in words (pages, databases, or both). */
+function submitLabel(t: Translate, pages: number, databases: number, offersDatabases: boolean) {
+  if (pages > 0 && databases > 0) {
+    return t("notion.import.submitBoth", {
+      pages: t("notion.import.pagesCount", { count: pages }),
+      databases: t("notion.import.databases.count", { count: databases }),
+    });
+  }
+  if (databases > 0) {
+    return t("notion.import.databases.submit", { count: databases });
+  }
+  if (pages > 0) {
+    return t("notion.import.submit", { count: pages });
+  }
+  return t(offersDatabases ? "notion.import.databases.submitNone" : "notion.import.submitNone");
 }
 
 interface BodyProps {
@@ -176,8 +238,10 @@ interface BodyProps {
   tree: readonly ImportNode[];
   included: ReadonlySet<string>;
   ticked: ReadonlySet<string>;
+  tickedDatabases: ReadonlySet<string>;
   settingsHref: string;
   onToggle: (id: string) => void;
+  onToggleDatabase: (id: string) => void;
 }
 
 function Body({
@@ -188,8 +252,10 @@ function Body({
   tree,
   included,
   ticked,
+  tickedDatabases,
   settingsHref,
   onToggle,
+  onToggleDatabase,
 }: BodyProps) {
   const { t } = useTranslation("pages");
   if (!connectionsKnown || (hasConnection && source.list.status === "loading")) {
@@ -228,7 +294,9 @@ function Body({
       </div>
     );
   }
-  if (tree.length === 0) {
+  const databases = source.databases;
+  const offered = databases?.status === "ready" ? databases.items : [];
+  if (tree.length === 0 && offered.length === 0) {
     return (
       <div className="flex flex-col gap-1">
         <strong>{t("notion.import.empty.title")}</strong>
@@ -237,37 +305,95 @@ function Body({
     );
   }
   return (
-    <div className="flex flex-col gap-1" role="group" aria-label={t("notion.import.listLabel")}>
-      {allNodes(tree).map(({ page, depth }) => {
-        const came = included.has(page.notion_page) && !ticked.has(page.notion_page);
-        return (
-          <div key={page.notion_page} className={INDENT[Math.min(depth, INDENT.length - 1)]}>
+    <div className="flex flex-col gap-3">
+      {offered.length > 0 ? (
+        <div
+          className="flex flex-col gap-1"
+          role="group"
+          aria-label={t("notion.import.databases.listLabel")}
+        >
+          <Text as="span" weight="semibold" size="sm">
+            {t("notion.import.databases.heading")}
+          </Text>
+          {offered.map((database) => (
             <Checkbox
+              key={database.data_source}
               label={
-                <span className="break-words">
-                  {page.title === "" ? t("untitled") : page.title}
+                <span className="flex min-w-0 items-center gap-2">
+                  <Icon name="table" />
+                  <span className="min-w-0 break-words">
+                    {database.title === "" ? t("untitled") : database.title}
+                  </span>
                 </span>
               }
               hint={
-                page.linked
+                database.linked
                   ? t("notion.import.linked")
-                  : page.sub_pages > 0
-                    ? t("notion.import.subPages", { count: page.sub_pages })
-                    : undefined
+                  : t("notion.import.databases.columns", { count: database.columns })
               }
-              checked={included.has(page.notion_page) || page.linked}
-              disabled={page.linked || came}
+              checked={database.linked || tickedDatabases.has(database.data_source)}
+              disabled={database.linked}
               onChange={() => {
-                onToggle(page.notion_page);
+                onToggleDatabase(database.data_source);
               }}
             />
-          </div>
-        );
-      })}
-      {source.list.truncated ? (
-        <Text tone="tertiary" size="sm">
-          {t("notion.import.truncated")}
-        </Text>
+          ))}
+          {databases?.truncated === true ? (
+            <Text tone="tertiary" size="sm">
+              {t("notion.import.databases.truncated")}
+            </Text>
+          ) : null}
+        </div>
+      ) : null}
+      {databases?.status === "error" ? (
+        <div className="flex flex-col items-start gap-2" role="alert">
+          <Text tone="secondary" size="sm">
+            {t("notion.import.databases.failed")}
+          </Text>
+          <Button variant="secondary" onClick={databases.retry}>
+            {t("notion.import.retry")}
+          </Button>
+        </div>
+      ) : null}
+      {tree.length > 0 ? (
+        <div className="flex flex-col gap-1" role="group" aria-label={t("notion.import.listLabel")}>
+          {offered.length > 0 ? (
+            <Text as="span" weight="semibold" size="sm">
+              {t("notion.import.pagesHeading")}
+            </Text>
+          ) : null}
+          {allNodes(tree).map(({ page, depth }) => {
+            const came = included.has(page.notion_page) && !ticked.has(page.notion_page);
+            return (
+              <div key={page.notion_page} className={INDENT[Math.min(depth, INDENT.length - 1)]}>
+                <Checkbox
+                  label={
+                    <span className="break-words">
+                      {page.title === "" ? t("untitled") : page.title}
+                    </span>
+                  }
+                  hint={
+                    page.linked
+                      ? t("notion.import.linked")
+                      : page.sub_pages > 0
+                        ? t("notion.import.subPages", { count: page.sub_pages })
+                        : undefined
+                  }
+                  checked={included.has(page.notion_page) || page.linked}
+                  disabled={page.linked || came}
+                  onChange={() => {
+                    onToggle(page.notion_page);
+                  }}
+                />
+              </div>
+            );
+          })}
+          {source.list.truncated ? (
+            <Text tone="tertiary" size="sm">
+              {t("notion.import.truncated")}
+            </Text>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

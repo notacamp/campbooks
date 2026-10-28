@@ -254,10 +254,34 @@
         }
       },
       "retry": "Intentarlo de nuevo",
-      "tooMany": "Elige como máximo {{max}} páginas cada vez.",
+      "tooMany": "Elige como máximo {{max}} páginas y bases de datos a la vez.",
       "failed": "No se pudo importar. No se cambió nada.",
       "done_one": "{{count}} página importada desde Notion",
-      "done_other": "{{count}} páginas importadas desde Notion"
+      "done_other": "{{count}} páginas importadas desde Notion",
+      "pagesHeading": "Páginas",
+      "pagesCount_one": "{{count}} página",
+      "pagesCount_other": "{{count}} páginas",
+      "submitBoth": "Importar {{pages}} y {{databases}}",
+      "doneTables_one": "{{count}} tabla importada desde Notion",
+      "doneTables_other": "{{count}} tablas importadas desde Notion",
+      "doneBoth": "Importadas desde Notion: {{pages}} y {{tables}}",
+      "databases": {
+        "lead": "Las páginas se quedan como páginas. Las bases de datos pasan a ser tablas, y cada entrada pasa a ser una fila que puedes abrir como página.",
+        "info": "Los valores y las columnas se sincronizan en los dos sentidos: añade, renombra, cambia el tipo o elimina una columna en cualquiera de los dos lados y el otro lo sigue. Las fórmulas, los rollups y las personas siguen siendo de Notion y se muestran de solo lectura; las columnas solo de Campbooks (como Conversaciones) se quedan aquí. Una relación con una base de datos que no importaste aparece como “Se mantiene en Notion”.",
+        "heading": "Bases de datos",
+        "listLabel": "Bases de datos de Notion",
+        "columns_one": "{{count}} columna",
+        "columns_other": "{{count}} columnas",
+        "count_one": "{{count}} base de datos",
+        "count_other": "{{count}} bases de datos",
+        "tablesCount_one": "{{count}} tabla",
+        "tablesCount_other": "{{count}} tablas",
+        "submit_one": "Importar {{count}} base de datos",
+        "submit_other": "Importar {{count}} bases de datos",
+        "submitNone": "Importar",
+        "truncated": "Notion lista más bases de datos de las que se muestran aquí. Comparte menos bases de datos en Notion para ver el resto.",
+        "failed": "No se pudieron listar las bases de datos ahora mismo. Las páginas se pueden importar igualmente."
+      }
     },
     "sync": {
       "label": "Sincronización con Notion",
@@ -283,7 +307,20 @@
       "stopFailed": "No se pudo dejar de sincronizar. No se cambió nada.",
       "conflicts_one": "{{count}} cambio por revisar",
       "conflicts_other": "{{count}} cambios por revisar",
-      "conflictsHint": "Ir al primero"
+      "conflictsHint": "Ir al primero",
+      "table": {
+        "reason": {
+          "stopped_by_member": "Sincronización con Notion detenida",
+          "disconnected": "No sincronizada: Notion se desconectó",
+          "trashed_here": "No sincronizada: la tabla se movió a la papelera",
+          "trashed_in_notion": "No sincronizada: la base de datos está en la papelera de Notion",
+          "not_shared": "No sincronizada: la base de datos ya no está compartida con Campbooks en Notion",
+          "member_left": "No sincronizada: se fue el miembro que conectó Notion",
+          "notion_unavailable": "No sincronizada: Notion no está disponible en esta instancia",
+          "other": "Ya no está sincronizada con Notion"
+        },
+        "stopQuestion": "¿Dejar de mantener esta tabla al día con Notion? La tabla se queda aquí y la base de datos de Notion no se toca. Para empezar de nuevo, impórtala otra vez."
+      }
     },
     "conflict": {
       "label": "Un cambio de Notion",
@@ -325,6 +362,62 @@
         "breadcrumb": "Ruta de navegación",
         "template": "Botón de plantilla",
         "unsupported": "Bloque"
+      }
+    },
+    "table": {
+      "cell": {
+        "label": "Un cambio de Notion en {{property}}",
+        "changed": "{{property}} se cambió aquí y en Notion",
+        "when": "Cambio en Notion: {{when}}",
+        "mine": "El tuyo",
+        "theirs": "El de Notion",
+        "choices": "Elige una versión de {{property}}",
+        "keepMineFor": "Conservar la mía en {{property}}",
+        "useNotionFor": "Usar la de Notion en {{property}}",
+        "flag": "{{property}} también cambió en Notion: elige una versión"
+      },
+      "column": {
+        "label": "Columna {{name}} cambiada en los dos lados",
+        "changed": "“{{name}}” se cambió aquí y en Notion",
+        "banner": "Columnas cambiadas en los dos lados",
+        "choices": "Elige una versión de {{name}}",
+        "keepName": "Conservar “{{name}}”",
+        "useName": "Usar “{{name}}”",
+        "footer": "Una columna eliminada en un lado y cambiada en el otro se conserva, nunca se borra por un conflicto.",
+        "differs": {
+          "name": "Nombre: “{{mine}}” aquí, “{{theirs}}” en Notion",
+          "type": "Tipo: {{mine}} aquí, {{theirs}} en Notion",
+          "options": "Opciones: {{mine}} aquí, {{theirs}} en Notion"
+        }
+      },
+      "lock": {
+        "formula": "Solo lectura: una fórmula, calculada en Notion",
+        "rollup": "Solo lectura: un rollup, calculado en Notion",
+        "people": "Solo lectura: las personas siguen siendo de Notion",
+        "external": "Solo lectura: se mantiene en Notion"
+      },
+      "lockNote": {
+        "formula": "{{name}} es una fórmula de Notion: Notion calcula sus valores, así que no se pueden editar aquí. Aun así puedes renombrar o eliminar la columna: el cambio también va a Notion.",
+        "rollup": "{{name}} es un rollup de Notion: Notion calcula sus valores, así que no se pueden editar aquí. Aun así puedes renombrar o eliminar la columna: el cambio también va a Notion.",
+        "people": "{{name}} es una columna de personas de Notion: sus valores siguen siendo de Notion. Aun así puedes renombrar o eliminar la columna: el cambio también va a Notion.",
+        "external": "{{name}} se mantiene en Notion (una relación, archivos u otro tipo que Campbooks no tiene): sus valores no se pueden editar aquí. Aun así puedes renombrar o eliminar la columna: el cambio también va a Notion."
+      },
+      "campbooksOnly": {
+        "reason": "Solo de Campbooks: nunca se envía a Notion",
+        "note": "{{name}} es solo de Campbooks: nunca se envía a Notion y los cambios de Notion no la tocan."
+      },
+      "stays": {
+        "short": "Se queda en Campbooks",
+        "options": "Añadir una opción va a Notion. Renombrar, cambiar el color o eliminar una se queda en Campbooks: Notion no puede hacer ese cambio."
+      },
+      "remove": {
+        "menu": "Eliminar de los dos lados…",
+        "title": "¿Eliminar “{{name}}” de los dos lados?",
+        "body_one": "También elimina la columna y sus valores ({{count}} fila) de la base de datos de Notion. Campbooks los guarda 30 días, así que Deshacer devuelve la columna y sus valores a los dos lados.",
+        "body_other": "También elimina la columna y sus valores ({{count}} filas) de la base de datos de Notion. Campbooks los guarda 30 días, así que Deshacer devuelve la columna y sus valores a los dos lados.",
+        "cancel": "Cancelar",
+        "confirm": "Eliminar de los dos lados",
+        "failed": "No se pudo eliminar. No se cambió nada."
       }
     }
   },
@@ -615,7 +708,8 @@
       "tableFailed": "No se pudo crear la tabla. No se guardó nada.",
       "createFailed": "No se pudo crear la tabla. No se guardó nada.",
       "inlineCreated": "Tabla añadida a la página",
-      "linkFailed": "No se pudo enlazar esa tabla. No se cambió nada."
+      "linkFailed": "No se pudo enlazar esa tabla. No se cambió nada.",
+      "columnRemovedBoth": "Columna {{property}} eliminada de los dos lados"
     }
   }
 }

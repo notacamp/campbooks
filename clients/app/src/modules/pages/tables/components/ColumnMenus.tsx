@@ -18,6 +18,9 @@ import {
 
 import { focusOnMount } from "../focus";
 import { isRecord, showsWho, sortable } from "../model";
+import { useSyncedTable } from "../notion/context";
+import { NotionMark, NotionNote } from "../notion/Marks";
+import { lockOf, reachesNotion, staysInCampbooks } from "../notion/model";
 import { glyphOf } from "../type-info";
 import {
   TYPE_GROUPS,
@@ -38,6 +41,7 @@ export function TypeMenu({
   onPick: (type: PropertyType) => void;
 }) {
   const { t } = useTranslation("pages");
+  const synced = useSyncedTable();
   const groups = Object.keys(TYPE_GROUPS) as TypeGroup[];
   return (
     <MenuList label={label}>
@@ -48,7 +52,11 @@ export function TypeMenu({
             <MenuItem
               key={type}
               glyph={glyphOf(type)}
-              hint={t(`tables.typeHint.${type}`)}
+              hint={
+                synced.syncing && staysInCampbooks(type)
+                  ? t("notion.table.stays.short")
+                  : t(`tables.typeHint.${type}`)
+              }
               checked={current === undefined ? undefined : current === type}
               onSelect={() => {
                 onPick(type);
@@ -218,11 +226,15 @@ export function ColumnMenu({
   onDelete,
 }: ColumnMenuProps) {
   const { t } = useTranslation("pages");
+  const synced = useSyncedTable();
   const [step, setStep] = useState<"menu" | "rename" | "type">("menu");
   const [name, setName] = useState(property.name);
   const isTitle = property.type === "title";
   const config = isRecord(property.config) ? property.config : {};
   const label = t("tables.column.menu", { property: property.name });
+  // Notion's own computed columns keep their type; the rest may change to what Notion can make.
+  const locked = lockOf(property.type) !== undefined;
+  const both = synced.syncing && reachesNotion(property.type);
 
   return (
     <Popover
@@ -238,11 +250,14 @@ export function ColumnMenu({
           {...trigger}
           glyph={glyphOf(property.type)}
           trailing={
-            sort === undefined ? null : (
-              <span role="img" aria-label={t(`tables.sort.${sort}`)}>
-                {sort === "asc" ? "↑" : "↓"}
-              </span>
-            )
+            <>
+              <NotionMark property={property} />
+              {sort === undefined ? null : (
+                <span role="img" aria-label={t(`tables.sort.${sort}`)}>
+                  {sort === "asc" ? "↑" : "↓"}
+                </span>
+              )}
+            </>
           }
         >
           {property.name}
@@ -292,131 +307,134 @@ export function ColumnMenu({
           );
         }
         return (
-          <MenuList label={label}>
-            {canWrite ? (
-              <MenuItem
-                icon="edit"
-                onSelect={() => {
-                  setStep("rename");
-                }}
-              >
-                {t("tables.column.rename")}
-              </MenuItem>
-            ) : null}
-            {canWrite && !isTitle ? (
-              <MenuItem
-                glyph={glyphOf(property.type)}
-                hint={t(`tables.type.${property.type}`)}
-                onSelect={() => {
-                  setStep("type");
-                }}
-              >
-                {t("tables.column.changeType")}
-              </MenuItem>
-            ) : null}
-            {canWrite && property.type === "number" ? (
-              <>
-                <MenuHeading>{t("tables.column.format")}</MenuHeading>
-                {NUMBER_FORMATS.map(([id, format, currency]) => (
+          <>
+            <NotionNote property={property} />
+            <MenuList label={label}>
+              {canWrite ? (
+                <MenuItem
+                  icon="edit"
+                  onSelect={() => {
+                    setStep("rename");
+                  }}
+                >
+                  {t("tables.column.rename")}
+                </MenuItem>
+              ) : null}
+              {canWrite && !isTitle && !locked ? (
+                <MenuItem
+                  glyph={glyphOf(property.type)}
+                  hint={t(`tables.type.${property.type}`)}
+                  onSelect={() => {
+                    setStep("type");
+                  }}
+                >
+                  {t("tables.column.changeType")}
+                </MenuItem>
+              ) : null}
+              {canWrite && property.type === "number" ? (
+                <>
+                  <MenuHeading>{t("tables.column.format")}</MenuHeading>
+                  {NUMBER_FORMATS.map(([id, format, currency]) => (
+                    <MenuItem
+                      key={id}
+                      checked={
+                        config["format"] === format &&
+                        (currency === undefined || config["currency"] === currency)
+                      }
+                      onSelect={() => {
+                        close();
+                        onConfig(currency === undefined ? { format } : { format, currency });
+                      }}
+                    >
+                      {t(`tables.numberFormat.${id}`)}
+                    </MenuItem>
+                  ))}
+                </>
+              ) : null}
+              {canWrite && property.type === "date" ? (
+                <MenuItem
+                  checked={config["time"] === true}
+                  onSelect={() => {
+                    close();
+                    onConfig({ time: config["time"] !== true });
+                  }}
+                >
+                  {t("tables.column.includeTime")}
+                </MenuItem>
+              ) : null}
+              {canWrite && (property.type === "created" || property.type === "edited") ? (
+                <MenuItem
+                  checked={showsWho(property)}
+                  onSelect={() => {
+                    close();
+                    onConfig({ of: showsWho(property) ? "time" : "who" });
+                  }}
+                >
+                  {t("tables.column.showsWho")}
+                </MenuItem>
+              ) : null}
+              {sortable(property) ? (
+                <>
+                  <MenuSeparator />
                   <MenuItem
-                    key={id}
-                    checked={
-                      config["format"] === format &&
-                      (currency === undefined || config["currency"] === currency)
-                    }
+                    icon="sort"
+                    checked={sort === "asc"}
                     onSelect={() => {
                       close();
-                      onConfig(currency === undefined ? { format } : { format, currency });
+                      onSort(sort === "asc" ? undefined : "asc");
                     }}
                   >
-                    {t(`tables.numberFormat.${id}`)}
+                    {t("tables.sort.asc")}
                   </MenuItem>
-                ))}
-              </>
-            ) : null}
-            {canWrite && property.type === "date" ? (
+                  <MenuItem
+                    icon="sort"
+                    checked={sort === "desc"}
+                    onSelect={() => {
+                      close();
+                      onSort(sort === "desc" ? undefined : "desc");
+                    }}
+                  >
+                    {t("tables.sort.desc")}
+                  </MenuItem>
+                </>
+              ) : null}
               <MenuItem
-                checked={config["time"] === true}
+                icon="filter"
                 onSelect={() => {
                   close();
-                  onConfig({ time: config["time"] !== true });
+                  onFilter();
                 }}
               >
-                {t("tables.column.includeTime")}
+                {t("tables.column.filter")}
               </MenuItem>
-            ) : null}
-            {canWrite && (property.type === "created" || property.type === "edited") ? (
-              <MenuItem
-                checked={showsWho(property)}
-                onSelect={() => {
-                  close();
-                  onConfig({ of: showsWho(property) ? "time" : "who" });
-                }}
-              >
-                {t("tables.column.showsWho")}
-              </MenuItem>
-            ) : null}
-            {sortable(property) ? (
-              <>
-                <MenuSeparator />
+              {isTitle ? null : (
                 <MenuItem
-                  icon="sort"
-                  checked={sort === "asc"}
+                  icon="close"
                   onSelect={() => {
                     close();
-                    onSort(sort === "asc" ? undefined : "asc");
+                    onHide();
                   }}
                 >
-                  {t("tables.sort.asc")}
+                  {t("tables.column.hide")}
                 </MenuItem>
-                <MenuItem
-                  icon="sort"
-                  checked={sort === "desc"}
-                  onSelect={() => {
-                    close();
-                    onSort(sort === "desc" ? undefined : "desc");
-                  }}
-                >
-                  {t("tables.sort.desc")}
-                </MenuItem>
-              </>
-            ) : null}
-            <MenuItem
-              icon="filter"
-              onSelect={() => {
-                close();
-                onFilter();
-              }}
-            >
-              {t("tables.column.filter")}
-            </MenuItem>
-            {isTitle ? null : (
-              <MenuItem
-                icon="close"
-                onSelect={() => {
-                  close();
-                  onHide();
-                }}
-              >
-                {t("tables.column.hide")}
-              </MenuItem>
-            )}
-            {canWrite && !isTitle ? (
-              <>
-                <MenuSeparator />
-                <MenuItem
-                  icon="trash"
-                  danger
-                  onSelect={() => {
-                    close();
-                    onDelete();
-                  }}
-                >
-                  {t("tables.column.delete")}
-                </MenuItem>
-              </>
-            ) : null}
-          </MenuList>
+              )}
+              {canWrite && !isTitle ? (
+                <>
+                  <MenuSeparator />
+                  <MenuItem
+                    icon="trash"
+                    danger
+                    onSelect={() => {
+                      close();
+                      onDelete();
+                    }}
+                  >
+                    {both ? t("notion.table.remove.menu") : t("tables.column.delete")}
+                  </MenuItem>
+                </>
+              ) : null}
+            </MenuList>
+          </>
         );
       }}
     </Popover>

@@ -8,7 +8,7 @@ import { NOTION_PAGES } from "../../../../test/demo/pages";
 import { DUARTE } from "../../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../../test/render";
 
-import { notionStartError, useNotionPages, useStartNotion } from "./notion";
+import { notionStartError, useNotionDataSources, useNotionPages, useStartNotion } from "./notion";
 
 const W = `/bff/api/v1/w/${DUARTE.id}`;
 
@@ -31,6 +31,17 @@ function Pages({ id }: { id: string | undefined }) {
   return (
     <p>
       {pages.fetchStatus}|{pages.data?.pages.length ?? "-"}|{pages.isError ? "error" : "ok"}
+    </p>
+  );
+}
+
+function Databases({ id }: { id: string | undefined }) {
+  const databases = useNotionDataSources(DUARTE.id, id);
+  return (
+    <p>
+      {databases.fetchStatus}|
+      {databases.data === undefined ? "-" : (databases.data?.data_sources.length ?? "none")}|
+      {databases.isError ? "error" : "ok"}
     </p>
   );
 }
@@ -63,6 +74,45 @@ describe("the Notion calls", () => {
     rerender(<Pages id={NOTION_CONNECTION.id} />);
     await waitFor(() => {
       expect(screen.getByText(`idle|${String(NOTION_PAGES.length)}|ok`)).toBeVisible();
+    });
+  });
+
+  it("lists the databases of a connection, only once it is named", async () => {
+    mockApi({
+      [`GET ${W}/connections/${NOTION_CONNECTION.id}/notion/data-sources`]: {
+        body: {
+          data_sources: [
+            {
+              data_source: "d1",
+              title: "Clients",
+              edited_at: "2026-10-27T09:00:00Z",
+              columns: 7,
+              linked: false,
+            },
+          ],
+          truncated: false,
+          requests: 1,
+        },
+      },
+    });
+    const { rerender } = renderWithProviders(<Databases id={undefined} />);
+    expect(await screen.findByText("idle|-|ok")).toBeVisible();
+    rerender(<Databases id={NOTION_CONNECTION.id} />);
+    await waitFor(() => {
+      expect(screen.getByText("idle|1|ok")).toBeVisible();
+    });
+  });
+
+  it("takes a 404 for the databases as none to offer, not as a failure", async () => {
+    mockApi({
+      [`GET ${W}/connections/${NOTION_CONNECTION.id}/notion/data-sources`]: problem(
+        404,
+        "not_found",
+      ),
+    });
+    renderWithProviders(<Databases id={NOTION_CONNECTION.id} />);
+    await waitFor(() => {
+      expect(screen.getByText("idle|none|ok")).toBeVisible();
     });
   });
 

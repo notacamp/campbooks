@@ -120,6 +120,58 @@ describe("NotionSync", () => {
     expect(screen.queryByRole("button", { name: "Stop syncing" })).toBeNull();
   });
 
+  it("words a table's sync in its own terms, and opens its database", async () => {
+    const onStop = vi.fn(() => Promise.resolve(true));
+    renderWithProviders(
+      <NotionSync
+        kind="table"
+        link={{
+          connection: "c",
+          data_source: NOTION_ROADMAP,
+          state: "syncing",
+          owner: "u",
+          conflicts: 1,
+          last_inbound_at: "2026-10-25T09:00:00Z",
+        }}
+        canStop
+        onStop={onStop}
+        onShowConflict={vi.fn()}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText(/^Synced with Notion · 1 min/u)).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open in Notion" })).toHaveAttribute(
+      "href",
+      "https://www.notion.so/0192f1a00000700080000000000007a1",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Stop syncing" }));
+    expect(
+      await screen.findByRole("group", { name: /Stop keeping this table in step with Notion/u }),
+    ).toBeVisible();
+  });
+
+  it("says why a table's sync ended, in terms of its database", () => {
+    renderWithProviders(
+      <NotionSync
+        kind="table"
+        link={{
+          connection: "c",
+          data_source: NOTION_ROADMAP,
+          state: "stopped",
+          stopped_reason: "not_shared",
+          owner: "u",
+          conflicts: 0,
+        }}
+        canStop
+        onStop={() => Promise.resolve(true)}
+        onShowConflict={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText("Not synced: the database isn’t shared with Campbooks in Notion any more"),
+    ).toBeVisible();
+  });
+
   it("uses the real clock when none is given", () => {
     renderSync(undefined, { now: undefined });
     expect(screen.getByText(/^Synced with Notion · /u)).toBeVisible();

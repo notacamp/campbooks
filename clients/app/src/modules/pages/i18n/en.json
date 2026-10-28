@@ -254,10 +254,34 @@
         }
       },
       "retry": "Try again",
-      "tooMany": "Pick at most {{max}} pages at a time.",
+      "tooMany": "Pick at most {{max}} pages and databases at a time.",
       "failed": "Couldn’t import. Nothing was changed.",
       "done_one": "Imported {{count}} page from Notion",
-      "done_other": "Imported {{count}} pages from Notion"
+      "done_other": "Imported {{count}} pages from Notion",
+      "pagesHeading": "Pages",
+      "pagesCount_one": "{{count}} page",
+      "pagesCount_other": "{{count}} pages",
+      "submitBoth": "Import {{pages}} and {{databases}}",
+      "doneTables_one": "Imported {{count}} table from Notion",
+      "doneTables_other": "Imported {{count}} tables from Notion",
+      "doneBoth": "Imported {{pages}} and {{tables}} from Notion",
+      "databases": {
+        "lead": "Pages become pages. Databases become tables, and each entry becomes a row you can open as a page.",
+        "info": "Values and columns sync both ways: add, rename, retype or remove a column in either place and the other follows. Formulas, rollups and people stay Notion’s and show read-only; Campbooks-only columns (like Threads) stay here. A relation to a database you didn’t import shows as “Kept in Notion”.",
+        "heading": "Databases",
+        "listLabel": "Databases from Notion",
+        "columns_one": "{{count}} column",
+        "columns_other": "{{count}} columns",
+        "count_one": "{{count}} database",
+        "count_other": "{{count}} databases",
+        "tablesCount_one": "{{count}} table",
+        "tablesCount_other": "{{count}} tables",
+        "submit_one": "Import {{count}} database",
+        "submit_other": "Import {{count}} databases",
+        "submitNone": "Import",
+        "truncated": "Notion lists more databases than are shown here. Share fewer databases in Notion to see the rest.",
+        "failed": "Databases couldn’t be listed just now. Pages can still be imported."
+      }
     },
     "sync": {
       "label": "Sync with Notion",
@@ -283,7 +307,20 @@
       "stopFailed": "Couldn’t stop syncing. Nothing was changed.",
       "conflicts_one": "{{count}} change to look at",
       "conflicts_other": "{{count}} changes to look at",
-      "conflictsHint": "Jump to the first one"
+      "conflictsHint": "Jump to the first one",
+      "table": {
+        "reason": {
+          "stopped_by_member": "Stopped syncing with Notion",
+          "disconnected": "Not synced: Notion was disconnected",
+          "trashed_here": "Not synced: the table was moved to the trash",
+          "trashed_in_notion": "Not synced: the database is in the trash in Notion",
+          "not_shared": "Not synced: the database isn’t shared with Campbooks in Notion any more",
+          "member_left": "Not synced: the member who connected Notion left",
+          "notion_unavailable": "Not synced: Notion isn’t available on this instance",
+          "other": "Not synced with Notion any more"
+        },
+        "stopQuestion": "Stop keeping this table in step with Notion? The table stays here and the Notion database is left alone. Starting again is an import."
+      }
     },
     "conflict": {
       "label": "A change from Notion",
@@ -325,6 +362,62 @@
         "breadcrumb": "Breadcrumb",
         "template": "Template button",
         "unsupported": "Block"
+      }
+    },
+    "table": {
+      "cell": {
+        "label": "A change from Notion in {{property}}",
+        "changed": "{{property}} was changed here and in Notion",
+        "when": "Notion’s change: {{when}}",
+        "mine": "Yours",
+        "theirs": "Notion’s",
+        "choices": "Choose a version of {{property}}",
+        "keepMineFor": "Keep mine for {{property}}",
+        "useNotionFor": "Use Notion’s for {{property}}",
+        "flag": "{{property}} changed in Notion too: choose a version"
+      },
+      "column": {
+        "label": "Column {{name}} changed in both places",
+        "changed": "“{{name}}” was changed here and in Notion",
+        "banner": "Columns changed in both places",
+        "choices": "Choose a version of {{name}}",
+        "keepName": "Keep “{{name}}”",
+        "useName": "Use “{{name}}”",
+        "footer": "A column removed on one side and changed on the other is kept, never deleted on a conflict.",
+        "differs": {
+          "name": "Name: “{{mine}}” here, “{{theirs}}” in Notion",
+          "type": "Type: {{mine}} here, {{theirs}} in Notion",
+          "options": "Options: {{mine}} here, {{theirs}} in Notion"
+        }
+      },
+      "lock": {
+        "formula": "Read-only: a formula, computed in Notion",
+        "rollup": "Read-only: a rollup, computed in Notion",
+        "people": "Read-only: people stay Notion’s",
+        "external": "Read-only: kept in Notion"
+      },
+      "lockNote": {
+        "formula": "{{name}} is a Notion formula: Notion computes its values, so they can’t be edited here. You can still rename or remove the column — the change goes to Notion too.",
+        "rollup": "{{name}} is a Notion rollup: Notion computes its values, so they can’t be edited here. You can still rename or remove the column — the change goes to Notion too.",
+        "people": "{{name}} is a Notion people column: its values stay Notion’s. You can still rename or remove the column — the change goes to Notion too.",
+        "external": "{{name}} is kept in Notion (a relation, files or another kind Campbooks doesn’t have): its values can’t be edited here. You can still rename or remove the column — the change goes to Notion too."
+      },
+      "campbooksOnly": {
+        "reason": "Campbooks only: never sent to Notion",
+        "note": "{{name}} is Campbooks only: it is never sent to Notion, and Notion’s changes don’t touch it."
+      },
+      "stays": {
+        "short": "Stays in Campbooks",
+        "options": "Adding an option goes to Notion. Renaming, recolouring or removing one stays in Campbooks: Notion can’t change this."
+      },
+      "remove": {
+        "menu": "Remove from both places…",
+        "title": "Remove “{{name}}” from both places?",
+        "body_one": "It also removes the column and its values ({{count}} row) from the Notion database. Campbooks keeps them for 30 days, so Undo puts the column and its values back in both places.",
+        "body_other": "It also removes the column and its values ({{count}} rows) from the Notion database. Campbooks keeps them for 30 days, so Undo puts the column and its values back in both places.",
+        "cancel": "Cancel",
+        "confirm": "Remove from both",
+        "failed": "Couldn’t remove it. Nothing was changed."
       }
     }
   },
@@ -615,7 +708,8 @@
       "tableFailed": "Couldn’t create the table. Nothing was saved.",
       "createFailed": "Couldn’t create the table. Nothing was saved.",
       "inlineCreated": "Table added to the page",
-      "linkFailed": "Couldn’t link that table. Nothing was changed."
+      "linkFailed": "Couldn’t link that table. Nothing was changed.",
+      "columnRemovedBoth": "Column {{property}} removed from both places"
     }
   }
 }

@@ -77,7 +77,17 @@ export function useNotionActions(workspaceId: string) {
         chosen === undefined
           ? imported.pages.length
           : Math.max(imported.pages.length, chosen - imported.skipped);
-      undo.notify(t("notion.import.done", { count }));
+      const tables = imported.tables?.length ?? 0;
+      undo.notify(
+        tables === 0
+          ? t("notion.import.done", { count })
+          : count === 0
+            ? t("notion.import.doneTables", { count: tables })
+            : t("notion.import.doneBoth", {
+                pages: t("notion.import.pagesCount", { count }),
+                tables: t("notion.import.databases.tablesCount", { count: tables }),
+              }),
+      );
       return imported;
     } catch {
       return undefined;

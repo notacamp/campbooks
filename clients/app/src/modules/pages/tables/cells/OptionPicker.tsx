@@ -13,6 +13,7 @@ import {
 
 import { focusOnMount } from "../focus";
 import { colorOf, nextColor, optionsOf } from "../model";
+import { OptionsNote } from "../notion/Marks";
 import {
   OPTION_COLORS,
   type ChoiceOption,
@@ -200,6 +201,7 @@ function OptionEditor({ option, onBack, onSave, onDelete }: OptionEditorProps) {
       <OptionTag color={color}>
         {name.trim() === "" ? t("tables.picker.optionName") : name}
       </OptionTag>
+      <OptionsNote />
       <div className="flex flex-wrap gap-2">
         <Button
           variant="primary"

@@ -157,10 +157,19 @@ function tableCalls(workspaceId: string) {
           body,
         }),
       ),
-    removeProperty: async (table: string, property: string): Promise<PropertyView> =>
+    // `confirm`: the member confirmed that a column of a table kept in step
+    // with Notion is removed there too (without it the server refuses).
+    removeProperty: async (
+      table: string,
+      property: string,
+      confirm = false,
+    ): Promise<PropertyView> =>
       unwrap(
         await api.DELETE("/api/v1/w/{workspace_id}/tables/{table_id}/properties/{property_id}", {
-          params: propertyAt(table, property),
+          params: {
+            ...propertyAt(table, property),
+            ...(confirm ? { query: { confirm_remote_delete: true } } : {}),
+          },
         }),
       ),
     restoreProperty: async (table: string, property: string): Promise<PropertyView> =>

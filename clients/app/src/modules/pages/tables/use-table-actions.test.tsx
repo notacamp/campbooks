@@ -304,6 +304,48 @@ describe("a column", () => {
     });
   });
 
+  it("is removed in both places only when the member confirms, and says so", async () => {
+    const urls: string[] = [];
+    const { server } = await setup(new TablesServer(), {
+      [`DELETE ${W}/tables/${CLIENTS_ID}/properties/${P.signed}`]: (_body: unknown, url: URL) => {
+        urls.push(url.search);
+        return url.searchParams.get("confirm_remote_delete") === "true"
+          ? { body: { id: P.signed } }
+          : { status: 400, body: { status: 400, code: "confirmation_required", title: "Confirm" } };
+      },
+    });
+    // Tried plain first: the server says it is Notion's too, and nothing changes.
+    let result: unknown;
+    await run(async (a) => {
+      result = await a.removeProperty(property(P.signed), { probe: true });
+    });
+    expect(result).toBe("confirm");
+    expect(urls).toEqual([""]);
+    expect(screen.queryByText("Couldn’t change the column. Nothing was changed.")).toBeNull();
+    // Confirmed: the parameter is sent, and the toast says both places.
+    await run(async (a) => {
+      result = await a.removeProperty(property(P.signed), { confirm: true });
+    });
+    expect(result).toBe("removed");
+    expect(urls).toEqual(["", "?confirm_remote_delete=true"]);
+    expect(await screen.findByText("Column Signed removed from both places")).toBeTruthy();
+    expect(server.calls.filter((call) => call.startsWith("DELETE"))).toHaveLength(0);
+  });
+
+  it("says when a probed removal fails for any other reason", async () => {
+    await setup(new TablesServer(), {
+      [`DELETE ${W}/tables/${CLIENTS_ID}/properties/${P.signed}`]: () => ({ status: 500 }),
+    });
+    let result: unknown;
+    await run(async (a) => {
+      result = await a.removeProperty(property(P.signed), { probe: true });
+    });
+    expect(result).toBe("failed");
+    expect(
+      await screen.findByText("Couldn’t change the column. Nothing was changed."),
+    ).toBeTruthy();
+  });
+
   it("says when a column change fails", async () => {
     await setup(new TablesServer(), {
       [`PATCH ${W}/tables/${CLIENTS_ID}/properties/${P.value}`]: () => ({ status: 500 }),

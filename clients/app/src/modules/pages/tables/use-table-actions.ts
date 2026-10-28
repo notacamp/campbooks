@@ -1,6 +1,7 @@
 import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { problemCode } from "~/lib/api";
 import { useUndoToast } from "~/lib/ui";
 
 import { tableKeys, useTableCalls } from "./api";
@@ -426,16 +427,45 @@ export function useTableActions(workspaceId: string, tableId: string) {
     });
   };
 
-  const removeProperty = async (property: PropertyView): Promise<void> => {
-    const done = await attempt(t("tables.toast.columnFailed"), () =>
-      calls.removeProperty(tableId, property.id),
-    );
+  /**
+   * Remove a column. For a table kept in step with Notion `confirm` says the
+   * member confirmed removing it there too; `probe` tries without it first
+   * (a column that may be only Campbooks') and answers `confirm` when the
+   * server says it is Notion's too, changing nothing.
+   */
+  const removeProperty = async (
+    property: PropertyView,
+    options: { confirm?: boolean; probe?: boolean } = {},
+  ): Promise<"removed" | "failed" | "confirm"> => {
+    const confirm = options.confirm === true;
+    const run = () => calls.removeProperty(tableId, property.id, confirm);
+    let done;
+    if (options.probe === true) {
+      try {
+        done = await run();
+      } catch (error) {
+        if (problemCode(error) === "confirmation_required") {
+          return "confirm";
+        }
+        undo.fail({
+          label: t("tables.toast.columnFailed"),
+          retry: () => {
+            void removeProperty(property, options);
+          },
+        });
+        return "failed";
+      }
+    } else {
+      done = await attempt(t("tables.toast.columnFailed"), run);
+    }
     if (done === undefined) {
-      return;
+      return "failed";
     }
     refreshSchema();
     undo.push({
-      label: t("tables.toast.columnRemoved", { property: property.name }),
+      label: t(confirm ? "tables.toast.columnRemovedBoth" : "tables.toast.columnRemoved", {
+        property: property.name,
+      }),
       undo: () => {
         void attempt(t("tables.toast.columnUndoFailed"), async () => {
           await calls.restoreProperty(tableId, property.id);
@@ -444,11 +474,12 @@ export function useTableActions(workspaceId: string, tableId: string) {
       },
       redo: () => {
         void attempt(t("tables.toast.columnFailed"), async () => {
-          await calls.removeProperty(tableId, property.id);
+          await run();
           refreshSchema();
         });
       },
     });
+    return "removed";
   };
 
   /** Add, rename, recolour, reorder or remove options (Undo sends the old list back, ids and all). */

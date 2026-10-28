@@ -4,3 +4,4 @@ import type { Schema } from "~/lib/api";
 // generated document is a one-line fix.
 export type StartNotion = Schema<"StartNotion">;
 export type NotionPages = Schema<"NotionPages">;
+export type NotionDataSources = Schema<"NotionDataSources">;

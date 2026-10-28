@@ -1,6 +1,6 @@
 import { errorStatus, problemCode } from "~/lib/api";
 
-import { useNotionPages } from "./api/notion";
+import { useNotionDataSources, useNotionPages } from "./api/notion";
 import { useNotionConnections } from "./api/queries";
 
 /** Why the pages of a Notion connection could not be listed. */
@@ -28,6 +28,14 @@ interface NotionSourcePage {
   linked: boolean;
 }
 
+/** A database the connection can see. */
+interface NotionSourceDatabase {
+  data_source: string;
+  title: string;
+  columns: number;
+  linked: boolean;
+}
+
 /**
  * What the Pages import needs of Notion, handed to the `pages` module by the
  * app shell (the pages module never imports `connectors`): the caller's own
@@ -43,6 +51,13 @@ interface NotionSource {
     error: NotionListError | undefined;
     retry: () => void;
   };
+  /** The databases the connection can see; `off` when this instance has none to offer. */
+  databases: {
+    status: "idle" | "loading" | "ready" | "error" | "off";
+    items: readonly NotionSourceDatabase[];
+    truncated: boolean;
+    retry: () => void;
+  };
 }
 
 export type UseNotionSource = (
@@ -54,6 +69,17 @@ export type UseNotionSource = (
 export const useNotionSource: UseNotionSource = (workspaceId, connectionId) => {
   const connections = useNotionConnections(workspaceId);
   const pages = useNotionPages(workspaceId, connectionId);
+  const databases = useNotionDataSources(workspaceId, connectionId);
+  let databasesStatus: NotionSource["databases"]["status"] = "idle";
+  if (connectionId !== undefined) {
+    if (databases.isError) {
+      databasesStatus = "error";
+    } else if (databases.isSuccess) {
+      databasesStatus = databases.data === null ? "off" : "ready";
+    } else {
+      databasesStatus = "loading";
+    }
+  }
   let status: NotionSource["list"]["status"] = "idle";
   if (connectionId !== undefined) {
     if (pages.isError) {
@@ -77,6 +103,14 @@ export const useNotionSource: UseNotionSource = (workspaceId, connectionId) => {
       error: pages.isError ? notionListError(pages.error) : undefined,
       retry: () => {
         void pages.refetch();
+      },
+    },
+    databases: {
+      status: databasesStatus,
+      items: databases.data?.data_sources ?? [],
+      truncated: databases.data?.truncated ?? false,
+      retry: () => {
+        void databases.refetch();
       },
     },
   };

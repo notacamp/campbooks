@@ -18,6 +18,10 @@ import { CellDisplay } from "../cells/CellDisplay";
 import { CellEditor } from "../cells/CellEditor";
 import type { CellContext } from "../cells/context";
 import { editable as typeEditable, isEmptyValue } from "../model";
+import { CellConflict } from "../notion/CellConflict";
+import { useSyncedTable } from "../notion/context";
+import { NotionMark } from "../notion/Marks";
+import { cellKey } from "../notion/model";
 import type { TableActions } from "../use-table-actions";
 import { glyphOf } from "../type-info";
 import type { PropertyType, PropertyView, RowView } from "../types";
@@ -58,6 +62,7 @@ export function RowProperties({
   upload,
 }: RowPropertiesProps) {
   const { t } = useTranslation("pages");
+  const synced = useSyncedTable();
   const [editing, setEditing] = useState<string | undefined>();
   const shown = properties.filter((property) => property.type !== "title");
 
@@ -66,7 +71,9 @@ export function RowProperties({
       {shown.map((property) => {
         const cell = row.cells[property.id];
         const value = cell?.value;
-        const writable = !readOnly && typeEditable(property.type);
+        const conflict = synced.cells.get(cellKey(row.id, property.id));
+        // A cell with a change from Notion waiting is settled first, then edited.
+        const writable = !readOnly && typeEditable(property.type) && conflict === undefined;
         const done = () => {
           setEditing(undefined);
         };
@@ -129,9 +136,31 @@ export function RowProperties({
           <PropertyLine
             key={property.id}
             name={property.name}
-            glyph={<TypeGlyph glyph={glyphOf(property.type)} />}
+            glyph={
+              <>
+                <TypeGlyph glyph={glyphOf(property.type)} />
+                <NotionMark property={property} />
+              </>
+            }
           >
-            {content}
+            {conflict === undefined ? (
+              content
+            ) : (
+              <div className="flex min-w-0 flex-col gap-2">
+                {content}
+                <CellConflict
+                  ctx={ctx}
+                  conflict={conflict}
+                  property={property}
+                  row={row}
+                  onChoose={
+                    readOnly || !synced.canResolve
+                      ? undefined
+                      : (keep) => synced.resolve(conflict.id, keep)
+                  }
+                />
+              </div>
+            )}
           </PropertyLine>
         );
       })}

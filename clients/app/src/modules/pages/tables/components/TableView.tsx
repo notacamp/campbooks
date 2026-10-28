@@ -18,6 +18,7 @@ import {
 import { useShortcut } from "~/lib/shortcuts";
 import { useMembers } from "~/modules/workspaces";
 
+import { NotionSync } from "../../components/NotionSync";
 import type { usePageActions } from "../../components/use-page-actions";
 import type { PageSummary } from "../../types";
 import { memberName, type CellContext } from "../cells/context";
@@ -32,6 +33,11 @@ import {
   specsOf,
   viewConfig,
 } from "../model";
+import { useTableSync } from "../notion/api";
+import { ColumnConflicts } from "../notion/ColumnConflicts";
+import { SyncedTableContext, syncedTable } from "../notion/context";
+import { columnConflicts, isSyncing } from "../notion/model";
+import { useTableSyncActions } from "../notion/use-sync-actions";
 import { useTableActions } from "../use-table-actions";
 import type {
   Condition,
@@ -132,6 +138,12 @@ function LoadedTable({
   const members = useMembers(workspaceId).data ?? [];
   const actions = useTableActions(workspaceId, tableId);
   const canWrite = detail.page.role !== "reader";
+  // Kept in step with a Notion database: its marks, its conflicts, its badge.
+  const sync = useTableSync(workspaceId, tableId);
+  const syncActions = useTableSyncActions(workspaceId, tableId);
+  const synced = syncedTable(sync.data, isSyncing(sync.data), canWrite, syncActions.resolve);
+  const link = sync.data?.link ?? undefined;
+  const conflictBanner = useRef<HTMLDivElement>(null);
 
   const [ownView, setOwnView] = useState(initialView);
   const chosen = onView === undefined ? ownView : viewInAddress;
@@ -492,140 +504,171 @@ function LoadedTable({
     />
   );
 
+  const openFirstConflict = () => {
+    if (columnConflicts(sync.data?.conflicts ?? []).length > 0) {
+      conflictBanner.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const cell = sync.data?.conflicts.find((conflict) => typeof conflict.row === "string");
+    if (cell?.row !== undefined && cell.row !== null) {
+      setPeek(cell.row);
+    }
+  };
+
   return (
-    <section
-      ref={box}
-      aria-label={detail.page.title === "" ? t("untitled") : detail.page.title}
-      className="flex min-w-0 flex-col gap-3"
-    >
-      {inline ? (
-        <MentionChip
-          kind="page"
-          label={detail.page.title === "" ? t("untitled") : detail.page.title}
-          href={`/w/${workspaceId}/pages/${tableId}`}
-          onOpen={(event) => {
-            if (!event.metaKey && !event.ctrlKey && event.button === 0) {
-              event.preventDefault();
-              open(`/w/${workspaceId}/pages/${tableId}`);
-            }
-          }}
-        />
-      ) : null}
-      {toolbar}
-      <div id={panelId} role="tabpanel" aria-label={view.name} className="min-w-0">
-        {query.isPending ? <SkeletonList rows={4} /> : null}
-        {query.isError ? (
-          <EmptyState
-            title={t("tables.error.rows")}
-            visor="thinking"
-            action={
-              <Button
-                onClick={() => {
-                  void query.refetch();
-                }}
-              >
-                {t("error.retry")}
-              </Button>
-            }
+    <SyncedTableContext value={synced}>
+      <section
+        ref={box}
+        aria-label={detail.page.title === "" ? t("untitled") : detail.page.title}
+        className="flex min-w-0 flex-col gap-3"
+      >
+        {inline ? (
+          <MentionChip
+            kind="page"
+            label={detail.page.title === "" ? t("untitled") : detail.page.title}
+            href={`/w/${workspaceId}/pages/${tableId}`}
+            onOpen={(event) => {
+              if (!event.metaKey && !event.ctrlKey && event.button === 0) {
+                event.preventDefault();
+                open(`/w/${workspaceId}/pages/${tableId}`);
+              }
+            }}
+          />
+        ) : null}
+        {link === undefined || inline ? null : (
+          <NotionSync
+            link={link}
+            kind="table"
+            canStop={canWrite}
+            onStop={syncActions.stop}
+            onShowConflict={openFirstConflict}
+          />
+        )}
+        {synced.syncing && columnConflicts(sync.data?.conflicts ?? []).length > 0 ? (
+          <div ref={conflictBanner}>
+            <ColumnConflicts
+              conflicts={columnConflicts(sync.data?.conflicts ?? [])}
+              onChoose={canWrite ? syncActions.resolve : undefined}
+            />
+          </div>
+        ) : null}
+        {toolbar}
+        <div id={panelId} role="tabpanel" aria-label={view.name} className="min-w-0">
+          {query.isPending ? <SkeletonList rows={4} /> : null}
+          {query.isError ? (
+            <EmptyState
+              title={t("tables.error.rows")}
+              visor="thinking"
+              action={
+                <Button
+                  onClick={() => {
+                    void query.refetch();
+                  }}
+                >
+                  {t("error.retry")}
+                </Button>
+              }
+            >
+              {t("error.body")}
+            </EmptyState>
+          ) : null}
+          {query.isSuccess && board ? (
+            <BoardPane
+              ctx={ctx}
+              view={view}
+              properties={detail.properties}
+              rows={rows}
+              groups={firstPage?.groups ?? []}
+              total={firstPage?.matching ?? rows.length}
+              actions={actions}
+              canWrite={canWrite}
+              complete={!query.hasNextPage}
+              onOpenRow={setPeek}
+              onGroupBy={(property) => {
+                save({ groupBy: property });
+              }}
+              onNewRow={(group) => {
+                const groupBy = config.groupBy;
+                void addRow(
+                  group === undefined || groupBy === undefined
+                    ? undefined
+                    : [{ property: groupBy, value: group }],
+                );
+              }}
+            />
+          ) : null}
+          {query.isSuccess && !board ? (
+            <GridPane
+              ctx={ctx}
+              view={view}
+              properties={detail.properties}
+              rows={rows}
+              total={firstPage?.matching ?? rows.length}
+              summaries={firstPage?.summaries ?? []}
+              pages={pages}
+              tables={tables}
+              here={here}
+              actions={actions}
+              canWrite={canWrite}
+              editing={editing}
+              onEditing={setEditing}
+              reveal={reveal}
+              onActiveRow={setActiveRow}
+              onOpenRow={setPeek}
+              onFilter={(property) => {
+                setFilterFocus(property);
+                setFilterOpen(true);
+              }}
+              hasMore={query.hasNextPage}
+              loadingMore={query.isFetchingNextPage}
+              onLoadMore={() => {
+                void query.fetchNextPage();
+              }}
+              upload={(row, file) => pageActions.calls.upload(row, file)}
+              onNewColumn={newProperty}
+              onNewRow={() => {
+                void addRow();
+              }}
+              tableRows={detail.rows}
+            />
+          ) : null}
+        </div>
+        {closed ? (
+          <RowPeek
+            label={t("tables.peek.label")}
+            crumb={t("tables.peek.crumb", {
+              table: detail.page.title === "" ? t("untitled") : detail.page.title,
+            })}
+            closeLabel={t("tables.peek.close")}
+            onClose={() => {
+              setPeek(undefined);
+            }}
           >
-            {t("error.body")}
-          </EmptyState>
+            <DocCard icon="document" title={t("mention.closed")} state="closed" />
+          </RowPeek>
         ) : null}
-        {query.isSuccess && board ? (
-          <BoardPane
+        {peeked === undefined ? null : (
+          <RowPeekPanel
+            key={peeked.id}
             ctx={ctx}
-            view={view}
+            tableTitle={detail.page.title}
             properties={detail.properties}
-            rows={rows}
-            groups={firstPage?.groups ?? []}
-            total={firstPage?.matching ?? rows.length}
+            row={peeked}
             actions={actions}
-            canWrite={canWrite}
-            complete={!query.hasNextPage}
-            onOpenRow={setPeek}
-            onGroupBy={(property) => {
-              save({ groupBy: property });
-            }}
-            onNewRow={(group) => {
-              const groupBy = config.groupBy;
-              void addRow(
-                group === undefined || groupBy === undefined
-                  ? undefined
-                  : [{ property: groupBy, value: group }],
-              );
-            }}
-          />
-        ) : null}
-        {query.isSuccess && !board ? (
-          <GridPane
-            ctx={ctx}
-            view={view}
-            properties={detail.properties}
-            rows={rows}
-            total={firstPage?.matching ?? rows.length}
-            summaries={firstPage?.summaries ?? []}
+            pageActions={pageActions}
             pages={pages}
-            tables={tables}
-            here={here}
-            actions={actions}
-            canWrite={canWrite}
-            editing={editing}
-            onEditing={setEditing}
-            reveal={reveal}
-            onActiveRow={setActiveRow}
-            onOpenRow={setPeek}
-            onFilter={(property) => {
-              setFilterFocus(property);
-              setFilterOpen(true);
+            readOnly={!canWrite}
+            canEditOptions={canWrite}
+            onClose={() => {
+              setPeek(undefined);
             }}
-            hasMore={query.hasNextPage}
-            loadingMore={query.isFetchingNextPage}
-            onLoadMore={() => {
-              void query.fetchNextPage();
-            }}
-            upload={(row, file) => pageActions.calls.upload(row, file)}
-            onNewColumn={newProperty}
-            onNewRow={() => {
-              void addRow();
+            onOpenAsPage={() => {
+              setPeek(undefined);
+              open(`/w/${workspaceId}/pages/${peeked.id}`);
             }}
           />
-        ) : null}
-      </div>
-      {closed ? (
-        <RowPeek
-          label={t("tables.peek.label")}
-          crumb={t("tables.peek.crumb", {
-            table: detail.page.title === "" ? t("untitled") : detail.page.title,
-          })}
-          closeLabel={t("tables.peek.close")}
-          onClose={() => {
-            setPeek(undefined);
-          }}
-        >
-          <DocCard icon="document" title={t("mention.closed")} state="closed" />
-        </RowPeek>
-      ) : null}
-      {peeked === undefined ? null : (
-        <RowPeekPanel
-          key={peeked.id}
-          ctx={ctx}
-          tableTitle={detail.page.title}
-          properties={detail.properties}
-          row={peeked}
-          actions={actions}
-          pageActions={pageActions}
-          pages={pages}
-          readOnly={!canWrite}
-          canEditOptions={canWrite}
-          onClose={() => {
-            setPeek(undefined);
-          }}
-          onOpenAsPage={() => {
-            setPeek(undefined);
-            open(`/w/${workspaceId}/pages/${peeked.id}`);
-          }}
-        />
-      )}
-    </section>
+        )}
+      </section>
+    </SyncedTableContext>
   );
 }
