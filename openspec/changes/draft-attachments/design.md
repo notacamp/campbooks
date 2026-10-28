@@ -34,7 +34,7 @@ takes the raw bytes as the body (as `pages.upload_file` does), with the
 | 409 | `draft_changed` / `content_changed` | As a save |
 | 409 | `draft_not_editable` | Scheduled or sending |
 | 413 | `attachments_too_large` | The file alone, or the draft's total, over 25 MiB |
-| 422 | `too_many_attachments` | Over 20 files |
+| 400 | `too_many_attachments` | Over 20 files (`kernel::Error` has no 422) |
 
 The route sets `DefaultBodyLimit::max(MAX_ATTACHMENT_BYTES)` (25 MiB). The
 kernel blob store's 50 MiB object cap stays the outer bound.

@@ -23,7 +23,7 @@ the draft with its new version. The assistant SHALL NOT be able to call it.
 ### Requirement: Limits on attached files
 An upload SHALL be refused with 400 `file_empty` when it has no bytes. It
 SHALL be refused with 413 `attachments_too_large` when the draft's
-attachments would pass 25 MiB in total, and with 422 `too_many_attachments`
+attachments would pass 25 MiB in total, and with 400 `too_many_attachments`
 past 20 files. A draft that is scheduled or sending SHALL answer 409
 `draft_not_editable`.
 
