@@ -75,6 +75,27 @@ const pick = (dialog: HTMLElement, name: RegExp | string) => {
 };
 
 describe("Save to page", () => {
+  it("keeps Cancel and Save in a footer of their own, outside the scrolling body", async () => {
+    // jsdom has no layout, so the phone sheet's visible box cannot be measured here;
+    // the structure that pins the footer (head, scrolling body, footer) can.
+    setup();
+    const dialog = await opened();
+    const save = within(dialog).getByRole("button", { name: /^Save/u });
+    const search = within(dialog).getByRole("combobox");
+    const topmost = (from: HTMLElement, other: HTMLElement) => {
+      let at = from;
+      while (at.parentElement !== null && !at.parentElement.contains(other)) {
+        at = at.parentElement;
+      }
+      return at;
+    };
+    const body = topmost(search, save);
+    const footer = topmost(save, search);
+    // Siblings under the panel, the footer after the body: it is not part of what scrolls.
+    expect(body.parentElement).toBe(footer.parentElement);
+    expect(body.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("lists the pages already linking the thread first, by name, leaving out what Ana may only read", async () => {
     setup({ linked: [HANDBOOK.id] });
     const dialog = await opened();

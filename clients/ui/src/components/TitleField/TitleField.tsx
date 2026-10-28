@@ -56,8 +56,25 @@ export function TitleField({
     };
     fit();
     window.addEventListener("resize", fit);
+    // The column can narrow without the window resizing (a chat opening beside the page).
+    const node = field.current;
+    let width = node?.clientWidth ?? 0;
+    const watch =
+      typeof ResizeObserver === "undefined"
+        ? undefined
+        : new ResizeObserver(() => {
+            // Only a change of width changes the wrapping (fitting changes the height).
+            if (node !== null && node.clientWidth !== width) {
+              width = node.clientWidth;
+              fit();
+            }
+          });
+    if (node !== null) {
+      watch?.observe(node);
+    }
     return () => {
       window.removeEventListener("resize", fit);
+      watch?.disconnect();
     };
   });
   const change = (event: ChangeEvent<HTMLTextAreaElement>) => {

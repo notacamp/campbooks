@@ -18,7 +18,7 @@ export interface Answer {
   status?: number;
   body?: unknown;
 }
-export type Handler = (body: unknown) => Answer;
+export type Handler = (body: unknown, url: URL) => Answer;
 
 /** The thread Ana saves. */
 export const KICKOFF_ID = "0192f1a0-0000-7000-8000-00000000a001";
@@ -119,9 +119,9 @@ export function saveToPageServer(options: SaveServerOptions = {}): SaveServer {
   const linked = options.linked ?? [CLIENT_ONBOARDING.id];
   const note =
     (route: string, handler: Handler): Handler =>
-    (body) => {
+    (body, url) => {
       calls.push(route);
-      return handler(body);
+      return handler(body, url);
     };
   const routes: Record<string, Handler> = {};
   const add = (route: string, handler: Handler) => {
@@ -129,22 +129,26 @@ export function saveToPageServer(options: SaveServerOptions = {}): SaveServer {
   };
   add(`GET ${W}/pages`, () => ({ body: { pages: [...pages.values()], tables: false } }));
   add(`GET ${W}/members`, () => ({ body: { members: MEMBERS } }));
-  add(`GET ${W}/pages/backlinks`, () => ({
+  add(`GET ${W}/pages/backlinks`, (_body, url) => ({
     body: {
-      pages: linked.flatMap((id) => {
-        const page = pages.get(id);
-        return page === undefined
-          ? []
-          : [
-              {
-                page: id,
-                title: page.title,
-                place: page.place,
-                icon: page.icon ?? null,
-                edited_at: page.edited_at,
-              },
-            ];
-      }),
+      // What links to a page is another page (Team handbook); what links to the
+      // thread is `linked`.
+      pages: (url.searchParams.get("type") === "pages.page" ? [HANDBOOK.id] : linked).flatMap(
+        (id) => {
+          const page = pages.get(id);
+          return page === undefined
+            ? []
+            : [
+                {
+                  page: id,
+                  title: page.title,
+                  place: page.place,
+                  icon: page.icon ?? null,
+                  edited_at: page.edited_at,
+                },
+              ];
+        },
+      ),
     },
   }));
   add(`POST ${W}/pages`, (body) => {
@@ -240,7 +244,7 @@ export function forRequests(
   return Object.fromEntries(
     Object.entries(routes).map(([route, handler]) => [
       route,
-      (_request: Request, body: unknown) => handler(body),
+      (request: Request, body: unknown) => handler(body, new URL(request.url)),
     ]),
   );
 }

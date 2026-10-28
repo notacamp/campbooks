@@ -46,7 +46,7 @@ import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
 /** The pretend server's routes in the stories' mock. */
 const forStories = (routes: Record<string, Handler>): Record<string, MockRoute> =>
   Object.fromEntries(
-    Object.entries(routes).map(([route, handler]) => [route, (body) => handler(body)]),
+    Object.entries(routes).map(([route, handler]) => [route, (body, url) => handler(body, url)]),
   );
 
 /** What the story's router draws: the part under test. */
