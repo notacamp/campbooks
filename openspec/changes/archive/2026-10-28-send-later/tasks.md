@@ -7,7 +7,7 @@
 - [x] 2.4 i18n en / pt-PT / es-ES / fr; `pnpm test:fit`; stories + tests; recording scenario
 ## 3. Finish
 - [x] 3.1 OpenAPI and client types regenerated
-- [ ] 3.2 Tracking plan regenerated (no change expected)
+- [x] 3.2 Tracking plan regenerated (no change expected)
 - [x] 3.3 Changelog entry `changelog/unreleased/added/392-send-later.md`
 - [ ] 3.4 Gates green in CI
 - [x] 3.5 Recording at 375 px and desktop
