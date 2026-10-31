@@ -1146,18 +1146,18 @@ mod tests {
                 "maintenance_reads_schedule",
                 "SELECT",
             ),
-            // The needs' clock (conversations, campbooks-cloud#275): which
-            // workspaces have a due row, read only.
-            (
-                "conversations.need_clocks",
-                "maintenance_reads_need_clocks",
-                "SELECT",
-            ),
             // The 30 days of an explanation of a thread (conversations,
             // campbooks-cloud#407): which workspaces hold an old one, read only.
             (
                 "conversations.explanations",
                 "maintenance_reads_explanations",
+                "SELECT",
+            ),
+            // The needs' clock (conversations, campbooks-cloud#275): which
+            // workspaces have a due row, read only.
+            (
+                "conversations.need_clocks",
+                "maintenance_reads_need_clocks",
                 "SELECT",
             ),
             // The needs backfill's dispatcher (conversations): reads ids and
