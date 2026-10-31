@@ -7,7 +7,8 @@
     "tableOpenRow": "Ouvrir la ligne",
     "tableEdit": "Modifier la cellule",
     "tableMove": "Se déplacer entre les cellules",
-    "tableClear": "Vider la cellule"
+    "tableClear": "Vider la cellule",
+    "saveThread": "Enregistrer dans une page"
   },
   "tree": {
     "label": "Pages",
@@ -46,7 +47,8 @@
     "emptyTitle": "Choisissez une page",
     "emptyBody": "Choisissez-en une dans la liste ou écrivez-en une nouvelle.",
     "missingTitle": "Cette page n’est pas là",
-    "missingBody": "Elle a peut-être été supprimée, ou elle n’a jamais été partagée avec vous."
+    "missingBody": "Elle a peut-être été supprimée, ou elle n’a jamais été partagée avec vous.",
+    "askScout": "Demander à Scout"
   },
   "save": {
     "saved": "Enregistré",
@@ -710,5 +712,62 @@
       "linkFailed": "Impossible de lier ce tableau. Rien n’a été modifié.",
       "columnRemovedBoth": "Colonne {{property}} supprimée des deux côtés"
     }
+  },
+  "saveToPage": {
+    "noSubject": "(sans objet)",
+    "title": "Enregistrer « {{subject}} » dans une page",
+    "where": "Où ça va",
+    "existing": "Ajouter à une page",
+    "new": "Nouvelle page",
+    "pages": "Pages",
+    "search": "Chercher une page par son nom",
+    "none": "Aucune page où vous pouvez écrire ne correspond.",
+    "loading": "Chargement des pages…",
+    "linked": "Renvoie déjà à cette conversation",
+    "newTitle": "Titre",
+    "newIn": "Une page privée au premier niveau : vous seul la voyez, tant que vous ne la déplacez pas dans l’Espace de travail ou ne la partagez pas.",
+    "what": "Quoi ajouter",
+    "live": {
+      "title": "Un bloc de la conversation en direct",
+      "body": "Montre toujours le message le plus récent. Les collègues qui ne peuvent pas lire la boîte voient seulement qu’une conversation est liée."
+    },
+    "copy": {
+      "title": "Une copie des messages",
+      "body": "Le texte fait partie de la page, lisible par tous ceux avec qui elle est partagée."
+    },
+    "summary": {
+      "title": "Le résumé de Scout",
+      "body": "Quelques lignes avec des liens vers chaque message. Vous le voyez avant qu’il soit ajouté."
+    },
+    "readers": {
+      "only": "Vous seul la lirez",
+      "everyone": "Tout l’espace de travail la lira",
+      "others_one": "{{count}} autre personne",
+      "others_other": "{{count}} autres personnes",
+      "and": "et",
+      "notion": "Elle est aussi envoyée à Notion",
+      "named_one": "{{names}} la lira",
+      "named_other": "{{names}} la liront",
+      "count_one": "{{count}} collègue la lira",
+      "count_other": "{{count}} collègues la liront"
+    },
+    "files_one": "Inclure les pièces jointes ({{count}})",
+    "files_other": "Inclure les pièces jointes ({{count}})",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "preview": "Voir le résumé",
+    "saved": "Enregistré dans {{page}}",
+    "open": "Ouvrir la page",
+    "undoFailed": "Impossible d’annuler. Rien d’autre n’a été modifié.",
+    "askExisting": "Écris une section pour la page « {{page}} » à partir de cette conversation, et montre-la-moi avant d’ajouter quoi que ce soit.",
+    "askNew": "Écris une nouvelle page intitulée « {{title}} » à partir de cette conversation, et montre-la-moi avant de la créer.",
+    "refused": {
+      "scope": "Cette connexion ne peut pas lire le courrier, donc ses pièces jointes ne peuvent pas être enregistrées dans une page. Rien n’a été ajouté.",
+      "changed": "La conversation a changé ou un fichier a disparu. Rouvrez la conversation. Rien n’a été ajouté.",
+      "tooLarge": "« {{name}} » dépasse 20 Mo, donc il ne peut pas être enregistré dans une page. Rien n’a été ajouté.",
+      "tooLargeSome": "Un fichier dépasse 20 Mo, donc les pièces jointes ne peuvent pas être enregistrées dans une page. Rien n’a été ajouté.",
+      "failed": "Impossible d’enregistrer dans la page. Rien n’a été ajouté."
+    },
+    "readFailed": "Impossible de lire les messages. Rien n’a été enregistré."
   }
 }

@@ -111,7 +111,8 @@
     "trash": {
       "title": "Cette conversation est dans la Corbeille.",
       "lead": "Votre fournisseur de messagerie vide la corbeille à son rythme."
-    }
+    },
+    "saveToPageFailed": "Impossible de lire les messages. Rien n’a été enregistré."
   },
   "actions": {
     "star": "Épingler",
@@ -145,7 +146,8 @@
     "reportSpam": "Signaler comme spam",
     "notSpam": "Pas un spam",
     "toInbox": "Remettre dans la boîte de réception",
-    "askScout": "Demander à Scout"
+    "askScout": "Demander à Scout",
+    "saveToPage": "Enregistrer dans une page"
   },
   "toast": {
     "done": "Terminé · {{subject}}",

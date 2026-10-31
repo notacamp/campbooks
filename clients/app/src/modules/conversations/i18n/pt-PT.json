@@ -111,7 +111,8 @@
     "trash": {
       "title": "Esta conversa está no Lixo.",
       "lead": "O seu fornecedor de correio esvazia o lixo quando entende."
-    }
+    },
+    "saveToPageFailed": "Não foi possível ler as mensagens. Nada foi guardado."
   },
   "actions": {
     "star": "Fixar",
@@ -145,7 +146,8 @@
     "reportSpam": "Denunciar spam",
     "notSpam": "Não é spam",
     "toInbox": "Mover para a Caixa de entrada",
-    "askScout": "Perguntar ao Scout"
+    "askScout": "Perguntar ao Scout",
+    "saveToPage": "Guardar numa página"
   },
   "toast": {
     "done": "Concluída · {{subject}}",
