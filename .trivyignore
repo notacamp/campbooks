@@ -7,4 +7,7 @@
 # campbooks-server never loads the system OpenSSL: it is built on rustls and
 # has no openssl-sys in Cargo.lock, so the library is present but unused.
 # Accepted until the distroless image ships the fix (owner, 2026-10-28).
-CVE-2026-84782 exp:2026-11-10
+# Renewed 2026-10-31: Debian ships the fix in bookworm-security, but
+# distroless's current cc-debian12:nonroot still carries 3.0.20-1~deb12u2.
+# Remove this entry as soon as it ships 3.0.22.
+CVE-2026-84782 exp:2026-11-24
