@@ -33,8 +33,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     LAYA_REVISION=reviewed
 
 # Debian security fixes released after the base image was built (the release
-# pipeline's Trivy gate fails on fixable HIGH/CRITICAL findings).
-RUN apt-get update \
+# pipeline's Trivy gate fails on fixable HIGH/CRITICAL findings). APT_REFRESH
+# is the build day, passed by CI and the release pipeline: a new value reruns
+# this step, so a cached layer never keeps a library Debian has since fixed
+# (laya:next shipped libssl3 3.0.22-1~deb12u1 from a cached layer while
+# bookworm-security had deb12u2, CVE-2026-84782).
+ARG APT_REFRESH=unset
+RUN echo "Debian packages as of ${APT_REFRESH}" \
+    && apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
