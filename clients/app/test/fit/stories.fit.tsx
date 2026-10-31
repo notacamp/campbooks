@@ -47,21 +47,35 @@ function withoutPlay(annotations: Annotations): Annotations {
 const isStoryName = (name: string, value: unknown) =>
   /^[A-Z]/u.test(name) && (typeof value === "object" || typeof value === "function");
 
+function hasCutOnPurpose(story: unknown) {
+  const parameters = (story as { parameters?: { cutOnPurpose?: boolean } }).parameters;
+  return parameters?.cutOnPurpose === true;
+}
+
 /** Every story of every stories file, as `[file, story name, composed story]`. */
 function allStories() {
   return Object.entries(modules).flatMap(([file, module]) => {
     const { default: meta, ...exports } = module;
     const component = withoutPlay((meta ?? {}) as Annotations) as Meta;
-    return Object.entries(exports)
-      .filter(([name, story]) => isStoryName(name, story))
-      .map(
-        ([name, story]) =>
-          [
-            file.replace(/^(\.\.\/)+/u, ""),
-            name,
-            composeStory(withoutPlay(story as Annotations) as StoryObj, component, undefined, name),
-          ] as const,
-      );
+    return (
+      Object.entries(exports)
+        .filter(([name, story]) => isStoryName(name, story))
+        // A story that sets a column narrower than its content on purpose (to show the ellipsis).
+        .filter(([, story]) => !hasCutOnPurpose(story))
+        .map(
+          ([name, story]) =>
+            [
+              file.replace(/^(\.\.\/)+/u, ""),
+              name,
+              composeStory(
+                withoutPlay(story as Annotations) as StoryObj,
+                component,
+                undefined,
+                name,
+              ),
+            ] as const,
+        )
+    );
   });
 }
 

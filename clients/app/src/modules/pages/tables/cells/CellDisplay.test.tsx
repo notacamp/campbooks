@@ -75,7 +75,8 @@ describe("what a cell shows", () => {
     expect(await screen.findByText("Acme Studio")).toBeTruthy();
     title.unmount();
     const number = show(property(P.value), "9600");
-    expect(await screen.findByText("€9,600.00")).toBeTruthy();
+    // A narrow column cuts the number with an ellipsis; the whole of it is in the title.
+    expect(await screen.findByText("€9,600.00")).toHaveAttribute("title", "€9,600.00");
     number.unmount();
     const select = show(property(P.stage), OPTIONS.kickoff);
     expect(await screen.findByText("Kickoff")).toBeTruthy();
