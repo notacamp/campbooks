@@ -174,6 +174,12 @@
       "date": "2026-10-28",
       "plan_version": 26,
       "pr": "#705"
+    },
+    {
+      "change": "Calendars shared after connecting (campbooks-cloud#405): Coverage for schedule.apply_calendar_list, which tracks the calendars it adds as schedule.calendar_added.",
+      "date": "2026-10-31",
+      "plan_version": 27,
+      "pr": "#713"
     }
   ],
   "coverage": [
@@ -486,6 +492,14 @@
       "exemption": "",
       "kind": "handler",
       "name": "schedule.apply_calendar_changes"
+    },
+    {
+      "events": [
+        "schedule.calendar_added"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "schedule.apply_calendar_list"
     },
     {
       "events": [
@@ -25378,8 +25392,8 @@
     }
   ],
   "generated_by": "campbooks-tracking-plan",
-  "plan_date": "2026-10-28",
-  "plan_version": 26,
+  "plan_date": "2026-10-31",
+  "plan_version": 27,
   "properties": [
     {
       "classification": "operational",

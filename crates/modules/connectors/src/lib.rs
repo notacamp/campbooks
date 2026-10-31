@@ -131,6 +131,7 @@ pub fn module(deps: Deps) -> Module {
         .publishes::<events::ConnectionRemoved>()
         .publishes::<events::MessagesChanged>()
         .publishes::<events::CalendarChanged>()
+        .publishes::<events::CalendarListRead>()
         .publishes::<events::CalendarChangeCompleted>()
         .publishes::<events::NotionPageRead>()
         .publishes::<events::NotionLinkStopped>()

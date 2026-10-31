@@ -278,6 +278,34 @@ impl DomainEvent for CalendarChanged {
     }
 }
 
+/// A calendar stream read its account's calendar list again
+/// (`contracts/connectors.calendar_list_read.v1.schema.json`), about once a
+/// day, so a calendar shared later reaches the schedule module. It is not a
+/// grant: `connectors.capability_granted` keeps meaning consent. The list is
+/// the same `calendar-list` v1 blob; the provider's calendar ids can be
+/// addresses, so they travel in the blob and never in the event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CalendarListRead {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: ConnectionId,
+    /// The member who granted calendar access, whose calendars they are.
+    pub granted_by: UserId,
+    /// The account's calendars: a `calendar-list` v1 blob.
+    #[schema(value_type = BlobSchema)]
+    pub calendars: BlobRef,
+}
+
+impl DomainEvent for CalendarListRead {
+    const NAME: &'static str = "connectors.calendar_list_read";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 /// How a calendar change asked for by `schedule.outbound_requested` ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
