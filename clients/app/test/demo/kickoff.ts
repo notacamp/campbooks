@@ -59,9 +59,7 @@ function message(n: number, from: typeof JONAS, text: string): Message {
   };
 }
 
-const KICKOFF_MESSAGES: Message[] = TEXTS.map(([from, text], at) =>
-  message(at + 1, from, text),
-);
+const KICKOFF_MESSAGES: Message[] = TEXTS.map(([from, text], at) => message(at + 1, from, text));
 
 /** Rui's message after the explanation was written (the thread moved on). */
 const KICKOFF_NEWER: Message = {
