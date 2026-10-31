@@ -340,11 +340,12 @@ export const NarrowNumberAndNewRowOnAPhone: Story = {
   parameters: { ...at("phone", 375, 812).parameters, cutOnPurpose: true },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await canvas.findByRole("grid");
     const cell = await canvas.findByText("€9,600.00");
     await expect(cell).toHaveAttribute("title", "€9,600.00");
     await expect(getComputedStyle(cell).textOverflow).toBe("ellipsis");
-    const row = must(canvas.getByRole("button", { name: /^New row/u }).closest("[role=row]"));
+    // The footer's New row, in the grid (the toolbar has its own on a phone).
+    const grid = within(await canvas.findByRole("grid"));
+    const row = must(grid.getByRole("button", { name: /^New row/u }).closest("[role=row]"));
     const add = canvas.getByRole("button", { name: "Add a column" });
     const head = must(add.closest("[role=row]"));
     await expect(head.getBoundingClientRect().height).toBeLessThan(
