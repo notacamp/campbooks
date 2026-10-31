@@ -748,20 +748,25 @@ export const ScoutIsntSureWaitOffer: Story = {
     await body.findByRole("dialog", { name: "Nudge Águas" });
     await userEvent.keyboard("{Escape}");
     const offer = await body.findByRole("dialog", { name: WAIT_TITLE });
-    await expect(
-      within(offer).getByText(
-        "Scout would wait on them and suggest a nudge after 3 working days. It never sends anything on its own.",
-      ),
-    ).toBeVisible();
+    await waitFor(async () => {
+      await expect(
+        within(offer).getByText(
+          "Scout would wait on them and suggest a nudge after 3 working days. It never sends anything on its own.",
+        ),
+      ).toBeVisible();
+    });
     await userEvent.click(within(offer).getByRole("button", { name: /Yes, always/u }));
     const rule = await body.findByRole("dialog", {
       name: "A rule for when Ana writes to someone else",
     });
-    await expect(
-      within(rule).getByText(
-        "Mail from ana@costa-arquitetos.example to someone else with you in Cc: wait on them.",
-      ),
-    ).toBeVisible();
+    // The dialog rises in over a moment: wait until it is shown.
+    await waitFor(async () => {
+      await expect(
+        within(rule).getByText(
+          "Mail from ana@costa-arquitetos.example to someone else with you in Cc: wait on them.",
+        ),
+      ).toBeVisible();
+    });
   },
 };
 
