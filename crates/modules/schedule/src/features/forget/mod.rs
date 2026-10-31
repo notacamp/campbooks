@@ -12,13 +12,13 @@ use sqlx::types::Uuid;
 use crate::{
     domain::{
         blobs::CALENDAR_REF_OWNER,
-        invitations,
+        invitations, locks,
         outbound::BLOB_OWNER,
         rows::{CALENDAR_COLUMNS, CalendarRow},
         tracked,
     },
     inbound::{ConnectionRemoved, MemberLeft, WorkspaceDeleting},
-    model::InvitationClosed,
+    model::{ConnectionId, InvitationClosed},
     tracking,
 };
 
@@ -41,6 +41,21 @@ impl EventHandler for ForgetMember {
             .map_err(|_| JobError::fatal("member_left names an invalid workspace"))?;
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
+        // A list read again must not make a calendar while theirs go: take
+        // the lock of each of their connections, in order, first.
+        let connections: Vec<ConnectionId> = sqlx::query_scalar(
+            "SELECT DISTINCT connection_id FROM schedule.calendars
+              WHERE workspace_id = $1 AND member_id = $2 AND source = 'provider'
+                AND connection_id IS NOT NULL
+              ORDER BY connection_id",
+        )
+        .bind(workspace)
+        .bind(left.user)
+        .fetch_all(&mut **tx)
+        .await?;
+        for connection in connections {
+            locks::connection(tx, connection).await?;
+        }
         // Their invitations leave Home with their calendars.
         let going = sqlx::query_as::<_, CalendarRow>(sqlx::AssertSqlSafe(format!(
             "SELECT {CALENDAR_COLUMNS} FROM schedule.calendars
@@ -124,6 +139,7 @@ impl EventHandler for ForgetConnection {
             .map_err(|_| JobError::fatal("connection_removed names an invalid workspace"))?;
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
+        locks::connection(tx, removed.connection).await?;
         // The calendars as they stand, for the record of their removal.
         let standing = tracked::calendars_of_connection(tx, removed.connection).await?;
         // Their invitations leave Home with them.

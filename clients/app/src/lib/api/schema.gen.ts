@@ -7727,6 +7727,9 @@ export interface components {
         } | {
             /** @enum {string} */
             action: "worth_a_look";
+        } | {
+            /** @enum {string} */
+            action: "wait_on_addressed";
         };
         /** @description One test on a message; all of a rule's conditions must hold. */
         RuleCondition: {
@@ -7775,6 +7778,9 @@ export interface components {
         } | {
             /** @enum {string} */
             field: "sender_checks_fail";
+        } | {
+            /** @enum {string} */
+            field: "member_not_in_to";
         };
         /** @description A rule a member just changed back on one conversation. */
         RuleException: {
@@ -7948,6 +7954,12 @@ export interface components {
             shared: boolean;
             /** @description Broad to narrow; empty when there is nothing to offer. */
             suggestions: components["schemas"]["RuleSuggestion"][];
+            /**
+             * Format: int32
+             * @description For the offer to wait on someone: the working days Scout waits before
+             *     it suggests a nudge. Absent for every other offer.
+             */
+            wait_days?: number | null;
         };
         /** @description A taught rule. */
         RuleView: {
@@ -13805,7 +13817,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description What the member did. */
-                action: "move_to_stream" | "archive" | "mark_read" | "add_label" | "not_needed" | "report" | "paid";
+                action: "move_to_stream" | "archive" | "mark_read" | "add_label" | "not_needed" | "report" | "paid" | "waiting";
                 /** @description The stream, for `move_to_stream`. */
                 stream?: components["schemas"]["Stream"];
                 /** @description The label, for `add_label`. */

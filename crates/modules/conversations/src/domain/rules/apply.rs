@@ -14,6 +14,7 @@ use sqlx::{PgConnection, Postgres, Transaction};
 use super::{
     Candidate, Stored, applications,
     effects::{self, Effects, TaughtAnswer},
+    waits,
 };
 use crate::{
     domain::{
@@ -275,7 +276,8 @@ impl Mine {
                 || outcome.asks_action.as_ref().is_some_and(|a| a.rule == id)
                 || outcome.surface.as_ref().is_some_and(|a| a.rule == id)
                 || outcome.paid.as_deref() == Some(id)
-                || outcome.highlight.as_deref() == Some(id),
+                || outcome.highlight.as_deref() == Some(id)
+                || outcome.wait.as_deref() == Some(id),
             bin: outcome
                 .bin
                 .as_ref()
@@ -364,6 +366,20 @@ async fn answer(
         )
         .await?;
         answered.push(answer.question.to_owned());
+    }
+    // "Wait on them": whose move it is, from the headers (none when there is
+    // no single person it was written to).
+    if outcome.wait.as_deref() == Some(rule) {
+        for answer in waits::answers(tx, candidate.message, rule).await? {
+            effects::store_decision(
+                tx,
+                ctx.workspace_id,
+                (candidate.message, candidate.id),
+                &answer,
+            )
+            .await?;
+            answered.push(answer.question.to_owned());
+        }
     }
     Ok(answered)
 }

@@ -176,6 +176,12 @@
       "pr": "#705"
     },
     {
+      "change": "Calendars shared after connecting (campbooks-cloud#405): Coverage for schedule.apply_calendar_list, which tracks the calendars it adds as schedule.calendar_added.",
+      "date": "2026-10-31",
+      "plan_version": 27,
+      "pr": "#713"
+    },
+    {
       "change": "Scout explains a thread (campbooks-cloud#407): conversations.explanation_completed (the outcome of a member's request to explain a thread, buckets of the message count and the duration, whether it replaced an earlier explanation); Coverage for conversations.explain, conversations.get_explanation, conversations.forget_explanation, conversations.explain_thread, conversations.dispatch_expire_explanations and conversations.expire_explanations.",
       "date": "2026-10-31",
       "plan_version": 28,
@@ -492,6 +498,14 @@
       "exemption": "",
       "kind": "handler",
       "name": "schedule.apply_calendar_changes"
+    },
+    {
+      "events": [
+        "schedule.calendar_added"
+      ],
+      "exemption": "",
+      "kind": "handler",
+      "name": "schedule.apply_calendar_list"
     },
     {
       "events": [

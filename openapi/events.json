@@ -128,6 +128,40 @@
       }
     },
     {
+      "name": "connectors.calendar_list_read",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A calendar stream read its account's calendar list again\n(`contracts/connectors.calendar_list_read.v1.schema.json`), about once a\nday, so a calendar shared later reaches the schedule module. It is not a\ngrant: `connectors.capability_granted` keeps meaning consent. The list is\nthe same `calendar-list` v1 blob; the provider's calendar ids can be\naddresses, so they travel in the blob and never in the event.",
+        "required": [
+          "workspace",
+          "connection",
+          "granted_by",
+          "calendars"
+        ],
+        "properties": {
+          "calendars": {
+            "$ref": "#/components/schemas/BlobRef",
+            "description": "The account's calendars: a `calendar-list` v1 blob."
+          },
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection."
+          },
+          "granted_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who granted calendar access, whose calendars they are."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "connectors.capability_granted",
       "module": "connectors",
       "version": 1,

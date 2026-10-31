@@ -7011,7 +7011,8 @@
                 "add_label",
                 "not_needed",
                 "report",
-                "paid"
+                "paid",
+                "waiting"
               ]
             }
           },
@@ -32908,6 +32909,21 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "Wait on the one person the message was written to: Scout answers\n\"someone else has the move\" and names them, so the conversation\nwaits on them and a nudge is suggested after the usual working days\n(campbooks-cloud#378). It answers nothing when there is no single\nobvious person in `To`. Nothing is ever sent on the rule's behalf.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "wait_on_addressed"
+                ]
+              }
+            }
           }
         ],
         "description": "What a rule does; at most one of each kind, labels excepted."
@@ -33085,6 +33101,21 @@
                 "type": "string",
                 "enum": [
                   "sender_checks_fail"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "None of the inbox's addresses is in the message's `To`: the member\nwas only copied (Cc, Bcc or an undisclosed list). Read from the\nheaders' addresses alone (campbooks-cloud#378).",
+            "required": [
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "member_not_in_to"
                 ]
               }
             }
@@ -33492,6 +33523,15 @@
               "$ref": "#/components/schemas/RuleSuggestion"
             },
             "description": "Broad to narrow; empty when there is nothing to offer."
+          },
+          "wait_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "For the offer to wait on someone: the working days Scout waits before\nit suggests a nudge. Absent for every other offer.",
+            "minimum": 0
           }
         }
       },

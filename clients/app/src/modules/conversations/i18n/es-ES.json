@@ -489,6 +489,7 @@
   },
   "rules": {
     "sentence": "Correos {{conditions}} → {{actions}}",
+    "waitSentence": "Correos de {{sender}} a otra persona con tu correo en Cc: esperar a esa persona.",
     "when": {
       "from": "de {{value}}",
       "list": "de la lista {{value}}",
@@ -498,7 +499,8 @@
       "label": "con una etiqueta",
       "stream": "en {{value}}",
       "checksFail": "que no pasa las comprobaciones del remitente",
-      "pretending": "que dice venir de {{value}} pero no pasa las comprobaciones del remitente"
+      "pretending": "que dice venir de {{value}} pero no pasa las comprobaciones del remitente",
+      "notInTo": "sin ti en Para"
     },
     "do": {
       "archive": "archivados",
@@ -514,7 +516,8 @@
       "spam": "denunciado como spam",
       "paid": "sus facturas ya están pagadas",
       "images": "sus imágenes se muestran siempre",
-      "worthALook": "se queda en Inicio hasta que lo abras"
+      "worthALook": "se queda en Inicio hasta que lo abras",
+      "waitOnAddressed": "Scout espera a la persona a la que se escribió"
     },
     "likeness": {
       "sender": "Todo de {{address}}",
@@ -643,7 +646,8 @@
       "spam": "Campbooks lo denunció como spam",
       "paid": "Campbooks dice que esto ya está pagado",
       "images": "Campbooks muestra las imágenes de este remitente",
-      "worthALook": "Campbooks mantiene este en Inicio hasta que lo abras"
+      "worthALook": "Campbooks mantiene este en Inicio hasta que lo abras",
+      "waitOnAddressed": "Campbooks espera a la persona a la que se escribió este correo"
     },
     "reader": {
       "stop": "Dejar de hacerlo"
@@ -798,6 +802,7 @@
     "titleTeach": "Una regla para correos como este",
     "titleReport": "Una regla para correos como este",
     "titlePaid": "Una regla para las facturas de {{payee}}",
+    "titleWaiting": "Una regla para cuando {{name}} escribe a otra persona",
     "titleNotice": "Una regla para los correos de {{sender}}",
     "whose": "Mostrar imágenes de",
     "imagesTitle": "Mostrar siempre las imágenes de {{sender}}",
@@ -842,6 +847,11 @@
     "paidTitle": "¿Las facturas de {{payee}} se pagan siempre solas?",
     "paidDetail": "Si están domiciliadas, Campbooks puede marcar como pagadas las próximas facturas de {{payee}}, sin preguntar. La regla aparece en la memoria de Scout.",
     "accept": "Sí, a partir de ahora",
+    "waitingTitle": "Cuando {{name}} escribe a otra persona con tu correo en Cc, ¿debe Scout esperar a esa persona por ti?",
+    "waitingDetail_one": "Scout esperaría a esa persona y sugeriría un recordatorio pasado {{count}} día hábil. Nunca envía nada por su cuenta.",
+    "waitingDetail_other": "Scout esperaría a esa persona y sugeriría un recordatorio pasados {{count}} días hábiles. Nunca envía nada por su cuenta.",
+    "waitingAccept": "Sí, siempre",
+    "waitingAsk": "Preguntarme cada vez",
     "loadFailed": "Campbooks no pudo preparar esa regla. No ha cambiado nada."
   },
   "noticed": {

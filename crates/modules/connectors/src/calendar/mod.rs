@@ -8,7 +8,7 @@
 //! both sides test against them.
 
 use campbooks_kernel::{Result, tenancy::WorkspaceId};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -362,6 +362,18 @@ pub async fn remember(
     stream: StreamId,
     listed: &[ListedCalendar],
 ) -> Result<u64> {
+    remember_as(conn, workspace, stream, listed, true).await
+}
+
+/// [`remember`], with `primary_reads` saying whether the primary calendar
+/// reads at once. A list read again turns nothing on by itself.
+pub async fn remember_as(
+    conn: &mut PgConnection,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    listed: &[ListedCalendar],
+    primary_reads: bool,
+) -> Result<u64> {
     let mut added = 0;
     for calendar in listed {
         added += sqlx::query(
@@ -374,12 +386,29 @@ pub async fn remember(
         .bind(workspace)
         .bind(stream)
         .bind(&calendar.provider_id)
-        .bind(calendar.primary)
+        .bind(calendar.primary && primary_reads)
         .execute(&mut *conn)
         .await?
         .rows_affected();
     }
     Ok(added)
+}
+
+/// How long after a read the calendar list is read again.
+const LIST_EVERY: TimeDelta = TimeDelta::hours(24);
+
+/// The most that is added to [`LIST_EVERY`], so streams do not line up.
+const LIST_JITTER_SECONDS: u128 = 2 * 60 * 60;
+
+/// How soon a list that could not be read is tried again.
+pub const LIST_RETRY: TimeDelta = TimeDelta::hours(1);
+
+/// When the list of `stream` is next read, after a read at `now`: a day and
+/// up to two hours, spread by the stream's id and the time.
+pub fn next_list_read(stream: StreamId, now: DateTime<Utc>) -> DateTime<Utc> {
+    let spread = stream.as_uuid().as_u128() ^ u128::from(now.timestamp().unsigned_abs());
+    let jitter = i64::try_from(spread % LIST_JITTER_SECONDS).unwrap_or(0);
+    now + LIST_EVERY + TimeDelta::seconds(jitter)
 }
 
 /// Record that `calendar` was read up to `token` at `now`.
