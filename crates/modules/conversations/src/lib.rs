@@ -186,6 +186,10 @@ pub fn module(deps: ConversationsDeps) -> Module {
         .ai
         .clone()
         .filter(features::read_message::may_read_mail);
+    // Explanations a member asks for are written only while it may too.
+    let explainer = features::explain::Explainer {
+        available: summaries.is_some(),
+    };
     // Scout's replies ask the `complete` role, when it may read mail.
     let writer = features::reply::ReplyWriter::new(deps.ai.clone());
     let model = match deps.model {
@@ -213,7 +217,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .layer(Extension(deps.config.notices))
             .layer(Extension(deps.config.actions))
             .layer(Extension(deps.policy.clone()))
-            .layer(Extension(writer)),
+            .layer(Extension(writer))
+            .layer(Extension(explainer)),
         admin_router: None,
         background: Background::new()
             .publishes::<events::MessageReceived>()
@@ -229,6 +234,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::NeedChanged>()
             .publishes::<events::NeedSummarised>()
             .publishes::<events::MessageRead>()
+            .publishes::<events::ThreadExplained>()
             .publishes::<events::RuleChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
@@ -242,6 +248,13 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 summaries.clone(),
             ))
             .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
+            .handler(features::explain_thread::ExplainThread::new(
+                summaries.clone(),
+            ))
+            .schedule::<features::expire_explanations::DispatchExpireExplanations>(
+                features::expire_explanations::EVERY,
+            )
+            .job::<features::expire_explanations::ExpireExplanations>()
             .handler(features::read_message::ReadMessage::new(
                 summaries,
                 needs.clone(),
@@ -329,11 +342,12 @@ fn model_may_read_mail(gateway: &Gateway) -> bool {
 /// Every route of the module, one per feature.
 fn router() -> OpenApiRouter<AppState> {
     use features::{
-        archive, create_draft, get_attachment, get_conversation, get_history, get_message_body,
-        get_message_read, labels, list_conversations, list_correspondents, list_drafts,
-        list_inboxes, list_labels, list_senders, list_streams, mark_read, move_to_stream, needs,
-        person_notes, reply, request_message_read, rule_notices, rules, send_draft, spam, star,
-        suggest_rules, trash, update_draft, upload_draft_attachment,
+        archive, create_draft, explain, forget_explanation, get_attachment, get_conversation,
+        get_explanation, get_history, get_message_body, get_message_read, labels,
+        list_conversations, list_correspondents, list_drafts, list_inboxes, list_labels,
+        list_senders, list_streams, mark_read, move_to_stream, needs, person_notes, reply,
+        request_message_read, rule_notices, rules, send_draft, spam, star, suggest_rules, trash,
+        update_draft, upload_draft_attachment,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -395,6 +409,11 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rule_notices::list))
         .routes(routes!(rule_notices::get))
         .routes(routes!(rule_notices::answer, rule_notices::clear_answer))
+        .routes(routes!(
+            get_explanation::handler,
+            explain::handler,
+            forget_explanation::handler
+        ))
         .routes(routes!(reply::suggest))
         .routes(routes!(reply::write))
         .routes(routes!(reply::nudge))

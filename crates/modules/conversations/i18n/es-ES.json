@@ -50,6 +50,8 @@
     "images_need_you": "Solo tú puedes elegir mostrar siempre las imágenes de un remitente. Abre uno de sus mensajes y elígelo allí.",
     "person_note_invalid": "Una nota necesita una dirección de correo simple y de 1 a {{max}} caracteres sobre la persona.",
     "person_notes_full": "Ya tienes {{max}} notas sobre personas. Quita una para añadir otra.",
-    "person_notes_need_member": "Solo un miembro de este espacio de trabajo guarda notas sobre personas."
+    "person_notes_need_member": "Solo un miembro de este espacio de trabajo guarda notas sobre personas.",
+    "not_explainable": "Scout no puede explicar esta conversación: está en spam o en la papelera, su bandeja es de solo lectura, no tiene mensajes o dio un aviso de phishing.",
+    "explain_unavailable": "Este servidor no tiene un modelo de lenguaje que pueda leer el correo, así que Scout no puede explicar conversaciones aquí."
   }
 }

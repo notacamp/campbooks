@@ -358,6 +358,39 @@ impl DomainEvent for NeedSummarised {
     }
 }
 
+/// A member's explanation of a thread was stored (campbooks-cloud#407), or
+/// failed: ids only, never the explanation. It exists so the reader of the
+/// member who asked asks for it again and shows it; only that member is told
+/// (an explanation is private to them).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ThreadExplained {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox: who may see the conversation.
+    pub inbox: InboxId,
+    /// The conversation explained.
+    pub conversation: ConversationId,
+    /// The member who asked: the only one told.
+    pub member: UserId,
+}
+
+impl DomainEvent for ThreadExplained {
+    const NAME: &'static str = "conversations.thread_explained";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::upsert(RecordRef::new(CONVERSATION_RECORD, &self.conversation))
+                .within(inbox_record(self.inbox))
+                .for_audience(Audience::User(self.member)),
+        ]
+    }
+}
+
 /// An item of a stored read, as `message_read` carries it: its key, kind and
 /// times, never its title, place or quote.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
