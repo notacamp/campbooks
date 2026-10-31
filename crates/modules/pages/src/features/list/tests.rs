@@ -129,3 +129,18 @@ async fn siblings_come_in_order_and_the_trash_lists_what_was_deleted(db: PgPool)
         .await;
     assert_eq!(titles(&children.json), Vec::<String>::new());
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_list_says_whether_mail_and_scout_are_on(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, _) = kit.member("ana", workspace);
+    let uri = Kit::pages(workspace);
+    // No pages yet: the answer is still there.
+    let on = kit.get(&ana, &uri).await;
+    assert_eq!(on.json["mail_scout"], json!(true));
+    assert_eq!(on.json["pages"], json!([]));
+    let kit = kit.with_mail_scout(false);
+    let off = kit.get(&ana, &uri).await;
+    assert_eq!(off.json["mail_scout"], json!(false));
+}
