@@ -1153,6 +1153,13 @@ mod tests {
                 "maintenance_reads_need_clocks",
                 "SELECT",
             ),
+            // The 30 days of an explanation of a thread (conversations,
+            // campbooks-cloud#407): which workspaces hold an old one, read only.
+            (
+                "conversations.explanations",
+                "maintenance_reads_explanations",
+                "SELECT",
+            ),
             // The needs backfill's dispatcher (conversations): reads ids and
             // states, and may only start a row (`WITH CHECK`).
             (
