@@ -52,6 +52,8 @@
     "person_note_invalid": "Una nota necesita una dirección de correo simple y de 1 a {{max}} caracteres sobre la persona.",
     "person_notes_full": "Ya tienes {{max}} notas sobre personas. Quita una para añadir otra.",
     "person_notes_need_member": "Solo un miembro de este espacio de trabajo guarda notas sobre personas.",
-    "send_at_busy": "Tienes demasiados envíos programados para ese minuto (el máximo es {{max}}). Elige otra hora."
+    "send_at_busy": "Tienes demasiados envíos programados para ese minuto (el máximo es {{max}}). Elige otra hora.",
+    "not_explainable": "Scout no puede explicar esta conversación: está en spam o en la papelera, su bandeja es de solo lectura, no tiene mensajes o dio un aviso de phishing.",
+    "explain_unavailable": "Este servidor no tiene un modelo de lenguaje que pueda leer el correo, así que Scout no puede explicar conversaciones aquí."
   }
 }

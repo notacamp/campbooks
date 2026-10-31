@@ -827,6 +827,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/explanation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The member's explanation of a thread. */
+        get: operations["conversations.get_explanation"];
+        put?: never;
+        /** Ask Scout to explain a thread. */
+        post: operations["conversations.explain"];
+        /** Forget your explanation of a thread. */
+        delete: operations["conversations.forget_explanation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/history": {
         parameters: {
             query?: never;
@@ -4404,6 +4423,14 @@ export interface components {
              *     their reasons: suggestions, except an answer marked `acted`.
              */
             decisions: components["schemas"]["DecisionView"][];
+            /**
+             * @description You may ask Scout to explain this thread (campbooks-cloud#407): a
+             *     model that may read mail is available here, and the thread is not in
+             *     spam or the trash, in an inbox kept read-only, empty, or a phishing
+             *     warning. The reader never probes; it offers "Explain this thread"
+             *     only while this is true, and shows nothing until you ask.
+             */
+            explain?: boolean;
             /** @description Up to the 100 newest messages, oldest first. */
             messages: components["schemas"]["MessageView"][];
             /**
@@ -5051,6 +5078,112 @@ export interface components {
              * @example Flight LIS → AMS
              */
             title: string;
+        };
+        /** @description The explanation itself: plain text only, no Markdown, no links. */
+        Explanation: {
+            /** @description What was agreed. */
+            agreed: components["schemas"]["ExplanationPoint"][];
+            /** @description The thread in a sentence or two. */
+            in_short: string;
+            /** @description What is on the member. */
+            on_you: components["schemas"]["ExplanationDuty"][];
+            /** @description What is still open. */
+            open: components["schemas"]["ExplanationPoint"][];
+            /** @description Who wants what. */
+            wants: components["schemas"]["ExplanationWant"][];
+        };
+        /** @description A message an explanation cites, for the chip beside a point. */
+        ExplanationCited: {
+            /** @description Who sent it: their name, else their address. */
+            from: string;
+            /** @description The message. */
+            id: components["schemas"]["MessageId"];
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            sent_at: string;
+        };
+        /** @description Something on the member. */
+        ExplanationDuty: {
+            /**
+             * Format: date
+             * @description The day it is due, as the thread states it.
+             */
+            due_on?: string | null;
+            /** @description The messages it comes from (one to three). */
+            refs: components["schemas"]["MessageId"][];
+            /** @description One plain line. */
+            text: string;
+        };
+        /**
+         * @description Why a request gave no explanation.
+         * @enum {string}
+         */
+        ExplanationFailure: "limit" | "unusable" | "unavailable";
+        /** @description The newest message, when the thread has moved on since the explanation. */
+        ExplanationNewer: {
+            /** @description Who sent it: their name, else their address. */
+            from: string;
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            sent_at: string;
+        };
+        /** @description Something agreed, or still open. */
+        ExplanationPoint: {
+            /** @description The messages it comes from (one to three). */
+            refs: components["schemas"]["MessageId"][];
+            /** @description One plain line. */
+            text: string;
+        };
+        /**
+         * @description Where an explanation is.
+         * @enum {string}
+         */
+        ExplanationState: "writing" | "ready" | "failed";
+        /** @description The member's explanation of a conversation. */
+        ExplanationView: {
+            body?: components["schemas"]["Explanation"] | null;
+            failure?: components["schemas"]["ExplanationFailure"] | null;
+            /**
+             * Format: int32
+             * @description How many of them were read in full; the earlier ones came from
+             *     Scout's notes.
+             */
+            in_full: number;
+            /** @description The language it is written in (`en`, `pt-PT`, `es-ES`, `fr`). */
+            locale?: string | null;
+            /**
+             * Format: int32
+             * @description How many messages it was made from.
+             */
+            messages: number;
+            newer?: components["schemas"]["ExplanationNewer"] | null;
+            /** @description The messages the explanation cites, for its chips. */
+            refs: components["schemas"]["ExplanationCited"][];
+            /**
+             * @description The thread has a newer message, or the member reads another language
+             *     now. Nothing is explained again on its own.
+             */
+            stale: boolean;
+            /** @description Where it is. */
+            state: components["schemas"]["ExplanationState"];
+            /**
+             * Format: date-time
+             * @description When it was written.
+             */
+            written_at?: string | null;
+        };
+        /** @description What someone in the thread wants. */
+        ExplanationWant: {
+            /** @description The messages it comes from (one to three). */
+            refs: components["schemas"]["MessageId"][];
+            /** @description What they want: one plain line. */
+            what: string;
+            /** @description Who wants it, as the thread names them. */
+            who: string;
         };
         /** @description When you are free. */
         FreeSlotList: {
@@ -12381,6 +12514,196 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConversationSummary"];
                 };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_explanation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your explanation of this thread. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExplanationView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description You have none for this thread, or you cannot see the thread, or a message it was made from is gone from it (it is deleted). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The member's explanation of this thread and language is ready: nothing was asked of the model. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExplanationView"];
+                };
+            };
+            /** @description The explanation is being written (asked now, or already asked): the answer arrives as a change to the conversation, or read it with `conversations.get_explanation`. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExplanationView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This thread cannot be explained (`not_explainable`): it is in spam or the trash, its inbox is kept read-only, it has no messages, or it raised a phishing warning. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many explanations asked for this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No language model may read mail here (`explain_unavailable`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.forget_explanation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your explanation of this thread is gone. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description No valid access token. */
             401: {

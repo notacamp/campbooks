@@ -132,6 +132,7 @@ export function ThreadMessage({
   if (!open) {
     return (
       <FoldedMessage
+        anchor={`message-${message.id}`}
         from={from}
         addressee={addressee}
         side={side}
@@ -193,6 +194,7 @@ export function ThreadMessage({
   const truncated = message.text?.truncated === true || body.data?.truncated === true;
   return (
     <MessageCard
+      anchor={`message-${message.id}`}
       from={from}
       addressee={addressee}
       side={side}

@@ -52,6 +52,8 @@
     "person_note_invalid": "Une note demande une adresse e-mail simple et de 1 à {{max}} caractères sur la personne.",
     "person_notes_full": "Vous avez déjà {{max}} notes sur des personnes. Supprimez-en une pour en ajouter une autre.",
     "person_notes_need_member": "Seul un membre de cet espace de travail garde des notes sur des personnes.",
-    "send_at_busy": "Vous avez trop d’envois programmés pour cette minute (le maximum est {{max}}). Choisissez une autre heure."
+    "send_at_busy": "Vous avez trop d’envois programmés pour cette minute (le maximum est {{max}}). Choisissez une autre heure.",
+    "not_explainable": "Scout ne peut pas expliquer cette conversation : elle est dans les indésirables ou la corbeille, sa boîte est en lecture seule, elle n’a aucun message ou elle a déclenché une alerte d’hameçonnage.",
+    "explain_unavailable": "Ce serveur n’a pas de modèle de langage autorisé à lire le courrier, Scout ne peut donc pas expliquer de conversations ici."
   }
 }

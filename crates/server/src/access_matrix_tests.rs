@@ -811,6 +811,24 @@ impl World {
         .await
         .unwrap();
         let item = self.seed_item(inbox, &conversation, &message).await;
+        // Each person's explanation of the thread is theirs alone
+        // (campbooks-cloud#407): one for every member, so a caller who may
+        // read it finds their own.
+        for member in self.users.values() {
+            sqlx::query(
+                "INSERT INTO conversations.explanations
+                     (workspace_id, member_id, conversation_id, state, asked_version, asked_locale,
+                      locale, thread_version, body, written_at)
+                 VALUES ($1, $2, $3::uuid, 'ready', 'v:1', 'en', 'en', 'v:1',
+                         '{\"in_short\": \"Matrix.\", \"wants\": [], \"agreed\": [], \"open\": [], \"on_you\": []}', now())",
+            )
+            .bind(self.a.as_uuid())
+            .bind(member.as_uuid())
+            .bind(&conversation)
+            .execute(&db)
+            .await
+            .unwrap();
+        }
         let draft = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO conversations.drafts (id, workspace_id, inbox_id, author, kind)
@@ -1663,8 +1681,14 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
                         ),
                         "{who:?}: {what}: allowed, but {status} {text}"
                     );
+                    // This instance has no language model, so a request to
+                    // explain a thread is refused as unavailable
+                    // (campbooks-cloud#407): not a failure of the server.
+                    let no_model = id == "conversations.explain"
+                        && status == StatusCode::SERVICE_UNAVAILABLE
+                        && text.contains("explain_unavailable");
                     assert!(
-                        !status.is_server_error(),
+                        !status.is_server_error() || no_model,
                         "{who:?}: {what}: {status} {text}"
                     );
                 }

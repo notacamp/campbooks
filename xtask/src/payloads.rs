@@ -350,6 +350,16 @@ pub const JOB_PAYLOAD_FIELDS: &[(&str, &str, &str)] = &[
         "a counter of the draft's sends",
     ),
     ("conversations.notice_rules", "inbox", INBOX_ID),
+    (
+        "conversations.explain_thread",
+        "member",
+        "the member's id (a UUID): whose explanation to write, never a name or an address",
+    ),
+    (
+        "conversations.explain_thread",
+        "conversation",
+        "the conversation's id (a UUID), never its subject or its mail",
+    ),
     ("conversations.read_message", "message", MESSAGE_ID),
     ("conversations.read_structured", "message", MESSAGE_ID),
     (
