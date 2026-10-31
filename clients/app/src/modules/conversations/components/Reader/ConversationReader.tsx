@@ -1118,44 +1118,43 @@ export function ConversationReader({
               }}
             />
           ) : (
-            <div key={entry.message.id} id={`message-${entry.message.id}`} className="min-w-0">
-              <ThreadMessage
-                workspaceId={workspaceId}
-                conversationId={conversationId}
-                message={entry.message}
-                open={open.has(entry.message.id)}
-                onOpen={() => {
-                  setOpened((current) => new Set([...current, entry.message.id]));
-                }}
-                showImages={!inSpam && images.has(entry.message.id)}
-                onShowImages={() => {
-                  setImages((current) => new Set([...current, entry.message.id]));
-                }}
-                onTrustImages={
-                  trustable && entry.message.direction === "inbound"
-                    ? (domain) => {
-                        trustImages(entry.message, domain);
-                      }
-                    : undefined
-                }
-                trustKey={active && trusting === null && entry.message.id === newestInbound?.id}
-                sharedInbox={inbox?.shared === true}
-                kind={entry.message.direction === "outbound" ? "person" : kind}
-                inertLinks={inSpam || conversation.need?.question === "suspicious"}
-                spam={inSpam}
-                found={
-                  entry.message.direction === "inbound"
-                    ? renderFound?.({
-                        workspaceId,
-                        conversationId,
-                        messageId: entry.message.id,
-                        subject: entry.message.subject,
-                      })
-                    : undefined
-                }
-                now={now}
-              />
-            </div>
+            <ThreadMessage
+              key={entry.message.id}
+              workspaceId={workspaceId}
+              conversationId={conversationId}
+              message={entry.message}
+              open={open.has(entry.message.id)}
+              onOpen={() => {
+                setOpened((current) => new Set([...current, entry.message.id]));
+              }}
+              showImages={!inSpam && images.has(entry.message.id)}
+              onShowImages={() => {
+                setImages((current) => new Set([...current, entry.message.id]));
+              }}
+              onTrustImages={
+                trustable && entry.message.direction === "inbound"
+                  ? (domain) => {
+                      trustImages(entry.message, domain);
+                    }
+                  : undefined
+              }
+              trustKey={active && trusting === null && entry.message.id === newestInbound?.id}
+              sharedInbox={inbox?.shared === true}
+              kind={entry.message.direction === "outbound" ? "person" : kind}
+              inertLinks={inSpam || conversation.need?.question === "suspicious"}
+              spam={inSpam}
+              found={
+                entry.message.direction === "inbound"
+                  ? renderFound?.({
+                      workspaceId,
+                      conversationId,
+                      messageId: entry.message.id,
+                      subject: entry.message.subject,
+                    })
+                  : undefined
+              }
+              now={now}
+            />
           ),
         )}
       </ReaderBody>
