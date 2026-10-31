@@ -526,14 +526,32 @@ jobs:
           if [ -n "$files" ]; then echo "run=true"; else echo "run=false"; fi >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v4
         if: steps.changed.outputs.run == 'true'
+      - id: day
+        if: steps.changed.outputs.run == 'true'
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v7
         if: steps.changed.outputs.run == 'true'
         with:
           context: deploy/laya
           load: true
           tags: campbooks-laya:ci
+          # As published (image.yml): the build day reruns the Debian upgrade.
+          build-args: APT_REFRESH=${{ steps.day.outputs.day }}
           cache-from: type=gha,scope=laya-${{ matrix.arch }}
           cache-to: type=gha,scope=laya-${{ matrix.arch }},mode=max
+      - name: Debian packages are current
+        # The image carries every Debian update there is today, so no accepted
+        # finding in .trivyignore (written for the distroless server image) can
+        # hide a library Laya actually loads, such as libssl3 for Python's ssl.
+        if: steps.changed.outputs.run == 'true'
+        run: |
+          docker run --rm --user root --entrypoint dpkg-query campbooks-laya:ci -W libssl3 openssl
+          pending=$(docker run --rm --user root --entrypoint sh campbooks-laya:ci -c \
+            'apt-get update -qq >/dev/null && apt-get -s upgrade | grep "^Inst " || true')
+          if [ -n "$pending" ]; then
+            echo "::error::the Laya image misses Debian updates:"; echo "$pending"; exit 1
+          fi
+          echo "No Debian updates pending."
       - name: Trivy (HIGH/CRITICAL, fixable)
         if: steps.changed.outputs.run == 'true'
         # Pinned by SHA: this action's tags have been tampered with before.
