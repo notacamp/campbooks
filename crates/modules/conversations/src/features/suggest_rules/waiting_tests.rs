@@ -104,7 +104,11 @@ async fn the_second_nudge_to_the_same_sender_offers_the_rule_once(db: PgPool) {
         .await;
     assert_eq!(reopened.status, StatusCode::OK, "{:?}", reopened.json);
     let undone = offer(&kit, &sam, workspace, "joao-2").await;
-    assert_eq!(undone["none"], "not_teachable", "{undone}");
+    // The question is back (a Review need), which no rule is offered over.
+    assert!(
+        undone["suggestions"].as_array().unwrap().is_empty(),
+        "{undone}"
+    );
     nudge(&kit, &sam, workspace, "joao-2").await;
 
     // "Ask me each time": not offered again.
@@ -177,6 +181,16 @@ async fn the_rule_waits_on_the_person_it_was_written_to_and_sends_nothing(db: Pg
     )
     .await;
     let waiting = need_of(&kit, "joao-1").await;
+    let seen: Vec<(String, String, String, bool)> = sqlx::query_as(
+        "SELECT question, source, value::text, acted FROM conversations.decisions ORDER BY 1, 2",
+    )
+    .fetch_all(&kit.db)
+    .await
+    .unwrap();
+    let rules: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.rules")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
     assert_eq!(
         waiting,
         Some((
@@ -184,7 +198,8 @@ async fn the_rule_waits_on_the_person_it_was_written_to_and_sends_nothing(db: Pg
             "sure".to_owned(),
             "taught".to_owned(),
             Some(ANA.1.to_owned())
-        ))
+        )),
+        "rules {rules}, decisions {seen:?}"
     );
 
     // Written to Sam: the rule does not apply, Scout asks as before.
