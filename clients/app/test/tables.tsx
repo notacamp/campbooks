@@ -15,7 +15,7 @@ export function tablesApi(
   extra: Record<string, Handler | MockHandler> = {},
 ): { server: TablesServer; mocked: MockedApi } {
   const shell: Record<string, Handler> = {
-    [`GET ${W}/pages`]: () => ({ body: { pages: server.pages(), tables: true } }),
+    [`GET ${W}/pages`]: () => ({ body: { pages: server.pages(), tables: true, mail_scout: true } }),
     [`GET ${W}/pages/backlinks`]: () => ({ body: { pages: [] } }),
     [`GET ${W}/members`]: () => ({ body: { members: TEAM } }),
     [`GET ${W}/conversations/${MARTA_DETAIL.conversation.id}`]: () => ({ body: MARTA_DETAIL }),

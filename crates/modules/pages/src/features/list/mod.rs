@@ -51,6 +51,9 @@ pub struct PageList {
     /// Whether tables are on here: when not, there are no table routes, and
     /// a client offers none.
     pub tables: bool,
+    /// Whether mail and Scout in pages is on here: when not, a client offers
+    /// no "Save to page" and no "Ask Scout" about a page.
+    pub mail_scout: bool,
 }
 
 /// List the pages the caller may open.
@@ -76,6 +79,7 @@ pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<PagesRead>,
     Extension(tables): Extension<crate::config::TablesOn>,
+    Extension(mail_scout): Extension<crate::config::MailScoutOn>,
     extract::Query(params): extract::Query<ListParams>,
 ) -> Result<Json<PageList>> {
     let access = &workspace.access;
@@ -122,6 +126,7 @@ pub async fn handler(
     Ok(Json(PageList {
         pages,
         tables: tables.0,
+        mail_scout: mail_scout.0,
     }))
 }
 

@@ -71,7 +71,7 @@ function render(proposal: Proposal, more: Parameters<typeof mockApi>[0] = {}) {
       states.set(proposal.id, (body as { state: string }).state);
       return { body: { ...proposal, state: (body as { state: Proposal["state"] }).state } };
     },
-    [`GET ${W}/pages`]: { body: { pages: [CLIENT_ONBOARDING], tables: false } },
+    [`GET ${W}/pages`]: { body: { pages: [CLIENT_ONBOARDING], tables: false, mail_scout: true } },
     [`GET ${W}/conversations`]: {
       body: { conversations: [MARTA, PEDRO], next_cursor: null },
     },

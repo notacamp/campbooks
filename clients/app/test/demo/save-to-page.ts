@@ -84,8 +84,10 @@ export interface SaveServerOptions {
   linked?: readonly string[];
   /** `pages.attach_from_message` answers this refusal. */
   attachRefusal?: { status: number; code?: string };
-  /** `pages.get_sharing` is a 404: the server does not offer mail and Scout in pages. */
+  /** `pages.list` says `mail_scout: false`: the server does not offer mail and Scout in pages. */
   off?: boolean;
+  /** A workspace with no pages yet (the first "New page" makes one). */
+  empty?: boolean;
 }
 
 export interface SaveServer {
@@ -106,7 +108,7 @@ export function saveToPageServer(options: SaveServerOptions = {}): SaveServer {
   const trashed = new Set<string>();
   const calls: string[] = [];
   const pages = new Map<string, Schema<"PageSummary">>(
-    WRITABLE.map((page) => [page.id, page] as const),
+    (options.empty === true ? [] : WRITABLE).map((page) => [page.id, page] as const),
   );
   const docOf = (id: string): Y.Doc => {
     let doc = docs.get(id);
@@ -127,7 +129,9 @@ export function saveToPageServer(options: SaveServerOptions = {}): SaveServer {
   const add = (route: string, handler: Handler) => {
     routes[route] = note(route, handler);
   };
-  add(`GET ${W}/pages`, () => ({ body: { pages: [...pages.values()], tables: false } }));
+  add(`GET ${W}/pages`, () => ({
+    body: { pages: [...pages.values()], tables: false, mail_scout: options.off !== true },
+  }));
   add(`GET ${W}/members`, () => ({ body: { members: MEMBERS } }));
   add(`GET ${W}/pages/backlinks`, (_body, url) => ({
     body: {
@@ -185,9 +189,6 @@ export function saveToPageServer(options: SaveServerOptions = {}): SaveServer {
       };
     });
     add(`GET ${W}/pages/${id}/sharing`, () => {
-      if (options.off === true) {
-        return { status: 404 };
-      }
       return {
         body: SHARING[id] ?? {
           everyone: false,
