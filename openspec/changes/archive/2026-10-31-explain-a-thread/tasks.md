@@ -28,6 +28,6 @@
 
 - [x] 4.1 OpenAPI and client types regenerated; tracking plan applied
 - [x] 4.2 Changelog entry `changelog/unreleased/added/407-explain-a-thread.md`
-- [ ] 4.3 Gates green in CI
+- [x] 4.3 Gates green in CI
 - [x] 4.4 Recording at 375 px and desktop
 - [x] 4.5 `openspec archive explain-a-thread --yes` before merge
