@@ -1118,7 +1118,7 @@ export function ConversationReader({
               }}
             />
           ) : (
-            <div key={entry.message.id} id={`message-${entry.message.id}`}>
+            <div key={entry.message.id} id={`message-${entry.message.id}`} className="min-w-0">
               <ThreadMessage
                 workspaceId={workspaceId}
                 conversationId={conversationId}

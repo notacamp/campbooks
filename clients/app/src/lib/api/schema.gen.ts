@@ -4060,18 +4060,6 @@ export interface components {
              */
             questions: number;
         };
-        /** @description A message an explanation cites, for the chip beside a point. */
-        Cited: {
-            /** @description Who sent it: their name, else their address. */
-            from: string;
-            /** @description The message. */
-            id: components["schemas"]["MessageId"];
-            /**
-             * Format: date-time
-             * @description When it was sent.
-             */
-            sent_at: string;
-        };
         /** @description The browser or web view the app runs in. */
         ClientBrowser: {
             /** @description Whether the device is a phone or a tablet. */
@@ -4952,18 +4940,6 @@ export interface components {
              */
             version: number;
         };
-        /** @description Something on the member. */
-        Duty: {
-            /**
-             * Format: date
-             * @description The day it is due, as the thread states it.
-             */
-            due_on?: string | null;
-            /** @description The messages it comes from (one to three). */
-            refs: components["schemas"]["MessageId"][];
-            /** @description One plain line. */
-            text: string;
-        };
         /** @description `/oauth2/end_session` parameters (query for GET, form for POST). */
         EndSession: {
             /** @description The client asking; must be the hint's audience when given. */
@@ -5106,20 +5082,71 @@ export interface components {
         /** @description The explanation itself: plain text only, no Markdown, no links. */
         Explanation: {
             /** @description What was agreed. */
-            agreed: components["schemas"]["Point"][];
+            agreed: components["schemas"]["ExplanationPoint"][];
             /** @description The thread in a sentence or two. */
             in_short: string;
             /** @description What is on the member. */
-            on_you: components["schemas"]["Duty"][];
+            on_you: components["schemas"]["ExplanationDuty"][];
             /** @description What is still open. */
-            open: components["schemas"]["Point"][];
+            open: components["schemas"]["ExplanationPoint"][];
             /** @description Who wants what. */
-            wants: components["schemas"]["Want"][];
+            wants: components["schemas"]["ExplanationWant"][];
         };
+        /** @description A message an explanation cites, for the chip beside a point. */
+        ExplanationCited: {
+            /** @description Who sent it: their name, else their address. */
+            from: string;
+            /** @description The message. */
+            id: components["schemas"]["MessageId"];
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            sent_at: string;
+        };
+        /** @description Something on the member. */
+        ExplanationDuty: {
+            /**
+             * Format: date
+             * @description The day it is due, as the thread states it.
+             */
+            due_on?: string | null;
+            /** @description The messages it comes from (one to three). */
+            refs: components["schemas"]["MessageId"][];
+            /** @description One plain line. */
+            text: string;
+        };
+        /**
+         * @description Why a request gave no explanation.
+         * @enum {string}
+         */
+        ExplanationFailure: "limit" | "unusable" | "unavailable";
+        /** @description The newest message, when the thread has moved on since the explanation. */
+        ExplanationNewer: {
+            /** @description Who sent it: their name, else their address. */
+            from: string;
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            sent_at: string;
+        };
+        /** @description Something agreed, or still open. */
+        ExplanationPoint: {
+            /** @description The messages it comes from (one to three). */
+            refs: components["schemas"]["MessageId"][];
+            /** @description One plain line. */
+            text: string;
+        };
+        /**
+         * @description Where an explanation is.
+         * @enum {string}
+         */
+        ExplanationState: "writing" | "ready" | "failed";
         /** @description The member's explanation of a conversation. */
         ExplanationView: {
             body?: components["schemas"]["Explanation"] | null;
-            failure?: components["schemas"]["Failure"] | null;
+            failure?: components["schemas"]["ExplanationFailure"] | null;
             /**
              * Format: int32
              * @description How many of them were read in full; the earlier ones came from
@@ -5133,27 +5160,31 @@ export interface components {
              * @description How many messages it was made from.
              */
             messages: number;
-            newer?: components["schemas"]["Newer"] | null;
+            newer?: components["schemas"]["ExplanationNewer"] | null;
             /** @description The messages the explanation cites, for its chips. */
-            refs: components["schemas"]["Cited"][];
+            refs: components["schemas"]["ExplanationCited"][];
             /**
              * @description The thread has a newer message, or the member reads another language
              *     now. Nothing is explained again on its own.
              */
             stale: boolean;
             /** @description Where it is. */
-            state: components["schemas"]["State"];
+            state: components["schemas"]["ExplanationState"];
             /**
              * Format: date-time
              * @description When it was written.
              */
             written_at?: string | null;
         };
-        /**
-         * @description Why a request gave no explanation.
-         * @enum {string}
-         */
-        Failure: "limit" | "unusable" | "unavailable";
+        /** @description What someone in the thread wants. */
+        ExplanationWant: {
+            /** @description The messages it comes from (one to three). */
+            refs: components["schemas"]["MessageId"][];
+            /** @description What they want: one plain line. */
+            what: string;
+            /** @description Who wants it, as the thread names them. */
+            who: string;
+        };
         /** @description When you are free. */
         FreeSlotList: {
             /** @description The calendars whose events were counted as busy. */
@@ -6222,16 +6253,6 @@ export interface components {
             /** @description `table` or `board`. */
             type: components["schemas"]["TableViewType"];
         };
-        /** @description The newest message, when the thread has moved on since the explanation. */
-        Newer: {
-            /** @description Who sent it: their name, else their address. */
-            from: string;
-            /**
-             * Format: date-time
-             * @description When it was sent.
-             */
-            sent_at: string;
-        };
         /**
          * @description Why there is nothing to offer.
          * @enum {string}
@@ -6801,13 +6822,6 @@ export interface components {
              * @description The revision you saw.
              */
             revision: number;
-        };
-        /** @description Something agreed, or still open. */
-        Point: {
-            /** @description The messages it comes from (one to three). */
-            refs: components["schemas"]["MessageId"][];
-            /** @description One plain line. */
-            text: string;
         };
         /** @description A rule to preview. */
         PreviewRule: {
@@ -8441,11 +8455,6 @@ export interface components {
             expires_at: string;
         };
         /**
-         * @description Where an explanation is.
-         * @enum {string}
-         */
-        State: "writing" | "ready" | "failed";
-        /**
          * @description Where a status option sits in the flow.
          * @enum {string}
          */
@@ -9282,15 +9291,6 @@ export interface components {
             name?: string | null;
             /** @description Its new place among the views. */
             position?: string | null;
-        };
-        /** @description What someone in the thread wants. */
-        Want: {
-            /** @description The messages it comes from (one to three). */
-            refs: components["schemas"]["MessageId"][];
-            /** @description What they want: one plain line. */
-            what: string;
-            /** @description Who wants it, as the thread names them. */
-            who: string;
         };
         /** @description A provider account the caller signs in with. */
         WayIn: {

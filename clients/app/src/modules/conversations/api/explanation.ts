@@ -6,7 +6,7 @@ export type ExplanationView = Schema<"ExplanationView">;
 export type Explanation = Schema<"Explanation">;
 
 /** How often a card that is being written asks again, in milliseconds. */
-export const POLL_MS = 1500;
+const POLL_MS = 1500;
 /** How long it keeps asking, in milliseconds; then it says Scout is taking long. */
 export const POLL_LIMIT_MS = 90_000;
 

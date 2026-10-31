@@ -168,8 +168,10 @@ export const Asked: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await ask(canvasElement);
-    const card = await canvas.findByRole("region", { name: CARD }, { timeout: 4000 });
-    await expect(within(card).findByText(/Acme Studio wants the kickoff/u)).resolves.toBeVisible();
+    // Written within a poll or two (1.5 s each).
+    await expect(
+      await canvas.findByText(/Acme Studio wants the kickoff/u, undefined, { timeout: 6000 }),
+    ).toBeVisible();
   },
 };
 

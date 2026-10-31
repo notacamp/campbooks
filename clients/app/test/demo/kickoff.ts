@@ -59,12 +59,12 @@ function message(n: number, from: typeof JONAS, text: string): Message {
   };
 }
 
-export const KICKOFF_MESSAGES: Message[] = TEXTS.map(([from, text], at) =>
+const KICKOFF_MESSAGES: Message[] = TEXTS.map(([from, text], at) =>
   message(at + 1, from, text),
 );
 
 /** Rui's message after the explanation was written (the thread moved on). */
-export const KICKOFF_NEWER: Message = {
+const KICKOFF_NEWER: Message = {
   ...message(10, RUI, "Jonas, our lawyer can join too if yours does."),
   sent_at: "2026-10-26T11:05:00Z",
 };
