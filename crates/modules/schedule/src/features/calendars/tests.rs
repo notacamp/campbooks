@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::{
-    inbound::{CalendarListRead, CapabilityGranted},
+    inbound::{CalendarListRead, CapabilityGranted, ConnectionRemoved, MemberLeft},
     model::{CalendarId, ConnectionId},
     testkit::Kit,
 };
@@ -373,4 +373,52 @@ async fn a_list_read_again_adds_new_calendars_off_and_changes_nothing_else(db: P
         .await
         .unwrap();
     assert_eq!(calendars, 7);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_late_list_read_after_a_removal_or_a_departure_adds_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let (_, ines) = kit.member("ines", ws);
+    let (_, marta) = kit.member("marta", ws);
+    let (removed, left) = (ConnectionId::new(), ConnectionId::new());
+    grant(&kit, ws, ines, removed, None).await;
+    grant(&kit, ws, marta, left, None).await;
+    kit.publish(
+        ws,
+        &ConnectionRemoved {
+            workspace: ws.to_string(),
+            connection: removed,
+        },
+    )
+    .await;
+    kit.publish(
+        ws,
+        &MemberLeft {
+            workspace: ws.to_string(),
+            user: marta,
+        },
+    )
+    .await;
+    let count = |connection: ConnectionId| {
+        let db = kit.db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT count(*) FROM schedule.calendars WHERE connection_id = $1",
+            )
+            .bind(connection)
+            .fetch_one(&db)
+            .await
+            .unwrap()
+        }
+    };
+    assert_eq!(count(removed).await, 0);
+    assert_eq!(count(left).await, 0);
+
+    let new = json!([{ "provider_id": "marta", "name": "Marta", "primary": false,
+                       "writable": true, "owned": false }]);
+    list_read(&kit, ws, ines, removed, new.clone()).await;
+    list_read(&kit, ws, marta, left, new).await;
+    assert_eq!(count(removed).await, 0);
+    assert_eq!(count(left).await, 0);
 }

@@ -24,6 +24,15 @@ calendar on, a later read never turns anything on (`syncing = false`).
 `following = owned IS FALSE` in both. `is_primary` is the provider's word in
 both.
 
+## A late read makes nothing
+
+Events are delivered in any order, so a `calendar_list_read` can be handled
+after `connection_removed` or after the member left, both of which delete the
+connection's calendars. A re-read therefore adds calendars only while the module
+still holds at least one provider calendar for that workspace, connection and
+member (checked in the same transaction). Only a grant makes a connection's
+first calendar.
+
 ## Cadence and the marker
 
 The list is read when it is due, at the start of a calendar stream's run that

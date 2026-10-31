@@ -14,7 +14,9 @@ When `connectors.calendar_list_read` is published, the module SHALL apply it
 by the same rule as a repeated grant, except that a calendar it does not have
 yet SHALL be added off whatever the provider says is primary, and a calendar
 SHALL never be turned on by it. Nothing but `owned` SHALL change on a calendar
-the module has.
+the module has. It SHALL NOT make the first calendar of a connection for a
+member: when the module holds none (the connection was removed, or the member
+left), a late read adds nothing.
 Turning a calendar off SHALL hide its events and stop applying its changes;
 turning it on SHALL ask connectors to read it again from the start
 (`schedule.calendar_sync_changed`).
@@ -46,3 +48,7 @@ turning it on SHALL ask connectors to read it again from the start
 #### Scenario: Nothing she chose is undone
 - **WHEN** a daily read lists "Family", which Inês set to mine, as not owned and renamed at the provider
 - **THEN** "Family" stays mine with its name and colour, and only its `owned` is filled if it was unknown
+
+#### Scenario: A read that arrives late
+- **WHEN** a daily read arrives after the connection was removed, or after the member left the workspace
+- **THEN** no calendar is added

@@ -117,7 +117,10 @@ impl EventHandler for ApplyCalendarList {
 /// one the module has when it did not know. Nothing else of a calendar the
 /// module has changes: the member's role, name and colour are theirs. A grant
 /// (`primary_on`) turns the provider's primary calendar on; a list read again
-/// never turns a calendar on. Returns how many calendars were added.
+/// never turns a calendar on, and never makes a connection's first calendar:
+/// when the module holds none for `member` on `connection` (the connection
+/// was removed, or the member left, and this read came late) it adds nothing.
+/// Returns how many calendars were added.
 async fn apply_list(
     tx: &mut Transaction<'static, Postgres>,
     state: &AppState,
@@ -130,6 +133,21 @@ async fn apply_list(
         .provider
         .as_deref()
         .filter(|name| matches!(*name, "google" | "zoho"));
+    if !primary_on {
+        let held: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM schedule.calendars
+                             WHERE workspace_id = $1 AND connection_id = $2
+                               AND member_id = $3 AND source = 'provider')",
+        )
+        .bind(workspace)
+        .bind(connection)
+        .bind(member)
+        .fetch_one(&mut **tx)
+        .await?;
+        if !held {
+            return Ok(0);
+        }
+    }
     let mut added = 0_u64;
     for calendar in list.calendars {
         let time_zone = calendar.time_zone.filter(|zone| parse_zone(zone).is_some());
