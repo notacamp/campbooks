@@ -83,7 +83,12 @@ export function useTopLayer({
     place();
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
+    // A panel whose content grows (a menu that becomes a form) is placed
+    // again, so it never runs off the window. Placing sets only its position.
+    const grown = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(place);
+    grown?.observe(box);
     return () => {
+      grown?.disconnect();
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
       try {

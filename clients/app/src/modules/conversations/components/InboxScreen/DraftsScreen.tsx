@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,7 +13,7 @@ import {
   useUndoToast,
 } from "~/lib/ui";
 
-import { useDrafts, type Draft } from "../../api/drafts";
+import { cancelSend, draftKeys, useDrafts, type Draft } from "../../api/drafts";
 import { useDeleteDraft } from "../../compose/use-delete-draft";
 import type { Translate } from "../../model";
 import { DraftsList } from "../DraftsList/DraftsList";
@@ -55,12 +56,25 @@ export function DraftsScreen({
   const drafts = useDrafts(workspaceId);
   const deleteDraft = useDeleteDraft(workspaceId);
   const toast = useUndoToast();
+  const queryClient = useQueryClient();
   const actions = useInboxActions(workspaceId);
   const toList = () => {
     void navigate({
       to: "/w/$workspaceId/inbox/$stream",
       params: { workspaceId, stream: "drafts" },
     });
+  };
+
+  /** Take a scheduled send back (campbooks-cloud#392): the draft, or nothing when too late. */
+  const takeBack = async (draft: Draft): Promise<Draft | undefined> => {
+    try {
+      return await cancelSend(workspaceId, draft.id);
+    } catch {
+      toast.notify(t("compose.tooLate"));
+      return undefined;
+    } finally {
+      void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
+    }
   };
 
   const open = (draft: Draft) => {
@@ -106,6 +120,21 @@ export function DraftsScreen({
           onDelete={(draft) => {
             void deleteDraft(draft).catch(() => {
               toast.notify(t("compose.errors.unknown"));
+            });
+          }}
+          onCancelSend={(draft) => {
+            void takeBack(draft).then((back) => {
+              if (back !== undefined) {
+                toast.notify(t("drafts.sendCancelled"));
+              }
+            });
+          }}
+          onCancelAndEdit={(draft) => {
+            void takeBack(draft).then((back) => {
+              if (back !== undefined) {
+                toast.notify(t("drafts.sendCancelled"));
+                open(back);
+              }
             });
           }}
           now={now}

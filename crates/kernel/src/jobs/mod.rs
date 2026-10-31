@@ -307,6 +307,28 @@ pub async fn unfinished_run_at<J: Job>(
     .await
 }
 
+/// [`unfinished_run_at`] for a kind run by a [`JobHandler`].
+///
+/// # Errors
+/// When the database fails, or `tx` cannot reach `workspace`'s rows.
+pub async fn unfinished_run_at_to<H: JobHandler>(
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    unique_key: &str,
+) -> Result<Option<DateTime<Utc>>, sqlx::Error> {
+    crate::db::require_scope(tx, workspace, "a workspace's queued job").await?;
+    sqlx::query_scalar(
+        "SELECT run_at FROM kernel.jobs
+          WHERE kind = $1 AND unique_key = $2 AND workspace_id = $3
+            AND state IN ('pending', 'running')",
+    )
+    .bind(H::NAME)
+    .bind(unique_key)
+    .bind(workspace)
+    .fetch_optional(&mut **tx)
+    .await
+}
+
 /// Enqueue `job` inside `tx`: it exists for workers once `tx` commits, and
 /// never if it rolls back. The job's span will link to the current span.
 ///

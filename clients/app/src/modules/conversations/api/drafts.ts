@@ -180,17 +180,24 @@ export async function fetchDraft(workspaceId: string, draftId: string): Promise<
  * `conversations.send_draft` of the saved `version` (409 `draft_changed` if
  * it is not the latest), with the `content_token` that came with the draft
  * on screen (409 `content_changed` if the draft is not that any more, or
- * there is none): scheduled, leaving at `send_at` unless cancelled.
+ * there is none): scheduled, leaving at `send_at` unless cancelled. With
+ * `sendAt` it leaves then, not when the undo window ends (400 `send_at_invalid`
+ * if the server will not take that time).
  */
 export async function sendDraft(
   workspaceId: string,
   draftId: string,
   shown: { version: number; contentToken: string | null | undefined },
+  sendAt?: Date,
 ): Promise<Draft> {
   return unwrap(
     await api.POST("/api/v1/w/{workspace_id}/drafts/{draft_id}/send", {
       params: draftPath(workspaceId, draftId),
-      body: { version: shown.version, content_token: shown.contentToken ?? null },
+      body: {
+        version: shown.version,
+        content_token: shown.contentToken ?? null,
+        ...(sendAt === undefined ? {} : { send_at: sendAt.toISOString() }),
+      },
     }),
   );
 }
