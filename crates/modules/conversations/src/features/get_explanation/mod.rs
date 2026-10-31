@@ -12,7 +12,8 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result,
+    AppState, Error, Operation, Problem, RecordRef, Result,
+    authz::Action,
     db::BeginFor as _,
     extract,
     i18n::Locale,
@@ -23,7 +24,9 @@ use crate::{
     domain::{
         explanation::{self, ExplanationView, Row, SELECT},
         paths::ConversationPath,
+        resources,
     },
+    events::CONVERSATION_RECORD,
     model::ConversationId,
     scopes::ConversationsRead,
 };
@@ -60,8 +63,16 @@ pub async fn handler(
     let conversation = path.conversation_id;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
+    let allowed = resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(CONVERSATION_RECORD, &conversation),
+    )
+    .await;
     let (member, inboxes) =
-        match explanation::member_sees(&state, &mut tx, access, conversation).await {
+        match explanation::member_sees(&mut tx, access, conversation, allowed).await {
             Ok(seen) => seen,
             Err(Error::NotFound) => {
                 tx.commit().await?;

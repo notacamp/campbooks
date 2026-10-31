@@ -223,6 +223,10 @@ path = "crates/modules/conversations/src/features/wake_needs/mod.rs"
 reason = "Needs that change with time alone (campbooks-cloud#275): the one-minute dispatcher reads which workspaces have a due row in `conversations.need_clocks` (its maintenance policy: read only, ids and times) and enqueues each workspace's wake job in that workspace; it reads and writes nothing else."
 
 [[access.maintenance_scope]]
+path = "crates/modules/conversations/src/features/expire_explanations/mod.rs"
+reason = "Explanations of threads are kept 30 days after they were written (campbooks-cloud#407): the daily dispatcher reads which workspaces hold an old one (`conversations.explanations` maintenance policy: read only, ids and times) and enqueues each workspace's expiry job in that workspace; it deletes nothing itself."
+
+[[access.maintenance_scope]]
 path = "crates/modules/schedule/src/features/announce_invitations/mod.rs"
 reason = "Invitations stored before invitations were announced (campbooks-cloud#360): the one-minute dispatcher reads which workspaces still have a row in `schedule.invitation_backfills` (its maintenance policy: read only, ids) and enqueues each workspace's announcing job in that workspace; it reads and writes nothing else."
 
@@ -250,6 +254,10 @@ reason = "The change feed: clients follow a taught rule and its run's progress."
 [[access.unconsumed_events]]
 name = "conversations.need_summarised"
 reason = "The change feed: Scout's summary of a need's email was written, so an open Home item or reader asks for the conversation again and shows it."
+
+[[access.unconsumed_events]]
+name = "conversations.thread_explained"
+reason = "The change feed: a member's explanation of a thread was stored (ids only), so that member's open reader asks for it again and shows it; only that member is told."
 
 [[access.unconsumed_events]]
 name = "conversations.send_failed"

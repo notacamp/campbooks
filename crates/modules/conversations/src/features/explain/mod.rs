@@ -21,7 +21,8 @@ use std::time::Duration;
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk,
+    AppState, Error, Operation, Problem, RecordRef, Result, Risk,
+    authz::Action,
     db::BeginFor as _,
     extract,
     i18n::Locale,
@@ -36,7 +37,9 @@ use crate::{
             self, ExplanationView, Row, SELECT, SELECT_LOCKED, State as RowState, WRITING_MINUTES,
         },
         paths::ConversationPath,
+        resources,
     },
+    events::CONVERSATION_RECORD,
     features::explain_thread::{ExplainThread, ExplainThreadPayload},
     model::ConversationId,
     scopes::ConversationsRead,
@@ -99,8 +102,16 @@ pub async fn handler(
     let access = &workspace.access;
     let language = locale.tag();
     let mut tx = state.db.begin_for(access.workspace).await?;
+    let allowed = resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(CONVERSATION_RECORD, &conversation),
+    )
+    .await;
     let (member, inboxes) =
-        match explanation::member_sees(&state, &mut tx, access, conversation).await {
+        match explanation::member_sees(&mut tx, access, conversation, allowed).await {
             Ok(seen) => seen,
             Err(Error::NotFound) => {
                 // Their explanation went with their access.

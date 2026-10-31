@@ -4845,6 +4845,308 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/explanation": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "The member's explanation of a thread.",
+        "operationId": "conversations.get_explanation",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your explanation of this thread.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "You have none for this thread, or you cannot see the thread, or a message it was made from is gone from it (it is deleted).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Ask Scout to explain a thread.",
+        "operationId": "conversations.explain",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The member's explanation of this thread and language is ready: nothing was asked of the model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationView"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The explanation is being written (asked now, or already asked): the answer arrives as a change to the conversation, or read it with `conversations.get_explanation`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This thread cannot be explained (`not_explainable`): it is in spam or the trash, its inbox is kept read-only, it has no messages, or it raised a phishing warning.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many explanations asked for this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No language model may read mail here (`explain_unavailable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Forget your explanation of a thread.",
+        "operationId": "conversations.forget_explanation",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Your explanation of this thread is gone."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/history": {
       "get": {
         "tags": [
@@ -24378,6 +24680,30 @@
           }
         }
       },
+      "Cited": {
+        "type": "object",
+        "description": "A message an explanation cites, for the chip beside a point.",
+        "required": [
+          "id",
+          "from",
+          "sent_at"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Who sent it: their name, else their address."
+          },
+          "id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was sent."
+          }
+        }
+      },
       "ClientBrowser": {
         "type": "object",
         "description": "The browser or web view the app runs in.",
@@ -25150,6 +25476,10 @@
               "$ref": "#/components/schemas/DecisionView"
             },
             "description": "The decide pass's answers about the newest inbound message, with\ntheir reasons: suggestions, except an answer marked `acted`."
+          },
+          "explain": {
+            "type": "boolean",
+            "description": "You may ask Scout to explain this thread (campbooks-cloud#407): a\nmodel that may read mail is available here, and the thread is not in\nspam or the trash, in an inbox kept read-only, empty, or a phishing\nwarning. The reader never probes; it offers \"Explain this thread\"\nonly while this is true, and shows nothing until you ask."
           },
           "messages": {
             "type": "array",
@@ -26360,6 +26690,35 @@
           }
         }
       },
+      "Duty": {
+        "type": "object",
+        "description": "Something on the member.",
+        "required": [
+          "text",
+          "refs"
+        ],
+        "properties": {
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "The day it is due, as the thread states it."
+          },
+          "refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageId"
+            },
+            "description": "The messages it comes from (one to three)."
+          },
+          "text": {
+            "type": "string",
+            "description": "One plain line."
+          }
+        }
+      },
       "EndSession": {
         "type": "object",
         "description": "`/oauth2/end_session` parameters (query for GET, form for POST).",
@@ -26720,6 +27079,148 @@
             "example": "Flight LIS → AMS"
           }
         }
+      },
+      "Explanation": {
+        "type": "object",
+        "description": "The explanation itself: plain text only, no Markdown, no links.",
+        "required": [
+          "in_short",
+          "wants",
+          "agreed",
+          "open",
+          "on_you"
+        ],
+        "properties": {
+          "agreed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Point"
+            },
+            "description": "What was agreed."
+          },
+          "in_short": {
+            "type": "string",
+            "description": "The thread in a sentence or two."
+          },
+          "on_you": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Duty"
+            },
+            "description": "What is on the member."
+          },
+          "open": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Point"
+            },
+            "description": "What is still open."
+          },
+          "wants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Want"
+            },
+            "description": "Who wants what."
+          }
+        }
+      },
+      "ExplanationView": {
+        "type": "object",
+        "description": "The member's explanation of a conversation.",
+        "required": [
+          "state",
+          "messages",
+          "in_full",
+          "stale",
+          "refs"
+        ],
+        "properties": {
+          "body": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Explanation",
+                "description": "The explanation kept: none while the first is being written, and none\nafter a first request that failed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Failure",
+                "description": "Why the last request gave no explanation, when it did not."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "in_full": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many of them were read in full; the earlier ones came from\nScout's notes.",
+            "minimum": 0
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The language it is written in (`en`, `pt-PT`, `es-ES`, `fr`)."
+          },
+          "messages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many messages it was made from.",
+            "minimum": 0
+          },
+          "newer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Newer",
+                "description": "The newest message, when the thread has moved on."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Cited"
+            },
+            "description": "The messages the explanation cites, for its chips."
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "The thread has a newer message, or the member reads another language\nnow. Nothing is explained again on its own."
+          },
+          "state": {
+            "$ref": "#/components/schemas/State",
+            "description": "Where it is."
+          },
+          "written_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was written."
+          }
+        }
+      },
+      "Failure": {
+        "type": "string",
+        "description": "Why a request gave no explanation.",
+        "enum": [
+          "limit",
+          "unusable",
+          "unavailable"
+        ]
       },
       "FreeSlotList": {
         "type": "object",
@@ -29101,6 +29602,25 @@
         },
         "additionalProperties": false
       },
+      "Newer": {
+        "type": "object",
+        "description": "The newest message, when the thread has moved on since the explanation.",
+        "required": [
+          "from",
+          "sent_at"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Who sent it: their name, else their address."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was sent."
+          }
+        }
+      },
       "NoSuggestion": {
         "type": "string",
         "description": "Why there is nothing to offer.",
@@ -30242,6 +30762,27 @@
           }
         },
         "additionalProperties": false
+      },
+      "Point": {
+        "type": "object",
+        "description": "Something agreed, or still open.",
+        "required": [
+          "text",
+          "refs"
+        ],
+        "properties": {
+          "refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageId"
+            },
+            "description": "The messages it comes from (one to three)."
+          },
+          "text": {
+            "type": "string",
+            "description": "One plain line."
+          }
+        }
       },
       "PreviewRule": {
         "type": "object",
@@ -34019,6 +34560,15 @@
           }
         }
       },
+      "State": {
+        "type": "string",
+        "description": "Where an explanation is.",
+        "enum": [
+          "writing",
+          "ready",
+          "failed"
+        ]
+      },
       "StatusGroup": {
         "type": "string",
         "description": "Where a status option sits in the flow.",
@@ -35723,6 +36273,32 @@
           }
         },
         "additionalProperties": false
+      },
+      "Want": {
+        "type": "object",
+        "description": "What someone in the thread wants.",
+        "required": [
+          "who",
+          "what",
+          "refs"
+        ],
+        "properties": {
+          "refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageId"
+            },
+            "description": "The messages it comes from (one to three)."
+          },
+          "what": {
+            "type": "string",
+            "description": "What they want: one plain line."
+          },
+          "who": {
+            "type": "string",
+            "description": "Who wants it, as the thread names them."
+          }
+        }
       },
       "WayIn": {
         "type": "object",

@@ -6,14 +6,16 @@
 
 use axum::{extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result,
+    AppState, Error, Operation, Problem, RecordRef, Result,
+    authz::Action,
     db::BeginFor as _,
     extract,
     tenancy::{Workspace, WorkspaceId},
 };
 
 use crate::{
-    domain::{explanation, paths::ConversationPath},
+    domain::{explanation, paths::ConversationPath, resources},
+    events::CONVERSATION_RECORD,
     model::ConversationId,
     scopes::ConversationsRead,
 };
@@ -48,7 +50,15 @@ pub async fn handler(
     let conversation = path.conversation_id;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let member = match explanation::member_sees(&state, &mut tx, access, conversation).await {
+    let allowed = resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(CONVERSATION_RECORD, &conversation),
+    )
+    .await;
+    let member = match explanation::member_sees(&mut tx, access, conversation, allowed).await {
         Ok((member, _)) => member,
         Err(Error::NotFound) => {
             tx.commit().await?;

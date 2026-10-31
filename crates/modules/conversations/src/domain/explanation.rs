@@ -12,8 +12,7 @@
 use std::collections::HashMap;
 
 use campbooks_kernel::{
-    AppState, Error, RecordRef, Result,
-    authz::Action,
+    Error, Result,
     tenancy::{Access, UserId},
 };
 use chrono::{DateTime, NaiveDate, Utc};
@@ -23,8 +22,7 @@ use sqlx::PgConnection;
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{access::visible_inboxes, resources},
-    events::CONVERSATION_RECORD,
+    domain::access::visible_inboxes,
     model::{Address, ConversationId, InboxId, MessageId},
 };
 
@@ -500,28 +498,22 @@ pub async fn forget(
     .rows_affected())
 }
 
-/// The member asking, the inboxes they can see, and the proof that they may
-/// read `conversation` now. When they cannot (it is not theirs to see any
-/// more), their explanation of it is deleted, and the answer is 404. A
-/// caller acting for no member finds nothing.
+/// The member asking and the inboxes they can see, given the answer of the
+/// central access check (`allowed`, the handler's own
+/// `resources::authorize` of a read of `conversation`). When they may not
+/// read the conversation (it is not theirs to see any more), their
+/// explanation of it is deleted, and the answer is 404. A caller acting for
+/// no member finds nothing. Any other refusal is passed on.
 ///
 /// On `Err(Error::NotFound)` the deletion has been done in `conn`; the caller
-/// commits before answering so it sticks ([`not_found`]).
+/// commits before answering so it sticks.
 pub async fn member_sees(
-    state: &AppState,
     conn: &mut PgConnection,
     access: &Access,
     conversation: ConversationId,
+    allowed: Result<()>,
 ) -> Result<(UserId, Vec<InboxId>)> {
     let user = access.user.ok_or(Error::NotFound)?;
-    let allowed = resources::authorize(
-        state,
-        conn,
-        access,
-        Action::Read,
-        &RecordRef::new(CONVERSATION_RECORD, &conversation),
-    )
-    .await;
     let inboxes = match allowed {
         Ok(()) => visible_inboxes(conn, access).await?,
         Err(Error::NotFound) => Vec::new(),

@@ -1258,6 +1258,40 @@
       }
     },
     {
+      "name": "conversations.thread_explained",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member's explanation of a thread was stored (campbooks-cloud#407), or\nfailed: ids only, never the explanation. It exists so the reader of the\nmember who asked asks for it again and shows it; only that member is told\n(an explanation is private to them).",
+        "required": [
+          "workspace",
+          "inbox",
+          "conversation",
+          "member"
+        ],
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation explained."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox: who may see the conversation."
+          },
+          "member": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who asked: the only one told."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "identity.account_created",
       "module": "identity",
       "version": 1,
