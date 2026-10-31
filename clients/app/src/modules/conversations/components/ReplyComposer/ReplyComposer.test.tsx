@@ -119,6 +119,20 @@ describe("ReplyComposer", () => {
     expect(await screen.findByRole("textbox", { name: "Message" })).toBeVisible();
   });
 
+  it("says in words why a scheduled send stopped, when its draft is opened", async () => {
+    mockApi({
+      [`GET ${D}`]: {
+        body: { drafts: [{ ...REPLY, state: "failed", failure_reason: "release_lost" }] },
+      },
+    });
+    renderWithProviders(slot(null));
+    expect(
+      await screen.findByText(
+        "We couldn’t confirm this was sent. Check your Sent folder before sending it again.",
+      ),
+    ).toBeVisible();
+  });
+
   it("explains a refused send and discards on request", async () => {
     const api = mockApi({
       [`GET ${D}`]: { body: { drafts: [REPLY] } },
@@ -127,7 +141,7 @@ describe("ReplyComposer", () => {
     });
     const onClose = vi.fn();
     renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }, onClose));
-    fireEvent.click(await screen.findByRole("button", { name: /Send/u }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Send(?! later)/u }));
     expect(await screen.findByText("Add at least one recipient.")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     await waitFor(() => {
@@ -175,7 +189,7 @@ describe("ReplyComposer", () => {
     // Leo was removed just before sending, but the save failed: the server
     // still has him, so nothing may be sent.
     replaceText(box, "Without Leo.");
-    fireEvent.click(screen.getByRole("button", { name: /Send/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^Send(?! later)/u }));
     expect(
       await screen.findByText(
         "Your last changes could not be saved, so nothing was sent. Try again.",
@@ -199,7 +213,7 @@ describe("ReplyComposer", () => {
       [`POST ${D}/${REPLY.id}/cancel_send`]: problem(409, "too_late"),
     });
     renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
-    fireEvent.click(await screen.findByRole("button", { name: /Send/u }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Send(?! later)/u }));
     fireEvent.click(await screen.findByRole("button", { name: /^Undo/u }));
     expect(await screen.findByText("Too late to undo: it was sent.")).toBeVisible();
     expect(api.calls.find((call) => call.route.endsWith("/send"))?.body).toEqual({
@@ -229,14 +243,14 @@ describe("ReplyComposer", () => {
       },
     });
     renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
-    fireEvent.click(await screen.findByRole("button", { name: /Send/u }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Send(?! later)/u }));
     expect(
       await screen.findByText("This changed since you opened it. Check it and send again."),
     ).toBeVisible();
     // The Bcc it gained is on screen, and nothing was sent for the member.
     expect(await screen.findByText("eve@example.com")).toBeVisible();
     expect(sends).toBe(1);
-    fireEvent.click(screen.getByRole("button", { name: /Send/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^Send(?! later)/u }));
     await waitFor(() => {
       expect(sends).toBe(2);
     });
@@ -273,7 +287,7 @@ describe("ReplyComposer", () => {
     });
     const onClose = vi.fn();
     renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }, onClose));
-    fireEvent.click(await screen.findByRole("button", { name: /Send/u }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Send(?! later)/u }));
     expect(
       await screen.findByText("This changed since you opened it. Check it and send again."),
     ).toBeVisible();
@@ -283,7 +297,7 @@ describe("ReplyComposer", () => {
     );
     expect(sends).toBe(1);
     expect(onClose).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Send/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^Send(?! later)/u }));
     expect(await screen.findByText("Sending to Maya Okafor")).toBeVisible();
     expect(
       api.calls.filter((call) => call.route.endsWith("/send")).map((call) => call.body),
@@ -553,7 +567,7 @@ describe("ReplyComposer", () => {
     expect(screen.getByRole("textbox", { name: "Message" })).toHaveTextContent(
       "Typed, not saved yet.",
     );
-    fireEvent.click(screen.getByRole("button", { name: /Send/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^Send(?! later)/u }));
     await waitFor(() => {
       expect(api.calls.some((c) => c.route.endsWith("/send"))).toBe(true);
     });

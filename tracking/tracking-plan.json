@@ -170,6 +170,12 @@
       "pr": "#699"
     },
     {
+      "change": "Send later review fixes (campbooks-cloud#392): conversations.unschedule_reason gains destination_changed (the inbox no longer sends from where the request was bound) and release_lost (a scheduled send found overdue with no release job); Coverage for the sweep job and its schedule.",
+      "date": "2026-10-28",
+      "plan_version": 26,
+      "pr": "#705"
+    },
+    {
       "change": "Scout explains a thread (campbooks-cloud#407): conversations.explanation_completed (the outcome of a member's request to explain a thread, buckets of the message count and the duration, whether it replaced an earlier explanation); Coverage for conversations.explain, conversations.get_explanation, conversations.forget_explanation, conversations.explain_thread, conversations.dispatch_expire_explanations and conversations.expire_explanations.",
       "date": "2026-10-31",
       "plan_version": 28,
@@ -788,6 +794,14 @@
       "exemption": "maintenance, no action of anyone: MACs re-tagged after a key rotation",
       "kind": "job",
       "name": "conversations.retag_bindings"
+    },
+    {
+      "events": [
+        "conversations.draft_unscheduled"
+      ],
+      "exemption": "",
+      "kind": "job",
+      "name": "conversations.sweep_overdue_sends"
     },
     {
       "events": [],
@@ -2304,6 +2318,12 @@
       "exemption": "maintenance, no action of anyone: only enqueues the jobs that do the work",
       "kind": "schedule",
       "name": "conversations.dispatch_needs_backfills"
+    },
+    {
+      "events": [],
+      "exemption": "maintenance, no action of anyone: only enqueues the jobs that do the work",
+      "kind": "schedule",
+      "name": "conversations.dispatch_overdue_sends"
     },
     {
       "events": [],
@@ -3927,6 +3947,16 @@
       "description": "The member took it back (Undo).",
       "enum": "conversations.unschedule_reason",
       "value": "cancelled"
+    },
+    {
+      "description": "The inbox no longer sends from where the author's request was bound.",
+      "enum": "conversations.unschedule_reason",
+      "value": "destination_changed"
+    },
+    {
+      "description": "A scheduled send was long overdue with no release job; it was not sent, and may never have been.",
+      "enum": "conversations.unschedule_reason",
+      "value": "release_lost"
     },
     {
       "description": "Its author may no longer send from the inbox.",
@@ -10863,6 +10893,8 @@
             "description": "Why it was taken back.",
             "enum": [
               "cancelled",
+              "destination_changed",
+              "release_lost",
               "sender_may_not_send"
             ],
             "type": "string",

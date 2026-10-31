@@ -227,6 +227,10 @@ path = "crates/modules/conversations/src/features/expire_explanations/mod.rs"
 reason = "Explanations of threads are kept 30 days after they were written (campbooks-cloud#407): the daily dispatcher reads which workspaces hold an old one (`conversations.explanations` maintenance policy: read only, ids and times) and enqueues each workspace's expiry job in that workspace; it deletes nothing itself."
 
 [[access.maintenance_scope]]
+path = "crates/modules/conversations/src/features/sweep_overdue_sends/mod.rs"
+reason = "A scheduled send must never stay scheduled for ever (campbooks-cloud#392): the ten-minute dispatcher asks `conversations.workspaces_with_overdue_sends` (a SECURITY DEFINER function owned by `campbooks_definer`, which may read only `workspace_id`, `state` and `send_at` of the drafts; it answers workspace ids) and enqueues the sweep job in each workspace with an overdue send; no policy lets this scope read a draft, and it writes nothing else."
+
+[[access.maintenance_scope]]
 path = "crates/modules/schedule/src/features/announce_invitations/mod.rs"
 reason = "Invitations stored before invitations were announced (campbooks-cloud#360): the one-minute dispatcher reads which workspaces still have a row in `schedule.invitation_backfills` (its maintenance policy: read only, ids) and enqueues each workspace's announcing job in that workspace; it reads and writes nothing else."
 

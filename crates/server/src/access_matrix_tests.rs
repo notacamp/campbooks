@@ -1931,7 +1931,8 @@ async fn a_scheduled_send_follows_its_authors_real_membership(db: PgPool) {
             // outbound-requests port, which confirmed it (campbooks-cloud#226).
             assert_eq!(sends_recorded(&world).await, 1);
         } else {
-            assert_eq!(state, "draft");
+            // Stopped, not silent: a failed draft that says why.
+            assert_eq!(state, "failed");
             assert_eq!(requested, 0);
         }
     }
@@ -2027,11 +2028,11 @@ async fn a_scheduled_send_is_released_to_where_its_member_sent_it(db: PgPool) {
 
 /// The stream pointed at another mailbox by SQL after the member asked: the
 /// release refuses it (a WARN), so nothing is requested, recorded or sent,
-/// and the draft is left as it is.
+/// and the draft stops as a failed one (`destination_changed`).
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_scheduled_send_whose_stream_was_repointed_is_never_released(db: PgPool) {
     let (state, requested, recorded) = send_through_a_stream(db, true).await;
-    assert_eq!(state, "scheduled");
+    assert_eq!(state, "failed");
     assert_eq!((requested, recorded), (0, 0));
 }
 
@@ -2136,7 +2137,8 @@ async fn a_planted_scheduled_send_is_never_released(db: PgPool) {
     .fetch_one(&world.db)
     .await
     .unwrap();
-    assert_eq!((state.as_str(), document), ("scheduled", false));
+    // A planted draft the binding does not hold for stops, named, unsent.
+    assert_eq!((state.as_str(), document), ("failed", false));
     assert_eq!(sends_recorded(&world).await, 0);
 }
 

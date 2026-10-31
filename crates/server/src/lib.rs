@@ -1866,10 +1866,33 @@ mod tests {
             .map(|(schema, privilege)| (schema.to_owned(), privilege.to_owned())),
             "`{DEFINER_ROLE}` may use the three schemas, and create nothing"
         );
+        // Column grants: exactly these, each narrower than a table grant.
+        let columns: Vec<(String, String)> = sqlx::query_as(
+            "SELECT c.oid::regclass::text || '.' || a.attname, x.privilege_type
+               FROM pg_attribute a
+               JOIN pg_class c ON c.oid = a.attrelid,
+                    aclexplode(a.attacl) x
+              WHERE x.grantee = $1::text::regrole
+              ORDER BY 1, 2",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            columns,
+            [
+                // `conversations.workspaces_with_overdue_sends`
+                // (campbooks-cloud#392): which workspaces, never a draft.
+                ("conversations.drafts.send_at", "SELECT"),
+                ("conversations.drafts.state", "SELECT"),
+                ("conversations.drafts.workspace_id", "SELECT"),
+            ]
+            .map(|(column, privilege)| (column.to_owned(), privilege.to_owned())),
+            "`{DEFINER_ROLE}` reads only the columns its functions need"
+        );
         let elsewhere: i64 = sqlx::query_scalar(
-            "SELECT (SELECT count(*) FROM pg_attribute a, aclexplode(a.attacl) x
-                      WHERE x.grantee = $1::text::regrole)
-                  + (SELECT count(*) FROM pg_proc p, aclexplode(p.proacl) x
+            "SELECT (SELECT count(*) FROM pg_proc p, aclexplode(p.proacl) x
                       WHERE x.grantee = $1::text::regrole AND p.proowner <> x.grantee)
                   + (SELECT count(*) FROM pg_database d, aclexplode(d.datacl) x
                       WHERE x.grantee = $1::text::regrole)",
@@ -1878,7 +1901,7 @@ mod tests {
         .fetch_one(&db)
         .await
         .unwrap();
-        assert_eq!(elsewhere, 0, "no column, function or database grant");
+        assert_eq!(elsewhere, 0, "no function or database grant");
 
         // The functions still work for the runtime role, as their owner.
         let runtime = testing::app_role_pool(&db).await;

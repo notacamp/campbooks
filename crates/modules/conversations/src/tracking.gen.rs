@@ -1766,6 +1766,12 @@ pub enum UnscheduleReason {
     /// The member took it back (Undo).
     #[serde(rename = "cancelled")]
     Cancelled,
+    /// The inbox no longer sends from where the author's request was bound.
+    #[serde(rename = "destination_changed")]
+    DestinationChanged,
+    /// A scheduled send was long overdue with no release job; it was not sent, and may never have been.
+    #[serde(rename = "release_lost")]
+    ReleaseLost,
     /// Its author may no longer send from the inbox.
     #[serde(rename = "sender_may_not_send")]
     SenderMayNotSend,
