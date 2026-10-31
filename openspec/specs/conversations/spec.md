@@ -1040,12 +1040,15 @@ SHALL list nothing for other container types.
 The module SHALL store taught rules: deterministic condition → action pairs
 for one inbox, with one to four conditions that must all hold and one to four
 actions, at most one per slot (`stream`, `archive`, `read`, `needs_reply`,
-`asks_action`, `surface`, `bin` (the trash or spam), `money`, `highlight`;
+`asks_action`, `surface`, `bin` (the trash or spam), `money`, `highlight`, `wait`;
 `add_label` is additive). Conditions SHALL be
 `sender_address is`, `sender_domain is` (never a free-mail domain on its
 own), `list_id is`, `subject_template is`, `subject_contains` (whole words,
 case- and accent-insensitive), `header is|present` (a stored header),
-`label has`, `stream is` and `sender_checks_fail` (the receiving provider's
+`label has`, `stream is`, `member_not_in_to` (none of the inbox's addresses is
+in the message's `To`: it was only copied, blind copied or sent to a list; read
+from the addresses alone, and false when the inbox is not known) and
+`sender_checks_fail` (the receiving provider's
 authentication results hold `dmarc=fail` under a published `reject` or
 `quarantine` policy the receiver applied (not `dis=none`, its sign of a
 trusted forwarder or list), so the domain's genuine mail passes; a policy that
@@ -1054,8 +1057,9 @@ for mail from an address the inbox writes to, on arrival and over existing
 mail alike). Actions SHALL be
 `move_to_stream`, `archive`,
 `add_label`, `mark_read`, `needs_reply` true or false, `asks_action` true or
-false, `surface` always or never, `trash`, `spam`, `mark_paid` and
-`worth_a_look` ("Highlight them": see Worth a look). A rule with
+false, `surface` always or never, `trash`, `spam`, `mark_paid`,
+`worth_a_look` ("Highlight them": see Worth a look) and `wait_on_addressed`
+("Wait on them": see Wait on them). A rule with
 `worth_a_look` SHALL hide nothing: with `archive`, `mark_read`, `trash`,
 `spam`, `mark_paid`, `surface` never, a `false` `needs_reply` or `asks_action`
 or a move out of Primary it answers 400 `invalid_rule`. A rule
@@ -1085,6 +1089,10 @@ now a public suffix answers 400 `invalid_rule` and is not kept.
 
 #### Scenario: Highlighting and hiding
 - **WHEN** a rule asks for `worth_a_look` and `archive`
+- **THEN** the response is 400 with code `invalid_rule` and nothing is stored
+
+#### Scenario: Waiting without "not in To"
+- **WHEN** a rule asks for `wait_on_addressed` without the condition `member_not_in_to`, or with `member_not_in_to` as its only condition
 - **THEN** the response is 400 with code `invalid_rule` and nothing is stored
 
 #### Scenario: Failed checks alone
@@ -1379,7 +1387,18 @@ domain unless a free-mail one, a correspondent included. These two SHALL be
 offered with nothing like it in the inbox yet (they are about mail still to
 come), the first the default, and SHALL answer no suggestion
 (`not_teachable`) when the conversation was not reported, or its need not
-answered Already paid. A correspondent SHALL get no report offer.
+answered Already paid. A correspondent SHALL get no report offer. After the member chose to wait on
+the person a message was written to (`action=waiting`) it SHALL offer one rule,
+`sender_address` of the sender with `member_not_in_to`, doing
+`wait_on_addressed`, as the default and only suggestion, with the working days
+a wait lasts (`wait_days`), and only when all of these hold: the message went
+to the member without them in `To`; the member's own answer on it was
+"someone else has the move" on exactly the one person the rule would name; and
+the member's active (not withdrawn) answers of that kind on mail from this
+sender in this inbox number at least two, this one included, counted from the
+`next_move` corrections inside the member's workspace. Otherwise it SHALL answer
+no suggestion (`too_few` below two, `not_teachable` for the rest). Undoing the
+answer withdraws its corrections, so the offer is gone.
 `POST …/conversations/{conversation_id}/rule-suggestions/dismiss`
 (`conversations.dismiss_rule_suggestion`, with the suggestion's `key`) SHALL
 hide it from that member for 30 days, and for good after a second dismissal.
@@ -1409,6 +1428,10 @@ suggestion.
 #### Scenario: A fake PayPal reported
 - **WHEN** Ana reports a message from service@paypal.com that failed DMARC, and another fake sits in her inbox next to real PayPal mail
 - **THEN** the offer's default is "paypal.com, failing its sender checks → spam", it would change 1, and the real mail is not counted
+
+#### Scenario: Nudge, twice
+- **WHEN** Sam answered "Nudge Ana" on João's mail to Ana, copying his inbox, and answers it again on another of João's
+- **THEN** `action=waiting` offers "João's mail, with Sam not in To → wait on the person it was written to" with `wait_days` 3; after the first answer alone it says `too_few`, and after Undo of the second it says `not_teachable`
 
 #### Scenario: Already paid
 - **WHEN** Ana says an EDP bill is already paid and asks for suggestions with `action=paid`
@@ -4172,3 +4195,41 @@ the draft.
 #### Scenario: Remove after attaching
 - **WHEN** Sam attaches a file, then saves the draft without it
 - **THEN** the draft lists no attachments, and the blob is no longer held by the draft
+
+### Requirement: Wait on them
+A rule whose action is `wait_on_addressed` SHALL, on a new message that
+matches its conditions (which SHALL include `member_not_in_to`), answer as a
+taught source what the member's own choice "Nudge {person}" would have filed:
+`next_move` is `someone_else` and `awaited` names the one person in the
+message's `To` who may be awaited (the facts' list: not the inbox, not the
+sender, no address that cannot answer, no machine sender). It SHALL answer
+nothing when `To` holds none, or more than one, such person, so the question is
+asked as before. It SHALL read addresses and headers only, never what a message
+says. The conversation SHALL then wait on that person at once, `sure`, with the
+rule as its basis, its nudge time and every guard of any other wait unchanged
+(never the inbox itself, never list or automatic mail, never a sorted stream
+other than Primary, heard-back clears it, the member writing to them re-arms
+it). The rule's answer SHALL replace the model's for those two questions, so the
+model's own "needs a reply" or "asks for an action" raises nothing; a "needs a
+reply" or "asks for an action" that another taught rule gives for the same mail
+SHALL still raise its Reply or Do, which comes before a wait, so the member's
+own rules are never silently overridden. The rule SHALL not act on suspicious
+mail, or mail that fails its sender checks. Nothing SHALL be sent on the rule's
+behalf: the nudge stays the member's. Removing the rule or an exception SHALL
+withdraw its two answers like any rule's.
+
+#### Scenario: A new message
+- **WHEN** the rule exists for João and he writes to Ana Costa, copying the inbox, and the model reads it as asking the member for a reply at 0.97
+- **THEN** the conversation waits on Ana Costa, `sure`, nothing is asked of the member, and nothing is sent
+
+#### Scenario: Written to the member
+- **WHEN** João writes to the inbox alone
+- **THEN** the rule does not match and the need is raised as before
+
+#### Scenario: Two people in To
+- **WHEN** João writes to Ana Costa and Eva Lopes, copying the inbox
+- **THEN** the rule answers nothing and Scout asks whose move it is
+
+#### Scenario: A reply taught for the same sender
+- **WHEN** another rule says João's mail needs a reply, and he writes to Ana Costa copying the inbox
+- **THEN** the need is that Reply, basis taught, and no wait is raised

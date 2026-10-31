@@ -21,10 +21,10 @@
 
 - [x] 4.1 `AheadAction` `waiting`; the offer in Home and the reader; the rule sentence; four locales with accents
 - [x] 4.2 Unit tests of the offer (Yes, always; Ask me each time; Undo)
-- [ ] 4.3 Home screen story and a play-less twin for the recording
+- [x] 4.3 Home screen story and a play-less twin for the recording
 
 ## 5. Close
 
-- [ ] 5.1 OpenAPI and client types regenerated, changelog entry file
-- [ ] 5.2 Gates green; the recording left to the maintainer (`## Recording` in the PR)
-- [ ] 5.3 Change archived into `openspec/specs/`
+- [x] 5.1 OpenAPI and client types regenerated, changelog entry file
+- [x] 5.2 Gates green; the recording left to the maintainer (`## Recording` in the PR)
+- [x] 5.3 Change archived into `openspec/specs/`
