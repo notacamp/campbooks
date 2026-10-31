@@ -114,12 +114,15 @@ const ref = (n: number, from: typeof JONAS) => ({
 
 /** Scout's explanation of the nine messages, as `conversations.get_explanation` answers it. */
 export function kickoffExplained(overrides: Partial<Explained> = {}): Explained {
+  // Up to 20 messages are read in full (design.md), so a shorter thread is
+  // read whole unless a story says otherwise.
+  const messages = overrides.messages ?? 9;
   return {
     state: "ready",
     locale: "en",
     written_at: "2026-10-25T10:42:00Z",
-    messages: 9,
-    in_full: 9,
+    messages,
+    in_full: Math.min(messages, 20),
     stale: false,
     body: {
       in_short:

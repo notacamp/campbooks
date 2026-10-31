@@ -210,7 +210,8 @@ describe("Explaining a thread in the reader", () => {
       stale: true,
       newer: { from: "Maya Okafor", sent_at: "2026-10-13T11:05:00Z" },
     });
-    const { api } = setup({ stored: stale, asked: explained({ messages: 4, in_full: 4 }) });
+    // Asking again: the server keeps the earlier explanation while it writes.
+    const { api } = setup({ stored: stale, asked: { ...stale, state: "writing", stale: false } });
     expect(await screen.findByText(/Maya wrote since, at /u)).toBeVisible();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(count(api, `POST ${PATH}`)).toBe(0);
@@ -221,6 +222,8 @@ describe("Explaining a thread in the reader", () => {
     await waitFor(() => {
       expect(count(api, `POST ${PATH}`)).toBe(1);
     });
+    // The earlier explanation stays in view, and the card says Scout is at it.
+    expect(await within(card).findByText(/Scout is reading the \d+ messages…/u)).toBeVisible();
   });
 
   it("says when it was written in another language", async () => {

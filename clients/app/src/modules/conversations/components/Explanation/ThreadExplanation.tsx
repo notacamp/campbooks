@@ -308,6 +308,11 @@ export function useThreadExplanation({
   }
 
   const notices: string[] = [];
+  // Explaining again keeps the earlier explanation in view, and says Scout
+  // is at it, so the click is never met by a card that looks unchanged.
+  if (writing) {
+    notices.push(t("explain.reading", { count: messageCount }));
+  }
   if (failure === "limit") {
     notices.push(t("explain.limit"));
   } else if (failure !== undefined) {
