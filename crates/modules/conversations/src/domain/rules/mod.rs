@@ -24,6 +24,7 @@ mod effects;
 mod exceptions;
 mod facts;
 mod images;
+mod waits;
 
 use campbooks_ai::decide::{
     signals::email::{TEMPLATE_MAX_CHARS, subject_words},
@@ -44,6 +45,7 @@ pub use facts::{
     Candidate, TEMPLATE_PAGE, candidate, corresponds, fill_templates, scan, templates_missing,
 };
 pub use images::{ImagesHeld, images};
+pub use waits::single_addressed;
 
 use crate::model::{
     ConversationId, InboxId, InboxRole, LabelId, PausedReason, RuleId, RuleOrigin, RuleState,
@@ -104,6 +106,10 @@ pub enum RuleCondition {
     /// domain failed its checks (with a sender or domain: "mail that says it
     /// is from paypal.com but is not").
     SenderChecksFail,
+    /// None of the inbox's addresses is in the message's `To`: the member
+    /// was only copied (Cc, Bcc or an undisclosed list). Read from the
+    /// headers' addresses alone (campbooks-cloud#378).
+    MemberNotInTo,
 }
 
 /// Always or never show.
@@ -166,6 +172,12 @@ pub enum RuleAction {
     /// campbooks-cloud#274). Not pinned: it hides nothing, and the mail can
     /// still be archived like any other.
     WorthALook,
+    /// Wait on the one person the message was written to: Scout answers
+    /// "someone else has the move" and names them, so the conversation
+    /// waits on them and a nudge is suggested after the usual working days
+    /// (campbooks-cloud#378). It answers nothing when there is no single
+    /// obvious person in `To`. Nothing is ever sent on the rule's behalf.
+    WaitOnAddressed,
 }
 
 impl From<&RuleCondition> for taught::Condition {
@@ -188,6 +200,7 @@ impl From<&RuleCondition> for taught::Condition {
             RuleCondition::Label(l) => Self::Label(l.to_string()),
             RuleCondition::Stream(s) => Self::Stream(s.as_str().to_owned()),
             RuleCondition::SenderChecksFail => Self::SenderChecksFail,
+            RuleCondition::MemberNotInTo => Self::MemberNotInTo,
         }
     }
 }
@@ -216,6 +229,7 @@ impl From<&RuleAction> for taught::Action {
             RuleAction::MarkPaid => Self::MarkPaid,
             RuleAction::ShowImages => Self::ShowImages,
             RuleAction::WorthALook => Self::WorthALook,
+            RuleAction::WaitOnAddressed => Self::WaitOnAddressed,
         }
     }
 }
@@ -249,9 +263,10 @@ pub fn validate(conditions: &[RuleCondition], actions: &[RuleAction]) -> Result<
             .value
             .as_ref()
             .is_some_and(|v| v.chars().count() > MAX_VALUE_CHARS),
-        RuleCondition::Label(_) | RuleCondition::Stream(_) | RuleCondition::SenderChecksFail => {
-            false
-        }
+        RuleCondition::Label(_)
+        | RuleCondition::Stream(_)
+        | RuleCondition::SenderChecksFail
+        | RuleCondition::MemberNotInTo => false,
     });
     if too_long {
         return Err(invalid());
@@ -964,7 +979,10 @@ pub fn hides(actions: &[RuleAction]) -> bool {
         RuleAction::MoveToStream { stream } => *stream != Stream::Primary,
         RuleAction::NeedsReply { value } | RuleAction::AsksAction { value } => !value,
         RuleAction::Surface { value } => *value == SurfaceWhen::Never,
-        RuleAction::AddLabel { .. } | RuleAction::ShowImages | RuleAction::WorthALook => false,
+        RuleAction::AddLabel { .. }
+        | RuleAction::ShowImages
+        | RuleAction::WorthALook
+        | RuleAction::WaitOnAddressed => false,
     })
 }
 

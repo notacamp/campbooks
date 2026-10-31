@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::{
-    inbound::CapabilityGranted,
+    inbound::{CalendarListRead, CapabilityGranted, ConnectionRemoved, MemberLeft},
     model::{CalendarId, ConnectionId},
     testkit::Kit,
 };
@@ -256,4 +256,202 @@ async fn the_migration_backfill_follows_what_cannot_be_written(db: PgPool) {
             .execute(&kit.db)
             .await;
     assert!(refused.is_err() || refused.unwrap().rows_affected() == 0);
+}
+
+/// Publish a calendar list read again, listing `calendars` (JSON, as the
+/// blob holds them).
+async fn list_read(
+    kit: &Kit,
+    workspace: WorkspaceId,
+    member: UserId,
+    connection: ConnectionId,
+    calendars: Value,
+) {
+    let list = kit
+        .blob(
+            workspace,
+            &json!({ "provider": "google", "calendars": calendars }),
+        )
+        .await;
+    kit.publish(
+        workspace,
+        &CalendarListRead {
+            workspace: workspace.to_string(),
+            connection,
+            granted_by: member,
+            calendars: list,
+        },
+    )
+    .await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_list_read_again_adds_new_calendars_off_and_changes_nothing_else(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let (token, ines) = kit.member("ines", ws);
+    let connection = ConnectionId::new();
+    grant(&kit, ws, ines, connection, None).await;
+    let family = calendar(&kit, ines, "Family").await;
+    // The member made "Family" theirs and it is on; then it is renamed at the
+    // provider and the provider says who owns it.
+    let patched = kit
+        .patch(
+            &token,
+            &format!("/api/v1/w/{ws}/schedule/calendars/{family}"),
+            json!({ "role": "mine" }),
+        )
+        .await;
+    assert_eq!(patched.status, StatusCode::OK, "{:?}", patched.json);
+    let before: (String, Option<String>, bool) =
+        sqlx::query_as("SELECT name, color, writable FROM schedule.calendars WHERE id = $1")
+            .bind(family)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+
+    list_read(
+        &kit,
+        ws,
+        ines,
+        connection,
+        json!([
+            { "provider_id": "ines", "name": "Ines renamed", "primary": true,
+              "writable": true, "owned": true, "color": "#112233" },
+            { "provider_id": "family", "name": "Family renamed", "primary": false,
+              "writable": true, "owned": false, "color": "#445566" },
+            // Shared with the member later, and one they made later; even a
+            // new "primary" does not turn on.
+            { "provider_id": "marta", "name": "Marta", "primary": false,
+              "writable": true, "owned": false },
+            { "provider_id": "side", "name": "Side project", "primary": false,
+              "writable": true, "owned": true },
+            { "provider_id": "unknown", "name": "Unknown", "primary": true,
+              "writable": true },
+        ]),
+    )
+    .await;
+
+    // Off; following when not owned, mine when owned, mine when unknown.
+    assert_eq!(
+        stored(&kit, calendar(&kit, ines, "Marta").await).await,
+        (false, true, Some(false))
+    );
+    assert_eq!(
+        stored(&kit, calendar(&kit, ines, "Side project").await).await,
+        (false, false, Some(true))
+    );
+    assert_eq!(
+        stored(&kit, calendar(&kit, ines, "Unknown").await).await,
+        (false, false, None)
+    );
+    // The calendars it had: only `owned` is filled where it was unknown.
+    assert_eq!(stored(&kit, family).await, (true, false, Some(false)));
+    let after: (String, Option<String>, bool) =
+        sqlx::query_as("SELECT name, color, writable FROM schedule.calendars WHERE id = $1")
+            .bind(family)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(after, before);
+    assert_eq!(
+        stored(&kit, calendar(&kit, ines, "Ines").await).await,
+        (true, false, Some(true))
+    );
+    // Read again, it adds nothing.
+    list_read(
+        &kit,
+        ws,
+        ines,
+        connection,
+        json!([{ "provider_id": "marta", "name": "Marta", "primary": false,
+                 "writable": true, "owned": false }]),
+    )
+    .await;
+    let calendars: i64 = sqlx::query_scalar("SELECT count(*) FROM schedule.calendars")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(calendars, 7);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_late_list_read_after_a_removal_or_a_departure_adds_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let (_, ines) = kit.member("ines", ws);
+    let (_, marta) = kit.member("marta", ws);
+    let (removed, left) = (ConnectionId::new(), ConnectionId::new());
+    grant(&kit, ws, ines, removed, None).await;
+    grant(&kit, ws, marta, left, None).await;
+    kit.publish(
+        ws,
+        &ConnectionRemoved {
+            workspace: ws.to_string(),
+            connection: removed,
+        },
+    )
+    .await;
+    kit.publish(
+        ws,
+        &MemberLeft {
+            workspace: ws.to_string(),
+            user: marta,
+        },
+    )
+    .await;
+    let count = |connection: ConnectionId| {
+        let db = kit.db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT count(*) FROM schedule.calendars WHERE connection_id = $1",
+            )
+            .bind(connection)
+            .fetch_one(&db)
+            .await
+            .unwrap()
+        }
+    };
+    assert_eq!(count(removed).await, 0);
+    assert_eq!(count(left).await, 0);
+
+    let new = json!([{ "provider_id": "marta", "name": "Marta", "primary": false,
+                       "writable": true, "owned": false }]);
+    list_read(&kit, ws, ines, removed, new.clone()).await;
+    list_read(&kit, ws, marta, left, new).await;
+    assert_eq!(count(removed).await, 0);
+    assert_eq!(count(left).await, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_member_whose_calendars_are_all_off_still_gets_new_ones(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let (token, ines) = kit.member("ines", ws);
+    let connection = ConnectionId::new();
+    grant(&kit, ws, ines, connection, None).await;
+    for name in ["Ines", "Family", "Holidays"] {
+        let id = calendar(&kit, ines, name).await;
+        let patched = kit
+            .patch(
+                &token,
+                &format!("/api/v1/w/{ws}/schedule/calendars/{id}"),
+                json!({ "role": "off" }),
+            )
+            .await;
+        assert_eq!(patched.status, StatusCode::OK, "{:?}", patched.json);
+    }
+    list_read(
+        &kit,
+        ws,
+        ines,
+        connection,
+        json!([{ "provider_id": "marta", "name": "Marta", "primary": false,
+                 "writable": true, "owned": false }]),
+    )
+    .await;
+    assert_eq!(
+        stored(&kit, calendar(&kit, ines, "Marta").await).await,
+        (false, true, Some(false))
+    );
 }

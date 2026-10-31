@@ -281,3 +281,33 @@ function stubCalls() {
   };
   return () => calls;
 }
+
+describe("useDraftEditor.send", () => {
+  it("sends now without a send_at, and at a chosen time with one", async () => {
+    const calls = stub(() => ({ status: 202, body: draftAt(2) }));
+    const editor = mount(draftAt(1));
+    await act(async () => {
+      await editor().send();
+    });
+    const at = new Date(Date.UTC(2026, 9, 29, 8, 0));
+    await act(async () => {
+      await editor().send(at);
+    });
+    const bodies = calls
+      .filter((c) => c.method === "POST")
+      .map((c) => JSON.parse(c.text) as Record<string, unknown>);
+    expect(bodies[0]).toEqual({ version: 1, content_token: "token-1" });
+    expect(bodies[1]).toMatchObject({ send_at: "2026-10-29T08:00:00.000Z" });
+  });
+
+  it("says why when the server will not take the time", async () => {
+    stub(() => problem(400, "send_at_invalid"));
+    const editor = mount(draftAt(1));
+    let sent: unknown = "unset";
+    await act(async () => {
+      sent = await editor().send(new Date(Date.UTC(2020, 0, 1)));
+    });
+    expect(sent).toBeUndefined();
+    expect(editor().error).toBe("send_at_invalid");
+  });
+});

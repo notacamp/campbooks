@@ -22,7 +22,16 @@
     "cap": "Vos {{count}} brouillons les plus récents.",
     "readerTitle": "Choisissez un brouillon",
     "readerBody": "Choisissez-en un dans la liste pour continuer à l’écrire.",
-    "errorTitle": "Impossible de charger les brouillons"
+    "errorTitle": "Impossible de charger les brouillons",
+    "scheduled": "Programmés",
+    "leaves": "Part {{time}}",
+    "cancelSendNamed": "Annuler l’envoi : {{title}}",
+    "editScheduled": "Cet envoi est programmé. Annulez-le pour modifier le brouillon.",
+    "cancelAndEdit": "Annuler l’envoi et modifier",
+    "keepScheduled": "Garder la programmation",
+    "sendCancelled": "Envoi annulé",
+    "shouldHaveLeft": "Aurait dû partir {{time}}",
+    "notSent": "Non envoyé"
   },
   "list": {
     "label": "Conversations",
@@ -324,7 +333,12 @@
       "unknown": "Un problème est survenu. Réessayez.",
       "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
       "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et renvoyez-le.",
-      "quote": "Impossible de lire l’e-mail pour le citer. Rien n’a été commencé. Réessayez."
+      "quote": "Impossible de lire l’e-mail pour le citer. Rien n’a été commencé. Réessayez.",
+      "send_at_invalid": "Cette heure n’est pas utilisable. Choisissez-en une plus tardive, jusqu’à un an à l’avance.",
+      "destination_changed": "Non envoyé : cette boîte a changé après la programmation. Vérifiez et envoyez à nouveau.",
+      "sender_may_not_send": "Non envoyé : vous ne pouvez plus envoyer depuis cette boîte.",
+      "release_lost": "Nous n’avons pas pu confirmer l’envoi. Vérifiez votre dossier Envoyés avant de renvoyer.",
+      "send_at_busy": "Vous avez trop d’envois programmés pour cette minute. Choisissez une autre heure."
     },
     "shortcuts": {
       "newMessage": "Nouveau message"
@@ -345,7 +359,8 @@
         "upload_incomplete": "{{name}} n’est pas arrivé en entier. Joignez-le de nouveau.",
         "request_timed_out": "{{name}} a mis trop de temps à se charger. Réessayez avec une connexion plus rapide, ou joignez un fichier plus petit."
       }
-    }
+    },
+    "scheduled": "Programmé pour {{time}}"
   },
   "needs": {
     "line": {
@@ -473,6 +488,7 @@
   },
   "rules": {
     "sentence": "Les e-mails {{conditions}} → {{actions}}",
+    "waitSentence": "E-mails de {{sender}} à quelqu’un d’autre avec vous en Cc : attendre cette personne.",
     "when": {
       "from": "de {{value}}",
       "list": "de la liste {{value}}",
@@ -482,7 +498,8 @@
       "label": "avec une étiquette",
       "stream": "dans {{value}}",
       "checksFail": "qui échoue aux vérifications de l’expéditeur",
-      "pretending": "qui dit venir de {{value}} mais échoue aux vérifications de l’expéditeur"
+      "pretending": "qui dit venir de {{value}} mais échoue aux vérifications de l’expéditeur",
+      "notInTo": "sans vous en À"
     },
     "do": {
       "archive": "archivés",
@@ -498,7 +515,8 @@
       "spam": "signalé comme spam",
       "paid": "ses factures sont déjà payées",
       "images": "ses images s’affichent toujours",
-      "worthALook": "reste sur l’Accueil jusqu’à ce que vous l’ouvriez"
+      "worthALook": "reste sur l’Accueil jusqu’à ce que vous l’ouvriez",
+      "waitOnAddressed": "Scout attend la personne à qui il était adressé"
     },
     "likeness": {
       "sender": "Tout ce qui vient de {{address}}",
@@ -627,7 +645,8 @@
       "spam": "Campbooks l’a signalé comme spam",
       "paid": "Campbooks dit que c’est déjà payé",
       "images": "Campbooks affiche les images de cet expéditeur",
-      "worthALook": "Campbooks garde celui-ci sur l’Accueil jusqu’à ce que vous l’ouvriez"
+      "worthALook": "Campbooks garde celui-ci sur l’Accueil jusqu’à ce que vous l’ouvriez",
+      "waitOnAddressed": "Campbooks attend la personne à qui cet e-mail était adressé"
     },
     "reader": {
       "stop": "Arrêter de faire ça"
@@ -782,6 +801,7 @@
     "titleTeach": "Une règle pour les e-mails comme celui-ci",
     "titleReport": "Une règle pour les e-mails comme celui-ci",
     "titlePaid": "Une règle pour les factures de {{payee}}",
+    "titleWaiting": "Une règle pour quand {{name}} écrit à quelqu’un d’autre",
     "titleNotice": "Une règle pour les e-mails de {{sender}}",
     "whose": "Afficher les images de",
     "imagesTitle": "Toujours afficher les images de {{sender}}",
@@ -826,6 +846,11 @@
     "paidTitle": "Les factures de {{payee}} sont-elles toujours payées pour vous ?",
     "paidDetail": "Si elles sont prélevées automatiquement, Campbooks peut marquer comme payées les prochaines factures de {{payee}}, sans demander. La règle apparaît dans la mémoire de Scout.",
     "accept": "Oui, désormais",
+    "waitingTitle": "Quand {{name}} écrit à quelqu’un d’autre en vous mettant en Cc, Scout doit-il attendre cette personne pour vous ?",
+    "waitingDetail_one": "Scout attendrait cette personne et suggérerait une relance après {{count}} jour ouvré. Il n’envoie jamais rien de lui-même.",
+    "waitingDetail_other": "Scout attendrait cette personne et suggérerait une relance après {{count}} jours ouvrés. Il n’envoie jamais rien de lui-même.",
+    "waitingAccept": "Oui, toujours",
+    "waitingAsk": "Me demander chaque fois",
     "loadFailed": "Campbooks n’a pas pu préparer cette règle. Rien n’a changé."
   },
   "noticed": {

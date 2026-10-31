@@ -22,7 +22,16 @@
     "cap": "Os seus {{count}} rascunhos mais recentes.",
     "readerTitle": "Escolha um rascunho",
     "readerBody": "Escolha um na lista para continuar a escrevê-lo.",
-    "errorTitle": "Não foi possível carregar os rascunhos"
+    "errorTitle": "Não foi possível carregar os rascunhos",
+    "scheduled": "Agendados",
+    "leaves": "Sai {{time}}",
+    "cancelSendNamed": "Cancelar envio: {{title}}",
+    "editScheduled": "Este envio está agendado. Cancele-o para editar o rascunho.",
+    "cancelAndEdit": "Cancelar envio e editar",
+    "keepScheduled": "Manter agendado",
+    "sendCancelled": "Envio cancelado",
+    "shouldHaveLeft": "Devia ter saído {{time}}",
+    "notSent": "Não enviado"
   },
   "list": {
     "label": "Conversas",
@@ -324,7 +333,12 @@
       "unknown": "Algo correu mal. Tente de novo.",
       "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
       "content_changed": "Isto mudou desde que o abriu. Verifique-o e envie de novo.",
-      "quote": "Não foi possível ler o email para o citar. Nada foi iniciado. Tente novamente."
+      "quote": "Não foi possível ler o email para o citar. Nada foi iniciado. Tente novamente.",
+      "send_at_invalid": "Esta hora não pode ser usada. Escolha uma mais tarde, até um ano de antecedência.",
+      "destination_changed": "Não enviado: esta caixa de correio mudou depois de agendar. Verifique e envie de novo.",
+      "sender_may_not_send": "Não enviado: já não pode enviar a partir desta caixa de correio.",
+      "release_lost": "Não conseguimos confirmar que foi enviado. Verifique a pasta Enviados antes de o enviar de novo.",
+      "send_at_busy": "Tem demasiados envios agendados para esse minuto. Escolha outra hora."
     },
     "shortcuts": {
       "newMessage": "Nova mensagem"
@@ -345,7 +359,8 @@
         "upload_incomplete": "{{name}} não chegou completo. Tente anexá-lo outra vez.",
         "request_timed_out": "{{name}} demorou demasiado a carregar. Tente outra vez com uma ligação mais rápida, ou anexe um ficheiro mais pequeno."
       }
-    }
+    },
+    "scheduled": "Agendado para {{time}}"
   },
   "needs": {
     "line": {
@@ -473,6 +488,7 @@
   },
   "rules": {
     "sentence": "Mensagens {{conditions}} → {{actions}}",
+    "waitSentence": "Emails de {{sender}} para outra pessoa com o seu email em Cc: ficar à espera dela.",
     "when": {
       "from": "de {{value}}",
       "list": "da lista {{value}}",
@@ -482,7 +498,8 @@
       "label": "com uma etiqueta",
       "stream": "em {{value}}",
       "checksFail": "que falha as verificações do remetente",
-      "pretending": "que diz vir de {{value}} mas falha as verificações do remetente"
+      "pretending": "que diz vir de {{value}} mas falha as verificações do remetente",
+      "notInTo": "sem si em Para"
     },
     "do": {
       "archive": "arquivadas",
@@ -498,7 +515,8 @@
       "spam": "denunciado como spam",
       "paid": "as faturas já estão pagas",
       "images": "as imagens aparecem sempre",
-      "worthALook": "fica na Página inicial até o abrir"
+      "worthALook": "fica na Página inicial até o abrir",
+      "waitOnAddressed": "o Scout fica à espera da pessoa a quem foi escrito"
     },
     "likeness": {
       "sender": "Tudo de {{address}}",
@@ -627,7 +645,8 @@
       "spam": "O Campbooks denunciou isto como spam",
       "paid": "O Campbooks diz que isto já está pago",
       "images": "O Campbooks mostra as imagens deste remetente",
-      "worthALook": "O Campbooks mantém esta na Página inicial até a abrir"
+      "worthALook": "O Campbooks mantém esta na Página inicial até a abrir",
+      "waitOnAddressed": "O Campbooks está à espera da pessoa a quem este email foi escrito"
     },
     "reader": {
       "stop": "Deixar de fazer isto"
@@ -782,6 +801,7 @@
     "titleTeach": "Uma regra para emails como este",
     "titleReport": "Uma regra para emails como este",
     "titlePaid": "Uma regra para as faturas de {{payee}}",
+    "titleWaiting": "Uma regra para quando {{name}} escreve a outra pessoa",
     "titleNotice": "Uma regra para emails de {{sender}}",
     "whose": "Mostrar imagens de",
     "imagesTitle": "Mostrar sempre as imagens de {{sender}}",
@@ -826,6 +846,11 @@
     "paidTitle": "As faturas de {{payee}} são sempre pagas por si?",
     "paidDetail": "Se estiverem em débito direto, o Campbooks pode marcar como pagas as próximas faturas de {{payee}}, sem perguntar. A regra aparece na memória do Scout.",
     "accept": "Sim, a partir de agora",
+    "waitingTitle": "Quando {{name}} escreve a outra pessoa com o seu email em Cc, o Scout deve ficar à espera dela por si?",
+    "waitingDetail_one": "O Scout ficaria à espera dela e sugeriria um lembrete passado {{count}} dia útil. Nunca envia nada sozinho.",
+    "waitingDetail_other": "O Scout ficaria à espera dela e sugeriria um lembrete passados {{count}} dias úteis. Nunca envia nada sozinho.",
+    "waitingAccept": "Sim, sempre",
+    "waitingAsk": "Perguntar de cada vez",
     "loadFailed": "O Campbooks não conseguiu preparar essa regra. Nada mudou."
   },
   "noticed": {

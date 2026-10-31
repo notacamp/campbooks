@@ -1,0 +1,16 @@
+# Calendars shared after connecting (campbooks-cloud#405, OpenSpec change
+# calendar-list-reread): Coverage for the handler that applies a calendar
+# list read again. It tracks the calendars it adds with the existing
+# schedule.calendar_added; no new events.
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0027-calendar-list-reread.yaml`.
+changelog:
+  - date: "2026-10-31"
+    plan_version: 27
+    change: "Calendars shared after connecting (campbooks-cloud#405): Coverage for schedule.apply_calendar_list, which tracks the calendars it adds as schedule.calendar_added."
+    pr: "#713"
+
+coverage:
+  - kind: "handler"
+    name: "schedule.apply_calendar_list"
+    events: [schedule.calendar_added]

@@ -11,11 +11,15 @@ import {
   type AheadAction,
   type RuleSuggestions,
 } from "../../api/rules";
-import type { Translate } from "../../model";
+import { firstName } from "../../compose/dialog";
+import { displayName, type Translate } from "../../model";
 import { needSender } from "../../needs";
 import { likenessTitle } from "../../rules-text";
 
 import { SmartRuleConfirm, type SmartRuleDraft } from "./SmartRuleConfirm";
+
+/** The working days a wait lasts when the offer does not say (the server's default). */
+const DEFAULT_WAIT_DAYS = 3;
 
 type Step =
   | { step: "idle" }
@@ -32,8 +36,9 @@ type Step =
 
 export interface AheadOfferApi {
   /**
-   * After Report and delete or Already paid on `conversation` (as it was
-   * before the action): offer the smart rule for mail like it still to come.
+   * After Report and delete, Already paid or Nudge on `conversation` (as it
+   * was before the action, or after it for a wait): offer the smart rule for
+   * mail like it still to come.
    */
   offer: (conversation: ConversationSummary, action: AheadAction) => void;
   /**
@@ -51,9 +56,12 @@ export interface AheadOfferApi {
 /**
  * Smart rules offered after an action about mail still to come
  * (campbooks-cloud#169): "Never see emails like this again?" after Report and
- * delete, "Are <payee>'s invoices always paid for you?" after Already paid.
- * Yes (1) opens the smart-rule confirmation, which alone saves; "Just this
- * one" (Esc) turns the offer down (`dismiss_rule_suggestion`).
+ * delete, "Are <payee>'s invoices always paid for you?" after Already paid,
+ * and, from the second Nudge for the same sender (campbooks-cloud#378), "When
+ * Ana writes to someone else with you in Cc, should Scout wait on them for
+ * you?". Yes (1) opens the smart-rule confirmation, which alone saves; "Just
+ * this one" (Esc), or "Ask me each time" for a wait, turns the offer down
+ * (`dismiss_rule_suggestion`).
  */
 export function useAheadOffer(workspaceId: string): AheadOfferApi {
   const [state, setState] = useState<Step>({ step: "idle" });
@@ -67,7 +75,10 @@ export function useAheadOffer(workspaceId: string): AheadOfferApi {
       asked.current = ask;
       askedFor.current = conversation.id;
       const need = conversation.need;
-      const payee = need === null || need === undefined ? "" : needSender(need, conversation);
+      const payee =
+        need === null || need === undefined
+          ? displayName(conversation.latest_from)
+          : needSender(need, conversation);
       void suggestRules(workspaceId, conversation.id, action)
         .then((offered) => {
           // A later action asked again meanwhile: that one wins.
@@ -157,14 +168,26 @@ function Asking({
   };
   const pretending = suggestion?.likeness === "impersonation";
   const report = action.kind === "report";
-  const title = report ? t("ahead.reportTitle") : t("ahead.paidTitle", { payee });
-  const detail = report
-    ? pretending
-      ? t("ahead.reportPretending", { domain: value("sender_domain") })
-      : t("ahead.reportSender", {
-          sender: value("sender_address") || value("sender_domain"),
-        })
-    : t("ahead.paidDetail", { payee });
+  const waiting = action.kind === "waiting";
+  const title = waiting
+    ? t("ahead.waitingTitle", { name: firstName(payee) })
+    : report
+      ? t("ahead.reportTitle")
+      : t("ahead.paidTitle", { payee });
+  const detail = waiting
+    ? t("ahead.waitingDetail", { count: offer.wait_days ?? DEFAULT_WAIT_DAYS })
+    : report
+      ? pretending
+        ? t("ahead.reportPretending", { domain: value("sender_domain") })
+        : t("ahead.reportSender", {
+            sender: value("sender_address") || value("sender_domain"),
+          })
+      : t("ahead.paidDetail", { payee });
+  const draftTitle = waiting
+    ? t("smartRule.titleWaiting", { name: firstName(payee) })
+    : report
+      ? t("smartRule.titleReport")
+      : t("smartRule.titlePaid", { payee });
 
   const accept = () => {
     if (suggestion === undefined) {
@@ -174,7 +197,7 @@ function Asking({
       inboxId: conversation.inbox_id,
       conditions: suggestion.conditions,
       actions: suggestion.actions,
-      title: report ? t("smartRule.titleReport") : t("smartRule.titlePaid", { payee }),
+      title: draftTitle,
       origin: "action",
       fromConversation: conversation.id,
       sharedInbox: offer.shared && inbox !== undefined ? inbox.address : undefined,
@@ -201,10 +224,10 @@ function Asking({
         actions={
           <>
             <Button variant="secondary" shortcut="item.choice1" onClick={accept}>
-              {t("ahead.accept")}
+              {waiting ? t("ahead.waitingAccept") : t("ahead.accept")}
             </Button>
             <Button variant="secondary" shortcut="overlay.close" onClick={dismiss}>
-              {t("rules.offer.justThis")}
+              {waiting ? t("ahead.waitingAsk") : t("rules.offer.justThis")}
             </Button>
           </>
         }

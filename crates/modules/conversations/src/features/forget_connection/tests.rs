@@ -610,3 +610,39 @@ async fn keeping_mail_stops_its_rules_and_drops_what_they_kept(db: PgPool) {
     let listed = kit.get(&s.sam, &format!("/api/v1/w/{ws}/rules")).await;
     assert_eq!(listed.json["rules"][0]["state"], "paused");
 }
+
+/// A send scheduled for later from an inbox whose mailbox is disconnected
+/// stops and says why (campbooks-cloud#392): a failed draft with
+/// `not_connected`, never a scheduled send that goes quiet.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_scheduled_send_from_a_disconnected_mailbox_stops_and_says_why(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let s = setup(&kit).await;
+    let ws = s.workspace;
+    let uri = format!("/api/v1/w/{ws}/drafts/{}", s.draft);
+    let shown = kit.get(&s.sam, &uri).await.json;
+    let tomorrow = (chrono::Utc::now() + chrono::TimeDelta::days(1)).to_rfc3339();
+    let scheduled = kit
+        .post(
+            &s.sam,
+            &format!("{uri}/send"),
+            Some(
+                json!({"version": shown["version"], "content_token": shown["content_token"],
+                "send_at": tomorrow}),
+            ),
+        )
+        .await;
+    assert_eq!(
+        scheduled.status,
+        StatusCode::ACCEPTED,
+        "{:?}",
+        scheduled.json
+    );
+
+    publish(&kit, ws, &removed(ws, s.inbox, MailChoice::Keep)).await;
+
+    let after = kit.get(&s.sam, &uri).await.json;
+    assert_eq!(after["state"], "failed", "{after:?}");
+    assert_eq!(after["failure_reason"], "not_connected", "{after:?}");
+    assert!(after["send_at"].is_null(), "{after:?}");
+}

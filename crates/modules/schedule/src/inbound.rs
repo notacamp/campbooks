@@ -1,7 +1,8 @@
 //! The other modules' events this module consumes, and the blob documents
 //! they point at, as their published contracts describe them (modules never
 //! import each other): `contracts/conversations.message_read.v1`,
-//! `connectors.capability_granted.v1`, `connectors.calendar_changed.v1`,
+//! `connectors.capability_granted.v1`, `connectors.calendar_list_read.v1`,
+//! `connectors.calendar_changed.v1`,
 //! `connectors.calendar_change_completed.v1`, `calendar-list.v1`,
 //! `calendar-change-batch.v1` and `calendar-change.v1`.
 //!
@@ -116,6 +117,29 @@ pub struct CapabilityGranted {
 
 impl DomainEvent for CapabilityGranted {
     const NAME: &'static str = "connectors.capability_granted";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `connectors.calendar_list_read` v1: the calendar list of a connection,
+/// read again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalendarListRead {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: ConnectionId,
+    /// The member whose calendars they are.
+    pub granted_by: UserId,
+    /// The `calendar-list` v1 document.
+    pub calendars: BlobRef,
+}
+
+impl DomainEvent for CalendarListRead {
+    const NAME: &'static str = "connectors.calendar_list_read";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

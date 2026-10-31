@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { MessageComposer, useUndoToast } from "~/lib/ui";
+import { MessageComposer, sendTimeLabel, useUndoToast } from "~/lib/ui";
 
 import { useSendingInboxes, type Draft } from "../../api/drafts";
 import type { Translate } from "../../model";
@@ -14,6 +14,7 @@ import {
   type RefusalReason,
 } from "../../compose/attachment-rules";
 import { addressLine, displayName } from "../../compose/quote";
+import { KNOWN_ERRORS } from "../../compose/errors";
 import { useDraftEditor } from "../../compose/use-draft-editor";
 import { useRecipientSuggestions } from "../../compose/use-recipient-suggestions";
 
@@ -36,21 +37,6 @@ export interface DraftComposerProps {
   quotedNote?: string | undefined;
 }
 
-const KNOWN_ERRORS = new Set([
-  "not_saved",
-  "content_changed",
-  "no_recipients",
-  "invalid_address",
-  "attachments_too_large",
-  "draft_not_editable",
-  "not_connected",
-  "needs_reauth",
-  "rejected",
-  "too_large",
-  "unavailable",
-  "unknown_outcome",
-]);
-
 /**
  * A draft in the message composer: saved as you type, sent with an undo
  * window, with people suggested in To, Cc and Bcc as you type.
@@ -66,7 +52,7 @@ export function DraftComposer({
   onUndone,
   quotedNote,
 }: DraftComposerProps) {
-  const { t: typed } = useTranslation("conversations");
+  const { t: typed, i18n } = useTranslation("conversations");
   const t = typed as unknown as Translate;
   const undoToast = useUndoToast();
   const editor = useDraftEditor(workspaceId, draft);
@@ -131,19 +117,24 @@ export function DraftComposer({
     });
   }
 
-  async function send() {
-    const scheduled = await editor.send();
+  /** Send now (`sendAt` absent) or at `sendAt`, then close with an Undo. */
+  async function send(sendAt?: Date) {
+    const scheduled = await editor.send(sendAt);
     if (scheduled === undefined) {
       return;
     }
     const first = scheduled.to[0] ?? scheduled.cc[0] ?? scheduled.bcc[0];
-    // Undo stays on offer for the whole window the server gives.
+    // Undo stays on offer for the whole window the server gives; for a send
+    // later, a short while (the Drafts list takes it back after that).
     const window =
-      scheduled.send_at === null || scheduled.send_at === undefined
+      scheduled.send_at === null || scheduled.send_at === undefined || sendAt !== undefined
         ? undefined
         : Math.max(1000, new Date(scheduled.send_at).getTime() - Date.now());
     undoToast.push({
-      label: t("compose.sending", { name: first === undefined ? "" : displayName(first) }),
+      label:
+        sendAt === undefined
+          ? t("compose.sending", { name: first === undefined ? "" : displayName(first) })
+          : t("compose.scheduled", { time: sendTimeLabel(sendAt, i18n.language) }),
       durationMs: window,
       undo: () => {
         void editor.undo().then((inTime) => {
@@ -218,6 +209,9 @@ export function DraftComposer({
       focus={focus}
       onSend={() => {
         void send();
+      }}
+      onSendLater={(at) => {
+        void send(at);
       }}
       onClose={() => {
         void editor.flush();

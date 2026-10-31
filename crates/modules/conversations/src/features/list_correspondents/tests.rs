@@ -256,7 +256,7 @@ async fn someone_copied_is_suggested(db: PgPool) {
     assert_eq!(leo[0]["wrote"], 0);
     assert_eq!(leo[0]["received"], 0);
 
-    // Someone in To alongside Sam counts too.
+    // Someone else in To alongside Sam wasn't copied: not suggested.
     let noor = ("Noor Haddad", "noor@haddad-works.example");
     kit.ingest_value(
         workspace,
@@ -271,7 +271,7 @@ async fn someone_copied_is_suggested(db: PgPool) {
         ),
     )
     .await;
-    assert_eq!(addresses(&kit, &sam, workspace, "haddad").await, [noor.1]);
+    assert!(addresses(&kit, &sam, workspace, "haddad").await.is_empty());
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -305,8 +305,8 @@ async fn copied_after_those_who_wrote(db: PgPool) {
         &mail("ria-1", "ria-1", pia, &[SAM], &[ria], 80),
     )
     .await;
-    // Rob: in both To and Cc of one message, still once; Ria's one copy
-    // and his one are tied, so the address orders them.
+    // Rob: in both To and Cc of one message, copied once (To isn't read);
+    // Ria's one copy and his one are tied, so the address orders them.
     kit.ingest_value(
         workspace,
         inbox,
@@ -460,7 +460,7 @@ async fn bounded(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn only_inboxes_the_caller_reads(db: PgPool) {
     let kit = Kit::new(db).await;
-    let (workspace, inbox, _) = kit.sams_inbox().await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
     let (ana, ana_id) = kit.member("ana", workspace);
     let uri = format!("/api/v1/w/{workspace}/correspondents?q=maya");
 
@@ -478,11 +478,33 @@ async fn only_inboxes_the_caller_reads(db: PgPool) {
         &sent_by("ana-dana", ("Ana", "ana@example.com"), &[DANA]),
     )
     .await;
+    // And Pia's email to Ana copied Quinn: only Ana's inbox saw it.
+    let quinn = ("Quinn Avery", "quinn@avery-works.example");
+    kit.ingest_value(
+        workspace,
+        anas,
+        &mail(
+            "pia-ana",
+            "thr-pia-ana",
+            ("Pia Costa", "pia@costa-works.example"),
+            &[("Ana", "ana@example.com")],
+            &[quinn],
+            20,
+        ),
+    )
+    .await;
     assert!(found(&kit, &ana, workspace, "maya").await.is_empty());
+    // Leo, copied on Maya's email in Sam's inbox, isn't revealed to Ana.
+    assert!(found(&kit, &ana, workspace, "leo").await.is_empty());
     assert_eq!(addresses(&kit, &ana, workspace, "dana").await, [DANA.1]);
+    assert_eq!(addresses(&kit, &ana, workspace, "quinn").await, [quinn.1]);
+    // Nor Quinn, copied in Ana's inbox, to Sam.
+    assert!(found(&kit, &sam, workspace, "quinn").await.is_empty());
+    assert!(found(&kit, &sam, workspace, "avery").await.is_empty());
 
     kit.add_to_inbox(inbox, ana_id, InboxRole::Reader).await;
     assert_eq!(addresses(&kit, &ana, workspace, "maya").await, [MAYA]);
+    assert_eq!(addresses(&kit, &ana, workspace, "leo").await, [LEO]);
 
     let stranger = kit
         .get(

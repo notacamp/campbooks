@@ -52,6 +52,7 @@ pub mod spam;
 pub mod star;
 pub mod suggest_rules;
 pub mod suspended_authors;
+pub mod sweep_overdue_sends;
 pub mod trash;
 pub mod update_draft;
 pub mod upload_draft_attachment;
