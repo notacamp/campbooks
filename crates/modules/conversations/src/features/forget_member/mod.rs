@@ -72,6 +72,8 @@ impl EventHandler for ForgetMember {
         .execute(&mut **tx)
         .await?
         .rows_affected();
+        // Their signatures (campbooks-cloud#393): theirs alone.
+        forget_signatures(tx, workspace, left.user, before).await?;
         // Whatever held their rules off ends with their membership: they
         // can only come back by signing in, so they are not suspended then.
         // Recorded as of their departure, so a suspension that took effect
@@ -129,8 +131,28 @@ impl EventHandler for ForgetMember {
             inboxes = inboxes.len(),
             drafts = drafts.len(),
             notes,
-            "a departed member's inbox access, drafts and notes removed"
+            "a departed member's inbox access, drafts and notes removed (and signatures)"
         );
         Ok(())
     }
+}
+
+/// Delete the signatures of `user` in `workspace` as of `before`: one
+/// changed since they came back stays.
+async fn forget_signatures(
+    tx: &mut sqlx::PgConnection,
+    workspace: WorkspaceId,
+    user: campbooks_kernel::tenancy::UserId,
+    before: chrono::DateTime<chrono::Utc>,
+) -> Result<u64, JobError> {
+    Ok(sqlx::query(
+        "DELETE FROM conversations.signatures
+          WHERE workspace_id = $1 AND user_id = $2 AND updated_at <= $3",
+    )
+    .bind(workspace.as_uuid())
+    .bind(user.as_uuid())
+    .bind(before)
+    .execute(tx)
+    .await?
+    .rows_affected())
 }

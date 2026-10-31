@@ -8,6 +8,7 @@ import type { Recipient, RecipientSuggestion } from "../RecipientField/Recipient
 import {
   MessageComposer,
   type ComposerAttachment,
+  type ComposerSignature,
   type ComposerUpload,
   type RecipientFieldName,
   type RecipientSuggester,
@@ -25,6 +26,7 @@ interface DemoProps {
   attachmentBudget?: number;
   onAttach?: (files: File[]) => void;
   onSendLater?: (at: Date) => void;
+  signature?: ComposerSignature;
   status?: string;
   error?: string;
   sending?: boolean;
@@ -311,6 +313,66 @@ export const NearTheLimit: Story = {
   },
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByText("24.4 MB of 25 MB")).toBeVisible();
+  },
+};
+
+const SETTINGS = "/w/duarte/settings/mailboxes";
+
+/** The signature under the text, muted and read-only: Leave off, or Edit in Settings. */
+export const WithSignature: Story = {
+  args: {
+    body: "Thursday works for me.",
+    signature: {
+      text: "**Sam Rivera**\nRivera Lettings · [rivera.example](https://rivera.example)",
+      available: true,
+      onLeaveOff: fn(),
+      onAdd: fn(),
+      settingsHref: SETTINGS,
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Sam Rivera")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Leave off" }));
+    await expect(args.signature?.onLeaveOff).toHaveBeenCalledOnce();
+    await expect(canvas.getByRole("link", { name: "Edit in Settings" })).toBeVisible();
+  },
+};
+
+/** Left off, with one to add back. */
+export const SignatureLeftOff: Story = {
+  args: {
+    body: "Thursday works for me.",
+    signature: {
+      text: "",
+      available: true,
+      onLeaveOff: fn(),
+      onAdd: fn(),
+      settingsHref: SETTINGS,
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Add signature" }));
+    await expect(args.signature?.onAdd).toHaveBeenCalledOnce();
+  },
+};
+
+/** No signature for this mailbox yet: a way to Settings to make one. */
+export const NoSignature: Story = {
+  args: {
+    body: "Thursday works for me.",
+    signature: {
+      text: "",
+      available: false,
+      onLeaveOff: fn(),
+      onAdd: fn(),
+      settingsHref: SETTINGS,
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByRole("link", { name: "Add a signature in Settings" }),
+    ).toBeVisible();
   },
 };
 

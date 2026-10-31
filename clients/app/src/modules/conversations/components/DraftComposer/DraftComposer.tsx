@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 import { MessageComposer, sendTimeLabel, useUndoToast } from "~/lib/ui";
 
 import { useSendingInboxes, type Draft } from "../../api/drafts";
+import { useSignature } from "../../api/signatures";
 import type { Translate } from "../../model";
 import {
   MAX_ATTACHMENT_BYTES,
@@ -59,6 +61,13 @@ export function DraftComposer({
   const { fields, update } = editor;
   // To, Cc and Bcc suggest the people you exchange mail with as you type.
   const suggest = useRecipientSuggestions(workspaceId, fields);
+
+  // The member's own signature for this mailbox: what "Add signature" brings
+  // back (the draft keeps the one it was made with).
+  const own = useSignature(workspaceId, draft.inbox_id);
+  const settingsHref = `/w/${workspaceId}/settings/mailboxes`;
+  // Without a router (a story, a test) the link is a plain one.
+  const router = useRouter({ warn: false }) as ReturnType<typeof useRouter> | undefined;
 
   const kept = editor.shown.attachments.filter((a) => fields.attachments.includes(a.id));
 
@@ -196,6 +205,26 @@ export function DraftComposer({
         update({ quoted });
       }}
       quotedNote={quotedNote}
+      signature={{
+        text: editor.shown.signature,
+        available: (own.data ?? "") !== "",
+        onLeaveOff: () => {
+          void editor.setSignature(false);
+        },
+        onAdd: () => {
+          void editor.setSignature(true);
+        },
+        settingsHref,
+        onOpenSettings: (event) => {
+          if (router === undefined || event.metaKey || event.ctrlKey || event.shiftKey) {
+            return;
+          }
+          // Leaving saves what was typed.
+          event.preventDefault();
+          void editor.flush();
+          void router.navigate({ href: settingsHref });
+        },
+      }}
       attachments={kept}
       onAttach={attach}
       uploading={editor.uploading.map((u) => ({ key: u.key, filename: u.name, size: u.size }))}

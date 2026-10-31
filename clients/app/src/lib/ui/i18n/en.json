@@ -71,6 +71,13 @@
         "past": "That time has passed. Pick a later one.",
         "tooFar": "Sends can be scheduled up to a year ahead."
       }
+    },
+    "signature": {
+      "label": "Signature",
+      "leaveOff": "Leave off",
+      "add": "Add signature",
+      "edit": "Edit in Settings",
+      "create": "Add a signature in Settings"
     }
   },
   "attachments": {

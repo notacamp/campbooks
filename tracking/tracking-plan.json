@@ -170,6 +170,12 @@
       "pr": "#699"
     },
     {
+      "change": "Signatures (campbooks-cloud#393): Coverage for conversations.get_signature and conversations.set_signature, which track nothing.",
+      "date": "2026-10-28",
+      "plan_version": 25,
+      "pr": "#393"
+    },
+    {
       "change": "Send later review fixes (campbooks-cloud#392): conversations.unschedule_reason gains destination_changed (the inbox no longer sends from where the request was bound) and release_lost (a scheduled send found overdue with no release job); Coverage for the sweep job and its schedule.",
       "date": "2026-10-28",
       "plan_version": 26,
@@ -1230,6 +1236,12 @@
       "name": "conversations.dismiss_rule_suggestion"
     },
     {
+      "events": [],
+      "exemption": "reads a member's own signature for an inbox; it changes nothing",
+      "kind": "operation",
+      "name": "conversations.get_signature"
+    },
+    {
       "events": [
         "conversations.conversation_read"
       ],
@@ -1339,6 +1351,12 @@
       "exemption": "",
       "kind": "operation",
       "name": "conversations.set_person_note"
+    },
+    {
+      "events": [],
+      "exemption": "keeps a member's own text for their mail, private to them; their words are personal data and no tracked event holds them",
+      "kind": "operation",
+      "name": "conversations.set_signature"
     },
     {
       "events": [

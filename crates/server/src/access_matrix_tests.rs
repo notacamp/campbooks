@@ -1199,6 +1199,7 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "conversations.add_label" => json!({"name": "Matrix"}),
         "conversations.move_to_stream" => json!({"stream": "updates"}),
         "conversations.create_draft" => json!({"kind": "new", "inbox_id": inbox}),
+        "conversations.set_signature" => json!({"text": "Matrix"}),
         "conversations.update_draft" => json!({"version": 1, "subject": "Matrix"}),
         "conversations.send_draft" => json!({"version": 1}),
         "identity.start_link" => json!({"purpose": "link", "provider": "google"}),
@@ -1374,6 +1375,8 @@ fn acts_in_the_inbox(id: &str) -> bool {
             | "conversations.get_rule_notice"
             | "conversations.answer_rule_notice"
             | "conversations.clear_rule_notice_answer"
+            | "conversations.get_signature"
+            | "conversations.set_signature"
     )
 }
 

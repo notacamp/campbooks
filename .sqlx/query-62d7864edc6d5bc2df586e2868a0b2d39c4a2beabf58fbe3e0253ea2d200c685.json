@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT d.id AS \"id: DraftId\", d.inbox_id AS \"inbox_id: InboxId\",\n                   i.address AS inbox_address, i.display_name AS inbox_name, d.kind,\n                   d.conversation_id AS \"conversation_id: ConversationId\",\n                   d.source_message_id AS \"source_message_id: MessageId\",\n                   d.to_recipients, d.cc_recipients, d.bcc_recipients, d.subject, d.body,\n                   d.quoted, d.in_reply_to, d.reference_ids, d.thread_key, d.attachments,\n                   d.version, d.state, d.send_generation, d.send_at,\n                   d.failure_reason, d.created_at, d.updated_at\n              FROM conversations.drafts d\n              JOIN conversations.inboxes i ON i.id = d.inbox_id\n             WHERE d.id = $1 AND d.author IS NOT DISTINCT FROM $2\n               FOR UPDATE OF d\n            ",
+  "query": "\n            SELECT d.id AS \"id: DraftId\", d.inbox_id AS \"inbox_id: InboxId\",\n                   i.address AS inbox_address, i.display_name AS inbox_name, d.kind,\n                   d.conversation_id AS \"conversation_id: ConversationId\",\n                   d.source_message_id AS \"source_message_id: MessageId\",\n                   d.to_recipients, d.cc_recipients, d.bcc_recipients, d.subject, d.body,\n                   d.quoted, d.in_reply_to, d.reference_ids, d.thread_key, d.attachments, d.signature,\n                   d.version, d.state, d.send_generation, d.send_at,\n                   d.failure_reason, d.created_at, d.updated_at\n              FROM conversations.drafts d\n              JOIN conversations.inboxes i ON i.id = d.inbox_id\n             WHERE d.id = $1 AND d.author IS NOT DISTINCT FROM $2\n               FOR UPDATE OF d\n            ",
   "describe": {
     "columns": [
       {
@@ -192,6 +192,17 @@
       },
       {
         "ordinal": 17,
+        "name": "signature",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "signature"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
         "name": "version",
         "type_info": "Int4",
         "origin": {
@@ -202,7 +213,7 @@
         }
       },
       {
-        "ordinal": 18,
+        "ordinal": 19,
         "name": "state",
         "type_info": "Text",
         "origin": {
@@ -213,7 +224,7 @@
         }
       },
       {
-        "ordinal": 19,
+        "ordinal": 20,
         "name": "send_generation",
         "type_info": "Int4",
         "origin": {
@@ -224,7 +235,7 @@
         }
       },
       {
-        "ordinal": 20,
+        "ordinal": 21,
         "name": "send_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -235,7 +246,7 @@
         }
       },
       {
-        "ordinal": 21,
+        "ordinal": 22,
         "name": "failure_reason",
         "type_info": "Text",
         "origin": {
@@ -246,7 +257,7 @@
         }
       },
       {
-        "ordinal": 22,
+        "ordinal": 23,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -257,7 +268,7 @@
         }
       },
       {
-        "ordinal": 23,
+        "ordinal": 24,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -295,11 +306,12 @@
       false,
       false,
       false,
+      false,
       true,
       true,
       false,
       false
     ]
   },
-  "hash": "4d2f294ecf6bbb80cf03883ad6181193d73532d27d99f1e1c6076692a42fe532"
+  "hash": "62d7864edc6d5bc2df586e2868a0b2d39c4a2beabf58fbe3e0253ea2d200c685"
 }

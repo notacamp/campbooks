@@ -397,7 +397,7 @@ fn outgoing(row: &drafts::DraftRow, send_id: SendId) -> Result<OutgoingMessage, 
         .map_or("campbooks.invalid", |(_, d)| d);
     let rfc_message_id = format!("{send_id}@{domain}");
     let (to, cc, bcc) = row.recipients()?;
-    let (html, text) = format::message(&row.body, &row.quoted);
+    let (html, text) = format::message(&row.body, &row.signature, &row.quoted);
     Ok(OutgoingMessage {
         version: OUTGOING_VERSION,
         inbox: row.inbox_id,

@@ -594,4 +594,56 @@ describe("MessageComposer", () => {
       expect(screen.getByRole("button", { name: /Tomorrow morning/u })).toBeInTheDocument();
     });
   });
+
+  describe("the signature", () => {
+    const sign = (over: Partial<NonNullable<MessageComposerProps["signature"]>> = {}) => ({
+      text: "**Sam Rivers**\n[Rivers Lettings](https://example.com)",
+      available: true,
+      onLeaveOff: vi.fn(),
+      onAdd: vi.fn(),
+      settingsHref: "/w/w1/settings/mailboxes",
+      ...over,
+    });
+
+    it("shows it under the text as it will read, with Leave off and a way to Settings", () => {
+      const signature = sign();
+      renderUi(<MessageComposer {...props({ signature })} />);
+      const group = screen.getByRole("group", { name: "Signature" });
+      expect(within(group).getByText("Sam Rivers").tagName).toBe("STRONG");
+      expect(within(group).getByRole("link", { name: "Rivers Lettings" })).toHaveAttribute(
+        "href",
+        "https://example.com",
+      );
+      expect(within(group).queryByRole("button", { name: "Add signature" })).toBeNull();
+      fireEvent.click(within(group).getByRole("button", { name: "Leave off" }));
+      expect(signature.onLeaveOff).toHaveBeenCalledOnce();
+      expect(within(group).getByRole("link", { name: "Edit in Settings" })).toHaveAttribute(
+        "href",
+        "/w/w1/settings/mailboxes",
+      );
+    });
+
+    it("offers to add it back once it is left off", () => {
+      const signature = sign({ text: "" });
+      renderUi(<MessageComposer {...props({ signature })} />);
+      expect(screen.queryByRole("button", { name: "Leave off" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Add signature" }));
+      expect(signature.onAdd).toHaveBeenCalledOnce();
+      expect(screen.getByRole("link", { name: "Edit in Settings" })).toBeInTheDocument();
+    });
+
+    it("sends the member to Settings when there is none", () => {
+      renderUi(<MessageComposer {...props({ signature: sign({ text: "", available: false }) })} />);
+      expect(screen.queryByRole("button", { name: "Add signature" })).toBeNull();
+      expect(screen.getByRole("link", { name: "Add a signature in Settings" })).toHaveAttribute(
+        "href",
+        "/w/w1/settings/mailboxes",
+      );
+    });
+
+    it("shows nothing for a composer without one", () => {
+      renderUi(<MessageComposer {...props()} />);
+      expect(screen.queryByRole("group", { name: "Signature" })).toBeNull();
+    });
+  });
 });

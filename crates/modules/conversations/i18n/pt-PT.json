@@ -52,6 +52,8 @@
     "person_note_invalid": "Uma nota precisa de um endereço de email simples e de 1 a {{max}} caracteres sobre a pessoa.",
     "person_notes_full": "Já tem {{max}} notas sobre pessoas. Remova uma para acrescentar outra.",
     "person_notes_need_member": "Só um membro deste espaço de trabalho guarda notas sobre pessoas.",
+    "signature_needs_member": "Tem de ser membro para guardar uma assinatura.",
+    "signature_too_long": "Uma assinatura pode ter no máximo {{max}} caracteres.",
     "send_at_busy": "Já tem demasiados envios agendados para esse minuto (o máximo é {{max}}). Escolha outra hora."
   }
 }

@@ -11,7 +11,7 @@ export const recordReaders: Readonly<Record<string, readonly string[]>> = {
   "connectors.connection": ["connectors.discover_imap", "connectors.get_connection", "connectors.list_connections", "connectors.list_notion_data_sources", "connectors.list_notion_pages"],
   "conversations.conversation": ["conversations.get", "conversations.get_history", "conversations.list", "conversations.list_streams", "conversations.suggest_rules"],
   "conversations.draft": ["conversations.get_draft", "conversations.list_drafts"],
-  "conversations.inbox": ["conversations.list_correspondents", "conversations.list_inboxes", "conversations.list_labels", "conversations.list_senders"],
+  "conversations.inbox": ["conversations.get_signature", "conversations.list_correspondents", "conversations.list_inboxes", "conversations.list_labels", "conversations.list_senders"],
   "conversations.message": ["conversations.get", "conversations.get_attachment", "conversations.get_history", "conversations.get_message_body", "conversations.get_message_read"],
   "conversations.person_note": ["conversations.list_person_notes"],
   "conversations.rule": ["conversations.get", "conversations.get_history", "conversations.get_message_body", "conversations.get_rule", "conversations.get_rule_notice", "conversations.list", "conversations.list_rule_notices", "conversations.list_rules", "conversations.preview_rule", "conversations.suggest_rules"],

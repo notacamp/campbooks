@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -49,6 +49,11 @@ export interface MailboxesPageProps {
   adding?: boolean | undefined;
   /** Open Pages with the import from Notion (without a reload). */
   onImport?: (() => void) | undefined;
+  /**
+   * Your signature for each mailbox you can send from (the conversations
+   * module's, handed over by the app shell: connectors may not import it).
+   */
+  signatures?: ReactNode | undefined;
 }
 
 /** A provider's name, in the user's language when it has one. */
@@ -73,6 +78,7 @@ export function MailboxesPage({
   result,
   adding = false,
   onImport,
+  signatures,
 }: MailboxesPageProps) {
   const { t } = useTranslation("connectors");
   const connections = useConnections(workspace.id);
@@ -252,6 +258,11 @@ export function MailboxesPage({
           </List>
         )}
       </SettingsSection>
+      {signatures === undefined ? null : (
+        <SettingsSection title={t("signature.title")} description={t("signature.lead")}>
+          {signatures}
+        </SettingsSection>
+      )}
       <SettingsSection title={t("connect.title")} description={t("connect.lead")}>
         <div className="flex">
           <Button

@@ -19,6 +19,7 @@ use serde::Deserialize;
 use serde_json::json;
 use utoipa::ToSchema;
 
+use crate::features::signature;
 use crate::{
     domain::{
         drafts::{self, DraftView, check_limits, shown_to_author, tidy},
@@ -67,6 +68,10 @@ pub struct DraftChanges {
     /// The attachments to keep, forwarded or uploaded (the others are dropped).
     #[serde(default)]
     pub attachments: Option<Vec<AttachmentId>>,
+    /// `false` leaves the signature off; `true` adds the author's current
+    /// signature for the inbox (campbooks-cloud#393). Absent keeps it as it is.
+    #[serde(default)]
+    pub signature: Option<bool>,
 }
 
 /// Save a draft.
@@ -136,6 +141,11 @@ pub async fn update(
         None => row.body.clone(),
     };
     let quoted = changes.quoted.unwrap_or_else(|| row.quoted.clone());
+    let signature = match changes.signature {
+        Some(false) => String::new(),
+        Some(true) => signature::own(&mut tx, row.inbox_id, access.user).await?,
+        None => row.signature.clone(),
+    };
     check_limits(to.len() + cc.len() + bcc.len(), &subject, &body, &quoted)?;
 
     let mut attachments = row.stored_attachments()?;
@@ -160,7 +170,7 @@ pub async fn update(
         r#"
         UPDATE conversations.drafts
            SET to_recipients = $2, cc_recipients = $3, bcc_recipients = $4, subject = $5,
-               body = $6, quoted = $7, attachments = $8, version = version + 1,
+               body = $6, quoted = $7, attachments = $8, signature = $10, version = version + 1,
                state = $9, failure_reason = NULL, updated_at = now()
          WHERE id = $1
         "#,
@@ -173,6 +183,7 @@ pub async fn update(
         quoted,
         json!(attachments),
         DraftState::Draft.as_str(),
+        signature,
     )
     .execute(&mut *tx)
     .await?;
@@ -185,6 +196,7 @@ pub async fn update(
         || subject != row.subject
         || body != row.body
         || quoted != row.quoted
+        || signature != row.signature
         || attachments != attachments_before
         || row.state()? != DraftState::Draft;
     if edited {

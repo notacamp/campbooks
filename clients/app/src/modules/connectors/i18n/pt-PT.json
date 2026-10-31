@@ -417,5 +417,9 @@
         "lead": "Nada foi alterado. Tente novamente."
       }
     }
+  },
+  "signature": {
+    "title": "A sua assinatura",
+    "lead": "Junta-se ao fim de cada nova mensagem de uma caixa de correio a partir da qual pode enviar. Cada membro assina com a sua."
   }
 }

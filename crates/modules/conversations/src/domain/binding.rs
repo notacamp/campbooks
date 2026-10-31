@@ -74,7 +74,7 @@ const CONTENT_TOKEN: &str = "campbooks/conversations.content-token/v1";
 /// SHA-256 of everything of `row` that goes out: the sender, the
 /// recipients (To, Cc, Bcc), subject, body and quoted history, the reply
 /// headers and thread, what it answers, and each attachment with its blob
-/// (hash, size, type). Canonical (length-prefixed, versioned), never a
+/// (hash, size, type), and its signature when it carries one. Canonical (length-prefixed, versioned), never a
 /// concatenation.
 pub fn content_hash(row: &DraftRow) -> Result<[u8; 32]> {
     let (to, cc, bcc) = row.recipients()?;
@@ -108,6 +108,12 @@ pub fn content_hash(row: &DraftRow) -> Result<[u8; 32]> {
             .str(&attachment.content_type)
             .uint(attachment.size);
         blob(&mut fields, &attachment.blob);
+    }
+    // The signature the draft carries (campbooks-cloud#393), only when there
+    // is one: a draft without it hashes as it always did, so a content token
+    // issued before signatures existed stays valid for it.
+    if !row.signature.is_empty() {
+        fields.str(&row.signature);
     }
     Ok(fields.digest())
 }
@@ -538,11 +544,64 @@ impl ContentToken {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use super::*;
     use crate::events::RequestedChange;
 
     fn binding() -> Binding {
         campbooks_kernel::testing::binding()
+    }
+
+    /// A draft row with nothing random in it.
+    fn row(signature: &str) -> DraftRow {
+        let at = chrono::DateTime::UNIX_EPOCH;
+        DraftRow {
+            id: DraftId::from_uuid(sqlx::types::Uuid::from_u128(1)),
+            inbox_id: InboxId::from_uuid(sqlx::types::Uuid::from_u128(2)),
+            inbox_address: "sam@example.com".into(),
+            inbox_name: Some("Sam Rivers".into()),
+            kind: "new".into(),
+            conversation_id: None,
+            source_message_id: None,
+            to_recipients: serde_json::json!([{"address": "leo@example.com"}]),
+            cc_recipients: serde_json::json!([]),
+            bcc_recipients: serde_json::json!([]),
+            subject: "Lease".into(),
+            body: "See you Thursday.".into(),
+            quoted: String::new(),
+            in_reply_to: None,
+            reference_ids: vec![],
+            thread_key: None,
+            attachments: serde_json::json!([]),
+            signature: signature.into(),
+            version: 1,
+            state: "draft".into(),
+            send_generation: 0,
+            send_at: None,
+            failure_reason: None,
+            created_at: at,
+            updated_at: at,
+        }
+    }
+
+    /// What the content hash of a draft without a signature was before
+    /// signatures existed (campbooks-cloud#393): a content token issued then
+    /// must stay valid for it, so this value may never change.
+    const UNSIGNED_BEFORE_SIGNATURES: &str =
+        "888ed6b177dba6880ae4845a584de94f667f8a955a6912a6ba5928a6fb938969";
+
+    #[test]
+    fn a_draft_without_a_signature_hashes_as_it_always_did() {
+        let mut hex = String::new();
+        for byte in content_hash(&row("")).unwrap() {
+            write!(hex, "{byte:02x}").unwrap();
+        }
+        assert_eq!(hex, UNSIGNED_BEFORE_SIGNATURES);
+        // One that carries a signature is another content, and so is each text.
+        let signed = content_hash(&row("Sam Rivers")).unwrap();
+        assert_ne!(signed, content_hash(&row("")).unwrap());
+        assert_ne!(signed, content_hash(&row("Sam R.")).unwrap());
     }
 
     #[test]
