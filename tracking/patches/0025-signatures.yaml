@@ -7,7 +7,7 @@
 # Applied with
 # `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0025-signatures.yaml`.
 changelog:
-  - date: "2026-10-29"
+  - date: "2026-10-28"
     plan_version: 25
     change: "Signatures (campbooks-cloud#393): Coverage for conversations.get_signature and conversations.set_signature, which track nothing."
     pr: "#393"
