@@ -922,16 +922,17 @@ fn asked(question: NeedQuestion) -> NeedQuestion {
 fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
     // A "Still needed?" question stands for the ask it was raised as.
     let question = asked(question);
-    // A wait is not cleared by a rule: its taught answer names a move, not yes
-    // or no (campbooks-cloud#378).
-    if matches!(question, NeedQuestion::Suspicious | NeedQuestion::NextMove) {
+    if question == NeedQuestion::Suspicious {
         return false;
     }
+    // A taught move names a person, not yes or no: it never reads as a "no"
+    // (campbooks-cloud#378).
     surfaces_never(answers)
         || (question == NeedQuestion::Money && taught_no_ask(answers))
-        || answers.iter().any(|a| {
-            a.basis == NeedBasis::Taught && a.question == question.as_str() && !a.is_true()
-        })
+        || (question != NeedQuestion::NextMove
+            && answers.iter().any(|a| {
+                a.basis == NeedBasis::Taught && a.question == question.as_str() && !a.is_true()
+            }))
 }
 
 /// What happened in the conversation since the need's message.
