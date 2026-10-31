@@ -16,3 +16,6 @@
 .idea/
 .vscode/
 .DS_Store
+
+# Local run output (test logs carry absolute local paths): never commit it.
+*.log
