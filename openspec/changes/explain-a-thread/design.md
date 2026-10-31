@@ -204,3 +204,36 @@ stale.
   open" expands the rest. Touch targets are at least 44 px.
 - en, pt-PT, es-ES and fr; tokens only; toolbars stay one row; it passes
   `pnpm test:fit`.
+
+## Deviations while building
+
+- **The row keeps two descriptions.** `conversations.explanations` has the
+  columns design.md lists, plus `asked_version` and `asked_locale` (what the
+  latest request was accepted for, which is what a second click is coalesced
+  with), `in_full` (how many messages went in whole), `reader` (the member's
+  name as the token gave it, kept only so the job can tell the model who
+  "you" is; it goes with the row) and `written_at`. The columns design.md
+  lists describe the explanation *kept*, so a request that fails (the daily
+  limit) leaves the earlier one as it was.
+- **The answer carries `in_full` and `locale`**, so the card can say "the
+  newest 20 in full, the 14 before them from Scout's notes" and "Written in
+  English".
+- **A request nobody answered is asked again after 10 minutes** when no job
+  is pending for it (the job failed or was lost); a pending job is never
+  queued twice.
+- **No `complete` role is a 503 with the code `explain_unavailable`**, and a
+  thread that cannot be explained a 409 `not_explainable`. The access
+  matrix, which treats a 5xx for an allowed caller as a failure, names this
+  one operation as the exception.
+- **The shortcut is W.** E is Done; W is free in every scope.
+- **Tracked event `conversations.explanation_completed`** (plan 28) carries
+  the outcome, buckets of the message count and the duration, and whether
+  an earlier explanation was kept in the row; the domain event
+  `conversations.thread_explained` (ids only, told to the member alone
+  through the change feed) is separate.
+- **One read of `get_explanation` when a thread opens**, to know whether the
+  member asked before (a 404 for most threads). The client probes nothing
+  else: whether they may ask is `ConversationDetail.explain`.
+- **The expiry counts from `written_at`, or from the last change for a
+  request that never wrote one.**
+
