@@ -21,7 +21,8 @@ use campbooks_kernel::{
 use sqlx::PgConnection;
 use uuid::Uuid;
 
-use super::model::{ConnectionId, InboxId, StreamId};
+use super::model::{ConnectionId, InboxId, Provider, StreamId};
+use crate::microsoft::graph_write::MAX_SEND_BODY;
 
 /// The port, for the server to register.
 pub fn outbound_destinations() -> DestinationsPort {
@@ -42,13 +43,15 @@ impl OutboundDestinations for Destinations {
 /// `None` when no stream feeds it, or when more than one claims it (only
 /// SQL can make two: none is trusted).
 pub async fn of_inbox(conn: &mut PgConnection, inbox: InboxId) -> Result<Option<Resolved>> {
-    let rows: Vec<(StreamId, ConnectionId, String, bool)> = sqlx::query_as(
+    let rows: Vec<(StreamId, ConnectionId, String, bool, String)> = sqlx::query_as(
         "SELECT s.id, s.connection_id, s.mailbox_key,
                 EXISTS (SELECT 1 FROM connectors.destinations_at_deploy d
                          WHERE d.stream_id = s.id AND d.inbox_id = s.inbox_id
                            AND d.connection_id = s.connection_id
-                           AND d.mailbox_key = s.mailbox_key)
+                           AND d.mailbox_key = s.mailbox_key),
+                c.provider
            FROM connectors.streams s
+           JOIN connectors.connections c ON c.id = s.connection_id
           WHERE s.inbox_id = $1 AND s.capability = 'messages'
           ORDER BY s.id
           LIMIT 2",
@@ -63,13 +66,33 @@ pub async fn of_inbox(conn: &mut PgConnection, inbox: InboxId) -> Result<Option<
         );
         return Ok(None);
     }
-    let Some((stream, connection, mailbox, as_at_deploy)) = rows.into_iter().next() else {
+    let Some((stream, connection, mailbox, as_at_deploy, provider)) = rows.into_iter().next()
+    else {
         return Ok(None);
     };
     Ok(Some(Resolved {
         destination: destination(stream, connection, mailbox),
         as_at_deploy,
+        max_attachment_bytes: Provider::parse(&provider)
+            .ok()
+            .and_then(max_attachment_bytes),
     }))
+}
+
+/// Headroom in a sent message for its headers and text, in bytes.
+const MESSAGE_HEADROOM: u64 = 64 * 1024;
+
+/// The most bytes of attachments one message through `provider` can carry,
+/// when the provider takes less than a draft's own 25 MiB (campbooks-cloud#391).
+/// Microsoft Graph takes at most [`MAX_SEND_BODY`] bytes in a `sendMail`,
+/// and the MIME message goes as base64 (3 bytes in 4), its attachments inside
+/// it as base64 again in 76-character lines (57 bytes in 78): what is left
+/// once the headers and text have their room.
+pub const fn max_attachment_bytes(provider: Provider) -> Option<u64> {
+    match provider {
+        Provider::Microsoft => Some((MAX_SEND_BODY as u64 / 4 * 3 - MESSAGE_HEADROOM) / 78 * 57),
+        Provider::Google | Provider::Zoho | Provider::Imap | Provider::Notion => None,
+    }
 }
 
 /// `stream`, its connection `connection` and its mailbox `mailbox` as the
@@ -85,6 +108,9 @@ pub async fn resolved(
     Ok(Resolved {
         as_at_deploy: as_at_deploy(conn, Some(inbox), stream, connection, mailbox).await?,
         destination: destination(stream, connection, mailbox.to_owned()),
+        // Read only where a draft is written (`of_inbox`); a send checks
+        // its size itself.
+        max_attachment_bytes: None,
     })
 }
 
@@ -120,5 +146,19 @@ fn destination(stream: StreamId, connection: ConnectionId, mailbox: String) -> D
         connection: *connection.as_uuid(),
         stream: *stream.as_uuid(),
         mailbox,
+    }
+}
+
+#[cfg(test)]
+mod limit_tests {
+    use super::{Provider, max_attachment_bytes};
+
+    #[test]
+    fn microsoft_carries_about_two_megabytes_of_files() {
+        let limit = max_attachment_bytes(Provider::Microsoft).unwrap();
+        // Twice base64 inside 4 MB, less the headroom: about 2.1 MB.
+        assert!((2_000_000..2_200_000).contains(&limit), "{limit}");
+        assert_eq!(max_attachment_bytes(Provider::Google), None);
+        assert_eq!(max_attachment_bytes(Provider::Imap), None);
     }
 }

@@ -90,6 +90,7 @@ export const DEFAULT_SHORTCUTS = [
   { id: "item.done", keys: "e", scope: "item", group: "item", label: "shortcuts:item.done" },
   { id: "item.snooze", keys: "s", scope: "item", group: "item", label: "shortcuts:item.snooze" },
   { id: "item.hold", keys: "h", scope: "item", group: "item", label: "shortcuts:item.hold" },
+  { id: "item.open", keys: "o", scope: "item", group: "item", label: "shortcuts:item.open" },
   { id: "item.choice1", keys: "1", scope: "item", group: "item", label: "shortcuts:item.choice1" },
   { id: "item.choice2", keys: "2", scope: "item", group: "item", label: "shortcuts:item.choice2" },
   { id: "item.choice3", keys: "3", scope: "item", group: "item", label: "shortcuts:item.choice3" },
@@ -188,6 +189,14 @@ export const DEFAULT_SHORTCUTS = [
     scope: "compose",
     group: "compose",
     label: "shortcuts:compose.expand",
+    allowInInputs: true,
+  },
+  {
+    id: "compose.attach",
+    keys: "mod+shift+u",
+    scope: "compose",
+    group: "compose",
+    label: "shortcuts:compose.attach",
     allowInInputs: true,
   },
   {

@@ -37,7 +37,7 @@
 
 use std::sync::Arc;
 
-use axum::Extension;
+use axum::{Extension, extract::DefaultBodyLimit};
 use campbooks_ai::{
     Gateway, Role,
     decide::{
@@ -75,8 +75,8 @@ pub use domain::{
     policy::{Policy, Switch},
 };
 pub use features::{
-    inbox_visibility::visibility, kept_mail::kept_mail, outbound_requests::outbound_requests,
-    search_source::search_source,
+    attachment_blobs::attachment_blobs, inbox_visibility::visibility, kept_mail::kept_mail,
+    outbound_requests::outbound_requests, search_source::search_source,
 };
 /// The owner's money mail as an eval set to label (campbooks-cloud#167).
 pub mod labelling {
@@ -218,6 +218,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
         background: Background::new()
             .publishes::<events::MessageReceived>()
             .publishes::<events::MessageSent>()
+            .publishes::<events::MemberReplied>()
             .publishes::<events::ConversationChanged>()
             .publishes::<events::ChangesRequested>()
             .publishes::<events::SendRequested>()
@@ -332,7 +333,7 @@ fn router() -> OpenApiRouter<AppState> {
         get_message_read, labels, list_conversations, list_correspondents, list_drafts,
         list_inboxes, list_labels, list_senders, list_streams, mark_read, move_to_stream, needs,
         person_notes, reply, request_message_read, rule_notices, rules, send_draft, spam, star,
-        suggest_rules, trash, update_draft,
+        suggest_rules, trash, update_draft, upload_draft_attachment,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -369,6 +370,15 @@ fn router() -> OpenApiRouter<AppState> {
             update_draft::delete
         ))
         .routes(routes!(send_draft::send))
+        .merge(
+            // The one route that takes a file: its body limit is the draft's
+            // total, the kernel blob store's object cap stays the outer bound.
+            OpenApiRouter::new()
+                .routes(routes!(upload_draft_attachment::handler))
+                .layer(DefaultBodyLimit::max(
+                    usize::try_from(domain::drafts::MAX_ATTACHMENT_BYTES).unwrap_or(usize::MAX),
+                )),
+        )
         .routes(routes!(send_draft::cancel))
         .routes(routes!(needs::resolve))
         .routes(routes!(needs::reopen))

@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -21,14 +22,18 @@ import {
   ReaderBody,
   ReaderFooter,
   SkeletonList,
+  Text,
+  useUndoToast,
   Visor,
   type OverflowAction,
 } from "~/lib/ui";
-import { MakeTaskForm } from "~/modules/tasks";
+import { SaveToPageDialog, useMailScoutAvailable, type SaveThread } from "~/modules/pages";
+import { MakeTaskForm, useReplyQuestion } from "~/modules/tasks";
 
 import {
   useConversation,
   useInboxes,
+  withWords,
   type ConversationPlace,
   type ConversationSummary,
   type MessageView,
@@ -61,6 +66,7 @@ import {
   unsureOf,
   warningReasons,
 } from "../../needs";
+import { saveThreadOf } from "../../save-thread";
 import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 import { ruleLine } from "../../rules-text";
 import { useNeedActions } from "../Needs/use-need-actions";
@@ -145,6 +151,9 @@ export function ConversationReader({
   const query = useConversation(workspaceId, conversationId);
   const detail = query.data;
   const conversation = detail?.conversation;
+  // A task of theirs from this thread that asks "You replied. Is it done?"
+  // (campbooks-cloud#396): the note below puts the question.
+  const replyQuestion = useReplyQuestion(workspaceId, conversationId);
   // The wait the member just asked for (campbooks-cloud#372): the nudge to that person is a
   // dialog away, and optional.
   const [nudging, setNudging] = useState<{ need: NeedView; opened: number } | undefined>();
@@ -260,6 +269,17 @@ export function ConversationReader({
   const [moving, setMoving] = useState(false);
   // "Make it a task": the inline form under the subject.
   const [makingTask, setMakingTask] = useState(false);
+  // Save to page (campbooks-cloud#364): only while the server offers it.
+  const mailScout = useMailScoutAvailable(workspaceId) === true;
+  // The dialog's words load before it opens, so it never waits for them.
+  useEffect(() => {
+    if (mailScout) {
+      void i18n.loadNamespaces("pages");
+    }
+  }, [mailScout, i18n]);
+  const [savingThread, setSavingThread] = useState<SaveThread | undefined>();
+  const queryClient = useQueryClient();
+  const undoToast = useUndoToast();
   const [reply, setReply] = useState<ReplyRequest | null>(null);
   // Reply first asks Scout (the reply dialog).
   const [replying, setReplying] = useState<{ opened: number } | undefined>();
@@ -424,6 +444,26 @@ export function ConversationReader({
     // Asking changes nothing: a reader of the inbox asks too.
     { enabled: scout !== undefined && conversation !== undefined },
   );
+  /** Save to page: the messages' words first (some come later), then the dialog. */
+  const saveToPage = () => {
+    if (conversation === undefined || !mailScout || savingThread !== undefined) {
+      return;
+    }
+    void Promise.all(
+      messages.map((message) => withWords(queryClient, workspaceId, conversation.id, message)),
+    ).then(
+      (whole) => {
+        setSavingThread(saveThreadOf(conversation.id, conversation.subject, whole));
+      },
+      () => {
+        undoToast.fail({ label: t("reader.saveToPageFailed") });
+      },
+    );
+  };
+  // ⇧P: save this thread to a page (only while the server offers it).
+  useShortcut("pages.save_thread", saveToPage, {
+    enabled: conversation !== undefined && mailScout && !binned && savingThread === undefined,
+  });
   const viewing = conversation !== undefined;
   // Remote images never load in spam.
   useShortcut("inbox.show_images", showAllImages, { enabled: viewing && !inSpam });
@@ -573,6 +613,12 @@ export function ConversationReader({
   // A reply since the message Scout read answered it (campbooks-cloud#355).
   const replied = repliedSince(detail?.messages ?? []);
   const suggestedReply = suggestsReply(decisions, replied) ? noteReply : null;
+  // Scout's sentence when no need is open: where it sorted it, and whether
+  // anything here waits.
+  const standing =
+    suggestion === undefined
+      ? noteSentence(t, decisions, i18n.language, replied)
+      : `${t("scout.suggestionNote", { stream: streamName(t, suggestion.stream) })} ${noteSentence(t, decisions, i18n.language, replied)}`;
   const exists = (key: string) => i18n.exists(`conversations:${key}`);
   const unread = conversation.unread_count > 0;
   const replyButtons =
@@ -668,6 +714,16 @@ export function ConversationReader({
         },
       ]
     : [];
+  // Saving changes no mail: offered to a reader of the inbox too.
+  if (mailScout && !binned) {
+    moreActions.push({
+      id: "save-to-page",
+      label: t("actions.saveToPage"),
+      icon: "document",
+      shortcut: "pages.save_thread",
+      onSelect: saveToPage,
+    });
+  }
   // Asking changes nothing: offered to a reader of the inbox too.
   if (scout !== undefined) {
     moreActions.push({
@@ -749,9 +805,18 @@ export function ConversationReader({
             ]}
           />
         </div>
+        {savingThread === undefined ? null : (
+          <SaveToPageDialog
+            workspaceId={workspaceId}
+            thread={savingThread}
+            open
+            onClose={() => {
+              setSavingThread(undefined);
+            }}
+          />
+        )}
         {makingTask ? (
           <MakeTaskForm
-            key={conversation.id}
             workspaceId={workspaceId}
             conversationId={conversation.id}
             subject={conversation.subject}
@@ -809,26 +874,44 @@ export function ConversationReader({
             how={
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }
-            {...(suggestion === undefined
-              ? {}
+            {...(replyQuestion === undefined
+              ? suggestion === undefined
+                ? {}
+                : {
+                    choice: {
+                      prompt: t("scout.prompt"),
+                      options: [
+                        {
+                          label: t("scout.accept", { stream: streamName(t, suggestion.stream) }),
+                          ...choiceKey("item.choice1"),
+                          onSelect: () => {
+                            actions.move(conversation, suggestion.stream);
+                          },
+                        },
+                      ],
+                    },
+                  }
               : {
                   choice: {
-                    prompt: t("scout.prompt"),
+                    prompt: t("scout.taskPrompt"),
                     options: [
                       {
-                        label: t("scout.accept", { stream: streamName(t, suggestion.stream) }),
+                        label: t("scout.taskDone"),
                         ...choiceKey("item.choice1"),
-                        onSelect: () => {
-                          actions.move(conversation, suggestion.stream);
-                        },
+                        onSelect: replyQuestion.done,
+                      },
+                      {
+                        label: t("scout.taskNotYet"),
+                        ...choiceKey("item.choice2"),
+                        onSelect: replyQuestion.notYet,
                       },
                     ],
                   },
                 })}
           >
-            {suggestion === undefined
-              ? noteSentence(t, decisions, i18n.language, replied)
-              : `${t("scout.suggestionNote", { stream: streamName(t, suggestion.stream) })} ${noteSentence(t, decisions, i18n.language, replied)}`}
+            {replyQuestion === undefined
+              ? standing
+              : `${standing} ${t("scout.taskOpen", { title: replyQuestion.task.title })}`}
           </Note>
         ) : (
           <Note
@@ -853,6 +936,15 @@ export function ConversationReader({
                   },
                 })}
             chips={<NeedChips need={need} now={now} />}
+            {...(detail?.need_read_failed === true
+              ? {
+                  after: (
+                    <Text as="span" tone="tertiary" size="sm">
+                      {t("scout.readFailed")}
+                    </Text>
+                  ),
+                }
+              : {})}
             {...(question
               ? {
                   choice: bill

@@ -543,3 +543,107 @@ export function chatWithCalendarProposals(
     ],
   };
 }
+
+// Scout proposes a section for a page, or a new page (campbooks-cloud#364):
+// cards that say where it goes, who will read it, and the whole text.
+
+const SECTION_ID = "0192f1a0-0000-7000-8000-000000003701";
+const KICKOFF_THREAD = { type: "conversations.conversation", id: MARTA.id } as const;
+
+/** The section Scout writes for Acme Studio, in Markdown. */
+export const KICKOFF_NOTES = [
+  "## Kickoff notes — Acme Studio",
+  "",
+  "- **Brand files**: sent on 21 Oct (guide and logo pack)",
+  "- **Copy sign-off**: still open, nobody has answered",
+  "- **First invoice**: Jonas asked to move it to November",
+].join("\n");
+
+/** A long section: past twelve lines, so the card folds it behind Show all. */
+export const LONG_NOTES = [
+  "## Everything agreed with Acme Studio",
+  "",
+  ...Array.from(
+    { length: 14 },
+    (_, index) => `- Item ${String(index + 1)}: agreed on 2${String(index % 10)} Oct`,
+  ),
+  "",
+  "Last checked on 28 Oct.",
+].join("\n");
+
+const pageFacts = (over: Partial<Schema<"ProposalPage">> = {}): Schema<"ProposalPage"> => ({
+  title: "Client onboarding",
+  audience: "only_you",
+  readers: [],
+  others: 0,
+  notion: false,
+  ...over,
+});
+
+/** A section for a page: the request `pages.append` sends, and its undo. */
+export function pageProposal(
+  over: {
+    id?: string;
+    page?: Schema<"ProposalPage"> | null;
+    markdown?: string | null;
+    pageId?: string;
+    state?: Proposal["state"];
+  } = {},
+): Proposal {
+  const pageId = over.pageId ?? "0192f1a0-0000-7000-8000-000000000907";
+  const markdown = over.markdown === undefined ? KICKOFF_NOTES : over.markdown;
+  return {
+    id: over.id ?? SECTION_ID,
+    kind: "change",
+    state: over.state ?? "pending",
+    action: "append_section",
+    record: { type: "pages.page", id: pageId },
+    ...(over.page === null ? {} : { page: over.page ?? pageFacts() }),
+    detail: {
+      ...(markdown === null ? {} : { markdown }),
+      sources: [KICKOFF_THREAD],
+    },
+    request: {
+      operation: "pages.append",
+      method: "POST",
+      path: `pages/${pageId}/append`,
+      body: { markdown: markdown ?? "", sources: [KICKOFF_THREAD] },
+    },
+    undo: {
+      operation: "pages.unappend",
+      method: "POST",
+      path: `pages/${pageId}/unappend`,
+      body: null,
+      from_response: ["append_id"],
+    },
+  };
+}
+
+/** A new private page under "Acme Studio". */
+export const NEW_PAGE_PROPOSAL: Proposal = {
+  id: "0192f1a0-0000-7000-8000-000000003702",
+  kind: "change",
+  state: "pending",
+  action: "new_page",
+  page: pageFacts({
+    title: "Kickoff notes",
+    parent: "Acme Studio",
+    audience: "named",
+    readers: ["Rui Matos"],
+    others: 0,
+  }),
+  detail: { markdown: KICKOFF_NOTES, sources: [KICKOFF_THREAD] },
+  request: {
+    operation: "pages.create",
+    method: "POST",
+    path: "pages",
+    body: { title: "Kickoff notes", place: "private", markdown: KICKOFF_NOTES },
+  },
+  undo: {
+    operation: "pages.trash",
+    method: "POST",
+    path: "pages/{page_id}/trash",
+    body: null,
+    from_response: ["@page_id:id"],
+  },
+};

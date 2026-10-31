@@ -2,6 +2,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import { pageRef, useScoutChat } from "~/lib/scout-chat";
+import { useShortcut } from "~/lib/shortcuts";
 import {
   Button,
   ChipLink,
@@ -17,9 +19,11 @@ import {
   StatusText,
   Text,
   TitleField,
+  Visor,
 } from "~/lib/ui";
 
 import { useNotionLink } from "../api/notion";
+import { useMailScoutAvailable } from "../api/mail-scout";
 import { useBacklinks, usePage, useTablesAvailable } from "../api/queries";
 import { PageEditor, type TableHelpers } from "../editor/PageEditor";
 import { useTableCalls } from "../tables/api";
@@ -196,6 +200,18 @@ function OpenPage({
     firstView: async (table) => (await tableCalls.getTable(table)).views[0]?.id ?? "",
     isTable: (id) => pages.some((candidate) => candidate.id === id && candidate.kind === "table"),
   };
+  // Ask Scout about this page (campbooks-cloud#364): in the More menu, so the
+  // toolbar stays one row; only while the server offers it and Scout is there.
+  const scout = useScoutChat();
+  const mailScout = useMailScoutAvailable(workspaceId, page.id) === true;
+  const canAsk = scout !== undefined && mailScout && page.kind === "page" && !trashed;
+  const askScout = () => {
+    const active = document.activeElement;
+    scout?.(pageRef(page.id), {
+      from: active instanceof HTMLElement && active !== document.body ? active : null,
+    });
+  };
+  useShortcut("scout.ask", askScout, { enabled: canAsk });
   const isTable = page.kind === "table";
   const isRow = page.kind === "row" && page.parent !== null && page.parent !== undefined;
 
@@ -233,6 +249,19 @@ function OpenPage({
         >
           {(close) => (
             <PopoverSection>
+              {canAsk ? (
+                <Button
+                  variant="ghost"
+                  leading={<Visor size="xs" />}
+                  shortcut="scout.ask"
+                  onClick={() => {
+                    close();
+                    askScout();
+                  }}
+                >
+                  {t("screen.askScout")}
+                </Button>
+              ) : null}
               <Button
                 variant="ghost"
                 icon="trash"

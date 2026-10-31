@@ -5,6 +5,7 @@ import type { ShortcutDefinition } from "~/lib/shortcuts";
  * `n t`: it makes a private page and opens it, from anywhere. The `table`
  * keys work on a table page: `n r` makes a row and `⌘↵` opens the active one;
  * the grid itself takes the arrows, Enter and Delete (listed so `?` shows them).
+ * `pages.save_thread` (⇧P) saves the open thread to a page, in the reader.
  */
 export const PAGES_SHORTCUTS = [
   {
@@ -13,6 +14,13 @@ export const PAGES_SHORTCUTS = [
     scope: "global",
     group: "general",
     label: "pages:shortcuts.create",
+  },
+  {
+    id: "pages.save_thread",
+    keys: "shift+p",
+    scope: "item",
+    group: "item",
+    label: "pages:shortcuts.saveThread",
   },
   {
     id: "pages.table.new_row",

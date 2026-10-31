@@ -18,7 +18,8 @@
     "choice2": "Second choice",
     "choice3": "Third choice",
     "nextAction": "Next action on the item",
-    "previousAction": "Previous action on the item"
+    "previousAction": "Previous action on the item",
+    "open": "Open the thread"
   },
   "compose": {
     "draft": "Draft it for me",
@@ -31,6 +32,7 @@
     "numbers": "Numbered list",
     "quote": "Quote",
     "expand": "Expand or shrink the composer",
+    "attach": "Attach files",
     "ask": "Ask"
   },
   "workspace": {

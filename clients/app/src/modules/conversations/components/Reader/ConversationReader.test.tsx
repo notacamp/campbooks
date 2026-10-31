@@ -1,11 +1,12 @@
 // A reader without the send slice's composer offers no Reply: none that
 // would do nothing (campbooks-cloud#220).
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ScoutChatProvider } from "~/lib/scout-chat";
 
 import { INBOX, Q4, Q4_BODY, Q4_DETAIL, W } from "../../../../../test/demo/conversations";
+import { ASK_REPLIED } from "../../../../../test/demo/tasks";
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../../../../test/render";
 import { useInboxActions } from "../InboxScreen/use-inbox-actions";
@@ -37,10 +38,10 @@ function Reader({ slot, onMove = vi.fn() }: { slot?: RenderReplySlot; onMove?: O
 
 const NEWEST = Q4_DETAIL.messages[2]?.id ?? "";
 
-function routes(conversation: ConversationSummary = Q4) {
+function routes(conversation: ConversationSummary = Q4, extra: Record<string, unknown> = {}) {
   return mockApi({
     [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
-    [`GET ${W}/conversations/${Q4.id}`]: { body: { ...Q4_DETAIL, conversation } },
+    [`GET ${W}/conversations/${Q4.id}`]: { body: { ...Q4_DETAIL, conversation, ...extra } },
     // In spam the server holds remote images back, whoever asks.
     [`GET ${W}/conversations/${Q4.id}/messages/${NEWEST}/body`]: {
       body: conversation.spam ? { ...Q4_BODY, remote_images: 2, images_held: "spam" } : Q4_BODY,
@@ -50,7 +51,39 @@ function routes(conversation: ConversationSummary = Q4) {
   });
 }
 
+const OPEN_NEED: ConversationSummary = {
+  ...Q4,
+  need: {
+    reason: "reply",
+    trust: "sure",
+    basis: "rules",
+    question: "needs_reply",
+    rule: "signals.question",
+    due_on: null,
+    overdue: false,
+    lapses_at: null,
+    urgent: false,
+    message_id: NEWEST,
+    sent_at: "2026-10-13T12:00:00Z",
+  },
+};
+
 describe("ConversationReader", () => {
+  it("says so when Scout could not read the message behind the need", async () => {
+    routes(OPEN_NEED, { need_read_failed: true });
+    renderWithProviders(<Reader />);
+    await waitFor(() => {
+      expect(screen.getByText("Scout couldn\u2019t read this one.")).toBeInTheDocument();
+    });
+  });
+
+  it("says nothing of a read that did not fail", async () => {
+    routes(OPEN_NEED);
+    renderWithProviders(<Reader />);
+    await screen.findByRole("region", { name: "Where things stand" });
+    expect(screen.queryByText("Scout couldn\u2019t read this one.")).not.toBeInTheDocument();
+  });
+
   it("offers Ask Scout on ., opening the chat about this conversation", async () => {
     routes();
     const scout = vi.fn();
@@ -183,6 +216,39 @@ describe("ConversationReader", () => {
     expect(note).toHaveTextContent("You replied on");
     expect(note).not.toHaveTextContent("it needs a reply");
     expect(within(note).queryByRole("button", { name: "Reply" })).toBeNull();
+  });
+
+  it("asks whether a task from this thread is done once the member replied, and answers with Done or Not yet", async () => {
+    // campbooks-cloud#396: the task Scout made from this email, replied to.
+    const asking = { ...ASK_REPLIED, source: { type: "conversations.conversation", id: Q4.id } };
+    const calls = mockApi({
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`GET ${W}/conversations/${Q4.id}`]: {
+        body: { ...Q4_DETAIL, conversation: { ...Q4, need: null } },
+      },
+      [`GET ${W}/conversations/${Q4.id}/messages/${NEWEST}/body`]: { body: Q4_BODY },
+      [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4, unread_count: 0 } },
+      [`GET ${W}/drafts`]: { body: { drafts: [] } },
+      [`GET ${W}/tasks`]: { body: { tasks: [asking] } },
+      [`POST ${W}/tasks/${asking.id}/reply_answered`]: {
+        body: { ...asking, asks_done: false, revision: 3 },
+      },
+      [`POST ${W}/tasks/${asking.id}/done`]: { body: { ...asking, state: "done", revision: 3 } },
+    });
+    renderWithProviders(<Reader slot={vi.fn<RenderReplySlot>(() => null)} />);
+    await screen.findByRole("heading", { name: Q4.subject });
+    const note = await screen.findByRole("region", { name: "Where things stand" });
+    expect(
+      await within(note).findByText(/Your task “Send the signed lease” is still open\./u),
+    ).toBeVisible();
+    expect(within(note).getByText("Is it done?")).toBeVisible();
+
+    fireEvent.click(within(note).getByRole("button", { name: /^Not yet/u }));
+    await vi.waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/reply_answered"))?.body).toEqual({
+        revision: 2,
+      });
+    });
   });
 
   it("says an ask that lapsed has expired, and offers nothing to resolve", async () => {

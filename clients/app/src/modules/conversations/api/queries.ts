@@ -713,3 +713,44 @@ export function useSenders(
       ).senders,
   });
 }
+
+/**
+ * `conversations.get_message_read`, for the sentence of a message that asked
+ * for a task. The server answers only a member who may read the inbox (404
+ * otherwise), which is the access rule for the sender's words; shares its
+ * cache entry with the schedule module's read of the same message.
+ */
+export function useMessageAsks(
+  workspaceId: string,
+  conversationId: string,
+  messageId: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: operationKey("conversations.get_message_read", {
+      workspace_id: workspaceId,
+      conversation_id: conversationId,
+      message_id: messageId,
+    }),
+    enabled,
+    // A 404 is the answer for someone who may not read it: not worth retrying.
+    retry: false,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET(
+          "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/read",
+          {
+            params: {
+              path: {
+                workspace_id: workspaceId,
+                conversation_id: conversationId,
+                message_id: messageId,
+              },
+            },
+            signal,
+          },
+        ),
+      ),
+    select: (read) => read.asks,
+  });
+}

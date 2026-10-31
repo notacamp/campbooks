@@ -1,9 +1,9 @@
 //! `POST /api/v1/w/{workspace_id}/pages` — a member makes a page, at the top
 //! level of a place or under a page they may write, optionally with a body.
 
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk,
+    AppState, Error, Operation, Problem, RecordRef, Result, Risk,
     authz::{self, Action},
     db::BeginFor as _,
     extract,
@@ -14,12 +14,14 @@ use utoipa::ToSchema;
 use yrs::Doc;
 
 use crate::{
+    config::MailScoutOn,
     domain::{
-        MAX_DEPTH, PageId, PageRow, PageView, Place, SELECT_ONE, access, announce, body,
+        MAX_DEPTH, PageId, PageRow, PageView, Place, SELECT_ONE, access, announce, append, body,
         clean_icon, clean_title, expect_live, position, resources::PAGE_RECORD, roles,
         store::Loaded, tracked, view,
     },
     events::PageChangeKind,
+    features::append::{clean_markdown, clean_sources},
     scopes::PagesWrite,
 };
 
@@ -47,6 +49,52 @@ pub struct NewPage {
     /// Its body as one Yjs update (v1), in base64. Default: empty.
     #[serde(default)]
     pub document: Option<String>,
+    /// Its body as Markdown of at most 16 KiB, read on the server into
+    /// blocks (as for `pages.append`), instead of `document`. Only while
+    /// mail and Scout work with pages.
+    #[serde(default)]
+    pub markdown: Option<String>,
+    /// With `markdown`: up to 10 records the body draws on, shown as
+    /// mentions after it.
+    #[serde(default)]
+    pub sources: Vec<RecordRef>,
+}
+
+/// The body a new page starts with, as one Yjs update: the `document`, or
+/// the `markdown` read into blocks (only while mail and Scout work with
+/// pages). Either goes through the one checker when it is stored.
+fn initial_update(request: &NewPage, mail_scout: MailScoutOn) -> Result<Option<Vec<u8>>> {
+    Ok(match (&request.document, &request.markdown) {
+        (Some(_), Some(_)) => {
+            return Err(Error::BadRequest(
+                crate::MESSAGES.reason("markdown_with_document"),
+            ));
+        }
+        (Some(document), None) => {
+            if !request.sources.is_empty() {
+                return Err(Error::BadRequest(
+                    crate::MESSAGES.reason("sources_without_markdown"),
+                ));
+            }
+            Some(body::decode_update(document)?)
+        }
+        (None, Some(markdown)) => {
+            if !mail_scout.0 {
+                return Err(Error::NotFound);
+            }
+            let blocks = clean_markdown(markdown)?;
+            let sources = clean_sources(&request.sources)?;
+            Some(append::append(&yrs::Doc::new(), &blocks, &sources)?.update)
+        }
+        (None, None) => {
+            if !request.sources.is_empty() {
+                return Err(Error::BadRequest(
+                    crate::MESSAGES.reason("sources_without_markdown"),
+                ));
+            }
+            None
+        }
+    })
 }
 
 /// Make a page.
@@ -58,12 +106,13 @@ pub struct NewPage {
     security(("bearer" = ["pages:write"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("pages.trash")
+        .assistant()
         .records(["pages.page"]).access("pages.page", campbooks_kernel::authz::Action::Create)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = NewPage,
     responses(
         (status = CREATED, description = "The page.", body = PageView),
-        (status = BAD_REQUEST, description = "A title over 200 characters (`invalid_title`), an unknown icon, a bad position, or a body that is not valid (`invalid_update`, `unknown_block`, `link_scheme`, `document_too_large`, `foreign_blob`).",
+        (status = BAD_REQUEST, description = "A title over 200 characters (`invalid_title`), an unknown icon, a bad position, both `document` and `markdown` (`markdown_with_document`), sources without Markdown, or a body that is not valid (`invalid_update`, `unknown_block`, `link_scheme`, `document_too_large`, `foreign_blob`, `markdown_empty`, `invalid_ref`, `too_many_sources`).",
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -78,6 +127,7 @@ pub struct NewPage {
 pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<PagesWrite>,
+    Extension(mail_scout): Extension<MailScoutOn>,
     extract::Json(request): extract::Json<NewPage>,
 ) -> Result<(StatusCode, Json<PageView>)> {
     let access = &workspace.access;
@@ -92,11 +142,7 @@ pub async fn handler(
     if let Some(key) = &request.position {
         position::check(key)?;
     }
-    let update = request
-        .document
-        .as_deref()
-        .map(body::decode_update)
-        .transpose()?;
+    let update = initial_update(&request, mail_scout)?;
 
     let mut tx = state.db.begin_for(access.workspace).await?;
     let (parent, place) = match request.parent {

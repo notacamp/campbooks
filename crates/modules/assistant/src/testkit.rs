@@ -35,7 +35,7 @@ use crate::AssistantDeps;
 
 /// Every scope a member's token carries here.
 pub const ALL_SCOPES: &str = "assistant:read assistant:write conversations:read search:read attention:read \
-     tasks:read workspaces:read schedule:read";
+     tasks:read workspaces:read schedule:read pages:read";
 
 #[derive(Debug, Default)]
 struct TestMembership {
@@ -109,6 +109,14 @@ pub struct Mail {
     pub events: HashMap<String, Value>,
     /// `schedule.list_calendars`'s `calendars`.
     pub calendars: Vec<Value>,
+    /// The `types` of every `search.query`, in order (`""` for none).
+    pub searched: Vec<String>,
+    /// `pages.list`'s `pages`.
+    pub pages: Vec<Value>,
+    /// `pages.get_sharing`'s answers, by page id; any other id is 404.
+    pub sharing: HashMap<String, Value>,
+    /// `pages.read_text`'s answers, by page id; any other id is 404.
+    pub page_texts: HashMap<String, Value>,
     /// Every stand-in operation called, in order.
     pub called: Vec<String>,
     /// Every change a chat invoked: always empty (each panics).
@@ -148,6 +156,13 @@ struct ScheduleRead;
 impl ScopeName for ScheduleRead {
     const NAME: &'static str = "schedule:read";
     const DESCRIPTION: &'static str = "Read the calendar (stand-in).";
+}
+
+struct PagesRead;
+
+impl ScopeName for PagesRead {
+    const NAME: &'static str = "pages:read";
+    const DESCRIPTION: &'static str = "Read pages (stand-in).";
 }
 
 struct WorkspacesRead;
@@ -361,14 +376,39 @@ async fn list_streams(
 #[utoipa::path(get, path = "/api/v1/w/{workspace_id}/search",
     operation_id = "search.query",
     params(("workspace_id" = String, Path), ("q" = Option<String>, Query),
-        ("limit" = Option<u32>, Query), ("sort" = Option<String>, Query)),
+        ("limit" = Option<u32>, Query), ("sort" = Option<String>, Query),
+        ("types" = Option<String>, Query)),
     security(("bearer" = ["search:read"])),
     extensions(("x-campbooks" = json!(Operation::query().assistant().records(["search.result"])))),
     responses((status = OK, body = Value)))]
-async fn search(_: Workspace<SearchRead>, Extension(mail): Extension<Shared>) -> Json<Value> {
+async fn search(
+    _: Workspace<SearchRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Query(query): extract::Query<SearchQuery>,
+) -> Json<Value> {
     let mut mail = mail.lock().unwrap();
     mail.called.push("search.query".into());
-    Json(json!({ "hits": mail.hits, "indexing": false, "query": {} }))
+    mail.searched.push(query.types.clone().unwrap_or_default());
+    // As the real search: only the kinds asked for are searched, and `limit`
+    // counts what is left.
+    let kinds: Option<Vec<&str>> = query.types.as_deref().map(|t| t.split(',').collect());
+    let hits: Vec<&Value> = mail
+        .hits
+        .iter()
+        .filter(|hit| {
+            kinds.as_ref().is_none_or(|kinds| {
+                kinds.contains(&hit["record"]["type"].as_str().unwrap_or_default())
+            })
+        })
+        .take(query.limit.unwrap_or(20) as usize)
+        .collect();
+    Json(json!({ "hits": hits, "indexing": false, "query": {} }))
+}
+
+#[derive(Deserialize)]
+struct SearchQuery {
+    limit: Option<u32>,
+    types: Option<String>,
 }
 
 #[utoipa::path(get, path = "/api/v1/w/{workspace_id}/attention",
@@ -753,6 +793,97 @@ async fn never_unpush_event(Extension(mail): Extension<Shared>) -> Json<Value> {
     never(&mail, "schedule.unpush_event")
 }
 
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/pages",
+    operation_id = "pages.list",
+    params(("workspace_id" = String, Path)),
+    security(("bearer" = ["pages:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["pages.page"])))),
+    responses((status = OK, body = Value)))]
+async fn list_pages(_: Workspace<PagesRead>, Extension(mail): Extension<Shared>) -> Json<Value> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("pages.list".into());
+    Json(json!({ "pages": mail.pages, "tables": true }))
+}
+
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/pages/{page_id}/sharing",
+    operation_id = "pages.get_sharing",
+    params(("workspace_id" = String, Path), ("page_id" = String, Path)),
+    security(("bearer" = ["pages:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["pages.page"])))),
+    responses((status = OK, body = Value)))]
+async fn get_page_sharing(
+    _: Workspace<PagesRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Path(path): extract::Path<(String, String)>,
+) -> Result<Json<Value>, Error> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("pages.get_sharing".into());
+    mail.sharing
+        .get(&path.1)
+        .cloned()
+        .map(Json)
+        .ok_or(Error::NotFound)
+}
+
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/pages/{page_id}/text",
+    operation_id = "pages.read_text",
+    params(("workspace_id" = String, Path), ("page_id" = String, Path)),
+    security(("bearer" = ["pages:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["pages.page"])))),
+    responses((status = OK, body = Value)))]
+async fn read_page_text(
+    _: Workspace<PagesRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Path(path): extract::Path<(String, String)>,
+) -> Result<Json<Value>, Error> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("pages.read_text".into());
+    mail.page_texts
+        .get(&path.1)
+        .cloned()
+        .map(Json)
+        .ok_or(Error::NotFound)
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/pages/{page_id}/append",
+    operation_id = "pages.append",
+    params(("workspace_id" = String, Path), ("page_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("pages.unappend").assistant().records(["pages.page"])))),
+    responses((status = OK, body = Value)))]
+async fn never_page_append(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "pages.append")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/pages/{page_id}/unappend",
+    operation_id = "pages.unappend",
+    params(("workspace_id" = String, Path), ("page_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("pages.append").assistant().records(["pages.page"])))),
+    responses((status = OK, body = Value)))]
+async fn never_page_unappend(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "pages.unappend")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/pages",
+    operation_id = "pages.create",
+    params(("workspace_id" = String, Path)),
+    request_body = Value,
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("pages.trash").assistant().records(["pages.page"])))),
+    responses((status = OK, body = Value)))]
+async fn never_page_create(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "pages.create")
+}
+
+#[utoipa::path(post, path = "/api/v1/w/{workspace_id}/pages/{page_id}/trash",
+    operation_id = "pages.trash",
+    params(("workspace_id" = String, Path), ("page_id" = String, Path)),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).undo("pages.restore").assistant().records(["pages.page"])))),
+    responses((status = OK, body = Value)))]
+async fn never_page_trash(Extension(mail): Extension<Shared>) -> Json<Value> {
+    never(&mail, "pages.trash")
+}
+
 /// The module over a fresh database.
 pub struct Kit {
     /// The test database as its owner (no row-level security).
@@ -839,6 +970,13 @@ impl Kit {
             .routes(routes!(never_respond_event))
             .routes(routes!(never_push_event))
             .routes(routes!(never_unpush_event))
+            .routes(routes!(list_pages))
+            .routes(routes!(read_page_text))
+            .routes(routes!(get_page_sharing))
+            .routes(routes!(never_page_append))
+            .routes(routes!(never_page_unappend))
+            .routes(routes!(never_page_create))
+            .routes(routes!(never_page_trash))
             .layer(Extension(mail.clone()));
         let state = idp
             .state(pool)

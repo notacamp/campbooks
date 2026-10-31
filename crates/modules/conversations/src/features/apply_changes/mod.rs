@@ -20,6 +20,8 @@ mod threading;
 #[cfg(test)]
 mod mirror_tests;
 #[cfg(test)]
+mod reply_tests;
+#[cfg(test)]
 mod tests;
 
 use std::{
@@ -60,7 +62,9 @@ use crate::{
         streams::{self, Inbound, sort_first_inbound},
         tracked,
     },
-    events::{Change, MESSAGE_RECORD, MessageFacts, MessageReceived, MessageSent, Origin},
+    events::{
+        Change, MESSAGE_RECORD, MemberReplied, MessageFacts, MessageReceived, MessageSent, Origin,
+    },
     ingest::{
         ApplyChangesPayload, BATCH_VERSION, MessageChange, MessageChangeBatch, NormalizedMessage,
         ProviderLabel,
@@ -1113,7 +1117,40 @@ impl Apply<'_> {
             self.events
                 .publish(tx, &MessageSent { message: facts })
                 .await?;
+            self.announce_reply(tx, message, conversation, id).await?;
         }
+        Ok(())
+    }
+
+    /// Publish `member_replied` for new outbound message `id` of a personal
+    /// inbox (campbooks-cloud#396): once, as the message is stored. Not for
+    /// a shared inbox, nor for the mail its first sync reads, which is old.
+    async fn announce_reply(
+        &self,
+        tx: &mut Transaction<'static, Postgres>,
+        message: &NormalizedMessage,
+        conversation: ConversationId,
+        id: MessageId,
+    ) -> Result<(), JobError> {
+        if self.backfill {
+            return Ok(());
+        }
+        let Some(owner) = crate::features::read_message::store::owner(tx, self.inbox).await? else {
+            return Ok(());
+        };
+        self.events
+            .publish(
+                tx,
+                &MemberReplied {
+                    workspace: self.ws.to_owned(),
+                    inbox: self.inbox,
+                    conversation,
+                    message: id,
+                    sent_at: message.sent_at,
+                    owner,
+                },
+            )
+            .await?;
         Ok(())
     }
 

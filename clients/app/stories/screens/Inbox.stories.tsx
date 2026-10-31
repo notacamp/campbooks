@@ -231,6 +231,58 @@ export const ThreadReplied: Story = {
   },
 };
 
+/**
+ * Scout's read of the message behind the open need failed for good: the note
+ * says so in one muted line instead of staying blank (campbooks-cloud#375).
+ */
+const Q4_NEEDING = {
+  ...Q4,
+  need: {
+    reason: "reply",
+    trust: "sure",
+    basis: "rules",
+    question: "needs_reply",
+    rule: "signals.question",
+    due_on: null,
+    overdue: false,
+    lapses_at: null,
+    urgent: false,
+    message_id: q4Body,
+    sent_at: "2026-10-13T12:00:00Z",
+  },
+} satisfies typeof Q4;
+
+const readFailed = {
+  args: {
+    path: `${PATH}/primary/${Q4.id}`,
+    api: inbox({
+      // The list, the thread and its read mark all carry the open need: the
+      // reader shows the need's note from the conversation it lists.
+      [`GET ${W}/conversations`]: {
+        body: {
+          conversations: PRIMARY.map((c) => (c.id === Q4.id ? Q4_NEEDING : c)),
+          next_cursor: null,
+        },
+      },
+      [`GET ${W}/conversations/${Q4.id}`]: {
+        body: { ...Q4_DETAIL, conversation: Q4_NEEDING, need_read_failed: true },
+      },
+      [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4_NEEDING, unread_count: 0 } },
+    }),
+  },
+} satisfies Story;
+
+export const ThreadReadFailed: Story = {
+  ...readFailed,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Scout couldn\u2019t read this one.")).toBeVisible();
+  },
+};
+
+/** The same, without a play, for recordings. */
+export const ThreadReadFailedRecording: Story = readFailed;
+
 /** A mailbox disconnected with its mail kept: history, read-only, nothing to act on. */
 export const KeptHistory: Story = {
   args: {
@@ -671,13 +723,56 @@ function replyDraftOpen(): Record<string, MockRoute> {
     [`GET ${W}/drafts`]: () => ({ body: { drafts: [draft] } }),
     [`GET ${W}/drafts/${draft.id}`]: () => ({ body: draft }),
     [`PATCH ${W}/drafts/${draft.id}`]: (changes) => {
-      draft = { ...draft, ...(changes as Partial<Draft>), version: draft.version + 1 };
+      // A save names the attachments to keep, by id.
+      const { attachments: keep, ...rest } = changes as Partial<Omit<Draft, "attachments">> & {
+        attachments?: string[] | null;
+      };
+      draft = {
+        ...draft,
+        ...rest,
+        attachments:
+          keep == null ? draft.attachments : draft.attachments.filter((a) => keep.includes(a.id)),
+        version: draft.version + 1,
+      };
       return { body: draft };
+    },
+    // An upload: the bytes are the body, the name is in the query.
+    [`POST ${W}/drafts/${draft.id}/attachments`]: (bytes, url) => {
+      const file = {
+        id: `0192f1a0-0000-7000-8000-0000000b${String(draft.attachments.length).padStart(4, "0")}`,
+        source: "uploaded" as const,
+        filename: url.searchParams.get("filename") ?? "file",
+        content_type: "application/octet-stream",
+        size: typeof bytes === "string" ? bytes.length : 1,
+      };
+      draft = { ...draft, attachments: [...draft.attachments, file], version: draft.version + 1 };
+      return { status: 201, body: draft };
     },
   });
 }
 export const ReplyDraftOpen: Story = {
   args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
+};
+
+/** Attaching to the open reply: a file picked is listed with its name, size and the total. */
+export const ReplyDraftAttach: Story = {
+  args: ReplyDraftOpen.args,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = await canvas.findByTestId("composer-files");
+    await userEvent.upload(input, [
+      new File([new Uint8Array(400_000)], "lease-4b-signed.pdf", { type: "application/pdf" }),
+      new File([new Uint8Array(1000)], "setup.exe"),
+    ]);
+    // Its size shows once the server has it (while it uploads the row says so).
+    await expect(await canvas.findByText("390.6 kB")).toBeVisible();
+    await expect(canvas.getByText("lease-4b-signed.pdf")).toBeVisible();
+    await expect(canvas.getByText(/ of 25 MB/u)).toBeVisible();
+    // A type mail providers block is refused up front, naming the file.
+    await expect(
+      await within(document.body).findByText(/setup\.exe wasn.t attached/u),
+    ).toBeVisible();
+  },
 };
 
 /** No drafts: one plain line. */

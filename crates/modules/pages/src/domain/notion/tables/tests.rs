@@ -965,9 +965,9 @@ async fn databases_off_there_is_nothing_to_reach(db: PgPool) {
 async fn no_event_carries_a_name_an_option_or_a_value(db: PgPool) {
     let (rig, table) = imported(db, 5).await;
     let value_id = rig.property_named(&table, "Value").await;
-    set(&rig, &table, "Client 2", &value_id, json!("5000")).await;
+    set(&rig, &table, "Client 2", &value_id, json!("5000.25")).await;
     let mut theirs = clients(5);
-    theirs[1].cells[2] = entry(0, 0, &[("p2", json!(7000))]).cells[0].clone();
+    theirs[1].cells[2] = entry(0, 0, &[("p2", json!(7000.75))]).cells[0].clone();
     theirs[1].edited = at(60);
     rig.read_table(
         &table,
@@ -975,7 +975,7 @@ async fn no_event_carries_a_name_an_option_or_a_value(db: PgPool) {
         &snapshot(ds(), 101, None, vec![theirs[1].clone()]),
     )
     .await;
-    set(&rig, &table, "Client 3", &value_id, json!("31337")).await;
+    set(&rig, &table, "Client 3", &value_id, json!("31337.5")).await;
     rig.push_table_now().await;
     let region = rig.property_named(&table, "Region").await;
     let uri = format!(
@@ -992,8 +992,11 @@ async fn no_event_carries_a_name_an_option_or_a_value(db: PgPool) {
         .fetch_all(&rig.kit.db)
         .await
         .unwrap();
+    // Values with a decimal point: ids, hashes and times never hold one
+    // between digits like these, so a bare number cannot match by chance.
     for word in [
-        "Client 2", "Region", "Lead", "Won", "5000", "7000", "31337", "Contract", "Stage", "Value",
+        "Client 2", "Region", "Lead", "Won", "5000.25", "7000.75", "31337.5", "Contract", "Stage",
+        "Value",
     ] {
         assert!(
             all.iter().chain(&jobs).all(|p| !p.contains(word)),
@@ -1013,9 +1016,9 @@ async fn the_changes_asked_for_are_tracked_without_names_or_values(db: PgPool) {
     )
     .await;
     let value_id = rig.property_named(&table, "Value").await;
-    set(&rig, &table, "Client 2", &value_id, json!("5000")).await;
+    set(&rig, &table, "Client 2", &value_id, json!("5000.25")).await;
     let mut theirs = clients(3);
-    theirs[1].cells[2] = entry(0, 0, &[("p2", json!(7000))]).cells[0].clone();
+    theirs[1].cells[2] = entry(0, 0, &[("p2", json!(7000.75))]).cells[0].clone();
     theirs[1].edited = at(60);
     rig.read_table(
         &table,
@@ -1034,7 +1037,7 @@ async fn the_changes_asked_for_are_tracked_without_names_or_values(db: PgPool) {
         seen.extend(rows.iter().map(|r| format!("{} {}", r.envelope, r.body)));
     }
     let text = seen.join("\n");
-    for word in ["Client", "Region", "5000", "7000", "Clients"] {
+    for word in ["Client", "Region", "5000.25", "7000.75", "Clients"] {
         assert!(!text.contains(word), "{word}");
     }
 }

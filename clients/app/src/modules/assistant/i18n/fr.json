@@ -400,6 +400,46 @@
         "title": "Une réponse à {{sender}}",
         "write": "Rédiger le brouillon",
         "done": "Brouillon ouvert. C’est vous qui l’envoyez, ou pas."
+      },
+      "page": {
+        "unknown": "Une modification d’une page",
+        "addTo": "Ajouter à « {{title}} »",
+        "newPage": "Nouvelle page",
+        "newUnder": "Nouvelle page dans « {{parent}} »",
+        "untitled": "Sans titre",
+        "added": "Ajouté",
+        "cannotShow": "La proposition de Scout ne dit pas ce qu’elle ajouterait ni qui la lirait, donc elle ne peut pas être ajoutée ici. Rien n’a été modifié.",
+        "add": "Ajouter à la page",
+        "edit": "Modifier d’abord",
+        "preview": "Retour à l’aperçu",
+        "discard": "Écarter",
+        "open": "Ouvrir la page",
+        "readersLabel": "Qui la lira",
+        "readers": {
+          "everyone": "Tout l’espace de travail",
+          "only": "Vous seul",
+          "you": "Vous",
+          "others_one": "{{count}} autre personne",
+          "others_other": "{{count}} autres personnes",
+          "and": "et"
+        },
+        "notion": "Envoyé aussi à Notion",
+        "editLabel": "Le texte à ajouter, en Markdown",
+        "left_one": "Il reste {{count}} caractère",
+        "left_other": "Il reste {{count}} caractères",
+        "tooLong": "Cela dépasse 16 Ko, plus qu’une section ne peut contenir. Raccourcissez-le.",
+        "showAll": "Tout afficher",
+        "showLess": "Afficher moins",
+        "sources": "Sur quoi elle s’appuie",
+        "source": {
+          "thread": "Conversation",
+          "task": "Tâche",
+          "event": "Événement",
+          "page": "Page",
+          "other": "Source"
+        },
+        "todoDone": "Fait",
+        "todoOpen": "À faire"
       }
     },
     "recent": "Récentes",
@@ -427,6 +467,13 @@
     "taskWho": "Qui pourrait la prendre ?",
     "taskLine": "Tâche : {{title}}",
     "unreadableTask": "Scout ne peut pas ouvrir de discussion sur cette tâche.",
-    "gone": "Cette discussion n’existe plus."
+    "gone": "Cette discussion n’existe plus.",
+    "pageLine": "Page : {{title}}",
+    "pageUntitled": "Sans titre",
+    "unreadablePage": "Scout ne peut pas ouvrir une conversation sur cette page.",
+    "pageIntro": "Posez-moi vos questions sur cette page.",
+    "pageOpen": "Qu’est-ce qui reste ouvert sur cette page ?",
+    "pageSummary": "Résumer cette page",
+    "pageNext": "Que dois-je faire ensuite ici ?"
   }
 }

@@ -77,6 +77,7 @@ import {
   heldText,
   holdable,
   HoldTime,
+  replyWhen,
   useTaskActions,
   useTasksByIds,
   type HoldSources,
@@ -117,6 +118,11 @@ const SCOUT_KEY = "scout.ask";
 
 /** The item's own actions take 1, 2 and 3, in order. */
 const CHOICE_KEYS = ["item.choice1", "item.choice2", "item.choice3"] as const;
+
+/** A task asking "You replied. Is this done?" (campbooks-cloud#396): Not yet, and the thread. */
+const NOT_YET = "not_yet";
+const THREAD = "thread";
+const THREAD_KEY = "item.open";
 
 /** A Do task's Hold time, and its key. */
 const HOLD = "hold";
@@ -205,6 +211,8 @@ type Listed = Entry | EventEntry;
 const EVENT_PREFIX = "event:";
 
 const isTask = (entry: Listed): entry is TaskEntry => "task" in entry;
+/** A task that asks the member whether it is done, after their reply in its thread. */
+const asksDone = (entry: Listed): entry is TaskEntry => isTask(entry) && entry.task.asks_done;
 const isInvite = (entry: Listed): entry is InviteEntry => "invite" in entry;
 const isRow = (entry: Listed): entry is Row => "need" in entry;
 const isEvent = (entry: Listed): entry is EventEntry => "event" in entry;
@@ -700,6 +708,11 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     hide(entry, tt(task.verb === "pay" ? "toast.paid" : "toast.done", { title: task.title }));
     taskActions.done(task);
   };
+  // Not yet: the task stays open; Home asks again only after a newer reply.
+  const notYetTask = (entry: TaskEntry) => {
+    hide(entry, tt("toast.stillOpen", { title: entry.task.title }));
+    taskActions.notYet(entry.task);
+  };
   const notNeededTask = (entry: TaskEntry) => {
     hide(entry, tt("toast.notNeeded", { title: entry.task.title }));
     taskActions.notNeeded(entry.task);
@@ -909,6 +922,28 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
           { id: "snooze", label: t("snooze.button"), key: UNIVERSAL_KEYS.snooze },
           { id: "calendar", label: t("calendar.openInCalendar"), key: "list.open" },
         ],
+        choices: [],
+        picked: false,
+      };
+    }
+    if (asksDone(entry)) {
+      // "You replied. Is this done?": Done and Not yet on 1 and 2, then the
+      // thread and Scout; the rest of a task's actions wait for the answer.
+      const chat = entry.conversation;
+      return {
+        own: [
+          { id: "done", label: tt("detail.done"), key: CHOICE_KEYS[0] },
+          { id: NOT_YET, label: tt("detail.notYet"), key: CHOICE_KEYS[1] },
+        ],
+        after: [
+          ...(chat === undefined
+            ? []
+            : [{ id: THREAD, label: tt("ask.openThread"), key: THREAD_KEY }]),
+          ...(chat === undefined || scout === undefined
+            ? []
+            : [{ id: SCOUT, label: t("actions.scout"), ai: true, key: SCOUT_KEY }]),
+        ],
+        universal: [],
         choices: [],
         picked: false,
       };
@@ -1212,6 +1247,20 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
           doneTask(entry);
           return;
         }
+        case NOT_YET: {
+          notYetTask(entry);
+          return;
+        }
+        case THREAD: {
+          if (entry.conversation !== undefined) {
+            openConversation({ conversation: entry.conversation });
+          }
+          return;
+        }
+        case SCOUT: {
+          continueWithScout(entry);
+          return;
+        }
         case "snooze": {
           startSnooze(entry);
           return;
@@ -1252,11 +1301,13 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   };
   // Continue with Scout: the panel opens on the need's conversation; the
   // need stays selected, and the focus comes back to the button on close.
-  const continueWithScout = (row: Row) => {
+  const continueWithScout = (row: { conversation?: ConversationSummary | undefined }) => {
     // Only the selected row shows its actions: its button is the one.
     const button =
       list.current?.querySelector<HTMLElement>(`[data-action="${CSS.escape(SCOUT)}"]`) ?? null;
-    scout?.(conversationRef(row.conversation.id), { from: button });
+    if (row.conversation !== undefined) {
+      scout?.(conversationRef(row.conversation.id), { from: button });
+    }
   };
   let selectedActions: ReturnType<typeof actionsOf> | undefined;
   if (selected !== undefined) {
@@ -1443,11 +1494,21 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
   useShortcut(
     SCOUT_KEY,
     () => {
-      if (selectedEntry !== undefined && isRow(selectedEntry)) {
+      if (selectedEntry !== undefined && (isRow(selectedEntry) || asksDone(selectedEntry))) {
         continueWithScout(selectedEntry);
       }
     },
     { enabled: hasRows && scout !== undefined },
+  );
+  // O: the thread a task asking "Is it done?" came from.
+  useShortcut(
+    THREAD_KEY,
+    () => {
+      if (selected !== undefined && asksDone(selected) && selected.conversation !== undefined) {
+        openConversation({ conversation: selected.conversation });
+      }
+    },
+    { enabled: selectedActions?.after.some((action) => action.id === THREAD) === true },
   );
 
   const today = now ?? new Date();
@@ -1680,6 +1741,79 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     </>
   );
 
+  // A task that asks "You replied. Is this done?" (campbooks-cloud#396): the
+  // reply and when, what it is, Scout's question; selected, Done and Not yet.
+  // Opened, why Scout asks: it saw that the member replied, never what they
+  // wrote.
+  const renderAskDone = (entry: TaskEntry, repliedAt: string, from: string | undefined) => {
+    const { task } = entry;
+    const isSelected = entry.item.id === selectedId;
+    const expanded = expandedId === entry.item.id;
+    const actions = isSelected ? actionsOf(entry) : undefined;
+    const clock = now ?? new Date();
+    const time = replyWhen(repliedAt, i18n.language, clock);
+    const name = from ?? tt("detail.someone");
+    return (
+      <Item
+        key={entry.item.id}
+        id={itemId(entry.item.id)}
+        eyebrow={{
+          signal: "do",
+          kind: tt("ask.replied"),
+          reason: ageLabel(repliedAt, clock, i18n.language).text,
+        }}
+        who={tt("ask.meta", { kind: tt("add.do"), name })}
+        what={task.title}
+        note={tt("ask.line", { name })}
+        avatar={{ name, kind: "person" }}
+        selected={isSelected}
+        expanded={expanded}
+        confirmation={entry.confirmation}
+        onConfirmEnd={() => {
+          folded(entry);
+        }}
+        onToggle={() => {
+          select(entry.item.id);
+          setExpandedId(expanded ? undefined : entry.item.id);
+        }}
+        actions={
+          actions === undefined ? undefined : (
+            <ItemActions
+              label={t("actions.label", { name: task.title })}
+              own={actions.own}
+              after={actions.after}
+              universal={actions.universal}
+              highlighted={highlight}
+              onHighlight={setHighlight}
+              onAction={(id) => {
+                run(entry, id);
+              }}
+            />
+          )
+        }
+        detail={
+          <ItemDetail
+            why={{
+              label: tt("ask.whyTitle"),
+              text: tt("ask.whyText", { time }),
+              notes: [tt("ask.whyNote")],
+            }}
+            actions={
+              <Button
+                variant="link"
+                onClick={() => {
+                  void navigate({ to: `/w/${workspaceId}/tasks/${task.id}` });
+                }}
+              >
+                {tt("ask.openTask")}
+              </Button>
+            }
+          />
+        }
+      />
+    );
+  };
+
   // A task as a row: its eyebrow (its kind and why it is here, its date
   // among them), where it came from, its title; the row opens it in Tasks.
   const renderTask = (entry: TaskEntry) => {
@@ -1688,6 +1822,9 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     const actions = isSelected ? actionsOf(entry) : undefined;
     const held = heldText(task, tt, i18n.language);
     const from = conversation === undefined ? undefined : displayName(conversation.latest_from);
+    if (asksDone(entry) && task.replied !== null && task.replied !== undefined) {
+      return renderAskDone(entry, task.replied.at, from);
+    }
     return (
       <Item
         key={entry.item.id}

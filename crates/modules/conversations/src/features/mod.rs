@@ -3,6 +3,7 @@
 pub mod apply_changes;
 pub mod apply_rule;
 pub mod archive;
+pub mod attachment_blobs;
 pub mod backfill_needs;
 pub mod check_send;
 pub mod create_draft;
@@ -53,4 +54,5 @@ pub mod suggest_rules;
 pub mod suspended_authors;
 pub mod trash;
 pub mod update_draft;
+pub mod upload_draft_attachment;
 pub mod wake_needs;

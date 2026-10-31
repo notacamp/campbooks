@@ -102,7 +102,8 @@
     "trash": {
       "title": "This conversation is in Trash.",
       "lead": "Your mail provider empties the trash on its own schedule."
-    }
+    },
+    "saveToPageFailed": "Couldn’t read the messages. Nothing was saved."
   },
   "actions": {
     "star": "Pin",
@@ -136,7 +137,8 @@
     "reportSpam": "Report spam",
     "notSpam": "Not spam",
     "toInbox": "Move to Inbox",
-    "askScout": "Ask Scout"
+    "askScout": "Ask Scout",
+    "saveToPage": "Save to page"
   },
   "toast": {
     "done": "Done · {{subject}}",
@@ -162,6 +164,7 @@
   },
   "scout": {
     "label": "Where things stand",
+    "readFailed": "Scout couldn’t read this one.",
     "suggestion": "Suggests {{stream}}",
     "suggestionNote": "Campbooks thinks this belongs in {{stream}}. It is a suggestion: nothing moves until you say so.",
     "prompt": "Move it?",
@@ -186,7 +189,11 @@
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspicious",
     "whyMoney": "Payment",
-    "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
+    "sortedTaught": "Campbooks put this in {{stream}}, by a rule",
+    "taskOpen": "Your task “{{title}}” is still open.",
+    "taskPrompt": "Is it done?",
+    "taskDone": "Done",
+    "taskNotYet": "Not yet"
   },
   "reasons": {
     "signals": {
@@ -324,7 +331,21 @@
     },
     "tooLate": "Too late to undo: it was sent.",
     "readingQuote": "Reading the email to quote it…",
-    "quoteCut": "This email is long: the quote holds its first part."
+    "quoteCut": "This email is long: the quote holds its first part.",
+    "draftRestoredWithoutFiles_one": "Draft restored. Attach its file again.",
+    "draftRestoredWithoutFiles_other": "Draft restored. Attach its {{count}} files again.",
+    "attach": {
+      "refused": {
+        "file_empty": "{{name}} is empty, so it wasn't attached.",
+        "filename_missing": "A file without a name can't be attached.",
+        "attachment_blocked": "{{name}} wasn't attached: mail providers block this kind of file.",
+        "attachments_too_large": "{{name}} wasn't attached: a message can carry {{max}} MB at most.",
+        "too_many_attachments": "{{name}} wasn't attached: a message can carry {{files}} files at most.",
+        "attachments_too_large_for_mailbox": "{{name}} wasn't attached: this mailbox can send {{max}} MB of attachments in one message.",
+        "upload_incomplete": "{{name}} didn't arrive whole. Try attaching it again.",
+        "request_timed_out": "{{name}} took too long to upload. Try again on a faster connection, or attach a smaller file."
+      }
+    }
   },
   "needs": {
     "line": {

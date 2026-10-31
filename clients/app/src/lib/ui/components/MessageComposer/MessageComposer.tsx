@@ -33,12 +33,28 @@ import { LinkForm } from "./LinkForm";
 import { fromMarks, toMarks, type DocNode } from "./marks";
 import styles from "./MessageComposer.module.css";
 
-/** A forwarded attachment, shown with a way to drop it. */
+/** An attachment, forwarded or uploaded, shown with a way to drop it. */
 export interface ComposerAttachment {
   id: string;
   filename: string;
   /** Bytes. */
   size: number;
+  /** Where it came from; a forward's own files and the member's uploads look alike. */
+  source?: "forwarded" | "uploaded" | undefined;
+}
+
+/** A file on its way to the server. */
+export interface ComposerUpload {
+  key: number;
+  filename: string;
+  /** Bytes. */
+  size: number;
+}
+
+/** A file's extension for its tile: "pdf" for "lease.PDF", nothing for "lease". */
+function tileOf(filename: string): string {
+  const dot = filename.lastIndexOf(".");
+  return dot <= 0 ? "" : filename.slice(dot + 1, dot + 5).toUpperCase();
 }
 
 /** One of the composer's address fields. */
@@ -77,6 +93,15 @@ export interface MessageComposerProps {
   quotedNote?: ReactNode | undefined;
   attachments?: readonly ComposerAttachment[] | undefined;
   onRemoveAttachment?: ((id: string) => void) | undefined;
+  /**
+   * Files from the device (the picker, a drop, a paste). Omit for a composer
+   * that cannot attach: no button, no drop zone, files paste as nothing.
+   */
+  onAttach?: ((files: File[]) => void) | undefined;
+  /** Files being uploaded: shown "Uploading…", counted in the total. */
+  uploading?: readonly ComposerUpload[] | undefined;
+  /** Most bytes of attachments in all; with it, the total is said once something is attached. */
+  attachmentBudget?: number | undefined;
   /** "Saved", "Saving…": said politely next to Send. */
   status?: ReactNode | undefined;
   /** Why it cannot be sent (shown above the buttons, announced). */
@@ -92,6 +117,16 @@ export interface MessageComposerProps {
   onDiscard?: (() => void) | undefined;
   /** Suggest people in To, Cc and Bcc as the member types; omit for none. */
   suggest?: RecipientSuggester | undefined;
+}
+
+/** The extension on a small tile in front of a file's name. */
+function FileTile({ filename }: { filename: string }) {
+  const extension = tileOf(filename);
+  return (
+    <span className={styles["tile"]} aria-hidden="true">
+      {extension === "" ? <Icon name="attachment" /> : extension}
+    </span>
+  );
 }
 
 /** Below this width of the composer, the less used formats fold into More. */
@@ -171,6 +206,9 @@ export function MessageComposer({
   quotedNote,
   attachments = [],
   onRemoveAttachment,
+  onAttach,
+  uploading = [],
+  attachmentBudget,
   status,
   error,
   sending = false,
@@ -198,6 +236,15 @@ export function MessageComposer({
   const frameRef = useRef<HTMLDialogElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const compact = useCompact(sectionRef, open);
+  const fileRef = useRef<HTMLInputElement>(null);
+  // Files dragged over it: counted in and out of its children, so the drop
+  // zone does not flicker as the pointer crosses them.
+  const dragDepth = useRef(0);
+  const [dropping, setDropping] = useState(false);
+  const attach = useRef(onAttach);
+  useEffect(() => {
+    attach.current = onAttach;
+  });
   // Where the cursor starts, read once: the composer focuses when it opens.
   const startAt = useRef(focus);
 
@@ -223,6 +270,23 @@ export function MessageComposer({
     extensions: composerExtensions(),
     content: fromMarks(body),
     editorProps: {
+      // Files on the clipboard (a screenshot, a file copied in the file
+      // manager) are attached; anything else pastes as text. A copy from a
+      // page or a spreadsheet carries a picture of it beside its HTML: that
+      // is text, not a file to attach.
+      handlePaste: (_view, event) => {
+        const files = [...(event.clipboardData?.files ?? [])];
+        if (
+          files.length === 0 ||
+          attach.current === undefined ||
+          (event.clipboardData?.getData("text/html") ?? "") !== ""
+        ) {
+          return false;
+        }
+        event.preventDefault();
+        attach.current(files);
+        return true;
+      },
       attributes: {
         id: `${id}-body`,
         role: "textbox",
@@ -440,6 +504,13 @@ export function MessageComposer({
     },
     { enabled: active && wide },
   );
+  useShortcut(
+    "compose.attach",
+    () => {
+      fileRef.current?.click();
+    },
+    { enabled: active && onAttach !== undefined },
+  );
   useShortcut("overlay.close", onEscape, { enabled: active });
 
   // Its shortcuts are live while focus is anywhere inside it.
@@ -478,6 +549,66 @@ export function MessageComposer({
     }
   }, [editor]);
 
+  // Not every engine scrolls an element into view (jsdom, in tests).
+  const bringIntoView = (
+    element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null,
+  ) => {
+    element?.scrollIntoView?.({ block: "nearest" });
+  };
+  // Files added, or why one was not, come into view: below a long text (a
+  // phone's pinned composer) they would otherwise be out of sight.
+  const filesRef = useRef<HTMLUListElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const fileCount = attachments.length + uploading.length;
+  const seenFiles = useRef(fileCount);
+  useEffect(() => {
+    const added = fileCount > seenFiles.current;
+    seenFiles.current = fileCount;
+    if (added) {
+      bringIntoView(filesRef.current);
+    }
+  }, [fileCount]);
+  useEffect(() => {
+    if (error !== undefined && error !== null) {
+      bringIntoView(errorRef.current);
+    }
+  }, [error]);
+
+  const carriesFiles = (event: React.DragEvent) => event.dataTransfer.types.includes("Files");
+  const drag =
+    onAttach === undefined
+      ? {}
+      : {
+          onDragEnter: (event: React.DragEvent) => {
+            if (carriesFiles(event)) {
+              dragDepth.current += 1;
+              setDropping(true);
+            }
+          },
+          onDragOver: (event: React.DragEvent) => {
+            if (carriesFiles(event)) {
+              event.preventDefault();
+            }
+          },
+          onDragLeave: (event: React.DragEvent) => {
+            if (carriesFiles(event)) {
+              dragDepth.current = Math.max(0, dragDepth.current - 1);
+              setDropping(dragDepth.current > 0);
+            }
+          },
+          onDrop: (event: React.DragEvent) => {
+            if (carriesFiles(event)) {
+              event.preventDefault();
+              dragDepth.current = 0;
+              setDropping(false);
+              onAttach([...event.dataTransfer.files]);
+            }
+          },
+        };
+
+  const heldBytes =
+    attachments.reduce((sum, a) => sum + a.size, 0) + uploading.reduce((sum, u) => sum + u.size, 0);
+
   const toolbar = (
     name: "bold" | "italic" | "strike" | "link" | "bullets" | "numbers" | "quote",
     shortcut: ShortcutId,
@@ -500,7 +631,12 @@ export function MessageComposer({
   const quote = toolbar("quote", "compose.quote", "quote", format.quote);
 
   const composer = (
-    <section ref={sectionRef} className={styles["composer"]} aria-labelledby={`${id}-title`}>
+    <section
+      ref={sectionRef}
+      className={styles["composer"]}
+      aria-labelledby={`${id}-title`}
+      {...drag}
+    >
       <header className={styles["header"]}>
         <h2 id={`${id}-title`} className={styles["title"]}>
           {title}
@@ -639,37 +775,102 @@ export function MessageComposer({
         </div>
       )}
 
-      {attachments.length === 0 ? null : (
-        <ul className={styles["attachments"]} aria-label={t("composer.attachments")}>
-          {attachments.map((attachment) => (
-            <li key={attachment.id} className={styles["attachment"]}>
-              <Icon name="attachment" />
-              <span className={styles["attachmentName"]}>{attachment.filename}</span>
-              <span className={styles["attachmentSize"]}>
-                {formatSize(attachment.size, i18n.language)}
-              </span>
-              {onRemoveAttachment === undefined ? null : (
-                <IconButton
-                  label={t("composer.removeAttachment", { name: attachment.filename })}
-                  icon="close"
-                  onClick={() => {
-                    onRemoveAttachment(attachment.id);
-                  }}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
+      {attachments.length === 0 && uploading.length === 0 ? null : (
+        <>
+          <ul
+            ref={filesRef}
+            className={styles["attachments"]}
+            aria-label={t("composer.attachments")}
+          >
+            {attachments.map((attachment) => (
+              <li key={attachment.id} className={styles["attachment"]}>
+                <FileTile filename={attachment.filename} />
+                <span className={styles["attachmentName"]} title={attachment.filename}>
+                  {attachment.filename}
+                </span>
+                <span className={styles["attachmentSize"]}>
+                  {formatSize(attachment.size, i18n.language)}
+                </span>
+                {onRemoveAttachment === undefined ? null : (
+                  <IconButton
+                    label={t("composer.removeAttachment", { name: attachment.filename })}
+                    icon="close"
+                    onClick={() => {
+                      onRemoveAttachment(attachment.id);
+                    }}
+                  />
+                )}
+              </li>
+            ))}
+            {uploading.map((upload) => (
+              <li
+                key={`up-${String(upload.key)}`}
+                className={styles["attachment"]}
+                aria-busy="true"
+              >
+                <FileTile filename={upload.filename} />
+                <span className={styles["attachmentName"]} title={upload.filename}>
+                  {upload.filename}
+                </span>
+                <span className={styles["attachmentSize"]}>{t("composer.uploading")}</span>
+              </li>
+            ))}
+          </ul>
+          {attachmentBudget === undefined ? null : (
+            <p className={styles["total"]}>
+              {t("composer.attachmentsTotal", {
+                used: formatSize(heldBytes, i18n.language),
+                max: formatSize(attachmentBudget, i18n.language),
+              })}
+            </p>
+          )}
+        </>
       )}
 
       {error === undefined || error === null ? null : (
-        <p className={styles["error"]} role="alert">
+        <p ref={errorRef} className={styles["error"]} role="alert">
           <Icon name="warning" />
           <span>{error}</span>
         </p>
       )}
 
+      {dropping ? (
+        <div className={styles["drop"]} aria-hidden="true">
+          <Icon name="attachment" />
+          <span>{t("composer.dropToAttach")}</span>
+        </div>
+      ) : null}
+
       <footer className={styles["footer"]}>
+        {onAttach === undefined ? null : (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              hidden
+              tabIndex={-1}
+              aria-label={t("composer.attach")}
+              data-testid="composer-files"
+              onChange={(event) => {
+                const files = [...(event.target.files ?? [])];
+                // The same file may be picked again.
+                event.target.value = "";
+                if (files.length > 0) {
+                  onAttach(files);
+                }
+              }}
+            />
+            <IconButton
+              label={t("composer.attach")}
+              icon="attachment"
+              shortcut="compose.attach"
+              onClick={() => {
+                fileRef.current?.click();
+              }}
+            />
+          </>
+        )}
         {onDiscard === undefined ? null : (
           <IconButton label={t("composer.discard")} icon="trash" onClick={onDiscard} />
         )}

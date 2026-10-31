@@ -12,6 +12,8 @@ export type SyncResponse = Schema<"SyncResponse">;
 export type UploadedFile = Schema<"UploadedFile">;
 export type NewPage = Schema<"NewPage">;
 export type PageMoveBody = Schema<"PageMove">;
+export type PageSharing = Schema<"PageSharing">;
+export type AttachedFile = Schema<"AttachedFile">;
 
 // The Notion shapes of the pages API, named once here so a rename in the
 // generated document is a one-line fix.

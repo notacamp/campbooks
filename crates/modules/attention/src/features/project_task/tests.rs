@@ -363,3 +363,41 @@ async fn a_new_bill_in_the_same_thread_shows_again(db: PgPool) {
     assert_eq!(listed[0]["record"]["type"], "conversations.conversation");
     assert_eq!(listed[0]["reason"], "pay");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_task_that_asks_done_stays_on_home_whatever_its_plan_until_answered(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (ana, ana_id) = kit.member("ana", workspace);
+    // Planned for next week: not for today, so not on Home.
+    let mut task = Task::open(TASK, 1, ana_id);
+    task.plan_on = Some(today() + TimeDelta::days(9));
+    kit.task(workspace, &task).await;
+    assert!(items(&kit, &ana, workspace).await.is_empty());
+
+    // The member replied in its conversation: Home asks.
+    task.revision = 2;
+    task.asks_done = true;
+    kit.task(workspace, &task).await;
+    let asking = items(&kit, &ana, workspace).await;
+    assert_eq!(asking.len(), 1);
+    assert_eq!(asking[0]["record"]["id"], TASK);
+    let stored: bool =
+        sqlx::query_scalar("SELECT asks_done FROM attention.items WHERE record_id = $1")
+            .bind(TASK)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert!(stored);
+
+    // Not yet: the plan decides again. A replayed older event changes nothing.
+    task.revision = 3;
+    task.asks_done = false;
+    kit.task(workspace, &task).await;
+    assert!(items(&kit, &ana, workspace).await.is_empty());
+    let mut stale = task.clone();
+    stale.revision = 2;
+    stale.asks_done = true;
+    kit.task(workspace, &stale).await;
+    assert!(items(&kit, &ana, workspace).await.is_empty());
+}

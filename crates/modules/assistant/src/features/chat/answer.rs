@@ -203,7 +203,7 @@ impl Asking {
                     turn.calls.clone(),
                 ));
                 for call in &turn.calls {
-                    if let Some(tool) = Toolbox::tool_for(call) {
+                    if let Some(tool) = self.toolbox.tool_for(call) {
                         sink.step(tool);
                     }
                     let outcome = self.toolbox.run(call).await;
@@ -242,7 +242,7 @@ impl Asking {
 
     /// The request for the next call.
     fn request(&self, with_tools: bool, timeout: Option<Duration>) -> ChatRequest {
-        let mut request = prompt::request(&self.messages, with_tools);
+        let mut request = prompt::request(&self.messages, with_tools, self.toolbox.pages());
         request.timeout = timeout.or(Some(TOTAL + Duration::from_secs(10)));
         request
     }

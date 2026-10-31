@@ -138,6 +138,35 @@ export async function saveDraft(
   );
 }
 
+/**
+ * `conversations.upload_draft_attachment`: add `file` to the draft shown (its
+ * `version` and `content_token`, named as a save names them). The file's own
+ * bytes are the body; the type it carries is kept for the message, never
+ * trusted. Answers the draft with the file and its new version and token.
+ * Refused as a save is when the draft is not the one shown (409
+ * `draft_changed`, `content_changed`), and with 400 `file_empty`,
+ * `filename_missing`, `attachment_blocked`, `too_many_attachments`, 413
+ * `attachments_too_large`, 409 `draft_not_editable`.
+ */
+export async function uploadAttachment(
+  workspaceId: string,
+  draft: Pick<Draft, "id" | "version"> & { content_token?: string | null | undefined },
+  file: File,
+): Promise<Draft> {
+  return unwrap(
+    await api.POST("/api/v1/w/{workspace_id}/drafts/{draft_id}/attachments", {
+      params: {
+        path: { workspace_id: workspaceId, draft_id: draft.id },
+        query: { version: draft.version, filename: file.name },
+        header: draft.content_token == null ? {} : { "X-Content-Token": draft.content_token },
+      },
+      body: file as unknown as string,
+      bodySerializer: (body: unknown) => body as BodyInit,
+      headers: { "Content-Type": file.type === "" ? "application/octet-stream" : file.type },
+    }),
+  );
+}
+
 /** `conversations.get_draft`, outside a query (after a conflict). */
 export async function fetchDraft(workspaceId: string, draftId: string): Promise<Draft> {
   return unwrap(

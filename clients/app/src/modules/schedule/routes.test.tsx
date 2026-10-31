@@ -18,6 +18,7 @@ import {
   HOLIDAYS,
   REVIEW,
   SETTINGS,
+  SHARED,
   SCHEDULE_NOW,
   TASKS,
   taskSources,
@@ -497,19 +498,53 @@ describe("Settings → Calendar", () => {
     });
   }
 
-  it("lists the calendars and turns one on", async () => {
-    const calls = settings({
-      [`PATCH ${S}/calendars/${HOLIDAYS.id}`]: { body: { ...HOLIDAYS, syncing: true } },
-    });
+  it("groups the calendars under Mine, Following and Off", async () => {
+    settings({ [`GET ${S}/calendars`]: { body: { calendars: [...CALENDARS, SHARED] } } });
     renderAt(`/w/${DUARTE.id}/settings/calendar`);
 
     expect(await screen.findByRole("heading", { name: "Calendars" })).toBeVisible();
-    expect(await screen.findByText("Always on")).toBeVisible();
-    fireEvent.click(await screen.findByRole("switch", { name: "Show Holidays in Portugal" }));
+    const mine = await screen.findByRole("list", { name: "Mine" });
+    expect(within(mine).getByText("Campbooks")).toBeVisible();
+    expect(within(mine).getByText("Work")).toBeVisible();
+    // The Campbooks calendar has no control.
+    expect(screen.queryByRole("group", { name: "Role of Campbooks" })).toBeNull();
+    const following = screen.getByRole("list", { name: "Following" });
+    expect(within(following).getByText("Marta Lopes")).toBeVisible();
+    expect(within(following).getByText(/Shared with you/)).toBeVisible();
+    expect(
+      within(screen.getByRole("list", { name: "Off" })).getByText("Holidays in Portugal"),
+    ).toBeVisible();
+    expect(
+      screen.getByText("Make you busy, hold your tasks, and send their invitations to Home"),
+    ).toBeVisible();
+  });
+
+  it("does not show a group with no calendar", async () => {
+    settings();
+    renderAt(`/w/${DUARTE.id}/settings/calendar`);
+
+    await screen.findByRole("list", { name: "Mine" });
+    expect(screen.queryByRole("list", { name: "Following" })).toBeNull();
+  });
+
+  it("sets a calendar's role, and Undo puts it back", async () => {
+    const calls = settings({
+      [`PATCH ${S}/calendars/${HOLIDAYS.id}`]: { body: { ...HOLIDAYS, role: "following" } },
+    });
+    renderAt(`/w/${DUARTE.id}/settings/calendar`);
+
+    const control = await screen.findByRole("group", { name: "Role of Holidays in Portugal" });
+    fireEvent.click(within(control).getByRole("button", { name: "Following" }));
     await waitFor(() => {
       expect(
         calls.calls.find((call) => call.route === `PATCH ${S}/calendars/${HOLIDAYS.id}`)?.body,
-      ).toEqual({ syncing: true });
+      ).toEqual({ role: "following" });
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /Undo/u }));
+    await waitFor(() => {
+      expect(
+        calls.calls.findLast((call) => call.route === `PATCH ${S}/calendars/${HOLIDAYS.id}`)?.body,
+      ).toEqual({ role: "off" });
     });
   });
 
@@ -627,6 +662,19 @@ describe("Settings → Calendar", () => {
         scout_kinds: SETTINGS.scout_kinds.filter((kind) => kind !== "delivery"),
       });
     });
+  });
+
+  it("shows an Also add to target that is no longer Mine as unset", async () => {
+    const followed = CALENDARS.map((calendar) =>
+      calendar.id === SETTINGS.also_add_to["travel"]
+        ? { ...calendar, role: "following" as const }
+        : calendar,
+    );
+    settings({ [`GET ${S}/calendars`]: { body: { calendars: followed } } });
+    renderAt(`/w/${DUARTE.id}/settings/calendar`);
+
+    const selects = await screen.findAllByRole("combobox", { name: "Also add to" });
+    expect(selects[0]).toHaveValue("");
   });
 
   it("sets where else a kind goes, replacing the whole map", async () => {

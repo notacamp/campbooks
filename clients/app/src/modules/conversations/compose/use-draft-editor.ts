@@ -10,6 +10,7 @@ import {
   fetchDraft,
   saveDraft,
   sendDraft,
+  uploadAttachment,
   type Draft,
   type DraftChanges,
 } from "../api/drafts";
@@ -27,6 +28,19 @@ export interface DraftFields {
 }
 
 export type SaveState = "saved" | "saving" | "unsaved" | "failed";
+
+/** A file the server did not take: why, as the problem code (`attachments_too_large`, ...). */
+export interface RefusedFile {
+  file: File;
+  code: string;
+}
+
+/** A file being uploaded. */
+export interface UploadingFile {
+  key: number;
+  name: string;
+  size: number;
+}
 
 /** Saves are this far apart while the member types. */
 const AUTOSAVE_MS = 800;
@@ -73,6 +87,7 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [error, setError] = useState<string | undefined>(draft.failure_reason ?? undefined);
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState<UploadingFile[]>([]);
   // What it shows but does not edit (From, the attachments' names), from the
   // same answer as the token below.
   const [shown, setShown] = useState<DraftShown>(() => shownOf(draft));
@@ -86,6 +101,9 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
   const saved = useRef(fields);
   const inFlight = useRef<Promise<void> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Uploads run one after the other, each after any save in flight.
+  const uploads = useRef<Promise<unknown>>(Promise.resolve());
+  const uploadKey = useRef(0);
 
   const refresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
@@ -208,6 +226,86 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     [replace],
   );
 
+  /**
+   * Attach files from the device, in turn with the saves: what was typed is
+   * saved first, then each file is uploaded naming the version and token the
+   * last answer gave. An upload is a change to the draft, so its answer
+   * becomes the draft shown (its version, token and attachments), and the
+   * attachments the editor keeps include the new file, so the next save does
+   * not drop it. A 409 is handled as a save's is: the draft is read again,
+   * nothing typed is lost, and the notice says to check it. Resolves with the
+   * files the server refused (and why), in order.
+   */
+  const attach = useCallback(
+    (files: File[]): Promise<RefusedFile[]> => {
+      const pending = files.map((file) => ({
+        file,
+        entry: { key: (uploadKey.current += 1), name: file.name, size: file.size },
+      }));
+      setUploading((list) => [...list, ...pending.map((p) => p.entry)]);
+      const done = (key: number) => {
+        setUploading((list) => list.filter((u) => u.key !== key));
+      };
+      const run = async (): Promise<RefusedFile[]> => {
+        const refused: RefusedFile[] = [];
+        for (const { file, entry } of pending) {
+          try {
+            // What was typed is saved first: the answer carries the draft as
+            // the server holds it.
+            await flush();
+            const upload = async () => {
+              try {
+                const answer = await uploadAttachment(
+                  workspaceId,
+                  { id: draft.id, version: version.current, content_token: shownToken.current },
+                  file,
+                );
+                version.current = answer.version;
+                shownToken.current = answer.content_token;
+                setShown(shownOf(answer));
+                const attachments = answer.attachments.map((a) => a.id);
+                // Only the attachments change: what was typed since stays
+                // unsaved, and a draft with nothing unsaved stays saved.
+                const clean = latest.current === saved.current;
+                const nextSaved = { ...saved.current, attachments };
+                saved.current = nextSaved;
+                latest.current = clean ? nextSaved : { ...latest.current, attachments };
+                setFields(latest.current);
+              } catch (thrown) {
+                if (!changedElsewhere(thrown)) {
+                  refused.push({ file, code: problemCode(thrown) ?? "unknown" });
+                  return;
+                }
+                // Not the draft that was shown: nothing was attached. Read it
+                // again for its version and token, keep what was typed.
+                refused.push({ file, code: problemCode(thrown) ?? "content_changed" });
+                try {
+                  const fresh = await fetchDraft(workspaceId, draft.id);
+                  version.current = fresh.version;
+                  shownToken.current = fresh.content_token;
+                  setShown(shownOf(fresh));
+                } catch {
+                  // The next save or upload asks again.
+                }
+                setError("content_changed");
+              }
+            };
+            inFlight.current = upload();
+            await inFlight.current;
+            inFlight.current = null;
+          } finally {
+            done(entry.key);
+          }
+        }
+        return refused;
+      };
+      const next = uploads.current.then(run, run);
+      uploads.current = next;
+      return next;
+    },
+    [draft.id, flush, workspaceId],
+  );
+
   /** Send: save first, then schedule. Resolves with the scheduled draft, or undefined. */
   const send = useCallback(async (): Promise<Draft | undefined> => {
     setSending(true);
@@ -292,7 +390,9 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
       await deleteWithUndo({
         ...draft,
         ...seen,
-        attachments: draft.attachments.filter((a) => seen.attachments.includes(a.id)),
+        // Uploaded files too: Undo brings the draft back without them (their
+        // blobs are released), and says so.
+        attachments: shown.attachments.filter((a) => seen.attachments.includes(a.id)),
       });
     } catch (error) {
       // Refused: the draft stays, and what was typed is still to be saved
@@ -300,7 +400,20 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
       latest.current = seen;
       throw error;
     }
-  }, [deleteWithUndo, draft]);
+  }, [deleteWithUndo, draft, shown.attachments]);
 
-  return { fields, shown, update, saveState, error, sending, send, undo, discard, flush };
+  return {
+    fields,
+    shown,
+    update,
+    attach,
+    uploading,
+    saveState,
+    error,
+    sending,
+    send,
+    undo,
+    discard,
+    flush,
+  };
 }

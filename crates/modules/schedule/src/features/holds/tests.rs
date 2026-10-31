@@ -252,6 +252,31 @@ async fn another_members_calendar_is_not_found_and_a_read_only_one_is_refused(db
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_calendar_the_member_follows_is_refused(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let (_, ana) = kit.member("ana", ws);
+    let marta = google(&kit, ws, ana).await;
+    sqlx::query("UPDATE schedule.calendars SET following = true WHERE id = $1")
+        .bind(marta)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    let mut tx = kit.state.db.begin_for(ws).await.unwrap();
+    let refused = holds()
+        .hold(&kit.state, &mut tx, ws, request(ana, Some(marta)))
+        .await
+        .unwrap_err();
+    assert_eq!(refused.reason().code(), "calendar_followed");
+    drop(tx);
+    let made: i64 = sqlx::query_scalar("SELECT count(*) FROM schedule.events WHERE kind = 'hold'")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(made, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn release_leaves_alone_what_is_not_the_members_hold(db: PgPool) {
     let kit = Kit::new(db).await;
     let ws = WorkspaceId::new();

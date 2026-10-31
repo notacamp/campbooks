@@ -1,0 +1,1 @@
+- **Mine, Following and Off in Settings → Calendar.** Your calendars are sorted into Mine, Following and Off, each with a control to change it (and Undo). Only your own make you busy, hold your tasks and bring invitations to Home; a calendar shared with you says so. Hold time, "Add to my calendar" and "Also add to" offer only your own.

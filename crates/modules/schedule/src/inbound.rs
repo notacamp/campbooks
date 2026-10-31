@@ -274,6 +274,9 @@ pub struct ListedCalendar {
     pub primary: bool,
     /// Whether events may be written on it.
     pub writable: bool,
+    /// Whether the account owns it, when the provider says.
+    #[serde(default)]
+    pub owned: Option<bool>,
 }
 
 /// When an event starts or ends in a `calendar-change-batch` v1 or

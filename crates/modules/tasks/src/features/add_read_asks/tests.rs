@@ -10,6 +10,8 @@ use crate::{
 };
 
 const MESSAGE: &str = "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9e01";
+/// The sender's own sentence, as a read quotes it.
+const SENTENCE: &str = "Could you confirm Thursday works for the walkthrough?";
 
 fn ask(key: &str, verb: &str, due: Option<&str>, same_as: Option<&str>) -> ReadAsk {
     ReadAsk {
@@ -17,7 +19,13 @@ fn ask(key: &str, verb: &str, due: Option<&str>, same_as: Option<&str>) -> ReadA
         verb: verb.to_owned(),
         due: due.map(str::to_owned),
         same_as: same_as.map(str::to_owned),
+        done_by: None,
     }
+}
+
+fn done_by(mut ask: ReadAsk, how: &str) -> ReadAsk {
+    ask.done_by = Some(how.to_owned());
+    ask
 }
 
 /// Deliver a read of `MESSAGE`; `texts` are `(key suffix, title, amount)`.
@@ -446,4 +454,94 @@ async fn a_model_read_that_lands_first_is_not_doubled_by_the_structured_read(db:
     assert_eq!(found[0].0, "Pay EDP by 30 October");
     // The date it had stays.
     assert_eq!(found[0].3.as_deref(), Some("2026-10-30"));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn how_an_ask_gets_done_is_kept_and_a_payment_is_always_elsewhere(db: PgPool) {
+    let kit = Kit::new(db).await.tracking();
+    let workspace = WorkspaceId::new();
+    let (ana_token, ana) = kit.member("ana", workspace);
+    // The sender's sentence rides along as a read could carry it; the tasks
+    // module must keep none of it, so the checks below look for these words.
+    let texts = json!({"asks": [
+        {"key": format!("{MESSAGE}:model:ask:1"), "title": "Confirm Thursday", "quote": SENTENCE},
+        {"key": format!("{MESSAGE}:model:ask:2"), "title": "Sign the lease"},
+        {"key": format!("{MESSAGE}:model:ask:3"), "title": "Pay the deposit"},
+    ]});
+    deliver(
+        &kit,
+        workspace,
+        Some(ana),
+        "model",
+        vec![
+            done_by(ask("model:ask:1", "do", None, None), "reply"),
+            done_by(ask("model:ask:2", "do", None, None), "elsewhere"),
+            // A payment the read called a reply is still done elsewhere.
+            done_by(ask("model:ask:3", "pay", None, None), "reply"),
+        ],
+        Some(texts),
+    )
+    .await;
+    let kept: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT title, done_by FROM tasks.tasks ORDER BY title")
+            .fetch_all(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(
+        kept,
+        [
+            ("Confirm Thursday".to_owned(), Some("reply".to_owned())),
+            ("Pay the deposit".to_owned(), Some("elsewhere".to_owned())),
+            ("Sign the lease".to_owned(), Some("elsewhere".to_owned())),
+        ]
+    );
+    // The API says how, and names the ask by key (ids only); it carries no
+    // sentence of the sender's, nor do the events or the tracked events.
+    let list = kit
+        .get(&ana_token, &format!("/api/v1/w/{workspace}/tasks"))
+        .await
+        .json
+        .to_string();
+    assert!(list.contains(r#""done_by":"reply""#), "{list}");
+    assert!(list.contains(&format!("{MESSAGE}:model:ask:1")), "{list}");
+    assert!(!list.contains(SENTENCE), "{list}");
+    let rows: Vec<String> = sqlx::query_scalar("SELECT row_to_json(t)::text FROM tasks.tasks t")
+        .fetch_all(&kit.db)
+        .await
+        .unwrap();
+    assert!(rows.iter().all(|row| !row.contains(SENTENCE)), "{rows:?}");
+    let events = kit.events("tasks.task_changed").await;
+    assert_eq!(events.len(), 3);
+    assert!(
+        events
+            .iter()
+            .all(|event| !event.to_string().contains(SENTENCE))
+    );
+    assert!(
+        campbooks_kernel::testing::tracked_events(&kit.db, "tasks.task_created")
+            .await
+            .iter()
+            .all(|event| !event.body.to_string().contains(SENTENCE))
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_read_from_before_it_was_asked_leaves_how_it_gets_done_open(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (_, ana) = kit.member("ana", workspace);
+    deliver(
+        &kit,
+        workspace,
+        Some(ana),
+        "model",
+        vec![ask("model:ask:1", "do", None, None)],
+        Some(lease_texts()),
+    )
+    .await;
+    let how: Option<String> = sqlx::query_scalar("SELECT done_by FROM tasks.tasks")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(how, None);
 }

@@ -23,6 +23,7 @@ export const SCOUT_CHAT_ABOUT = {
   rule: "conversations.rule",
   ruleNotice: "conversations.rule_notice",
   task: "tasks.task",
+  page: "pages.page",
 } as const;
 
 /** A conversation, as a chat is about it. */
@@ -43,6 +44,11 @@ export function ruleNoticeRef(id: string): RecordRef {
 /** A task, as a chat is about it. */
 export function taskRef(id: string): RecordRef {
   return { type: SCOUT_CHAT_ABOUT.task, id };
+}
+
+/** A page, as a chat about it (campbooks-cloud#364). */
+export function pageRef(id: string): RecordRef {
+  return { type: SCOUT_CHAT_ABOUT.page, id };
 }
 
 const ScoutChatContext = createContext<OpenScoutChat | undefined>(undefined);

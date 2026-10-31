@@ -18,7 +18,8 @@
     "choice2": "Segunda opción",
     "choice3": "Tercera opción",
     "nextAction": "Siguiente acción del elemento",
-    "previousAction": "Acción anterior del elemento"
+    "previousAction": "Acción anterior del elemento",
+    "open": "Abrir el hilo"
   },
   "compose": {
     "draft": "Redáctalo por mí",
@@ -31,6 +32,7 @@
     "numbers": "Lista numerada",
     "quote": "Cita",
     "expand": "Ampliar o reducir el editor",
+    "attach": "Adjuntar archivos",
     "ask": "Preguntar"
   },
   "workspace": {

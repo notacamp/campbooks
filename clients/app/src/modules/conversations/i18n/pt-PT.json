@@ -102,7 +102,8 @@
     "trash": {
       "title": "Esta conversa está no Lixo.",
       "lead": "O seu fornecedor de correio esvazia o lixo quando entende."
-    }
+    },
+    "saveToPageFailed": "Não foi possível ler as mensagens. Nada foi guardado."
   },
   "actions": {
     "star": "Fixar",
@@ -136,7 +137,8 @@
     "reportSpam": "Denunciar spam",
     "notSpam": "Não é spam",
     "toInbox": "Mover para a Caixa de entrada",
-    "askScout": "Perguntar ao Scout"
+    "askScout": "Perguntar ao Scout",
+    "saveToPage": "Guardar numa página"
   },
   "toast": {
     "done": "Concluída · {{subject}}",
@@ -162,6 +164,7 @@
   },
   "scout": {
     "label": "Ponto da situação",
+    "readFailed": "O Scout não conseguiu ler esta.",
     "suggestion": "Sugere {{stream}}",
     "suggestionNote": "O Campbooks acha que isto pertence a {{stream}}. É uma sugestão: nada sai do sítio sem a sua decisão.",
     "prompt": "Mover?",
@@ -186,7 +189,11 @@
     "whyUrgent": "Urgente",
     "whySuspicious": "Suspeita",
     "whyMoney": "Pagamento",
-    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra"
+    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra",
+    "taskOpen": "A sua tarefa «{{title}}» continua aberta.",
+    "taskPrompt": "Está feita?",
+    "taskDone": "Feita",
+    "taskNotYet": "Ainda não"
   },
   "reasons": {
     "signals": {
@@ -324,7 +331,21 @@
     },
     "tooLate": "Já não é possível anular: a mensagem foi enviada.",
     "readingQuote": "A ler o email para o citar…",
-    "quoteCut": "Este email é longo: a citação tem a primeira parte."
+    "quoteCut": "Este email é longo: a citação tem a primeira parte.",
+    "draftRestoredWithoutFiles_one": "Rascunho restaurado. Anexe o ficheiro outra vez.",
+    "draftRestoredWithoutFiles_other": "Rascunho restaurado. Anexe os seus {{count}} ficheiros outra vez.",
+    "attach": {
+      "refused": {
+        "file_empty": "{{name}} está vazio, por isso não foi anexado.",
+        "filename_missing": "Não é possível anexar um ficheiro sem nome.",
+        "attachment_blocked": "{{name}} não foi anexado: os fornecedores de correio bloqueiam este tipo de ficheiro.",
+        "attachments_too_large": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{max}} MB.",
+        "too_many_attachments": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{files}} ficheiros.",
+        "attachments_too_large_for_mailbox": "{{name}} não foi anexado: esta caixa de correio só envia {{max}} MB de anexos numa mensagem.",
+        "upload_incomplete": "{{name}} não chegou completo. Tente anexá-lo outra vez.",
+        "request_timed_out": "{{name}} demorou demasiado a carregar. Tente outra vez com uma ligação mais rápida, ou anexe um ficheiro mais pequeno."
+      }
+    }
   },
   "needs": {
     "line": {

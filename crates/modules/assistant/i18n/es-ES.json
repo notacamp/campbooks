@@ -21,6 +21,7 @@
     "about_lost_rule": "Ya no puedo ver esta regla, así que he respondido sin ella.",
     "about_lost_rule_notice": "Esta sugerencia ya no se te ofrece, así que he respondido sin ella.",
     "about_lost_task": "Ya no puedo ver esta tarea, así que he respondido sin ella.",
-    "about_lost_event": "Ya no puedo ver este evento, así que he respondido sin él."
+    "about_lost_event": "Ya no puedo ver este evento, así que he respondido sin él.",
+    "about_lost_page": "Ya no puedo ver esta página, así que he respondido sin ella."
   }
 }

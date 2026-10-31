@@ -26,6 +26,7 @@ export const CAMPBOOKS: Calendar = {
   primary: false,
   syncing: true,
   writable: true,
+  role: "mine",
   color: null,
   time_zone: SCHEDULE_ZONE,
 };
@@ -37,6 +38,7 @@ const PERSONAL: Calendar = {
   primary: true,
   syncing: true,
   writable: true,
+  role: "mine",
   color: "#2b7fb8",
   time_zone: SCHEDULE_ZONE,
 };
@@ -48,6 +50,7 @@ const WORK: Calendar = {
   primary: false,
   syncing: true,
   writable: true,
+  role: "mine",
   color: "#2f9e6b",
   time_zone: SCHEDULE_ZONE,
 };
@@ -59,7 +62,22 @@ export const HOLIDAYS: Calendar = {
   primary: false,
   syncing: false,
   writable: false,
+  role: "off",
   color: "#b88a2b",
+  time_zone: SCHEDULE_ZONE,
+};
+/** A colleague's calendar shared with Ana and followed, not hers (`owned: false`). */
+export const SHARED: Calendar = {
+  id: id(5),
+  name: "Marta Lopes",
+  source: "provider",
+  provider: "google",
+  primary: false,
+  syncing: true,
+  writable: false,
+  role: "following",
+  owned: false,
+  color: "#8a5bb8",
   time_zone: SCHEDULE_ZONE,
 };
 export const CALENDARS = [CAMPBOOKS, PERSONAL, WORK, HOLIDAYS];
@@ -416,6 +434,7 @@ const task = (n: number, over: Partial<Task>): Task => ({
   created_by: ANA.user_id,
   handed_by: null,
   source: null,
+  asks_done: false,
   revision: 1,
   created_at: "2026-10-20T09:00:00Z",
   updated_at: "2026-10-20T09:00:00Z",

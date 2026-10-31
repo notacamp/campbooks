@@ -43,6 +43,10 @@ pub struct Member {
     pub principal: Principal,
     /// The workspace.
     pub workspace: WorkspaceId,
+    /// Whether mail and Scout work with pages
+    /// (`CAMPBOOKS_PAGES__MAIL_SCOUT__ENABLED`): off, Scout has no tool for
+    /// pages, proposes none and is never asked about one.
+    pub pages: bool,
 }
 
 impl Member {

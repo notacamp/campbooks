@@ -7,7 +7,8 @@
     "tableOpenRow": "Abrir la fila",
     "tableEdit": "Editar la celda",
     "tableMove": "Moverse entre celdas",
-    "tableClear": "Vaciar la celda"
+    "tableClear": "Vaciar la celda",
+    "saveThread": "Guardar en una página"
   },
   "tree": {
     "label": "Páginas",
@@ -46,7 +47,8 @@
     "emptyTitle": "Elige una página",
     "emptyBody": "Elige una de la lista o escribe una nueva.",
     "missingTitle": "Esta página no está aquí",
-    "missingBody": "Puede que se haya eliminado, o que nunca se compartiera contigo."
+    "missingBody": "Puede que se haya eliminado, o que nunca se compartiera contigo.",
+    "askScout": "Preguntar a Scout"
   },
   "save": {
     "saved": "Guardado",
@@ -710,5 +712,62 @@
       "linkFailed": "No se pudo enlazar esa tabla. No se cambió nada.",
       "columnRemovedBoth": "Columna {{property}} eliminada de los dos lados"
     }
+  },
+  "saveToPage": {
+    "noSubject": "(sin asunto)",
+    "title": "Guardar “{{subject}}” en una página",
+    "where": "Adónde va",
+    "existing": "Añadir a una página",
+    "new": "Página nueva",
+    "pages": "Páginas",
+    "search": "Buscar una página por su nombre",
+    "none": "Ninguna página en la que puedas escribir coincide.",
+    "loading": "Cargando las páginas…",
+    "linked": "Ya enlaza esta conversación",
+    "newTitle": "Título",
+    "newIn": "Una página privada en el nivel superior: solo tú la ves hasta que la muevas al Espacio de trabajo o la compartas.",
+    "what": "Qué añadir",
+    "live": {
+      "title": "Un bloque de la conversación en vivo",
+      "body": "Muestra siempre el mensaje más reciente. Quien no puede leer la bandeja de entrada solo ve que hay una conversación enlazada."
+    },
+    "copy": {
+      "title": "Una copia de los mensajes",
+      "body": "El texto pasa a formar parte de la página, legible por todos con quienes se comparte."
+    },
+    "summary": {
+      "title": "El resumen de Scout",
+      "body": "Unas líneas con enlaces a cada mensaje. Lo ves antes de que se añada."
+    },
+    "readers": {
+      "only": "Solo tú la leerás",
+      "everyone": "Todo el espacio de trabajo la leerá",
+      "others_one": "{{count}} persona más",
+      "others_other": "{{count}} personas más",
+      "and": "y",
+      "notion": "También se envía a Notion",
+      "named_one": "{{names}} la leerá",
+      "named_other": "{{names}} la leerán",
+      "count_one": "{{count}} compañero la leerá",
+      "count_other": "{{count}} compañeros la leerán"
+    },
+    "files_one": "Incluir adjuntos ({{count}})",
+    "files_other": "Incluir adjuntos ({{count}})",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "preview": "Ver el resumen",
+    "saved": "Guardado en {{page}}",
+    "open": "Abrir la página",
+    "undoFailed": "No se pudo deshacer. No se cambió nada más.",
+    "askExisting": "Escribe una sección para la página “{{page}}” a partir de esta conversación y enséñamela antes de añadir nada.",
+    "askNew": "Escribe una página nueva llamada “{{title}}” a partir de esta conversación y enséñamela antes de crearla.",
+    "refused": {
+      "scope": "Este inicio de sesión no puede leer el correo, así que los adjuntos no se pueden guardar en una página. No se añadió nada.",
+      "changed": "La conversación cambió o falta un archivo. Ábrela de nuevo. No se añadió nada.",
+      "tooLarge": "“{{name}}” pesa más de 20 MB, así que no se puede guardar en una página. No se añadió nada.",
+      "tooLargeSome": "Un archivo pesa más de 20 MB, así que los adjuntos no se pueden guardar en una página. No se añadió nada.",
+      "failed": "No se pudo guardar en la página. No se añadió nada."
+    },
+    "readFailed": "No se pudieron leer los mensajes. No se guardó nada."
   }
 }

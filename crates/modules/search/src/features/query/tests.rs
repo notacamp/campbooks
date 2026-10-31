@@ -137,6 +137,34 @@ async fn accents_stems_and_languages(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_query_can_be_limited_to_kinds_of_record(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, sam, _) = mailbox(&kit).await;
+    let with = |types: &str| format!("{}&types={types}", q("fatura"));
+    // The kind that is searched, alone or in a list.
+    for types in [
+        "conversations.conversation",
+        "pages.page,conversations.conversation",
+    ] {
+        assert_eq!(
+            kit.ids(&sam, workspace, &with(types)).await,
+            ["c-water"],
+            "{types}"
+        );
+    }
+    // A kind that holds nothing here, one nobody has, and an empty list find
+    // nothing: the others are not searched in their place.
+    for types in ["pages.page", "nothing.at_all", ""] {
+        assert!(
+            kit.ids(&sam, workspace, &with(types)).await.is_empty(),
+            "{types}"
+        );
+    }
+    // No limit is everything the caller may search, as before.
+    assert_eq!(kit.ids(&sam, workspace, &q("fatura")).await, ["c-water"]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn people_partially(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, sam, _) = mailbox(&kit).await;

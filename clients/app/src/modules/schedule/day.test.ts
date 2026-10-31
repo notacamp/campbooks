@@ -184,6 +184,7 @@ describe("Add to my calendar", () => {
     name: "Campbooks",
     syncing: true,
     writable: true,
+    role: "mine",
     primary: false,
   };
   const work: CalendarView = {
@@ -192,6 +193,7 @@ describe("Add to my calendar", () => {
     name: "Work",
     syncing: true,
     writable: true,
+    role: "mine",
     primary: true,
   };
   const family: CalendarView = { ...work, id: "family", name: "Family", primary: false };
@@ -203,6 +205,14 @@ describe("Add to my calendar", () => {
     expect(offersAdd({ ...delivery, on_provider: true }, [own, work])).toBe(false);
     expect(offersAdd(delivery, [own, shared])).toBe(false);
     expect(offersAdd({ ...delivery, kind: "hold" }, [own, work])).toBe(false);
+  });
+
+  it("never goes to a calendar the member only follows", () => {
+    const followed: CalendarView = { ...family, role: "following" };
+    expect(pushTarget([own, followed, work], "family")?.id).toBe("work");
+    expect(pushTarget([own, { ...work, role: "following" }, followed], null)).toBeUndefined();
+    const delivery = event({ kind: "delivery", calendar_id: "own", on_provider: false });
+    expect(offersAdd(delivery, [own, { ...work, role: "following" }])).toBe(false);
   });
 
   it("goes to the calendar added to last, else the primary one", () => {

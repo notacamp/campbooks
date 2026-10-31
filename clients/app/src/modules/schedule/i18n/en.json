@@ -140,7 +140,8 @@
     "kindChanged": "{{title}} is now {{kind}}",
     "pushed": "Added to {{calendar}}",
     "answered": "{{title}}: {{response}}",
-    "saved": "{{title}} saved"
+    "saved": "{{title}} saved",
+    "role": "{{name}}: {{role}}"
   },
   "found": {
     "label": "Scout noticed",
@@ -173,10 +174,16 @@
       "title": "Calendars",
       "description": "Campbooks reads and writes these calendars both ways. Your Campbooks calendar holds what Scout finds in your mail; only you see it until you add an event to one of the others.",
       "campbooks": "What Scout finds in your mail · only you",
-      "alwaysOn": "Always on",
       "primary": "primary",
       "readOnly": "read-only",
-      "show": "Show {{name}}",
+      "role": "Role of {{name}}",
+      "shared": "Shared with you",
+      "roles": { "mine": "Mine", "following": "Following", "off": "Off" },
+      "roleHints": {
+        "mine": "Make you busy, hold your tasks, and send their invitations to Home",
+        "following": "Shown only",
+        "off": "Hidden"
+      },
       "colour": "Colour of {{name}}",
       "access": "Add calendar access",
       "accessHint": "Mail only. Allow calendar access to see this account’s calendars here.",

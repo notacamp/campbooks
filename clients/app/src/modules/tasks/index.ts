@@ -3,6 +3,7 @@
 export { useTaskCount, useTasks, useTasksByIds, type TaskView } from "./api/queries";
 export { HoldTime } from "./components/HoldTime";
 export { MakeTaskForm } from "./components/MakeTask/MakeTaskForm";
+export { useReplyQuestion } from "./components/use-reply-question";
 export { useTaskActions } from "./components/use-task-actions";
 export { buildTasksRoutes } from "./routes";
 export { useTaskSubject } from "./scout-subjects";
@@ -15,5 +16,6 @@ export {
   type HoldPick,
   type HoldSources,
 } from "./hold";
-export { CONVERSATION, type TaskSource, type UseTaskSources } from "./source";
+export { CONVERSATION, type TaskSource, type UseTaskQuote, type UseTaskSources } from "./source";
+export { replyWhen } from "./model";
 export { heldText } from "./task-text";

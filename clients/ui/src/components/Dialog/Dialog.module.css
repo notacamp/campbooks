@@ -23,7 +23,9 @@
   gap: var(--space-4);
   width: min(var(--dialog-width), 100%);
   max-height: calc(var(--size-viewport-min) - var(--space-8));
-  overflow: auto;
+
+  /* The head and the footer stay; the body between them scrolls. */
+  overflow: hidden;
   padding: var(--space-5);
   border-radius: var(--overlay-radius);
   background: var(--surface-overlay);
@@ -76,12 +78,16 @@
 
 .body {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--space-3);
+  min-height: 0;
+  overflow: auto;
 }
 
 .footer {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);

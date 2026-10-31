@@ -987,6 +987,16 @@ question.
 - **WHEN** the user opens the conversation of João's message to Ana Costa, copying them
 - **THEN** the note reads "João Pereira wrote to Ana Costa. You're in Cc." with "Scout isn't sure" and the actions Nudge Ana…, Reply to João… and Nothing for me
 
+### Requirement: The note asks whether a task from the thread is done
+When an open task of the member that came from the conversation asks Done? and no
+need is open, the "where things stand" note SHALL add "Your task “<title>” is
+still open." and ask "Is it done?" with Done (1) and Not yet (2). While it asks,
+it takes the place of a stream suggestion's choice.
+
+#### Scenario: Ana opens the thread she replied in
+- **WHEN** Ana opens the conversation "Send the signed lease" came from
+- **THEN** the note says the task is still open and offers Done and Not yet
+
 ### Requirement: Room to write
 The message composer (Reply, Reply all, Forward, New message, and a draft
 reopened from Drafts) SHALL set From, To, Cc, Bcc and the subject at the
@@ -1059,3 +1069,81 @@ put it back where it was. Below 48rem Expand SHALL be hidden.
 #### Scenario: No Expand on a phone
 - **WHEN** the composer is open at 375px
 - **THEN** Expand is not shown
+
+### Requirement: Attaching files in the composer
+The composer SHALL offer Attach (⇧⌘U), which opens the device's file picker
+for several files. Files dragged onto the composer, or pasted into its text,
+SHALL attach too; text pastes as before. Each file SHALL show "Uploading…"
+until it is stored, then its name, size and a Remove button. Once anything
+is attached, the composer SHALL show the total against 25 MB.
+
+#### Scenario: Attach two files
+- **WHEN** the user presses ⇧⌘U and picks two PDFs
+- **THEN** both show as uploading, then with their names and sizes, and the total reads, for example, "1.2 MB of 25 MB"
+
+#### Scenario: Drop a file
+- **WHEN** the user drags a file over the composer
+- **THEN** the composer shows "Drop to attach", and dropping the file attaches it
+
+#### Scenario: Paste a screenshot
+- **WHEN** the user pastes an image from the clipboard into the text
+- **THEN** it is attached as a file and the text is unchanged
+
+### Requirement: Files the composer refuses
+Before uploading, the composer SHALL refuse a file that is empty, would take
+the total past 25 MB, or has a blocked type. It SHALL say which file and
+why in the composer, beside its files, and upload nothing for it. A refusal from the server SHALL
+be said the same way.
+
+#### Scenario: Too large
+- **WHEN** 24 MB are attached and the user adds a 2 MB file
+- **THEN** the composer says that file would take the message over 25 MB, and it is not attached
+
+#### Scenario: A blocked type
+- **WHEN** the user drops `setup.exe`
+- **THEN** the composer says that file type can't be sent by email, and it is not attached
+
+### Requirement: The note says when Scout could not read the message
+When `conversations.get` says `need_read_failed`, the reader's note for an open
+need SHALL show one muted line, "Scout couldn't read this one.", under the
+need's sentence, in the user's language (English, European Portuguese,
+Spanish from Spain and French). It SHALL show nothing for a read that is
+pending, finished, or has a call left.
+
+#### Scenario: A read that failed for good
+- **WHEN** the user opens a conversation with an open need whose read failed on every call
+- **THEN** the note shows the need's sentence and, under it, "Scout couldn't read this one."
+
+#### Scenario: A read that did not fail
+- **WHEN** the user opens a conversation with an open need whose read is done or pending
+- **THEN** the note shows no such line
+
+### Requirement: Save a thread to a page
+With pages enabled, the reader SHALL offer "Save to page" in its More menu
+and through a shortcut. It opens a dialog to pick an existing page (filtered
+by name, pages already linking the thread first) or a new private page, and
+what to add: a live thread block, a copy of the messages (saying who reads
+the page, from its effective readers, and whether it is sent to Notion), or
+Scout's summary (shown as Scout's card before anything is added; hidden when
+Scout is unavailable). Attachments can be
+included. Every save SHALL show an Undo toast.
+
+#### Scenario: A live block in an existing page
+- **WHEN** Ana saves "Kickoff agenda" to "Client onboarding" as a live thread block
+- **THEN** the page ends with the thread block and a toast offers "Open page" and "Undo"
+
+#### Scenario: Scout not configured
+- **WHEN** the `complete` role is not configured and Ana opens "Save to page"
+- **THEN** the dialog offers the live block and the copy, but not Scout's summary
+
+#### Scenario: A copy to a shared page says who will read it
+- **WHEN** Ana chooses a copy of the messages for "Acme", which Rui reads through a grant on the page above it
+- **THEN** the dialog says Rui will read it before Ana saves
+
+#### Scenario: Off while the server does not offer it
+- **WHEN** mail and Scout in pages is off on the server
+- **THEN** the reader has no "Save to page" entry and its shortcut does nothing
+
+#### Scenario: An attachment over the cap
+- **WHEN** Ana includes attachments and one is over 20 MiB
+- **THEN** the dialog says which file is too large and nothing is added
