@@ -159,13 +159,25 @@ stale.
 
 ## The reader (client)
 
-- **The button.** "Explain this thread" in the "Where things stand" note,
-  with the shortcut `conversations.explain` (`E` if free, shown as a hint),
-  and a ⌘K command. It shows only while `explain` is true.
+- **On demand only (owner, 2026-10-31: "scout asks should be on demand,
+  not for every thread by default").**
+  - A thread the member never asked about shows nothing: no card, no block,
+    no call, and no `get_explanation` request beyond the one the button
+    needs.
+  - The entry is a quiet action: a ghost button "Explain this thread" in
+    the "Where things stand" note, the same action in the reader's More
+    menu, the shortcut `conversations.explain` (`E` if free, shown as a
+    hint), and a ⌘K command. It shows only while `explain` is true.
+  - Nothing is ever explained again on its own, after new mail or
+    otherwise. The member chooses "Explain again".
+- **Coming back** to a thread the member did ask about shows one collapsed
+  line, not the card: "Your explanation from 10:42 · from 9 messages" with
+  Show. If stale, it adds "Rui Matos wrote since, at 11:05" and "Explain
+  again". The card opens only when the member chooses Show, or right after
+  they asked.
 - **The card**, below the note, as in the prototype:
   - **Header:** the visor, "Scout's explanation", "From N messages · written
-    <time>", and Hide. Hide collapses the card, and the collapsed state is
-    remembered per device (localStorage, wrapped).
+    <time>", and Hide. Hide collapses the card to the one line.
   - **While writing:** a skeleton and "Scout is reading the N messages…",
     with Stop, which only hides the card; the call finishes and is kept.
     The answer arrives whole, without streaming, because it is one strict

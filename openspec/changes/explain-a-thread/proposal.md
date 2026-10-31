@@ -7,7 +7,7 @@ The owner asked for "a feature for AI to explain an email thread to me" (campboo
 
 ## What Changes
 
-- **Explain this thread** in the reader's "Where things stand" note, with `E`, and in ⌘K. It is shown only when Scout can read mail on this server and the thread raised no phishing warning.
+- **Explain this thread, on demand only.** The owner's rule: "scout asks should be on demand, not for every thread by default". It is a quiet action in the reader's "Where things stand" note and More menu, with `E`, and in ⌘K. It is offered only when Scout can read mail on this server and the thread raised no phishing warning. A thread nobody asked about shows nothing. Coming back to one you asked about shows a single collapsed line.
 - **One `complete` call, on request only, never in the background.** It reads the thread and answers, in the member's language:
   - **In short**;
   - **Who wants what**;

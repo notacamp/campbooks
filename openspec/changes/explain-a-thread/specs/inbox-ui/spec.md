@@ -1,9 +1,14 @@
 ## ADDED Requirements
 
 ### Requirement: Explain this thread in the reader
-While the conversation detail says the member may ask, the reader's "Where
-things stand" note SHALL offer "Explain this thread" (with its shortcut and
-hint, and in ⌘K).
+Scout SHALL explain a thread only when the member asks. A thread they never
+asked about SHALL show no explanation and take no space for one, and nothing
+SHALL be explained again on its own. While the conversation detail says the
+member may ask, the reader SHALL offer "Explain this thread" as a quiet
+action: in the "Where things stand" note, in the reader's More menu, with its
+shortcut and hint, and in ⌘K. Coming back to a thread they did ask about
+SHALL show one collapsed line (when it was written, and that newer mail
+arrived if it did) with Show and, when stale, "Explain again".
 
 **The card** below the note SHALL show:
 - while writing: "Scout is reading the N messages…" with a skeleton;
@@ -35,3 +40,11 @@ tap away. Every string SHALL be in en, pt-PT, es-ES and fr.
 #### Scenario: Not offered
 - **WHEN** Scout can't read mail on this server, or the thread raised a phishing warning
 - **THEN** the note has no "Explain this thread"
+
+#### Scenario: A thread nobody asked about
+- **WHEN** Ana opens a thread she never asked Scout to explain
+- **THEN** the reader shows no explanation and no call is made
+
+#### Scenario: Coming back
+- **WHEN** Ana opens "Kickoff agenda" the next day, after Rui wrote again
+- **THEN** one line says her explanation predates Rui's message, with Show and "Explain again", and nothing is written until she chooses
