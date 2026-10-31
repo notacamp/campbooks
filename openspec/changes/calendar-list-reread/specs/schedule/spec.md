@@ -16,7 +16,8 @@ yet SHALL be added off whatever the provider says is primary, and a calendar
 SHALL never be turned on by it. Nothing but `owned` SHALL change on a calendar
 the module has. It SHALL NOT make the first calendar of a connection for a
 member: when the module holds none (the connection was removed, or the member
-left), a late read adds nothing.
+left), a late read adds nothing. A calendar that is off still counts as one
+the module holds.
 Turning a calendar off SHALL hide its events and stop applying its changes;
 turning it on SHALL ask connectors to read it again from the start
 (`schedule.calendar_sync_changed`).
@@ -49,6 +50,14 @@ turning it on SHALL ask connectors to read it again from the start
 - **WHEN** a daily read lists "Family", which Inês set to mine, as not owned and renamed at the provider
 - **THEN** "Family" stays mine with its name and colour, and only its `owned` is filled if it was unknown
 
-#### Scenario: A read that arrives late
-- **WHEN** a daily read arrives after the connection was removed, or after the member left the workspace
+#### Scenario: A read that arrives after the connection was removed
+- **WHEN** a daily read is handled after `connection_removed` for that connection
 - **THEN** no calendar is added
+
+#### Scenario: A read that arrives after the member left
+- **WHEN** a daily read is handled after the member left the workspace
+- **THEN** no calendar is added
+
+#### Scenario: Every calendar is off
+- **WHEN** all of Inês's calendars on a connection are off and a daily read lists "Marta"
+- **THEN** "Marta" is added off

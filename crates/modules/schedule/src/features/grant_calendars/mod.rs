@@ -19,6 +19,7 @@ use sqlx::{Postgres, Transaction};
 use crate::{
     domain::{
         blobs::{MAX_DOCUMENT_BYTES, read_json},
+        locks,
         moment::parse_zone,
         rows::ensure_campbooks_calendar,
         tracked,
@@ -134,6 +135,9 @@ async fn apply_list(
         .as_deref()
         .filter(|name| matches!(*name, "google" | "zoho"));
     if !primary_on {
+        // Wait for a removal or a departure that is deleting this
+        // connection's calendars, and keep them waiting for us.
+        locks::connection(tx, connection).await?;
         let held: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT 1 FROM schedule.calendars
                              WHERE workspace_id = $1 AND connection_id = $2

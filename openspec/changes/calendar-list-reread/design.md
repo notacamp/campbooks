@@ -30,8 +30,20 @@ Events are delivered in any order, so a `calendar_list_read` can be handled
 after `connection_removed` or after the member left, both of which delete the
 connection's calendars. A re-read therefore adds calendars only while the module
 still holds at least one provider calendar for that workspace, connection and
-member (checked in the same transaction). Only a grant makes a connection's
-first calendar.
+member (any role counts, Off too). Only a grant makes a connection's first calendar.
+
+A bare check is not enough: a delete already running cannot see a row
+inserted after its snapshot, so that row would survive it. So a transaction-
+scoped advisory lock serialises them. The key is
+`hashtextextended('schedule.calendar_list:' || connection_id, 0)`: namespaced
+so it cannot meet another module's advisory locks, and without the workspace
+because a connection id is unique. One helper, `domain::locks::connection`,
+derives it. The re-read and `connection_removed` each take the lock of their
+one connection, first in their transaction. Forgetting a member is per member,
+so it takes the lock of each of the member's provider connections, in
+ascending connection id order, before deleting anything; the same order keeps
+two forgets, or a forget and a re-read, from waiting on each other in a circle.
+The guard is checked after the lock is held.
 
 ## Cadence and the marker
 

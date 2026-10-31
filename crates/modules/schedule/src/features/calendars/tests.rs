@@ -422,3 +422,36 @@ async fn a_late_list_read_after_a_removal_or_a_departure_adds_nothing(db: PgPool
     assert_eq!(count(removed).await, 0);
     assert_eq!(count(left).await, 0);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_member_whose_calendars_are_all_off_still_gets_new_ones(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let (token, ines) = kit.member("ines", ws);
+    let connection = ConnectionId::new();
+    grant(&kit, ws, ines, connection, None).await;
+    for name in ["Ines", "Family", "Holidays"] {
+        let id = calendar(&kit, ines, name).await;
+        let patched = kit
+            .patch(
+                &token,
+                &format!("/api/v1/w/{ws}/schedule/calendars/{id}"),
+                json!({ "role": "off" }),
+            )
+            .await;
+        assert_eq!(patched.status, StatusCode::OK, "{:?}", patched.json);
+    }
+    list_read(
+        &kit,
+        ws,
+        ines,
+        connection,
+        json!([{ "provider_id": "marta", "name": "Marta", "primary": false,
+                 "writable": true, "owned": false }]),
+    )
+    .await;
+    assert_eq!(
+        stored(&kit, calendar(&kit, ines, "Marta").await).await,
+        (false, true, Some(false))
+    );
+}
