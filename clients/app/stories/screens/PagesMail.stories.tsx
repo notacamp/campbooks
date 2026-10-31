@@ -24,7 +24,15 @@ import {
   pageProposal,
 } from "../../test/demo/assistant";
 import { COUNTS, MARTA } from "../../test/demo/attention";
-import { INBOX, STREAM_COUNTS, W } from "../../test/demo/conversations";
+import {
+  INBOX,
+  PRIMARY,
+  Q4,
+  Q4_BODY,
+  Q4_DETAIL,
+  STREAM_COUNTS,
+  W,
+} from "../../test/demo/conversations";
 import { CLIENT_ONBOARDING } from "../../test/demo/pages";
 import {
   HEAVY_THREAD,
@@ -281,7 +289,9 @@ const card = {
     const done = (state: string) => ({ body: { ...args.proposal, state } });
     const proposalPath = `${W}/assistant/chats/${MARTA_CHAT.id}/proposals/${args.proposal.id}`;
     return mockFetch({
-      [`GET ${W}/pages`]: { body: { pages: [CLIENT_ONBOARDING], tables: false } },
+      [`GET ${W}/pages`]: {
+        body: { pages: [CLIENT_ONBOARDING], tables: false, mail_scout: true },
+      },
       [`GET ${W}/conversations`]: { body: { conversations: [MARTA], next_cursor: null } },
       [`POST ${W}/pages/${CLIENT_ONBOARDING.id}/append`]: {
         body: { append_id: "0192f1a0-0000-7000-8000-0000000007a1", blocks: 4, revision: 3 },
@@ -526,3 +536,48 @@ export const AskScoutOffWhileTheServerDoesNotOfferIt: AskStory = {
 
 /** The page, nothing done yet (the recording opens the menu and asks). */
 export const AskScoutIdle: AskStory = { ...ask, args: { server: {} }, ...at("desktop", 1440, 900) };
+
+// --- Save to page in a workspace with no pages ---------------------------
+
+const newest = Q4_DETAIL.messages[2]?.id ?? "";
+
+const firstPage = {
+  parameters: { layout: "fullscreen" },
+  beforeEach: ({ globals }: { globals: Record<string, unknown> }) => {
+    saveThemeFromGlobals(globals);
+    return mockFetch({
+      ...forStories(saveToPageServer({ empty: true }).routes),
+      "GET /bff/session": { body: SESSION },
+      "GET /bff/api/v1/workspaces": { body: { workspaces: [DUARTE] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`GET ${W}/streams`]: { body: { streams: STREAM_COUNTS } },
+      [`GET ${W}/conversations`]: { body: { conversations: PRIMARY, next_cursor: null } },
+      [`GET ${W}/conversations/${Q4.id}`]: { body: Q4_DETAIL },
+      [`GET ${W}/conversations/${Q4.id}/messages/${newest}/body`]: { body: Q4_BODY },
+      [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4, unread_count: 0 } },
+      [`GET ${W}/drafts`]: { body: { drafts: [] } },
+    });
+  },
+  render: () => <AppAt path={`/w/${DUARTE.id}/inbox/primary/${Q4.id}`} />,
+};
+
+/** No pages yet: the reader still offers Save to page, and "New page" makes the first. */
+export const SaveToPageWithNoPages: StoryObj = {
+  ...firstPage,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByTitle("Message from Maya Okafor")).toBeVisible();
+    await userEvent.click(await canvas.findByRole("button", { name: "More actions" }));
+    await userEvent.click(
+      await body(canvasElement).findByRole("button", { name: /Save to page/u }),
+    );
+    const choice = await body(canvasElement).findByRole("button", { name: "New page" });
+    await waitFor(() => expect(choice).toBeVisible());
+  },
+};
+
+/** The reader, nothing done yet (the recording opens Save to page and makes the first page). */
+export const SaveToPageWithNoPagesIdle: StoryObj = {
+  ...firstPage,
+  ...at("desktop", 1440, 900),
+};

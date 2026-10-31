@@ -53,9 +53,9 @@ export function usePages(workspaceId: string) {
   });
 }
 
-/** Whether tables are on here (`pages.list` says so); nothing is offered while that is not known. */
-export function useTablesAvailable(workspaceId: string): boolean {
-  const pages = useQuery({
+/** One answer of `pages.list` (same query as `usePages`, so one request); `undefined` while unknown. */
+export function usePagesAnswer<T>(workspaceId: string, pick: (list: PageList) => T): T | undefined {
+  return useQuery({
     queryKey: keys.list(workspaceId),
     queryFn: async ({ signal }) =>
       unwrap(
@@ -64,10 +64,14 @@ export function useTablesAvailable(workspaceId: string): boolean {
           signal,
         }),
       ),
-    select: (list: PageList) => list.tables,
+    select: pick,
     retry: retryUnlessMissing,
-  });
-  return pages.data === true;
+  }).data;
+}
+
+/** Whether tables are on here (`pages.list` says so); nothing is offered while that is not known. */
+export function useTablesAvailable(workspaceId: string): boolean {
+  return usePagesAnswer(workspaceId, (list) => list.tables) === true;
 }
 
 /** `pages.list?trashed=true`: what was deleted in the last 30 days. */

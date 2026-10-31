@@ -6416,6 +6416,11 @@ export interface components {
         PageKind: "page" | "table" | "row";
         /** @description The pages. */
         PageList: {
+            /**
+             * @description Whether mail and Scout in pages is on here: when not, a client offers
+             *     no "Save to page" and no "Ask Scout" about a page.
+             */
+            mail_scout: boolean;
             /** @description The pages, sorted by position among their siblings. */
             pages: components["schemas"]["PageSummary"][];
             /**

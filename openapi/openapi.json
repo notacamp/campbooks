@@ -29676,9 +29676,14 @@
         "description": "The pages.",
         "required": [
           "pages",
-          "tables"
+          "tables",
+          "mail_scout"
         ],
         "properties": {
+          "mail_scout": {
+            "type": "boolean",
+            "description": "Whether mail and Scout in pages is on here: when not, a client offers\nno \"Save to page\" and no \"Ask Scout\" about a page."
+          },
           "pages": {
             "type": "array",
             "items": {
