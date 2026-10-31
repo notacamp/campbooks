@@ -51,34 +51,33 @@ pub fn message(body: &str, signature: &str, quoted: &str) -> (String, String) {
         return (to_html(body, Marks::Own), to_plain(body));
     }
     let body = body.trim_end();
-    let mut html = to_html_parts(&[(body, Marks::Own)]);
+    // Built in one pass inside the one outer `<div>`: the text, then the
+    // signature in its own block, then the quoted history. Nothing is cut
+    // back out of what was written.
+    let mut html = String::from("<div>");
+    blocks(&body.lines().collect::<Vec<_>>(), Marks::Own, &mut html);
     let mut plain = to_plain(body);
     if signed {
-        // Inside the one outer `<div>`, before the quoted history.
-        html.truncate(html.len() - "</div>".len());
         html.push_str("<div class=\"signature\">");
         blocks(
             &signature.trim_end().lines().collect::<Vec<_>>(),
             Marks::Own,
             &mut html,
         );
-        html.push_str("</div></div>");
+        html.push_str("</div>");
         plain.push_str("\n\n-- \n");
         plain.push_str(&to_plain(signature.trim_end()));
     }
     if quoted_any {
-        html.truncate(html.len() - "</div>".len());
-        let mut tail = String::new();
         blocks(
             &quoted.lines().collect::<Vec<_>>(),
             Marks::Quoted,
-            &mut tail,
+            &mut html,
         );
-        html.push_str(&tail);
-        html.push_str("</div>");
         plain.push_str("\n\n");
         plain.push_str(quoted);
     }
+    html.push_str("</div>");
     (html, plain)
 }
 
