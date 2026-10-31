@@ -260,6 +260,9 @@ async fn a_quiet_zoho_mailbox_is_read_every_minute_whatever_the_global_maximum(d
     // is the default 60 s, and the next read is due a tick's slack early.
     let mut config = crate::config::ConnectorsConfig::default();
     config.poll.max_seconds = 600;
+    // The login's budget refills in real time, which a test that moves a
+    // fake clock does not wait for: keep it out of the way.
+    config.zoho.requests_per_minute = 100_000;
     let kit = Kit::with_config(db, config).await;
     connected(&kit).await;
     for _ in 0..4 {
