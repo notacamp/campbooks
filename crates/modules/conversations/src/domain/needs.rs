@@ -922,7 +922,9 @@ fn asked(question: NeedQuestion) -> NeedQuestion {
 fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
     // A "Still needed?" question stands for the ask it was raised as.
     let question = asked(question);
-    if question == NeedQuestion::Suspicious {
+    // A wait is not cleared by a rule: its taught answer names a move, not yes
+    // or no (campbooks-cloud#378).
+    if matches!(question, NeedQuestion::Suspicious | NeedQuestion::NextMove) {
         return false;
     }
     surfaces_never(answers)
