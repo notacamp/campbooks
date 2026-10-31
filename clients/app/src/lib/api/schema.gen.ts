@@ -8028,6 +8028,14 @@ export interface components {
              */
             content_token?: string | null;
             /**
+             * Format: date-time
+             * @description When it leaves (campbooks-cloud#392): at least a minute after the
+             *     undo window ends and at most [`MAX_SEND_AHEAD_DAYS`] days ahead, else
+             *     400 `send_at_invalid`. Without it, it leaves when the undo window
+             *     ends. Until then `cancel_send` takes it back.
+             */
+            send_at?: string | null;
+            /**
              * Format: int32
              * @description The draft's version as last saved by the caller; any other answers
              *     409 `draft_changed`, so what is sent is what the member saw.
@@ -14581,7 +14589,7 @@ export interface operations {
                     "application/json": components["schemas"]["DraftView"];
                 };
             };
-            /** @description No recipient (`no_recipients`), a malformed address (`invalid_address`) or too many attachments (`attachments_too_large`). */
+            /** @description No recipient (`no_recipients`), a malformed address (`invalid_address`), too many attachments (`attachments_too_large`), or a `send_at` too soon or too far ahead (`send_at_invalid`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14626,7 +14634,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again. */
+            /** @description `rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again. Or `send_at_busy`: too many sends of yours are scheduled for that minute. */
             429: {
                 headers: {
                     [name: string]: unknown;

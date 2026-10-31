@@ -2,7 +2,8 @@
 //! `POST …/drafts/{draft_id}/cancel_send` — take it back within the window.
 //!
 //! Sending checks the draft, then schedules it: `conversations.release_send`
-//! runs when the window ends and hands it to the connector, unless it was
+//! runs when the window ends (or at the `send_at` the member chose,
+//! campbooks-cloud#392) and hands it to the connector, unless it was
 //! cancelled, deleted or sent again meanwhile (each send has a generation,
 //! and a release acts only at its own).
 //!
@@ -21,7 +22,7 @@ use campbooks_kernel::{
     operations::RateLimit,
     tenancy::{Workspace, WorkspaceId},
 };
-use chrono::{TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 
@@ -51,6 +52,35 @@ pub struct SendDraft {
     /// sent (campbooks-cloud#242).
     #[serde(default)]
     pub content_token: Option<String>,
+    /// When it leaves (campbooks-cloud#392): at least a minute after the
+    /// undo window ends and at most [`MAX_SEND_AHEAD_DAYS`] days ahead, else
+    /// 400 `send_at_invalid`. Without it, it leaves when the undo window
+    /// ends. Until then `cancel_send` takes it back.
+    #[serde(default)]
+    pub send_at: Option<DateTime<Utc>>,
+}
+
+/// The furthest ahead a send may be scheduled, in days.
+pub const MAX_SEND_AHEAD_DAYS: i64 = 366;
+
+/// When a send asked to leave at `asked` (none: when the undo window ends)
+/// leaves, seen at `now`; `None` when `asked` is out of range.
+pub fn leaves_at(
+    now: DateTime<Utc>,
+    undo: TimeDelta,
+    asked: Option<DateTime<Utc>>,
+) -> Option<DateTime<Utc>> {
+    let soonest = now + undo;
+    match asked {
+        None => Some(soonest),
+        Some(at)
+            if at >= soonest + TimeDelta::minutes(1)
+                && at <= now + TimeDelta::days(MAX_SEND_AHEAD_DAYS) =>
+        {
+            Some(at)
+        }
+        Some(_) => None,
+    }
 }
 
 /// How sending behaves, from the module's settings.
@@ -82,7 +112,7 @@ pub struct SendSettings {
     responses(
         (status = ACCEPTED, description = "Scheduled: it leaves at `send_at` unless cancelled.",
             body = DraftView),
-        (status = BAD_REQUEST, description = "No recipient (`no_recipients`), a malformed address (`invalid_address`) or too many attachments (`attachments_too_large`).",
+        (status = BAD_REQUEST, description = "No recipient (`no_recipients`), a malformed address (`invalid_address`), too many attachments (`attachments_too_large`), or a `send_at` too soon or too far ahead (`send_at_invalid`).",
             body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -92,7 +122,7 @@ pub struct SendSettings {
             body = Problem, content_type = "application/problem+json"),
         (status = CONFLICT, description = "Already on its way (`draft_not_editable`), saved since that version (`draft_changed`), or not what you were shown (`content_changed`): read it again, check it, and send again.",
             body = Problem, content_type = "application/problem+json"),
-        (status = TOO_MANY_REQUESTS, description = "`rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again.",
+        (status = TOO_MANY_REQUESTS, description = "`rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again. Or `send_at_busy`: too many sends of yours are scheduled for that minute.",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -116,6 +146,13 @@ pub async fn send(
     if i64::from(body.version) != i64::from(row.version) {
         return Err(Error::Conflict(crate::MESSAGES.reason("draft_changed")));
     }
+    let Some(send_at) = leaves_at(Utc::now(), settings.undo, body.send_at) else {
+        return Err(Error::BadRequest(
+            crate::MESSAGES
+                .reason("send_at_invalid")
+                .arg("days", MAX_SEND_AHEAD_DAYS),
+        ));
+    };
     if !state.binding.is_enabled() {
         tracing::warn!(
             workspace = %access.workspace,
@@ -148,7 +185,9 @@ pub async fn send(
                 .arg("max", MAX_ATTACHMENT_BYTES / (1024 * 1024)),
         ));
     }
-    let send_at = Utc::now() + settings.undo;
+    if body.send_at.is_some() {
+        send_slot_free(&state, &mut tx, access, id, send_at).await?;
+    }
     let generation = sqlx::query_scalar!(
         r#"
         UPDATE conversations.drafts
@@ -185,6 +224,59 @@ pub async fn send(
     .await?;
     tx.commit().await?;
     Ok((StatusCode::ACCEPTED, Json(draft)))
+}
+
+/// Sends scheduled for a chosen time count against the send rate when they
+/// are asked for, not when they leave, so many for the same minute would
+/// burst past it at release. Past what the Send class allows in a minute
+/// (its count over its window, at least one), the author's sends for the same
+/// minute of `send_at` are refused: 429 `send_at_busy`. Counted for this
+/// workspace and author, under a lock so two at once cannot both take the
+/// last place.
+async fn send_slot_free(
+    state: &AppState,
+    tx: &mut sqlx::PgConnection,
+    access: &campbooks_kernel::tenancy::Access,
+    draft: DraftId,
+    send_at: chrono::DateTime<Utc>,
+) -> Result<()> {
+    let Some((max, window)) = state
+        .api_limits
+        .limit(campbooks_kernel::rate_limit::api::Class::Send)
+    else {
+        return Ok(());
+    };
+    let per_minute = (u64::from(max) * 60)
+        .div_ceil(window.as_secs().max(1))
+        .max(1);
+    let author = access.user.map(|user| *user.as_uuid());
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(format!(
+            "conversations.send_at:{}:{author:?}",
+            access.workspace
+        ))
+        .execute(&mut *tx)
+        .await?;
+    let taken: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.drafts
+          WHERE workspace_id = $1 AND author IS NOT DISTINCT FROM $2 AND id <> $3
+            AND state = 'scheduled'
+            AND date_trunc('minute', send_at) = date_trunc('minute', $4::timestamptz)",
+    )
+    .bind(access.workspace.as_uuid())
+    .bind(author)
+    .bind(draft)
+    .bind(send_at)
+    .fetch_one(&mut *tx)
+    .await?;
+    if u64::try_from(taken).unwrap_or(u64::MAX) >= per_minute {
+        return Err(Error::TooManyRequests(
+            crate::MESSAGES
+                .reason("send_at_busy")
+                .arg("max", per_minute),
+        ));
+    }
+    Ok(())
 }
 
 /// 403 `send_needs_you` unless the request is the member's own
@@ -332,3 +424,25 @@ pub async fn cancel(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod leaves_at_tests {
+    use super::{TimeDelta, Utc, leaves_at};
+
+    #[test]
+    fn a_send_leaves_when_the_window_ends_or_at_a_time_in_range() {
+        let now = Utc::now();
+        let undo = TimeDelta::seconds(10);
+        assert_eq!(leaves_at(now, undo, None), Some(now + undo));
+        let tomorrow = now + TimeDelta::days(1);
+        assert_eq!(leaves_at(now, undo, Some(tomorrow)), Some(tomorrow));
+        // Inside the window plus a minute, or past a year and a day: refused.
+        assert_eq!(
+            leaves_at(now, undo, Some(now + TimeDelta::seconds(30))),
+            None
+        );
+        assert_eq!(leaves_at(now, undo, Some(now - TimeDelta::hours(1))), None);
+        assert_eq!(leaves_at(now, undo, Some(now + TimeDelta::days(367))), None);
+        assert!(leaves_at(now, undo, Some(now + TimeDelta::days(366))).is_some());
+    }
+}

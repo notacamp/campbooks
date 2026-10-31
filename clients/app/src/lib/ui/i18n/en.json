@@ -56,7 +56,22 @@
     "send": "Send",
     "close": "Close",
     "expand": "Expand",
-    "shrink": "Shrink"
+    "shrink": "Shrink",
+    "sendLater": {
+      "title": "Send later",
+      "tomorrow": "Tomorrow morning",
+      "workingDay": "Next working day",
+      "pick": "Pick a time…",
+      "pickTitle": "Send on",
+      "date": "Date",
+      "time": "Time",
+      "back": "Back",
+      "schedule": "Schedule",
+      "problem": {
+        "past": "That time has passed. Pick a later one.",
+        "tooFar": "Sends can be scheduled up to a year ahead."
+      }
+    }
   },
   "attachments": {
     "label": "Attachments",

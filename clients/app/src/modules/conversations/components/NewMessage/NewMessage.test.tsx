@@ -42,7 +42,7 @@ describe("NewMessage", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Subject" }), {
       target: { value: "Lunch?" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Send/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^Send(?! later)/u }));
     await waitFor(() => {
       expect(onLeave).toHaveBeenCalled();
     });

@@ -56,7 +56,22 @@
     "send": "Enviar",
     "close": "Cerrar",
     "expand": "Ampliar",
-    "shrink": "Reducir"
+    "shrink": "Reducir",
+    "sendLater": {
+      "title": "Enviar más tarde",
+      "tomorrow": "Mañana por la mañana",
+      "workingDay": "Próximo día hábil",
+      "pick": "Elegir una hora…",
+      "pickTitle": "Enviar el",
+      "date": "Fecha",
+      "time": "Hora",
+      "back": "Atrás",
+      "schedule": "Programar",
+      "problem": {
+        "past": "Esa hora ya ha pasado. Elige una posterior.",
+        "tooFar": "Los envíos se pueden programar con hasta un año de antelación."
+      }
+    }
   },
   "attachments": {
     "label": "Adjuntos",

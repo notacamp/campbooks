@@ -357,3 +357,11 @@
 .error {
   scroll-margin-block-end: calc(var(--btn-height) + var(--space-6));
 }
+
+/* Send and its chevron, side by side. */
+.sendGroup {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
