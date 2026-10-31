@@ -1,0 +1,29 @@
+# Review fixes for send later (campbooks-cloud#392, PR #705): a scheduled send
+# that stops no longer goes silent. A release the binding refuses, or whose
+# destination changed, and a send whose release was lost (found by a sweep
+# every ten minutes) become failed drafts with a named reason, and each is
+# tracked as the draft_unscheduled it is. Two new reasons; the sweep is a job
+# and its dispatcher a schedule, both with Coverage.
+# Applied with
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0026-send-later.yaml`.
+changelog:
+  - date: "2026-10-28"
+    plan_version: 26
+    change: "Send later review fixes (campbooks-cloud#392): conversations.unschedule_reason gains destination_changed (the inbox no longer sends from where the request was bound) and release_lost (a scheduled send found overdue with no release job); Coverage for the sweep job and its schedule."
+    pr: "#705"
+
+enums:
+  - enum: "conversations.unschedule_reason"
+    value: "destination_changed"
+    description: "The inbox no longer sends from where the author's request was bound."
+  - enum: "conversations.unschedule_reason"
+    value: "release_lost"
+    description: "A scheduled send was long overdue with no release job; it was not sent, and may never have been."
+
+coverage:
+  - kind: "job"
+    name: "conversations.sweep_overdue_sends"
+    events: [conversations.draft_unscheduled]
+  - kind: "schedule"
+    name: "conversations.dispatch_overdue_sends"
+    exemption: "maintenance, no action of anyone: only enqueues the jobs that do the work"

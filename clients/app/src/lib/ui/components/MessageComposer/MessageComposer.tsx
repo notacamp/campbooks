@@ -30,6 +30,7 @@ import {
 
 import { composerExtensions } from "./editor";
 import { LinkForm } from "./LinkForm";
+import { SendLater } from "./SendLater";
 import { fromMarks, toMarks, type DocNode } from "./marks";
 import styles from "./MessageComposer.module.css";
 
@@ -111,6 +112,8 @@ export interface MessageComposerProps {
   /** Put the cursor in To (a new message, a forward) rather than in the text. */
   focus?: "to" | "body" | undefined;
   onSend: () => void;
+  /** Send at a chosen moment (the chevron beside Send); omit for a composer that only sends now. */
+  onSendLater?: ((at: Date) => void) | undefined;
   /** Esc: close, keeping the draft. */
   onClose: () => void;
   /** Throw the draft away. */
@@ -214,6 +217,7 @@ export function MessageComposer({
   sending = false,
   focus = "body",
   onSend,
+  onSendLater,
   onClose,
   onDiscard,
   suggest,
@@ -877,15 +881,18 @@ export function MessageComposer({
         <span className={styles["status"]} aria-live="polite">
           {status}
         </span>
-        <Button
-          variant="primary"
-          icon="send"
-          shortcut="compose.send"
-          disabled={sending}
-          onClick={onSend}
-        >
-          {t("composer.send")}
-        </Button>
+        <div className={styles["sendGroup"]}>
+          <Button
+            variant="primary"
+            icon="send"
+            shortcut="compose.send"
+            disabled={sending}
+            onClick={onSend}
+          >
+            {t("composer.send")}
+          </Button>
+          {onSendLater === undefined ? null : <SendLater onPick={onSendLater} disabled={sending} />}
+        </div>
       </footer>
     </section>
   );

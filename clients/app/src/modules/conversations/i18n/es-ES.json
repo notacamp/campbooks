@@ -22,7 +22,16 @@
     "cap": "Tus {{count}} borradores más recientes.",
     "readerTitle": "Elige un borrador",
     "readerBody": "Elige uno de la lista para seguir escribiéndolo.",
-    "errorTitle": "No se han podido cargar los borradores"
+    "errorTitle": "No se han podido cargar los borradores",
+    "scheduled": "Programados",
+    "leaves": "Sale {{time}}",
+    "cancelSendNamed": "Cancelar envío: {{title}}",
+    "editScheduled": "Este envío está programado. Cancélalo para editar el borrador.",
+    "cancelAndEdit": "Cancelar envío y editar",
+    "keepScheduled": "Mantener programado",
+    "sendCancelled": "Envío cancelado",
+    "shouldHaveLeft": "Debería haber salido {{time}}",
+    "notSent": "No enviado"
   },
   "list": {
     "label": "Conversaciones",
@@ -324,7 +333,12 @@
       "unknown": "Algo ha salido mal. Inténtalo de nuevo.",
       "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",
       "content_changed": "Esto ha cambiado desde que lo abriste. Revísalo y vuelve a enviarlo.",
-      "quote": "No se pudo leer el correo para citarlo. No se ha iniciado nada. Inténtalo de nuevo."
+      "quote": "No se pudo leer el correo para citarlo. No se ha iniciado nada. Inténtalo de nuevo.",
+      "send_at_invalid": "Esta hora no se puede usar. Elige una posterior, con hasta un año de antelación.",
+      "destination_changed": "No enviado: este buzón cambió después de programarlo. Revísalo y envíalo de nuevo.",
+      "sender_may_not_send": "No enviado: ya no puedes enviar desde este buzón.",
+      "release_lost": "No pudimos confirmar que se enviara. Mira tu carpeta de enviados antes de volver a enviarlo.",
+      "send_at_busy": "Tienes demasiados envíos programados para ese minuto. Elige otra hora."
     },
     "shortcuts": {
       "newMessage": "Mensaje nuevo"
@@ -345,7 +359,8 @@
         "upload_incomplete": "{{name}} no llegó completo. Vuelve a adjuntarlo.",
         "request_timed_out": "{{name}} tardó demasiado en subirse. Inténtalo de nuevo con una conexión más rápida o adjunta un archivo más pequeño."
       }
-    }
+    },
+    "scheduled": "Programado para el {{time}}"
   },
   "needs": {
     "line": {

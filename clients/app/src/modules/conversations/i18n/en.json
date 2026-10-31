@@ -22,7 +22,16 @@
     "cap": "Your {{count}} newest drafts.",
     "readerTitle": "Pick a draft",
     "readerBody": "Choose one from the list to keep writing it.",
-    "errorTitle": "Could not load your drafts"
+    "errorTitle": "Could not load your drafts",
+    "scheduled": "Scheduled",
+    "leaves": "Leaves {{time}}",
+    "cancelSendNamed": "Cancel send: {{title}}",
+    "editScheduled": "This send is scheduled. Cancel it to edit the draft.",
+    "cancelAndEdit": "Cancel send and edit",
+    "keepScheduled": "Keep it scheduled",
+    "sendCancelled": "Send cancelled",
+    "shouldHaveLeft": "Should have left {{time}}",
+    "notSent": "Not sent"
   },
   "list": {
     "label": "Conversations",
@@ -324,7 +333,12 @@
       "unknown": "Something went wrong. Try again.",
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
       "content_changed": "This changed since you opened it. Check it and send again.",
-      "quote": "Couldn’t read the email to quote it. Nothing was started. Try again."
+      "quote": "Couldn’t read the email to quote it. Nothing was started. Try again.",
+      "send_at_invalid": "This time can’t be used. Pick a later one, up to a year ahead.",
+      "destination_changed": "Not sent: this mailbox changed after you scheduled it. Check it and send it again.",
+      "sender_may_not_send": "Not sent: you can no longer send from this mailbox.",
+      "release_lost": "We couldn’t confirm this was sent. Check your Sent folder before sending it again.",
+      "send_at_busy": "Too many of your sends are scheduled for that minute. Pick another time."
     },
     "shortcuts": {
       "newMessage": "New message"
@@ -345,7 +359,8 @@
         "upload_incomplete": "{{name}} didn't arrive whole. Try attaching it again.",
         "request_timed_out": "{{name}} took too long to upload. Try again on a faster connection, or attach a smaller file."
       }
-    }
+    },
+    "scheduled": "Scheduled for {{time}}"
   },
   "needs": {
     "line": {

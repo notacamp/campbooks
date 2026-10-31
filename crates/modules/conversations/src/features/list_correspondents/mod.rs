@@ -2,8 +2,8 @@
 //! the caller can read exchange mail with, for suggesting them in the
 //! composer's To, Cc and Bcc as the member types (campbooks-cloud#304).
 //! Both directions: who writes to those inboxes (the sender of inbound mail)
-//! and who they wrote to (To and Cc of sent mail), and who else was on the
-//! mail they received (its To and Cc). Addresses, display names
+//! and who they wrote to (To and Cc of sent mail), and who was copied on
+//! the mail they received (its Cc). Addresses, display names
 //! and counts only: never a subject or any text. Bounded (at most ten, no
 //! cursor, `q` required), and it reads only the newest mail ([`WINDOW_DAYS`],
 //! at most [`MAX_SCANNED`] received and as many sent messages, through
@@ -104,7 +104,7 @@ struct Row {
 }
 
 /// The newest received and sent mail of the inboxes `$1` within `$4` days,
-/// at most `$5` of each; every person in it (the sender and the To and Cc of
+/// at most `$5` of each; every person in it (the sender and the Cc of
 /// received mail, the To and Cc of sent mail) whose address or names hold
 /// each word of `$2`, without the inboxes' own addresses; ranked, then
 /// those not written to are checked best first, only until `$3` pass
@@ -153,8 +153,7 @@ const CORRESPONDENTS: &str = concat!(
                r.sent_at, 'copied', r.id, NULL, lower(trim(r.address)), r.results
           FROM received r
          CROSS JOIN LATERAL jsonb_array_elements(
-               coalesce(r.recipients->'to', '[]'::jsonb)
-               || coalesce(r.recipients->'cc', '[]'::jsonb)) AS p
+               coalesce(r.recipients->'cc', '[]'::jsonb)) AS p
     ),
     people AS (
         SELECT address,
