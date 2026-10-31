@@ -11,8 +11,9 @@
 //!   `conversations.inbox_removed` tells search to forget it and the change
 //!   feed that it is gone.
 //! - **Keep**: each inbox is frozen read-only (`detached_at`): nothing syncs
-//!   into it, nothing is written or sent from it (scheduled sends go back to
-//!   drafts, which their authors may still delete), its taught rules stop
+//!   into it, nothing is written or sent from it (scheduled sends stop as
+//!   failed drafts, `not_connected`, which their authors may still delete),
+//!   its taught rules stop
 //!   acting (their runs are cancelled; the member's words, what they changed
 //!   and the dismissed suggestions are purged), its members keep reading.
 //!
@@ -224,15 +225,18 @@ async fn keep_inbox(
                 },
             )
             .await?;
-        // Nothing is sent from it: scheduled sends go back to drafts (their
-        // release jobs act only at the generation they were given).
-        sqlx::query!(
-            r#"UPDATE conversations.drafts
-                  SET state = 'draft', send_at = NULL, send_generation = send_generation + 1,
-                      version = version + 1, updated_at = now()
-                WHERE inbox_id = $1 AND state = 'scheduled'"#,
-            inbox as InboxId
+        // Nothing is sent from it: scheduled sends stop, and say why
+        // (campbooks-cloud#392: a send scheduled for later never stops
+        // silently). Their release jobs act only at the generation they were
+        // given, which this moves past.
+        sqlx::query(
+            "UPDATE conversations.drafts
+                SET state = 'failed', failure_reason = 'not_connected', send_at = NULL,
+                    send_generation = send_generation + 1, version = version + 1,
+                    updated_at = now()
+              WHERE inbox_id = $1 AND state = 'scheduled'",
         )
+        .bind(inbox)
         .execute(&mut **tx)
         .await?;
         // Its rules act no more: their runs stop, and what only served

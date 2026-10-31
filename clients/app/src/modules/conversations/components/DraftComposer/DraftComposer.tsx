@@ -18,11 +18,13 @@ import type { Translate } from "../../model";
 import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS,
+  megabytes,
   refusalOfCode,
   screen,
   type RefusalReason,
 } from "../../compose/attachment-rules";
 import { addressLine, displayName } from "../../compose/quote";
+import { KNOWN_ERRORS } from "../../compose/errors";
 import { useDraftEditor } from "../../compose/use-draft-editor";
 import { useRecipientSuggestions } from "../../compose/use-recipient-suggestions";
 
@@ -55,24 +57,6 @@ export interface DraftComposerProps {
       ) => Promise<void>)
     | undefined;
 }
-
-const KNOWN_ERRORS = new Set([
-  "not_saved",
-  "content_changed",
-  "no_recipients",
-  "invalid_address",
-  "attachments_too_large",
-  "send_at_invalid",
-  "inbox_read_only",
-  "switch_failed",
-  "draft_not_editable",
-  "not_connected",
-  "needs_reauth",
-  "rejected",
-  "too_large",
-  "unavailable",
-  "unknown_outcome",
-]);
 
 /**
  * A draft in the message composer: saved as you type, sent with an undo
@@ -108,11 +92,13 @@ export function DraftComposer({
   const sendingInboxes = useSendingInboxes(workspaceId);
   const inboxes = sendingInboxes.data ?? [];
   const current = inboxes.find((inbox) => inbox.id === editor.shown.inboxId);
-  // The most a message from this inbox may carry: its mailbox's own limit
-  // when the server gives one.
-  const budget =
-    (current as { max_attachment_bytes?: number | null } | undefined)?.max_attachment_bytes ??
-    MAX_ATTACHMENT_BYTES;
+  // What the draft's mailbox can send in one message: 25 MiB, or less for a
+  // provider that takes less (Microsoft Graph, campbooks-cloud#391). It
+  // follows the draft when From moves it to another inbox.
+  const budget = Math.min(
+    MAX_ATTACHMENT_BYTES,
+    current?.max_attachment_bytes ?? MAX_ATTACHMENT_BYTES,
+  );
 
   // Why a switch or a rewrite did not happen, said in the composer.
   const [notice, setNotice] = useState<string | undefined>();
@@ -202,7 +188,7 @@ export function DraftComposer({
   function refuse(file: File, reason: RefusalReason) {
     const said = t(`compose.attach.refused.${reason}`, {
       name: file.name,
-      max: Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024)),
+      max: reason === "attachments_too_large" ? megabytes(MAX_ATTACHMENT_BYTES) : megabytes(budget),
       files: MAX_ATTACHMENTS,
     });
     setRefusals((so) => [...so, said]);

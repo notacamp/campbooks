@@ -173,6 +173,7 @@ async fn a_calendar_grant_lists_the_calendars_and_the_stream_reads_them(db: PgPo
     assert_eq!(list["calendars"][0]["provider_id"], CALENDAR);
     assert_eq!(list["calendars"][0]["primary"], true);
     assert_eq!(list["calendars"][0]["writable"], true);
+    assert_eq!(list["calendars"][0]["owned"], true);
 
     // The first read: the whole calendar, with the sync token kept.
     let first = batches(&kit, ws).await;

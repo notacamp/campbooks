@@ -231,6 +231,58 @@ export const ThreadReplied: Story = {
   },
 };
 
+/**
+ * Scout's read of the message behind the open need failed for good: the note
+ * says so in one muted line instead of staying blank (campbooks-cloud#375).
+ */
+const Q4_NEEDING = {
+  ...Q4,
+  need: {
+    reason: "reply",
+    trust: "sure",
+    basis: "rules",
+    question: "needs_reply",
+    rule: "signals.question",
+    due_on: null,
+    overdue: false,
+    lapses_at: null,
+    urgent: false,
+    message_id: q4Body,
+    sent_at: "2026-10-13T12:00:00Z",
+  },
+} satisfies typeof Q4;
+
+const readFailed = {
+  args: {
+    path: `${PATH}/primary/${Q4.id}`,
+    api: inbox({
+      // The list, the thread and its read mark all carry the open need: the
+      // reader shows the need's note from the conversation it lists.
+      [`GET ${W}/conversations`]: {
+        body: {
+          conversations: PRIMARY.map((c) => (c.id === Q4.id ? Q4_NEEDING : c)),
+          next_cursor: null,
+        },
+      },
+      [`GET ${W}/conversations/${Q4.id}`]: {
+        body: { ...Q4_DETAIL, conversation: Q4_NEEDING, need_read_failed: true },
+      },
+      [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4_NEEDING, unread_count: 0 } },
+    }),
+  },
+} satisfies Story;
+
+export const ThreadReadFailed: Story = {
+  ...readFailed,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Scout couldn\u2019t read this one.")).toBeVisible();
+  },
+};
+
+/** The same, without a play, for recordings. */
+export const ThreadReadFailedRecording: Story = readFailed;
+
 /** A mailbox disconnected with its mail kept: history, read-only, nothing to act on. */
 export const KeptHistory: Story = {
   args: {
@@ -843,14 +895,14 @@ export const ReplyDraftAttach: Story = {
   },
 };
 
-/** Send later from the open reply: the composer closes with "Scheduled: …" and Undo. */
+/** Send later from the open reply: the composer closes with "Scheduled for …" and Undo. */
 export const ReplyDraftSendLater: Story = {
   args: { path: `${PATH}/drafts/${Q4.id}?draft=${REPLY_WRITTEN.id}`, api: replyDraftOpen() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByRole("button", { name: "Send later" }));
     await userEvent.click(await canvas.findByRole("button", { name: /Tomorrow morning/u }));
-    await expect(await within(document.body).findByText(/^Scheduled: /u)).toBeVisible();
+    await expect(await within(document.body).findByText(/^Scheduled for /u)).toBeVisible();
   },
 };
 
@@ -882,6 +934,64 @@ export const DraftsScheduled: Story = {
     await expect(await within(document.body).findByText("Send cancelled")).toBeVisible();
     await waitFor(() => expect(canvas.queryByRole("region", { name: "Scheduled" })).toBeNull());
   },
+};
+
+/** The same list without a play, for recordings: nothing cancelled yet. */
+export const DraftsScheduledIdle: Story = {
+  args: { path: `${PATH}/drafts`, api: scheduledDrafts() },
+};
+
+/**
+ * Sends that did not leave when they should (campbooks-cloud#392): one past
+ * its time stays listed to cancel, and the drafts that stopped say why.
+ */
+function stoppedDrafts(): Record<string, MockRoute> {
+  const overdue = new Date(Date.now() - 3 * 3_600_000).toISOString();
+  const list: Draft[] = [
+    {
+      ...TO_MARTA,
+      id: "0192f1a0-0000-7000-8000-0000000002a1",
+      subject: "Lease renewal",
+      state: "scheduled",
+      send_at: overdue,
+    },
+    {
+      ...REPLY_WRITTEN,
+      state: "failed",
+      failure_reason: "sender_may_not_send",
+    },
+    {
+      ...TO_MARTA,
+      id: "0192f1a0-0000-7000-8000-0000000002a2",
+      subject: "Boiler invoice",
+      state: "failed",
+      failure_reason: "release_lost",
+    },
+  ];
+  return inbox({ [`GET ${W}/drafts`]: { body: { drafts: list } } });
+}
+export const DraftsStopped: Story = {
+  args: { path: `${PATH}/drafts`, api: stoppedDrafts() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const group = await canvas.findByRole("region", { name: "Scheduled" });
+    await expect(within(group).getByText(/^Should have left /u)).toBeVisible();
+    await expect(
+      within(group).getByRole("button", { name: "Cancel send: Lease renewal" }),
+    ).toBeVisible();
+    await expect(canvas.getAllByText("Not sent")).toHaveLength(2);
+    await expect(
+      canvas.getByText("Not sent: you can no longer send from this mailbox."),
+    ).toBeVisible();
+    await expect(canvas.getByText(/We couldn’t confirm this was sent/u)).toBeVisible();
+  },
+};
+
+/** The same on a phone. */
+export const DraftsStoppedPhone: Story = {
+  ...DraftsStopped,
+  args: { path: `${PATH}/drafts`, api: stoppedDrafts() },
+  ...at("phone", 375, 812),
 };
 
 /** Scheduled sends on a phone. */

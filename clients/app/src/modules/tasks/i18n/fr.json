@@ -40,7 +40,8 @@
     "fromEmail": "De {{name}} · e-mail",
     "with": "Avec {{name}}",
     "markDone": "Marquer comme faite : {{title}}",
-    "markPaid": "Marquer comme payée : {{title}}"
+    "markPaid": "Marquer comme payée : {{title}}",
+    "repliedAsk": "Vous avez répondu · Faite ?"
   },
   "due": {
     "overdue_one": "En retard · {{count}} jour",
@@ -80,9 +81,8 @@
     "tonight": "Ce soir",
     "tomorrow": "Demain",
     "nextWeek": "La semaine prochaine",
-    "source": "D’où elle vient",
-    "foundByScout": "Scout a trouvé cela dans l’e-mail",
     "sourceLine": "{{subject}} · {{date}}",
+    "quote": "« {{quote}} »",
     "openEmail": "Ouvrir l’e-mail",
     "hand": "La confier à quelqu’un",
     "handFind": "Chercher un collègue par son nom",
@@ -95,7 +95,113 @@
     "notNeeded": "Plus nécessaire",
     "payNote": "Campbooks ne paie jamais à votre place. Cela la marque seulement comme payée.",
     "holdTime": "Réserver du temps",
-    "release": "Libérer"
+    "release": "Libérer",
+    "notYet": "Pas encore",
+    "yourReply": "Votre réponse · {{date}}",
+    "replyQuestion": {
+      "replied": "Vous avez répondu à {{name}} ({{time}}).",
+      "done": "Cette tâche est-elle faite ?"
+    },
+    "why": "Pourquoi elle est là",
+    "history": "Historique"
+  },
+  "why": {
+    "scout": "Scout l’a créée",
+    "scoutRest": "le {{date}} à {{time}}, à partir d’un e-mail qu’il a lu dans votre boîte de réception.",
+    "you": "Vous avez créé cette tâche",
+    "member": "{{name}} a créé cette tâche",
+    "madeRest": "le {{date}} à {{time}}.",
+    "handed": "{{name}} vous l’a confiée le {{date}}.",
+    "handedNoDate": "{{name}} vous l’a confiée."
+  },
+  "history": {
+    "teammate": "Un collègue",
+    "scout": "Scout",
+    "calendar": "Le calendrier",
+    "dueSuffix": ", pour le {{date}}",
+    "showAll": "Tout afficher ({{total}})",
+    "replied": "Vous avez répondu dans la conversation. Scout a demandé si c’était fait.",
+    "field": {
+      "title": "le titre",
+      "task_verb": "le type",
+      "due": "l’échéance"
+    },
+    "created": {
+      "you": "Vous l’avez créée",
+      "other": "{{who}} l’a créée",
+      "scoutFrom": "Scout l’a créée à partir de l’e-mail de {{name}}"
+    },
+    "edited": {
+      "you": "Vous avez modifié {{fields}}",
+      "other": "{{who}} a modifié {{fields}}"
+    },
+    "dueSet": {
+      "you": "Vous avez fixé l’échéance au {{date}}",
+      "other": "{{who}} a fixé l’échéance au {{date}}"
+    },
+    "dueRemoved": {
+      "you": "Vous avez retiré l’échéance",
+      "other": "{{who}} a retiré l’échéance"
+    },
+    "planned": {
+      "you": "Vous l’avez planifiée pour le {{day}}",
+      "other": "{{who}} l’a planifiée pour le {{day}}"
+    },
+    "later": {
+      "you": "Vous l’avez repoussée au {{date}}",
+      "other": "{{who}} l’a repoussée au {{date}}"
+    },
+    "unplanned": {
+      "you": "Vous l’avez retirée du plan",
+      "other": "{{who}} l’a retirée du plan"
+    },
+    "done": {
+      "you": "Vous l’avez marquée comme faite",
+      "other": "{{who}} l’a marquée comme faite"
+    },
+    "paid": {
+      "you": "Vous l’avez marquée comme payée",
+      "other": "{{who}} l’a marquée comme payée"
+    },
+    "notNeeded": {
+      "you": "Vous l’avez marquée comme inutile",
+      "other": "{{who}} l’a marquée comme inutile"
+    },
+    "reopened": {
+      "you": "Vous l’avez rouverte",
+      "other": "{{who}} l’a rouverte"
+    },
+    "handedOff": {
+      "you": "Vous l’avez confiée à {{member}}",
+      "other": "{{who}} l’a confiée à {{member}}",
+      "toYou": "{{who}} vous l’a confiée"
+    },
+    "takenBack": {
+      "you": "Vous l’avez reprise à {{member}}",
+      "other": "{{who}} l’a reprise à {{member}}",
+      "fromYou": "{{who}} vous l’a reprise"
+    },
+    "held": {
+      "you": "Vous avez réservé du temps {{when}}",
+      "other": "{{who}} a réservé du temps {{when}}",
+      "moved": "Le calendrier a déplacé le temps réservé à {{when}}"
+    },
+    "released": {
+      "you": "Vous avez libéré le temps réservé",
+      "other": "{{who}} a libéré le temps réservé"
+    },
+    "replyAnswered": {
+      "you": "Vous avez dit que ce n’est pas encore fait",
+      "other": "{{who}} a dit que ce n’est pas encore fait"
+    },
+    "replyUnanswered": {
+      "you": "Vous avez annulé « Pas encore »",
+      "other": "{{who}} a annulé « Pas encore »"
+    },
+    "changed": {
+      "you": "Vous l’avez modifiée",
+      "other": "{{who}} l’a modifiée"
+    }
   },
   "toast": {
     "done": "Faite · {{title}}",
@@ -111,7 +217,8 @@
     "failed": "Impossible de modifier {{title}}. Elle reste comme avant.",
     "changed": "{{title}} a changé entre-temps. Regardez à nouveau.",
     "held": "Réservé {{when}} · {{title}}",
-    "released": "Libéré · {{title}}"
+    "released": "Libéré · {{title}}",
+    "stillOpen": "D’accord, elle reste ouverte · {{title}}"
   },
   "make": {
     "button": "En faire une tâche",
@@ -141,5 +248,15 @@
   "holdDialog": {
     "title": "Réserver du temps",
     "description": "Un créneau occupé dans votre agenda, sur votre temps libre."
+  },
+  "ask": {
+    "replied": "Vous avez répondu",
+    "meta": "Tâche · {{kind}} · de {{name}}",
+    "line": "Vous avez répondu à l’e-mail de {{name}}. Cette tâche est-elle faite ?",
+    "whyTitle": "Pourquoi Scout demande",
+    "whyText": "Vous avez répondu dans le même fil ({{time}}), après la création de la tâche. Scout n’a pas lu votre réponse.",
+    "whyNote": "Rien ne change tant que vous n’avez pas répondu.",
+    "openThread": "Ouvrir le fil",
+    "openTask": "Ouvrir la tâche"
   }
 }

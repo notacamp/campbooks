@@ -14,6 +14,10 @@ use figment::Figment;
 use serde_json::Value;
 
 /// What the module is composed with.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "four independent switches, each read on its own"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Deps {
     /// Whether pages are on (`CAMPBOOKS_PAGES__ENABLED`, default false).
@@ -26,6 +30,12 @@ pub struct Deps {
     /// Effective only with Notion (`CAMPBOOKS_CONNECTORS__NOTION__ENABLED`),
     /// pages and tables on; the connectors module reads the same switches.
     pub databases: bool,
+    /// Whether mail and Scout work with pages
+    /// (`CAMPBOOKS_PAGES__MAIL_SCOUT__ENABLED`, default false): files saved
+    /// from a message, a page read as text, sections appended, and Scout's
+    /// reading and proposing of pages. Needs pages on too; the assistant
+    /// reads the same switch.
+    pub mail_scout: bool,
 }
 
 /// Whether tables are on, for a handler to read from the request.
@@ -37,6 +47,11 @@ pub struct TablesOn(pub bool);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DatabasesOn(pub bool);
 
+/// Whether mail and Scout work with pages (a switch of its own, effective
+/// only with pages on), for a handler to read from the request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MailScoutOn(pub bool);
+
 /// The catalogues (OpenAPI, events, scopes) and tests compose the module
 /// switched on; a server reads the setting with [`Deps::from_env`].
 impl Default for Deps {
@@ -45,13 +60,14 @@ impl Default for Deps {
             enabled: true,
             tables: true,
             databases: true,
+            mail_scout: true,
         }
     }
 }
 
 impl Deps {
-    /// Read `CAMPBOOKS_PAGES__ENABLED` and `CAMPBOOKS_PAGES__TABLES__ENABLED`
-    /// from the environment.
+    /// Read `CAMPBOOKS_PAGES__ENABLED`, `CAMPBOOKS_PAGES__TABLES__ENABLED`
+    /// and `CAMPBOOKS_PAGES__MAIL_SCOUT__ENABLED` from the environment.
     pub fn from_env() -> Self {
         Self::from_figment(&env_source())
     }
@@ -67,6 +83,7 @@ impl Deps {
                 && tables
                 && switch(figment, "connectors.notion.enabled")
                 && switch(figment, "connectors.notion.databases.enabled"),
+            mail_scout: enabled && switch(figment, "pages.mail_scout.enabled"),
         }
     }
 }
@@ -146,6 +163,38 @@ mod tests {
             json!({"notion": {"enabled": {"a": 1}, "databases": {"enabled": {"b": 2}}}}),
         ] {
             assert!(!on(stray, all.clone()).databases);
+        }
+    }
+
+    #[test]
+    fn mail_and_scout_are_off_unless_asked_for_and_need_pages() {
+        assert!(!Deps::from_figment(&Figment::new()).mail_scout);
+        assert!(!Deps::from_figment(&figment(json!({"pages": {"enabled": true}}))).mail_scout);
+        let on = Deps::from_figment(&figment(
+            json!({"pages": {"enabled": true, "mail_scout": {"enabled": "true"}}}),
+        ));
+        assert!(on.enabled && on.mail_scout);
+        // Without pages there is nothing to save mail to.
+        let alone = Deps::from_figment(&figment(json!({"pages": {"mail_scout": {"enabled": 1}}})));
+        assert!(!alone.enabled && !alone.mail_scout);
+        // It does not turn tables on.
+        assert!(!on.tables);
+    }
+
+    #[test]
+    fn stray_mail_and_scout_settings_never_stop_the_server() {
+        for stray in [
+            json!({"pages": {"enabled": true, "mail_scout": "nope"}}),
+            json!({"pages": {"enabled": true, "mail_scout": 7}}),
+            json!({"pages": {"enabled": true, "mail_scout": ["enabled"]}}),
+            json!({"pages": {"enabled": true, "mail_scout": {"enabled": ["yes"]}}}),
+            json!({"pages": {"enabled": true, "mail_scout": {"enabled": {"a": 1}}}}),
+            json!({"pages": {"enabled": true, "mail_scout": {"enabled": "maybe"}}}),
+            json!({"pages": {"enabled": true, "mail_scout": {"enabled": null}}}),
+            // Production's other settings.
+            json!({"pages": {"enabled": true}, "connectors": {"poll": {"min_seconds": 60, "max_seconds": 120}}}),
+        ] {
+            assert!(!Deps::from_figment(&figment(stray)).mail_scout);
         }
     }
 

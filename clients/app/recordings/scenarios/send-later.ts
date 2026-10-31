@@ -8,7 +8,7 @@ import { caption } from "./inbox.ts";
 //   pnpm --dir clients storybook
 //   pnpm --dir clients record send-later --base-url http://localhost:6006
 const REPLY = "/iframe.html?id=screens-inbox--reply-draft-open&viewMode=story";
-const DRAFTS = "/iframe.html?id=screens-inbox--drafts-scheduled&viewMode=story";
+const DRAFTS = "/iframe.html?id=screens-inbox--drafts-scheduled-idle&viewMode=story";
 
 /** A date a few days ahead, as a date input reads it (YYYY-MM-DD). */
 function inDays(days: number): string {
@@ -44,9 +44,9 @@ async function run(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Schedule" }).click();
 
   // The composer closes with a short toast; Undo takes the send back.
-  const toast = page.getByText(/^Scheduled: /u);
+  const toast = page.getByText(/^Scheduled for /u);
   await toast.waitFor();
-  await caption(page, "It closes with “Scheduled: …” and an Undo", 2400);
+  await caption(page, "It closes with “Scheduled for …” and an Undo", 2400);
   await page.getByRole("button", { name: /^Undo/u }).click();
   await composer.getByRole("textbox", { name: "Message" }).waitFor();
   await caption(page, "Undo cancels the send and brings the draft back", 2400);

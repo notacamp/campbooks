@@ -16,14 +16,18 @@ export default async function signatures({ page }: ScenarioContext): Promise<voi
   await box.waitFor();
   await caption(page, "Settings → Mailboxes: your own signature for each mailbox", 2400);
   // Added to, as the member would (the editor sits on its element).
-  await box.evaluate(
-    `(box) => box.editor.chain().focus().selectAll().insertContent([
+  // A script string, called here: a string handed to `locator.evaluate` is
+  // only evaluated, never called with the element.
+  await page.evaluate(`(() => {
+    const box = document.querySelector(
+      '[role="textbox"][aria-label="Your signature for ana@example.com"]');
+    box.editor.chain().focus().selectAll().insertContent([
       { type: 'text', text: 'Ana Duarte', marks: [{ type: 'bold' }] },
       { type: 'hardBreak' },
       { type: 'text', text: 'Duarte & Pessoa · ' },
       { type: 'text', text: 'duarte.example', marks: [{ type: 'link', attrs: { href: 'https://duarte.example' } }] },
-    ]).run()`,
-  );
+    ]).run();
+  })()`);
   await page.getByText(/ of 2000 characters/u).waitFor();
   await caption(page, "Bold, italic and links, up to 2000 characters", 2400);
   await page.getByRole("button", { name: "Save" }).click();

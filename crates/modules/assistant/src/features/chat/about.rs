@@ -41,6 +41,8 @@ const RULE_NOTICE: &str = "conversations.rule_notice";
 const TASK: &str = "tasks.task";
 /// An event of the member's calendar.
 const SCHEDULE_EVENT: &str = "schedule.event";
+/// A page (the pages module's), while mail and Scout work with pages.
+const PAGE: &str = "pages.page";
 
 /// Every record type a chat may be about.
 pub const REGISTRY: &[AboutType] = &[
@@ -77,12 +79,22 @@ pub const REGISTRY: &[AboutType] = &[
         id_param: "event_id",
         lost_line: "chat.about_lost_event",
     },
+    // A page of the member's, read as text: a mention in it stays a
+    // reference (campbooks-cloud#364). Only while mail and Scout work with
+    // pages.
+    AboutType {
+        record_type: PAGE,
+        reads: &["pages.read_text"],
+        id_param: "page_id",
+        lost_line: "chat.about_lost_page",
+    },
 ];
 
-/// The registry's entry for `record_type`.
-pub fn entry(record_type: &str) -> Option<&'static AboutType> {
+/// The registry's entry for `record_type`; a page only while `pages`.
+pub fn entry(record_type: &str, pages: bool) -> Option<&'static AboutType> {
     REGISTRY
         .iter()
+        .filter(|entry| pages || entry.record_type != PAGE)
         .find(|entry| entry.record_type == record_type)
 }
 
@@ -133,7 +145,7 @@ pub enum Seen {
 /// # Errors
 /// [`Unread`] when they cannot, or the read failed.
 pub async fn check(member: &Member, about: &RecordRef) -> Result<(), Unread> {
-    let entry = entry(&about.record_type).ok_or(Unread::Refused)?;
+    let entry = entry(&about.record_type, member.pages).ok_or(Unread::Refused)?;
     let first = entry.reads.first().ok_or(Unread::Broken("empty_entry"))?;
     member
         .read(first, input(entry.id_param, &about.id))
@@ -146,7 +158,7 @@ pub async fn check(member: &Member, about: &RecordRef) -> Result<(), Unread> {
 /// # Errors
 /// [`Unread::Broken`] when a read failed for another reason than access.
 pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
-    let Some(entry) = entry(&about.record_type) else {
+    let Some(entry) = entry(&about.record_type, member.pages) else {
         return Ok(Seen::Lost);
     };
     let mut answers: Vec<Value> = Vec::with_capacity(entry.reads.len());
@@ -175,6 +187,7 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
         RULE_NOTICE => project::rule_notice(first),
         TASK => project::task_detail(first),
         SCHEDULE_EVENT => project::event(first, answers.get(1)),
+        PAGE => project::page(first, MAX_ABOUT_BYTES - 2 * 1024),
         _ => return Ok(Seen::Lost),
     };
     let mut value = json!({ "type": entry.record_type, "id": about.id });

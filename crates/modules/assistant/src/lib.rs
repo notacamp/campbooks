@@ -53,6 +53,12 @@ pub struct AssistantDeps {
     /// Scout's handbook: this module's core section and the sections the
     /// server composed from the other modules.
     pub handbook: Handbook,
+    /// Whether mail and Scout work with pages
+    /// (`CAMPBOOKS_PAGES__MAIL_SCOUT__ENABLED`, off by default): Scout reads
+    /// pages (`find_pages`, `read_page`), may be asked about one and may
+    /// propose a section or a new page. Off, none of that exists. The server
+    /// reads the setting from the pages module's own.
+    pub pages: bool,
 }
 
 /// The `assistant` module, composed with `deps`, ready for the server to
@@ -65,6 +71,7 @@ pub fn module(deps: AssistantDeps) -> Module {
             .layer(axum::Extension(features::chat::Chatter::new(
                 deps.ai.clone(),
                 deps.handbook,
+                deps.pages,
             )))
             .layer(axum::Extension(features::compile::Compiler::new(deps.ai))),
         admin_router: None,

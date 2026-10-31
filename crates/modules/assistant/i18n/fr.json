@@ -21,6 +21,7 @@
     "about_lost_rule": "Je ne vois plus cette règle, j’ai donc répondu sans elle.",
     "about_lost_rule_notice": "Cette suggestion ne vous est plus proposée, j’ai donc répondu sans elle.",
     "about_lost_task": "Je ne vois plus cette tâche, j’ai donc répondu sans elle.",
-    "about_lost_event": "Je ne vois plus cet événement, j’ai donc répondu sans lui."
+    "about_lost_event": "Je ne vois plus cet événement, j’ai donc répondu sans lui.",
+    "about_lost_page": "Je ne vois plus cette page, j’ai donc répondu sans elle."
   }
 }

@@ -132,9 +132,7 @@ export function useWritableCalendars(workspaceId: string): readonly HoldCalendar
     return calendar.source === "campbooks" ? 1 : 2;
   };
   return calendars
-    .filter(
-      (calendar) => calendar.writable && (calendar.source === "campbooks" || calendar.syncing),
-    )
+    .filter((calendar) => calendar.writable && calendar.role === "mine")
     .toSorted((a, b) => rank(a) - rank(b))
     .map((calendar) => ({
       id: calendar.id,

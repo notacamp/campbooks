@@ -398,6 +398,46 @@
         "title": "Una respuesta a {{sender}}",
         "write": "Escribir el borrador",
         "done": "Borrador abierto. Lo envías tú, o no."
+      },
+      "page": {
+        "unknown": "Un cambio en una página",
+        "addTo": "Añadir a “{{title}}”",
+        "newPage": "Página nueva",
+        "newUnder": "Página nueva en “{{parent}}”",
+        "untitled": "Sin título",
+        "added": "Añadido",
+        "cannotShow": "La propuesta de Scout no dice qué añadiría ni quién la leería, así que no se puede añadir aquí. No se cambió nada.",
+        "add": "Añadir a la página",
+        "edit": "Editar antes",
+        "preview": "Volver a la vista previa",
+        "discard": "Descartar",
+        "open": "Abrir la página",
+        "readersLabel": "Quién la leerá",
+        "readers": {
+          "everyone": "Todo el espacio de trabajo",
+          "only": "Solo tú",
+          "you": "Tú",
+          "others_one": "{{count}} persona más",
+          "others_other": "{{count}} personas más",
+          "and": "y"
+        },
+        "notion": "También se envía a Notion",
+        "editLabel": "El texto que se añadirá, en Markdown",
+        "left_one": "Queda {{count}} carácter",
+        "left_other": "Quedan {{count}} caracteres",
+        "tooLong": "Esto supera los 16 KB, más de lo que cabe en una sección. Acórtalo.",
+        "showAll": "Mostrar todo",
+        "showLess": "Mostrar menos",
+        "sources": "En qué se basa",
+        "source": {
+          "thread": "Conversación",
+          "task": "Tarea",
+          "event": "Evento",
+          "page": "Página",
+          "other": "Fuente"
+        },
+        "todoDone": "Hecho",
+        "todoOpen": "Por hacer"
       }
     },
     "recent": "Recientes",
@@ -425,6 +465,13 @@
     "taskWho": "¿Quién podría encargarse?",
     "taskLine": "Tarea: {{title}}",
     "unreadableTask": "Scout no puede abrir un chat sobre esta tarea.",
-    "gone": "Este chat ya no está."
+    "gone": "Este chat ya no está.",
+    "pageLine": "Página: {{title}}",
+    "pageUntitled": "Sin título",
+    "unreadablePage": "Scout no puede abrir un chat sobre esta página.",
+    "pageIntro": "Pregúntame sobre esta página.",
+    "pageOpen": "¿Qué sigue abierto en esta página?",
+    "pageSummary": "Resumir esta página",
+    "pageNext": "¿Qué debo hacer a continuación aquí?"
   }
 }

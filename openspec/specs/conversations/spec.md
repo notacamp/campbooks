@@ -2089,15 +2089,21 @@ instruction SHALL forbid time relative to the moment it is written ("in 10
 minutes", "today", "tomorrow", "expires soon") and ask for times and
 durations as the email states them, anchored to when it was sent, because
 the read is kept and shown later. The answer SHALL be held to a strict JSON
-schema with at least 4,096 tokens allowed (the model reasons within them),
-then the summary kept as plain text on one line without control, reordering
+schema with 8,192 tokens allowed at low reasoning effort (the model reasons
+within them; chosen from a measurement, because at the default effort and
+4,096 tokens a reasoning model could spend the whole budget thinking and
+write nothing), and a call that ran out of tokens before it wrote anything
+SHALL be asked again once in the same job with twice the budget before it
+counts, then the summary kept as plain text on one line without control, reordering
 or invisible characters, at most 400 characters per language, and not at all
 when English has nothing. The call SHALL be counted against the workspace's
 daily AI limit as background work under `conversations.read_message`, one
 call per message however often its need is worked out again or it is
 opened, and a message that already has a read SHALL NOT be asked again. A
 call with no usable answer SHALL be stored as failed and tried at most once
-more later. The job SHALL skip a message whose inbox is kept read-only, that
+more later. A newer message that raises a need and is flagged SHALL be read
+on its own, with its own two calls, whatever became of an older message's
+read. The job SHALL skip a message whose inbox is kept read-only, that
 is in spam or the trash, or that has no words. Failures SHALL be logged by
 kind only. When a summary is written the module SHALL publish
 `conversations.need_summarised` (ids only); once the read is stored it SHALL
@@ -2124,6 +2130,14 @@ again.
 - **WHEN** the model answers with nothing usable
 - **THEN** the message is stored as failed, nothing is shown, a later run asks once more, and after that never
 
+#### Scenario: The model thinks for its whole budget
+- **WHEN** the model stops at its token limit without writing anything
+- **THEN** the same job asks again once with twice the budget and low effort, and that answer is the call's answer
+
+#### Scenario: A newer message after a failed read
+- **WHEN** a read failed for good and a newer flagged message raises the need
+- **THEN** the newer message is read on its own, with its own two calls
+
 #### Scenario: No role
 - **WHEN** no `complete` role may receive mail on this server
 - **THEN** no read job is queued and the conversation shows its email without a summary
@@ -2141,9 +2155,11 @@ again.
 behind the conversation's open need, in the caller's language (English when
 theirs is missing), or none when there is no open need, the need is a
 phishing warning (even with a summary written before it became one), none is
-written yet, or none can be. It SHALL be read with the same access checks as the
-conversation, so a caller who may not read the inbox gets 404 and no summary,
-and reading it SHALL never ask the model.
+written yet, or none can be. It SHALL also return `need_read_failed: true`
+when the model's read of that email failed on every call it gets (so none
+will be written), and nothing otherwise. It SHALL be read with the same access
+checks as the conversation, so a caller who may not read the inbox gets 404
+and no summary, and reading it SHALL never ask the model.
 
 #### Scenario: Each member reads their own language
 - **WHEN** a Portuguese reader and an English reader open the same item
@@ -2152,6 +2168,14 @@ and reading it SHALL never ask the model.
 #### Scenario: Not in the inbox
 - **WHEN** a member who is not in the inbox asks for the conversation
 - **THEN** the answer is 404
+
+#### Scenario: A read that failed for good
+- **WHEN** both calls for the read of the open need's message gave no usable answer
+- **THEN** `need_read_failed` is true and `need_summary` is none
+
+#### Scenario: A read with a call left
+- **WHEN** the read failed once and may be asked again
+- **THEN** `need_read_failed` is absent
 
 ### Requirement: Summaries for needs that opened before
 On upgrade every inbox SHALL be queued for the needs backfill, without any
@@ -3535,8 +3559,8 @@ Messages SHALL not be asked their other questions again.
 ### Requirement: Who the caller exchanges mail with
 `GET /api/v1/w/{workspace_id}/correspondents` (`conversations.list_correspondents`,
 `conversations:read`) SHALL list the people the inboxes the caller can read
-exchange mail with: the senders of their inbound mail, the To and Cc
-recipients of their inbound mail, and the To and Cc recipients of their sent
+exchange mail with: the senders of their inbound mail, the Cc
+recipients of their inbound mail (not its other To recipients), and the To and Cc recipients of their sent
 mail. Each person SHALL carry their address (lower-cased), the newest display
 name seen for it in any of these, `wrote` (sent messages that had them in To
 or Cc, each message once) and `received` (inbound messages from them); never
@@ -3547,7 +3571,7 @@ display name seen for them, case- and accent-insensitively, and `%`, `_` and
 `\` in it SHALL match themselves. `limit` SHALL be 1 to 10 (default 10). A
 `q` or `limit` out of range SHALL get 400 `invalid_correspondents_query`.
 There SHALL be no cursor. The answer SHALL be ordered by `wrote`, then
-`received`, then the inbound messages that had them in To or Cc (each
+`received`, then the inbound messages that had them in Cc (each
 message once), all most first, then by address. It SHALL read only the newest
 mail of those inboxes: the last 365 days, at most 5,000 inbound messages
 (not in spam or the trash) and at most 5,000 sent messages, newest first,
@@ -3563,7 +3587,7 @@ under review or holding a `suspicious` answer of `true` no member corrected.
 A person only copied on inbound mail (never written to, never wrote in) SHALL
 be listed only when they are not a no-reply address, none of their own mail
 in the window is flagged as above, and the newest inbound message that had
-them in To or Cc came from a sender who may be written to: that message not
+them in Cc came from a sender who may be written to: that message not
 failing its sender's checks nor refused by their DMARC policy, and none of
 that sender's mail in the window flagged as above. Those checks SHALL run
 person by person in ranking order, only until the answer is full, so their
@@ -3578,6 +3602,10 @@ never what the mail says.
 #### Scenario: Copied on received mail
 - **WHEN** Maya's email to Sam had Leo Park in Cc, and Sam never wrote to Leo and Leo never wrote to Sam
 - **THEN** `q=leo` lists leo@northwind-studio.example as "Leo Park" with `wrote` 0 and `received` 0
+
+#### Scenario: Someone else in To
+- **WHEN** Pia's email to Sam also had Noor Haddad in To, and Sam never wrote to Noor and Noor never wrote to Sam
+- **THEN** `q=haddad` lists nobody
 
 #### Scenario: Copied after those who wrote
 - **WHEN** one Rivera wrote to Sam once, another was copied on three emails Sam received, and a third on one
@@ -3835,8 +3863,8 @@ When a read is stored, of either layer, the module SHALL publish
 conversation and inbox ids, the inbox's personal owner (none for a shared
 inbox), the layer, the items (key, kind, start, end, all-day, time zone,
 updates or cancels), the asks (key, verb, due, whether it has an amount, same
-as) and whether a summary is ready, and no title, place, quote, amount or
-other text. The titles, places and calendar `UID`s of the items SHALL travel
+as, and `done_by` when read) and whether a summary is ready, and no title, place, quote, amount or
+other text (`done_by` is an enum). The titles, places and calendar `UID`s of the items SHALL travel
 in a `read-texts` v1 blob that the event points at (`texts`) and that the
 message holds, so they are deleted with it and are never in the event log.
 Item and ask keys SHALL be stable for the same message and position, so a
@@ -3963,6 +3991,27 @@ SHALL change nothing.
 - **WHEN** a member said Yes to the question earlier
 - **THEN** the upgrade leaves the need as it is
 
+### Requirement: The member's reply is a fact for other modules
+`conversations` SHALL publish `conversations.member_replied` v1 in the
+transaction that stores an outbound message for the first time in a conversation
+of a personal inbox, whether the member sent it from Campbooks or from the
+provider's own client: the workspace, inbox, conversation, message, the time it
+was sent and the inbox's owner. It SHALL hold no name, address, subject or text.
+It SHALL NOT be published for a shared inbox, for mail read by an inbox's first
+sync, or again when a message is stored again.
+
+#### Scenario: Sam answers from his phone
+- **WHEN** a change batch brings a message Sam sent from his mail app into his personal inbox
+- **THEN** one `member_replied` names the conversation, the message, its time and Sam, and no address
+
+#### Scenario: A shared inbox
+- **WHEN** a message sent from an inbox several members read is stored
+- **THEN** no `member_replied` is published
+
+#### Scenario: The batch again
+- **WHEN** the same batch is applied again
+- **THEN** no second `member_replied` is published
+
 ### Requirement: The marks a message may carry
 A draft's text SHALL be plain text with marks, and only the server SHALL
 turn it into HTML, escaping every character first. The marks SHALL be
@@ -4033,6 +4082,25 @@ the escapes, and keep the other marks as typed.
 - **WHEN** the body is `2 \* 3`
 - **THEN** the plain-text part reads `2 * 3`
 
+### Requirement: How an ask gets done
+Each ask of the read SHALL carry `done_by`, required by the strict schema: `reply` when replying to the message is itself how the obligation is done (giving an answer, an approval, comments, a confirmation, a choice, information asked for), `elsewhere` when it is done some other way (paying, signing or sending a document or a form, filing, booking, going somewhere, doing work). The instruction SHALL say it in one sentence with contrasting examples. It SHALL be part of the same single call. Code SHALL only veto: a value outside the set SHALL be kept as none, and an ask with verb `pay` SHALL be `elsewhere`. The read SHALL store it with the ask and `conversations.get_message_read` SHALL return it; a read made before it was asked has none.
+
+#### Scenario: Confirm a day
+- **WHEN** the email asks "can you confirm Thursday works?"
+- **THEN** the ask's `done_by` is `reply`
+
+#### Scenario: Sign and send
+- **WHEN** the email asks to sign and return a contract
+- **THEN** the ask's `done_by` is `elsewhere`
+
+#### Scenario: A bill
+- **WHEN** the model calls a `pay` ask `reply`
+- **THEN** it is kept as `elsewhere`
+
+#### Scenario: The sender's sentence stays under the conversation's access
+- **WHEN** a member who may not read the inbox asks for the read of a message
+- **THEN** the answer is 404 and carries no sentence of the sender's, and `message_read` never does
+
 ### Requirement: Attaching a file to a draft
 The draft's author SHALL be able to add a file to it with
 `conversations.upload_draft_attachment`. The request SHALL carry the raw
@@ -4064,6 +4132,25 @@ past 20 files. A draft that is scheduled or sending SHALL answer 409
 - **WHEN** a draft holds 24 MiB of attachments and a 2 MiB file is uploaded
 - **THEN** the response is 413 `attachments_too_large` and the draft still holds 24 MiB
 
+### Requirement: What a mailbox can carry
+An upload SHALL also be refused with 413 `attachments_too_large_for_mailbox`
+when the draft's attachments would pass what its mailbox's provider can send
+in one message, when that is less than 25 MiB (a Microsoft mailbox: about
+2 MB, as Graph takes at most 4 MB of base64 holding a MIME message), and
+`conversations.list_inboxes` SHALL say each inbox's limit as
+`max_attachment_bytes`. An upload SHALL have the longest a request may run
+(100 s) for its bytes to arrive, its body SHALL be read only after that, and
+a body past 25 MiB SHALL be refused as the `attachments_too_large` problem.
+A caller with no signed-in member SHALL find no draft to upload to (404).
+
+#### Scenario: A Microsoft mailbox
+- **WHEN** Sam uploads a 2.2 MB file to a draft from a Microsoft mailbox
+- **THEN** the response is 413 `attachments_too_large_for_mailbox`, its detail names about 2.1 MB, and the inbox lists `max_attachment_bytes` near 2.1 MB
+
+#### Scenario: No member behind the token
+- **WHEN** a client token with no user uploads to a draft
+- **THEN** the response is 404 and nothing is stored
+
 ### Requirement: Blocked file types and clean names
 An upload whose cleaned file name ends in an extension that mail providers
 block (such as `.exe`, `.js`, `.bat` or `.scr`, case-insensitive) SHALL be
@@ -4089,3 +4176,114 @@ the draft.
 #### Scenario: Remove after attaching
 - **WHEN** Sam attaches a file, then saves the draft without it
 - **THEN** the draft lists no attachments, and the blob is no longer held by the draft
+
+### Requirement: Sending at a chosen time
+`conversations.send_draft` SHALL take an optional `send_at`. When given, it
+SHALL be at least a minute after the undo window ends and at most 366 days
+ahead. Otherwise the request SHALL answer 400 `send_at_invalid` and leave the
+draft unchanged. A valid `send_at` SHALL schedule the draft to leave then,
+and it SHALL be cancellable until then with `conversations.cancel_send`,
+which makes it an editable draft again. Without `send_at`, a send SHALL wait
+only for the undo window.
+
+#### Scenario: Tomorrow morning
+- **WHEN** Sam sends a draft with `send_at` tomorrow at 08:00
+- **THEN** the draft is scheduled with that `send_at`, and nothing is sent before then
+
+#### Scenario: In the past
+- **WHEN** Sam sends a draft with a `send_at` an hour ago
+- **THEN** the response is 400 `send_at_invalid` and the draft is still a draft
+
+#### Scenario: Taken back the evening before
+- **WHEN** Sam cancels a send scheduled for tomorrow
+- **THEN** it is a draft again, and nothing is ever sent for that schedule
+
+### Requirement: A scheduled send that stops says why
+When a scheduled send is due and cannot be released, nothing SHALL be sent and the draft SHALL become `failed` with a reason: `destination_changed` when its inbox no longer sends from where the request was bound, `sender_may_not_send` when the author lost the workspace or the right to send from the inbox. Only the generation the release was queued for SHALL change. Drafts SHALL keep it listed.
+
+#### Scenario: Removed before it was due
+- **WHEN** Sam's send is scheduled for tomorrow and Sam is made a reader of the inbox before then
+- **THEN** nothing is sent, and the draft is failed with `sender_may_not_send` and still listed
+
+#### Scenario: The mailbox changed
+- **WHEN** the inbox's mail goes out from another mailbox by the time a send is due
+- **THEN** nothing is sent and the draft is failed with `destination_changed`
+
+#### Scenario: The mailbox is disconnected first
+- **WHEN** Sam has a send scheduled for tomorrow and its mailbox is disconnected, keeping its mail
+- **THEN** the draft is failed with `not_connected`, and nothing is sent
+
+### Requirement: Overdue scheduled sends are settled
+A sweep every ten minutes SHALL mark `failed` with `release_lost` each draft still scheduled fifteen minutes past its time with no unfinished release job for its generation. It SHALL NOT queue the release again, because that job may already have sent. A draft whose release job is queued, or that is not yet late, SHALL be left alone.
+
+#### Scenario: The job was lost
+- **WHEN** a scheduled draft is an hour overdue and its release job is gone
+- **THEN** it becomes failed with `release_lost`, and no send is queued
+
+#### Scenario: The workers are behind
+- **WHEN** a scheduled draft is an hour overdue and its release job is still queued
+- **THEN** the sweep leaves it for the job
+
+### Requirement: Limit on sends for one minute
+A send with a chosen `send_at` SHALL be refused with 429 `send_at_busy` when the author already has as many sends scheduled for the same minute as the Send rate allows in a minute (its count over its window, at least one), counted for the author in the workspace. Other minutes and other authors SHALL be unaffected.
+
+#### Scenario: A fourth at the same minute
+- **WHEN** Sam has three sends scheduled for Tuesday 08:00 and schedules a fourth for it
+- **THEN** the response is 429 `send_at_busy` and the fourth is still a draft
+
+### Requirement: A member's signature per inbox
+A member SHALL be able to read and set their own signature for an inbox
+they may send from, with `conversations.get_signature` and
+`conversations.set_signature`. A signature SHALL be text with the marks a
+message may carry, at most 2,000 characters; longer text SHALL answer 400
+`signature_too_long`. A member SHALL never see or change another member's
+signature. A `reader` of the inbox SHALL get 403 `inbox_read_only`, and the
+assistant SHALL NOT be able to call either operation.
+
+#### Scenario: Set and read
+- **WHEN** Sam sets the signature "Sam Rivers · Rivers Lettings" for the office inbox and reads it back
+- **THEN** it reads "Sam Rivers · Rivers Lettings"
+
+#### Scenario: A shared inbox
+- **WHEN** Sam and Ana both send from office@ and Ana sets her signature
+- **THEN** Sam's signature for office@ is unchanged
+
+### Requirement: Drafts carry the signature they show
+A new draft SHALL take its author's signature for its inbox when it is
+created. A save SHALL be able to leave the signature off, or add the
+author's current one back. Editing a signature SHALL NOT change drafts
+already started. On send, the signature SHALL follow the member's text: in
+the plain-text part after a `-- ` line, and in the HTML part in its own
+block before the quoted history.
+
+#### Scenario: A reply signed
+- **WHEN** Sam, whose signature for the inbox is "Sam Rivers", starts a reply and sends it
+- **THEN** the plain-text part reads Sam's text, then `-- ` and "Sam Rivers" on its own lines, then the quoted history
+
+#### Scenario: Left off
+- **WHEN** Sam leaves the signature off a reply and sends it
+- **THEN** the message carries no signature
+
+#### Scenario: Edited meanwhile
+- **WHEN** Sam starts a reply, then changes their signature in Settings, then sends the reply
+- **THEN** the reply carries the signature it showed when it was started
+
+### Requirement: Moving a draft to another inbox
+A draft save SHALL be able to name another `inbox_id`. The target SHALL be
+an inbox in the same workspace where the author is a `sender` or `manager`
+and that is not read-only. A `reader` SHALL get 403 `inbox_read_only`, and
+any other inbox SHALL answer 404. The draft SHALL then be sent from that
+inbox's address. A reply SHALL keep its `In-Reply-To` and `References`, and
+drop the first mailbox's thread key.
+
+#### Scenario: Reply from the other mailbox
+- **WHEN** Sam moves a reply draft from personal@ to office@, where Sam is a sender, and sends it
+- **THEN** it leaves from office@ with the original `In-Reply-To` and `References`
+
+#### Scenario: An inbox Sam only reads
+- **WHEN** Sam moves a draft to an inbox where Sam is a reader
+- **THEN** the response is 403 `inbox_read_only` and the draft is unchanged
+
+#### Scenario: Too much for the new mailbox
+- **WHEN** a draft with 20 MB of attachments is moved to an inbox whose mailbox carries about 2.1 MB
+- **THEN** the response is 413 `attachments_too_large_for_mailbox` naming the limit, and the draft stays where it was

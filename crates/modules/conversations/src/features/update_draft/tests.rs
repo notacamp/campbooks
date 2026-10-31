@@ -319,3 +319,118 @@ async fn the_assistant_may_choose_from_and_it_sends_nothing(db: PgPool) {
             .is_empty()
     );
 }
+
+/// Where inboxes send from in these tests: the ones named carry at most the
+/// bytes given (as Microsoft Graph does), the others what any mailbox does.
+#[derive(Debug)]
+struct Carries(std::collections::HashMap<sqlx::types::Uuid, u64>);
+
+impl campbooks_kernel::outbound::OutboundDestinations for Carries {
+    fn destination<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        inbox: sqlx::types::Uuid,
+    ) -> campbooks_kernel::outbound::DestinationFuture<'a> {
+        let max = self.0.get(&inbox).copied();
+        Box::pin(async move {
+            Ok(Some(campbooks_kernel::outbound::Resolved {
+                destination: campbooks_kernel::outbound::Destination {
+                    connection: sqlx::types::Uuid::nil(),
+                    stream: sqlx::types::Uuid::nil(),
+                    mailbox: "inbox".into(),
+                },
+                as_at_deploy: true,
+                max_attachment_bytes: max,
+            }))
+        })
+    }
+}
+
+/// Attach `size` bytes to the draft at `uri` as `shown` showed it.
+async fn attach(w: &World, uri: &str, shown: &Value, name: &str, size: usize) -> Value {
+    let up = w
+        .kit
+        .upload(
+            &w.sam,
+            &format!(
+                "{uri}/attachments?version={}&filename={name}",
+                shown["version"]
+            ),
+            "application/octet-stream",
+            vec![7; size],
+            &[(
+                "x-content-token",
+                shown["content_token"].as_str().unwrap_or_default(),
+            )],
+        )
+        .await;
+    assert_eq!(up.status, StatusCode::CREATED, "{:?}", up.json);
+    up.json
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_draft_with_more_than_the_new_mailbox_carries_does_not_move(db: PgPool) {
+    let mut w = world(db).await;
+    // office@ is a mailbox that carries about 2.1 MB; the others carry 25 MiB.
+    let carries = std::collections::HashMap::from([(*w.office.as_uuid(), 2_100_000_u64)]);
+    w.kit = w
+        .kit
+        .with_destinations(std::sync::Arc::new(Carries(carries)));
+    let (uri, shown) = w.reply().await;
+    // 20 MB of attachments, fine where it is.
+    let mut now = shown;
+    for n in 0..4 {
+        now = attach(&w, &uri, &now, &format!("part{n}.bin"), 5_000_000).await;
+    }
+    assert_eq!(now["attachments"].as_array().unwrap().len(), 4);
+
+    let refused = w.move_to(&uri, &now, w.office).await;
+    assert_eq!(
+        refused.status,
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "{:?}",
+        refused.json
+    );
+    assert_eq!(refused.json["code"], "attachments_too_large_for_mailbox");
+    assert!(
+        refused.json["detail"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("2.1 MB"),
+        "{:?}",
+        refused.json
+    );
+    // Unchanged: still in its inbox, still at its version, still all four files.
+    let read = w.kit.get(&w.sam, &uri).await.json;
+    assert_eq!(read["inbox_id"], w.personal.to_string());
+    assert_eq!(read["version"], now["version"]);
+    assert_eq!(read["attachments"].as_array().unwrap().len(), 4);
+
+    // Dropping them in the same save lets it move; so does a mailbox that
+    // carries the 20 MB (another inbox of Sam's).
+    let keep_none = w
+        .kit
+        .patch(
+            &w.sam,
+            &uri,
+            json!({"version": now["version"], "content_token": now["content_token"],
+                "inbox_id": w.office, "attachments": []}),
+        )
+        .await;
+    assert_eq!(keep_none.status, StatusCode::OK, "{:?}", keep_none.json);
+    assert_eq!(keep_none.json["inbox_id"], w.office.to_string());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_small_draft_moves_to_a_mailbox_that_carries_less(db: PgPool) {
+    let mut w = world(db).await;
+    let carries = std::collections::HashMap::from([(*w.office.as_uuid(), 2_100_000_u64)]);
+    w.kit = w
+        .kit
+        .with_destinations(std::sync::Arc::new(Carries(carries)));
+    let (uri, shown) = w.reply().await;
+    let now = attach(&w, &uri, &shown, "plans.bin", 1_000_000).await;
+    let moved = w.move_to(&uri, &now, w.office).await;
+    assert_eq!(moved.status, StatusCode::OK, "{:?}", moved.json);
+    assert_eq!(moved.json["attachments"].as_array().unwrap().len(), 1);
+}

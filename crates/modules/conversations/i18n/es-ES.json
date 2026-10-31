@@ -19,6 +19,8 @@
     "no_recipients": "Añade al menos un destinatario.",
     "invalid_address": "Esta dirección no es válida: {{address}}",
     "attachments_too_large": "Los archivos adjuntos pueden sumar como máximo {{max}} MB.",
+    "attachments_too_large_for_mailbox": "Este buzón solo puede enviar hasta {{max}} MB de adjuntos en un mensaje.",
+    "upload_incomplete": "El archivo no llegó completo. Vuelve a adjuntarlo.",
     "file_empty": "El archivo no tiene contenido.",
     "filename_missing": "El archivo necesita un nombre.",
     "attachment_blocked": "No se puede adjuntar {{name}}: los proveedores de correo bloquean este tipo de archivo.",
@@ -51,6 +53,7 @@
     "person_notes_full": "Ya tienes {{max}} notas sobre personas. Quita una para añadir otra.",
     "person_notes_need_member": "Solo un miembro de este espacio de trabajo guarda notas sobre personas.",
     "signature_needs_member": "Debes ser miembro para guardar una firma.",
-    "signature_too_long": "Una firma puede tener {{max}} caracteres como máximo."
+    "signature_too_long": "Una firma puede tener {{max}} caracteres como máximo.",
+    "send_at_busy": "Tienes demasiados envíos programados para ese minuto (el máximo es {{max}}). Elige otra hora."
   }
 }

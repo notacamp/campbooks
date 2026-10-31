@@ -5,10 +5,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   BLOCKED_EXTENSIONS,
-  MAX_ATTACHMENT_BYTES,
-  MAX_ATTACHMENTS,
   extensionOf,
   isBlocked,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS,
+  megabytes,
   refusalOfCode,
   screen,
 } from "./attachment-rules";
@@ -76,5 +77,34 @@ describe("screen", () => {
   it("knows the server's refusals", () => {
     expect(refusalOfCode("filename_missing")).toBe("filename_missing");
     expect(refusalOfCode("content_changed")).toBeUndefined();
+  });
+});
+
+describe("a mailbox that carries less (campbooks-cloud#391)", () => {
+  const file = (name: string, size: number) => new File([new Uint8Array(size)], name);
+
+  it("refuses past the mailbox's budget, naming it as the mailbox's limit", () => {
+    const { accepted, refused } = screen(
+      [file("small.pdf", 1_000_000), file("plans.pdf", 1_500_000)],
+      { bytes: 0, count: 0 },
+      2_100_000,
+    );
+    expect(accepted.map((f) => f.name)).toEqual(["small.pdf"]);
+    expect(refused).toEqual([
+      { file: expect.any(File) as File, reason: "attachments_too_large_for_mailbox" },
+    ]);
+  });
+
+  it("says the limit as the server does", () => {
+    expect(megabytes(2_144_416)).toBe("2.1");
+    expect(megabytes(25 * 1024 * 1024)).toBe("25");
+  });
+
+  it("knows a slow upload and a cut-short one as refusals", () => {
+    expect(refusalOfCode("request_timed_out")).toBe("request_timed_out");
+    expect(refusalOfCode("upload_incomplete")).toBe("upload_incomplete");
+    expect(refusalOfCode("attachments_too_large_for_mailbox")).toBe(
+      "attachments_too_large_for_mailbox",
+    );
   });
 });

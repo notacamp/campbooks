@@ -153,6 +153,18 @@ impl Kit {
         self
     }
 
+    /// The same kit, resolving where inboxes send from through
+    /// `destinations` (campbooks-cloud#391: what a mailbox can carry).
+    #[must_use]
+    pub fn with_destinations(
+        mut self,
+        destinations: campbooks_kernel::outbound::DestinationsPort,
+    ) -> Self {
+        self.state = self.state.with_destinations(destinations);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
     /// The same kit, reading the tasks open for an email through
     /// `open_tasks` (campbooks-cloud#42).
     #[must_use]

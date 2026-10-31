@@ -80,6 +80,16 @@ pub struct ListedCalendar {
     pub primary: bool,
     /// Whether events may be written on it.
     pub writable: bool,
+    /// Whether the account owns it, when the provider says.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owned: Option<bool>,
+}
+
+/// Whether the account owns a calendar, from the provider's word for the
+/// account's role on it: `owner` is owned, any other value is not, and no
+/// value is unknown.
+pub fn owned_by(role: Option<&str>) -> Option<bool> {
+    role.map(|role| role == "owner")
 }
 
 /// When an event starts or ends: a date (all-day), or a time with an offset

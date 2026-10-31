@@ -987,6 +987,16 @@ question.
 - **WHEN** the user opens the conversation of João's message to Ana Costa, copying them
 - **THEN** the note reads "João Pereira wrote to Ana Costa. You're in Cc." with "Scout isn't sure" and the actions Nudge Ana…, Reply to João… and Nothing for me
 
+### Requirement: The note asks whether a task from the thread is done
+When an open task of the member that came from the conversation asks Done? and no
+need is open, the "where things stand" note SHALL add "Your task “<title>” is
+still open." and ask "Is it done?" with Done (1) and Not yet (2). While it asks,
+it takes the place of a stream suggestion's choice.
+
+#### Scenario: Ana opens the thread she replied in
+- **WHEN** Ana opens the conversation "Send the signed lease" came from
+- **THEN** the note says the task is still open and offers Done and Not yet
+
 ### Requirement: Room to write
 The message composer (Reply, Reply all, Forward, New message, and a draft
 reopened from Drafts) SHALL set From, To, Cc, Bcc and the subject at the
@@ -1092,3 +1102,133 @@ be said the same way.
 #### Scenario: A blocked type
 - **WHEN** the user drops `setup.exe`
 - **THEN** the composer says that file type can't be sent by email, and it is not attached
+
+### Requirement: The note says when Scout could not read the message
+When `conversations.get` says `need_read_failed`, the reader's note for an open
+need SHALL show one muted line, "Scout couldn't read this one.", under the
+need's sentence, in the user's language (English, European Portuguese,
+Spanish from Spain and French). It SHALL show nothing for a read that is
+pending, finished, or has a call left.
+
+#### Scenario: A read that failed for good
+- **WHEN** the user opens a conversation with an open need whose read failed on every call
+- **THEN** the note shows the need's sentence and, under it, "Scout couldn't read this one."
+
+#### Scenario: A read that did not fail
+- **WHEN** the user opens a conversation with an open need whose read is done or pending
+- **THEN** the note shows no such line
+
+### Requirement: Send later from the composer
+The composer's Send SHALL have a menu with "Tomorrow morning" (tomorrow at
+08:00), "Next working day" (08:00 on the next day that falls Monday to Friday) and
+"Pick a time…". Each SHALL show the time it resolves to, in the device's
+time zone. Choosing one SHALL schedule the draft, close the composer and
+show "Scheduled for <time>" with Undo, which cancels the send. ⌘↵ SHALL
+still send now.
+
+#### Scenario: On a Friday
+- **WHEN** the user opens Send's menu on a Friday
+- **THEN** "Next working day" reads Monday at 08:00
+
+#### Scenario: Undo a schedule
+- **WHEN** the user schedules a reply for tomorrow and presses Undo in the toast
+- **THEN** the send is cancelled and the composer shows the draft again
+
+### Requirement: Scheduled mail in Drafts
+Drafts SHALL list sends scheduled more than two minutes ahead in a
+"Scheduled" group above the drafts, soonest first. Each row SHALL say when it
+leaves and offer "Cancel send", which makes it a draft again. Opening a
+scheduled row SHALL offer "Cancel send and edit", which cancels the send and
+opens the draft in the composer.
+
+#### Scenario: A scheduled reply
+- **WHEN** the user has a reply scheduled for Tuesday at 08:00 and opens Drafts
+- **THEN** it shows under Scheduled with "Leaves Tue 29 Oct, 08:00" and Cancel send
+
+#### Scenario: Cancel from the list
+- **WHEN** the user presses Cancel send on a scheduled row
+- **THEN** it moves to the drafts with "Send cancelled", and nothing is sent
+
+### Requirement: Sends that did not leave
+Drafts SHALL list a scheduled send more than two minutes past its time in the "Scheduled" group as "Should have left <time>", with Cancel send. A draft that stopped SHALL show "Not sent" and its reason in words on its row, and in the composer when opened. The reasons SHALL include that the author can no longer send from the mailbox, that the mailbox changed, and that the send could not be confirmed.
+
+#### Scenario: Past its time
+- **WHEN** a send scheduled for 08:00 is still scheduled at 08:10
+- **THEN** it shows under Scheduled as "Should have left" with Cancel send
+
+#### Scenario: Could not be confirmed
+- **WHEN** a draft failed with `release_lost`
+- **THEN** its row says "We couldn't confirm this was sent. Check your Sent folder before sending it again."
+
+### Requirement: Save a thread to a page
+With pages enabled, the reader SHALL offer "Save to page" in its More menu
+and through a shortcut. It opens a dialog to pick an existing page (filtered
+by name, pages already linking the thread first) or a new private page, and
+what to add: a live thread block, a copy of the messages (saying who reads
+the page, from its effective readers, and whether it is sent to Notion), or
+Scout's summary (shown as Scout's card before anything is added; hidden when
+Scout is unavailable). Attachments can be
+included. Every save SHALL show an Undo toast.
+
+#### Scenario: A live block in an existing page
+- **WHEN** Ana saves "Kickoff agenda" to "Client onboarding" as a live thread block
+- **THEN** the page ends with the thread block and a toast offers "Open page" and "Undo"
+
+#### Scenario: Scout not configured
+- **WHEN** the `complete` role is not configured and Ana opens "Save to page"
+- **THEN** the dialog offers the live block and the copy, but not Scout's summary
+
+#### Scenario: A copy to a shared page says who will read it
+- **WHEN** Ana chooses a copy of the messages for "Acme", which Rui reads through a grant on the page above it
+- **THEN** the dialog says Rui will read it before Ana saves
+
+#### Scenario: Off while the server does not offer it
+- **WHEN** mail and Scout in pages is off on the server
+- **THEN** the reader has no "Save to page" entry and its shortcut does nothing
+
+#### Scenario: An attachment over the cap
+- **WHEN** Ana includes attachments and one is over 20 MiB
+- **THEN** the dialog says which file is too large and nothing is added
+
+### Requirement: The signature in the composer
+The composer SHALL show the draft's signature under the text, muted and not
+editable there, with "Leave off" and "Edit in Settings". When it is left
+off and the member has a signature, it SHALL offer "Add signature". With no
+signature for that mailbox, it SHALL offer "Add a signature in Settings".
+
+#### Scenario: Leave it off
+- **WHEN** the user presses "Leave off" under the signature
+- **THEN** the signature disappears, "Add signature" shows instead, and the sent message carries none
+
+#### Scenario: No signature yet
+- **WHEN** the user has no signature for the mailbox and opens a reply
+- **THEN** the composer shows "Add a signature in Settings" under the text
+
+### Requirement: From, mode and subject in the composer
+When the member may send from more than one inbox, the composer SHALL show
+From as a picker of those inboxes, for every kind of draft. The composer's
+title SHALL switch between Reply, Reply all and Forward, keeping the text.
+The subject SHALL be shown and editable for every kind.
+
+#### Scenario: Switch to Reply all
+- **WHEN** the user has written two lines in a reply and switches the title to Reply all
+- **THEN** the composer shows the reply-all recipients and the same two lines
+
+#### Scenario: One inbox
+- **WHEN** the member sends from one inbox only
+- **THEN** From shows that inbox's address, with no picker
+
+### Requirement: Scout in the composer
+On a reply, reply-all or nudge draft, and while Scout can write replies,
+the composer SHALL offer Scout ▾ (⌘J) with Shorter, Warmer, Fix spelling and
+Change…. Each SHALL rewrite the text in place, show Scout's thinking while
+it works, and offer Undo. Scout's text SHALL go in as plain text, with no
+formatting and no link whose words hide where it goes.
+
+#### Scenario: Shorter
+- **WHEN** the user picks Scout ▾ → Shorter on a reply
+- **THEN** the text is replaced by Scout's shorter version, and Undo puts the previous text back
+
+#### Scenario: Scout writes a worded link
+- **WHEN** Scout's rewrite contains `[pay here](https://example.net)`
+- **THEN** the composer shows those characters as text, with no link

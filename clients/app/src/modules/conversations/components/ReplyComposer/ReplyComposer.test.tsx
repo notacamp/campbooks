@@ -119,6 +119,20 @@ describe("ReplyComposer", () => {
     expect(await screen.findByRole("textbox", { name: "Message" })).toBeVisible();
   });
 
+  it("says in words why a scheduled send stopped, when its draft is opened", async () => {
+    mockApi({
+      [`GET ${D}`]: {
+        body: { drafts: [{ ...REPLY, state: "failed", failure_reason: "release_lost" }] },
+      },
+    });
+    renderWithProviders(slot(null));
+    expect(
+      await screen.findByText(
+        "We couldn’t confirm this was sent. Check your Sent folder before sending it again.",
+      ),
+    ).toBeVisible();
+  });
+
   it("explains a refused send and discards on request", async () => {
     const api = mockApi({
       [`GET ${D}`]: { body: { drafts: [REPLY] } },

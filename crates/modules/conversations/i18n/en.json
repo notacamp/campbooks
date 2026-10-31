@@ -19,6 +19,8 @@
     "no_recipients": "Add at least one recipient.",
     "invalid_address": "This address is not valid: {{address}}",
     "attachments_too_large": "Attachments can add up to {{max}} MB at most.",
+    "attachments_too_large_for_mailbox": "This mailbox can send at most {{max}} MB of attachments in one message.",
+    "upload_incomplete": "The file didn't arrive whole. Try attaching it again.",
     "file_empty": "The file has no content.",
     "filename_missing": "The file needs a name.",
     "attachment_blocked": "{{name}} can't be attached: mail providers block this kind of file.",
@@ -51,6 +53,7 @@
     "person_notes_full": "You keep {{max}} notes about people already. Remove one to add another.",
     "person_notes_need_member": "Only a member of this workspace keeps notes about people.",
     "signature_needs_member": "You need to be a member to keep a signature.",
-    "signature_too_long": "A signature can have {{max}} characters at most."
+    "signature_too_long": "A signature can have {{max}} characters at most.",
+    "send_at_busy": "Too many of your sends are scheduled for that minute (the most is {{max}}). Pick another time."
   }
 }

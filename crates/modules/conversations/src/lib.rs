@@ -75,8 +75,8 @@ pub use domain::{
     policy::{Policy, Switch},
 };
 pub use features::{
-    inbox_visibility::visibility, kept_mail::kept_mail, outbound_requests::outbound_requests,
-    search_source::search_source,
+    attachment_blobs::attachment_blobs, inbox_visibility::visibility, kept_mail::kept_mail,
+    outbound_requests::outbound_requests, search_source::search_source,
 };
 /// The owner's money mail as an eval set to label (campbooks-cloud#167).
 pub mod labelling {
@@ -218,6 +218,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
         background: Background::new()
             .publishes::<events::MessageReceived>()
             .publishes::<events::MessageSent>()
+            .publishes::<events::MemberReplied>()
             .publishes::<events::ConversationChanged>()
             .publishes::<events::ChangesRequested>()
             .publishes::<events::SendRequested>()
@@ -250,6 +251,10 @@ pub fn module(deps: ConversationsDeps) -> Module {
             ))
             .handler(features::wake_needs::WakeNeeds::new(needs.clone()))
             .schedule::<features::wake_needs::DispatchNeedClocks>(features::wake_needs::EVERY)
+            .handler(features::sweep_overdue_sends::SweepOverdueSends)
+            .schedule::<features::sweep_overdue_sends::DispatchOverdueSends>(
+                features::sweep_overdue_sends::EVERY,
+            )
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -447,6 +452,8 @@ mod tests {
             "conversations.retag_bindings",
             "conversations.wake_needs",
             "conversations.dispatch_need_clocks",
+            "conversations.sweep_overdue_sends",
+            "conversations.dispatch_overdue_sends",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
@@ -454,6 +461,7 @@ mod tests {
         assert!(schedules.contains(&"conversations.dispatch_needs_backfills"));
         assert!(schedules.contains(&"conversations.dispatch_rule_resigns"));
         assert!(schedules.contains(&"conversations.dispatch_need_clocks"));
+        assert!(schedules.contains(&"conversations.dispatch_overdue_sends"));
     }
 
     // A runtime query rather than `query!`, so this test needs no entry in

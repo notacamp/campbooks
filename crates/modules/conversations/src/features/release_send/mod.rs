@@ -215,6 +215,19 @@ async fn releasable(
             "a scheduled send is not bound to its author's request, or not to where its inbox \
              sends from now; it is not released"
         );
+        // Not silent: it stops as a failed draft that says why (a newer
+        // generation is never touched).
+        stop_scheduled(
+            state,
+            read,
+            workspace,
+            payload,
+            (
+                "destination_changed",
+                tracking::UnscheduleReason::DestinationChanged,
+            ),
+        )
+        .await?;
         return Ok(None);
     }
     if !still_may_send(state, read, workspace, author, payload).await? {
@@ -229,8 +242,8 @@ type Released = (drafts::DraftRow, Option<UserId>, Option<Resolved>);
 
 /// Whether the author may still send the draft: still a member of the
 /// workspace (held until `tx` ends) and allowed to send it (they may have
-/// lost the inbox, or it was kept read-only). When not, it goes back to a
-/// draft.
+/// lost the inbox, or it was kept read-only). When not, it stops as a failed
+/// draft that says why.
 async fn still_may_send(
     state: &campbooks_kernel::AppState,
     tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
@@ -241,28 +254,55 @@ async fn still_may_send(
     if author_may_send(state, tx, workspace, author, payload.draft).await? {
         return Ok(true);
     }
-    let unscheduled = sqlx::query!(
-        r#"UPDATE conversations.drafts
-              SET state = 'draft', send_at = NULL, updated_at = now()
-            WHERE id = $1 AND state = 'scheduled' AND send_generation = $2"#,
-        payload.draft as DraftId,
-        payload.generation,
+    stop_scheduled(
+        state,
+        tx,
+        workspace,
+        payload,
+        (
+            "sender_may_not_send",
+            tracking::UnscheduleReason::SenderMayNotSend,
+        ),
     )
+    .await?;
+    tracing::info!(draft = %payload.draft, "scheduled send not released: the author may no longer send it");
+    Ok(false)
+}
+
+/// Stop a scheduled send that will not be released: the draft becomes
+/// `failed` with `reason` (the client says it in words) and no time, and the
+/// stop is tracked. Only the generation the job was enqueued for is touched,
+/// and only while it is still scheduled, so a cancel or a newer send wins.
+/// Nothing is sent. Also what the sweep of lost releases does.
+pub(crate) async fn stop_scheduled(
+    state: &campbooks_kernel::AppState,
+    tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    workspace: WorkspaceId,
+    payload: &ReleaseSendPayload,
+    (reason, why): (&'static str, tracking::UnscheduleReason),
+) -> Result<bool, JobError> {
+    let stopped = sqlx::query(
+        "UPDATE conversations.drafts
+            SET state = 'failed', failure_reason = $3, send_at = NULL, updated_at = now()
+          WHERE id = $1 AND state = 'scheduled' AND send_generation = $2",
+    )
+    .bind(payload.draft)
+    .bind(payload.generation)
+    .bind(reason)
     .execute(&mut **tx)
     .await?
     .rows_affected();
-    if unscheduled > 0 {
+    if stopped > 0 {
         tracked::track_draft(&state.tracker, tx, payload.draft, |draft| {
             tracking::DraftUnscheduled {
                 workspace,
                 draft,
-                reason: tracking::UnscheduleReason::SenderMayNotSend,
+                reason: why,
             }
         })
         .await?;
     }
-    tracing::info!(draft = %payload.draft, "scheduled send not released: the author may no longer send it");
-    Ok(false)
+    Ok(stopped > 0)
 }
 
 /// What a released send is marked with.

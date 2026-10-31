@@ -7,7 +7,8 @@
     "tableOpenRow": "Open the row",
     "tableEdit": "Edit the cell",
     "tableMove": "Move between cells",
-    "tableClear": "Clear the cell"
+    "tableClear": "Clear the cell",
+    "saveThread": "Save to page"
   },
   "tree": {
     "label": "Pages",
@@ -46,7 +47,8 @@
     "emptyTitle": "Pick a page",
     "emptyBody": "Choose one from the list, or write a new one.",
     "missingTitle": "This page isn’t here",
-    "missingBody": "It may have been deleted, or it was never shared with you."
+    "missingBody": "It may have been deleted, or it was never shared with you.",
+    "askScout": "Ask Scout"
   },
   "save": {
     "saved": "Saved",
@@ -710,5 +712,62 @@
       "linkFailed": "Couldn’t link that table. Nothing was changed.",
       "columnRemovedBoth": "Column {{property}} removed from both places"
     }
+  },
+  "saveToPage": {
+    "noSubject": "(no subject)",
+    "title": "Save “{{subject}}” to a page",
+    "where": "Where it goes",
+    "existing": "Add to a page",
+    "new": "New page",
+    "pages": "Pages",
+    "search": "Find a page by name",
+    "none": "No page you can write to matches.",
+    "loading": "Loading pages…",
+    "linked": "Already links this thread",
+    "newTitle": "Title",
+    "newIn": "A private page at the top level: only you see it until you move it to Workspace or share it.",
+    "what": "What to add",
+    "live": {
+      "title": "A live thread block",
+      "body": "Always shows the newest message. Teammates who can’t read the inbox see only that a thread is linked."
+    },
+    "copy": {
+      "title": "A copy of the messages",
+      "body": "The text becomes part of the page, readable by everyone the page is shared with."
+    },
+    "summary": {
+      "title": "Scout’s summary",
+      "body": "A few lines with links back to each message. You see it before it’s added."
+    },
+    "readers": {
+      "only": "Only you will read it",
+      "everyone": "Everyone in the workspace will read it",
+      "others_one": "{{count}} other",
+      "others_other": "{{count}} others",
+      "and": "and",
+      "notion": "It’s sent to Notion too",
+      "named_one": "{{names}} will read it",
+      "named_other": "{{names}} will read it",
+      "count_one": "{{count}} teammate will read it",
+      "count_other": "{{count}} teammates will read it"
+    },
+    "files_one": "Include attachments ({{count}})",
+    "files_other": "Include attachments ({{count}})",
+    "cancel": "Cancel",
+    "save": "Save",
+    "preview": "Preview summary",
+    "saved": "Saved to {{page}}",
+    "open": "Open page",
+    "undoFailed": "Couldn’t take that back. Nothing else was changed.",
+    "askExisting": "Write a section for the page “{{page}}” from this conversation, and show it to me before anything is added.",
+    "askNew": "Write a new page called “{{title}}” from this conversation, and show it to me before anything is made.",
+    "refused": {
+      "scope": "This sign-in may not read mail, so its attachments can’t be saved to a page. Nothing was added.",
+      "changed": "The thread changed, or a file is gone. Open the thread again. Nothing was added.",
+      "tooLarge": "“{{name}}” is over 20 MB, so it can’t be saved to a page. Nothing was added.",
+      "tooLargeSome": "A file is over 20 MB, so attachments can’t be saved to a page. Nothing was added.",
+      "failed": "Couldn’t save to the page. Nothing was added."
+    },
+    "readFailed": "Couldn’t read the messages. Nothing was saved."
   }
 }

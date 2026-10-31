@@ -1256,8 +1256,15 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "tasks.create" => json!({"title": "Call the accountant"}),
         "tasks.update" => json!({"revision": 1, "title": "Call the accountant", "verb": "do"}),
         "tasks.plan" => json!({"revision": 1, "plan": "none"}),
-        "tasks.done" | "tasks.not_needed" | "tasks.reopen" | "tasks.take_back"
-        | "tasks.release_hold" => json!({"revision": 1}),
+        "tasks.done"
+        | "tasks.not_needed"
+        | "tasks.reopen"
+        | "tasks.take_back"
+        | "tasks.release_hold"
+        | "tasks.answer_reply"
+        | "tasks.unanswer_reply" => {
+            json!({"revision": 1})
+        }
         "tasks.hold" => {
             let starts = chrono::Utc::now() + chrono::TimeDelta::days(1);
             json!({"revision": 1, "starts": starts, "ends": starts + chrono::TimeDelta::minutes(30)})
@@ -1280,6 +1287,16 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "pages.upload_file" | "conversations.upload_draft_attachment" => {
             json!({"file": "matrix"})
         }
+        // Mail and Scout in pages (campbooks-cloud#364): a section, the
+        // seeded message's attachment, and the seeded file.
+        "pages.append" => json!({"markdown": "Matrix section"}),
+        "pages.unappend" => json!({"append_id": Uuid::now_v7().to_string()}),
+        "pages.attach_from_message" => json!({
+            "conversation": world.instances["conversations.conversation"],
+            "message": world.instances["conversations.message"],
+            "attachments": [world.instances["conversations.attachment"]],
+        }),
+        "pages.detach_files" => json!({"files": [world.instances["pages.file"]]}),
         // Tables: a table, its select property, a row and a view are seeded.
         "pages.create_table" => json!({"title": "Matrix table"}),
         "pages.add_property" => json!({"name": "Notes", "type": "text"}),
@@ -1468,6 +1485,15 @@ fn expected(
     // One of Scout's suggestions reads as the list shows it: a member who
     // only reads its inbox is never shown it, so it is not there for them.
     if id == "conversations.get_rule_notice" && decision == Decision::Forbidden {
+        return Decision::NotFound;
+    }
+    // Saving a message's attachment to a page needs the right to write the
+    // page and to read the message: a caller who may not read that inbox is
+    // answered as for an attachment that does not exist.
+    if id == "pages.attach_from_message"
+        && decision == Decision::Allow
+        && who.inbox_role().is_none()
+    {
         return Decision::NotFound;
     }
     // Importing from Notion goes through a Notion connection of the caller's
@@ -1884,7 +1910,8 @@ async fn a_scheduled_send_follows_its_authors_real_membership(db: PgPool) {
             // outbound-requests port, which confirmed it (campbooks-cloud#226).
             assert_eq!(sends_recorded(&world).await, 1);
         } else {
-            assert_eq!(state, "draft");
+            // Stopped, not silent: a failed draft that says why.
+            assert_eq!(state, "failed");
             assert_eq!(requested, 0);
         }
     }
@@ -1980,11 +2007,11 @@ async fn a_scheduled_send_is_released_to_where_its_member_sent_it(db: PgPool) {
 
 /// The stream pointed at another mailbox by SQL after the member asked: the
 /// release refuses it (a WARN), so nothing is requested, recorded or sent,
-/// and the draft is left as it is.
+/// and the draft stops as a failed one (`destination_changed`).
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_scheduled_send_whose_stream_was_repointed_is_never_released(db: PgPool) {
     let (state, requested, recorded) = send_through_a_stream(db, true).await;
-    assert_eq!(state, "scheduled");
+    assert_eq!(state, "failed");
     assert_eq!((requested, recorded), (0, 0));
 }
 
@@ -2089,7 +2116,8 @@ async fn a_planted_scheduled_send_is_never_released(db: PgPool) {
     .fetch_one(&world.db)
     .await
     .unwrap();
-    assert_eq!((state.as_str(), document), ("scheduled", false));
+    // A planted draft the binding does not hold for stops, named, unsent.
+    assert_eq!((state.as_str(), document), ("failed", false));
     assert_eq!(sends_recorded(&world).await, 0);
 }
 
@@ -2429,4 +2457,54 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
         }
     }
     tx.rollback().await.unwrap();
+}
+
+/// Saving a message's attachment to a page needs the mail scope as well as
+/// the pages scope: a token without `conversations:read` is refused, even for
+/// a member who may read the message and write the page (campbooks-cloud#364).
+#[sqlx::test(migrations = "../../migrations")]
+async fn saving_an_attachment_needs_the_mail_scope_as_well_as_the_pages_scope(db: PgPool) {
+    let mut world = World::new(db).await;
+    world.seed().await;
+    let id = "pages.attach_from_message";
+    let path = "/api/v1/w/{workspace_id}/pages/{page_id}/files/from-message";
+    let uri = fill(&world, path, id);
+    let payload = body(&world, id);
+    let token_with = |scopes: &str| {
+        let mut claims = world.idp.claims(scopes);
+        claims["sub"] = json!(format!("{}-{}", Who::Connector.subject(), world.run));
+        world.idp.token(&claims)
+    };
+    let (status, bytes, _) = world
+        .call(
+            Some(&token_with("pages:read pages:write")),
+            "POST",
+            &uri,
+            payload.as_ref(),
+        )
+        .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "{}",
+        String::from_utf8_lossy(&bytes)
+    );
+    assert!(String::from_utf8_lossy(&bytes).contains("insufficient_scope"));
+    // The same member with the mail scope as well is let through.
+    let (status, bytes, _) = world
+        .call(
+            Some(&token_with("pages:read pages:write conversations:read")),
+            "POST",
+            &uri,
+            payload.as_ref(),
+        )
+        .await;
+    assert!(
+        !matches!(
+            status,
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::NOT_FOUND
+        ),
+        "{status}: {}",
+        String::from_utf8_lossy(&bytes)
+    );
 }

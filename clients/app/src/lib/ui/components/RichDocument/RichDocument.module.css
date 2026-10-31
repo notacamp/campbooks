@@ -43,9 +43,13 @@
  * the two blocks' wishes: a line's gap between blocks, a little more around
  * the boxed ones (callouts, quotes, code, cards), more above a heading than
  * below it. The same holds inside callouts, quotes, toggles and list items.
+ *
+ * The editor's own class names (`tiptap`, `react-renderer`, `node-*`,
+ * `ProseMirror-*`) are global: in this module they must be wrapped in
+ * `:global()`, or they are renamed and never match.
  */
 .document
-  :where(.tiptap, [data-type="callout"], blockquote, [data-node-view-content-react])
+  :where(:global(.tiptap), [data-type="callout"], blockquote, [data-node-view-content-react])
   > *
   + * {
   margin-top: var(--space-2);
@@ -59,7 +63,14 @@
   margin-top: var(--space-1);
 }
 
-.document :where(pre, blockquote, [data-type="callout"], .react-renderer:not(.node-toggle), .card) {
+.document
+  :where(
+    pre,
+    blockquote,
+    [data-type="callout"],
+    :global(.react-renderer):not(:global(.node-toggle)),
+    .card
+  ) {
   margin-block: var(--space-3);
 }
 
@@ -94,13 +105,13 @@
 
 /* Nothing pushes away from the top or bottom edge of the page or a box. */
 .document
-  :where(.tiptap, [data-type="callout"], blockquote, [data-node-view-content-react])
+  :where(:global(.tiptap), [data-type="callout"], blockquote, [data-node-view-content-react])
   > :first-child {
   margin-top: 0;
 }
 
 .document
-  :where(.tiptap, [data-type="callout"], blockquote, [data-node-view-content-react])
+  :where(:global(.tiptap), [data-type="callout"], blockquote, [data-node-view-content-react])
   > :last-child {
   margin-bottom: 0;
 }
@@ -180,7 +191,7 @@
   border-top: var(--border-width) solid var(--border-subtle);
 }
 
-.document :where(.tiptap > hr:first-child) {
+.document :where(:global(.tiptap) > hr:first-child) {
   margin-top: 0;
 }
 
@@ -273,7 +284,7 @@
   pointer-events: none;
 }
 
-.document :where(.ProseMirror-selectednode) {
+.document :where(:global(.ProseMirror-selectednode)) {
   outline: var(--focus-width) solid var(--focus-ring);
   outline-offset: var(--focus-offset);
 }

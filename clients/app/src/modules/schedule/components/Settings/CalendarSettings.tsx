@@ -12,6 +12,7 @@ import {
   KindIcon,
   List,
   ListRow,
+  Segmented,
   Select,
   SettingsEmpty,
   SettingsPage,
@@ -19,6 +20,7 @@ import {
   Switch,
   Text,
   TimePicker,
+  useUndoToast,
 } from "~/lib/ui";
 import {
   useConnections,
@@ -30,11 +32,13 @@ import {
 import { useCalendars, useScheduleSettings, useSettingsMutations } from "../../api/queries";
 import {
   SCOUT_KINDS,
+  type CalendarRole,
   type CalendarView,
   type EventKind,
   type SettingsView,
   type WorkingHours,
 } from "../../api/types";
+import { takesTime } from "../../model";
 
 const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 type Weekday = (typeof WEEKDAYS)[number];
@@ -59,6 +63,8 @@ function zoneOptions(current: string): { value: string; label: string }[] {
   const zones = known.includes(current) ? known : [current, ...known];
   return zones.map((zone) => ({ value: zone, label: zone.replaceAll("_", " ") }));
 }
+
+const ROLES = ["mine", "following", "off"] as const satisfies readonly CalendarRole[];
 
 const PROVIDER_NAMES: Record<string, string> = {
   google: "Google",
@@ -85,6 +91,35 @@ export function CalendarSettings({ workspaceId, consent, result }: CalendarSetti
   const calendars = useCalendars(workspaceId);
   const connections = useConnections(workspaceId);
   const { settings: save, calendar: saveCalendar } = useSettingsMutations(workspaceId);
+  const undo = useUndoToast();
+  const setRole = (calendar: CalendarView, role: CalendarRole) => {
+    const before = calendar.role;
+    if (role === before) {
+      return;
+    }
+    const patch = (to: CalendarRole) => {
+      saveCalendar.mutate({ calendarId: calendar.id, patch: { role: to } });
+    };
+    saveCalendar.mutate(
+      { calendarId: calendar.id, patch: { role } },
+      {
+        onSuccess: () => {
+          undo.push({
+            label: t("toast.role", {
+              name: calendar.name,
+              role: t(`settings.calendars.roles.${role}`),
+            }),
+            undo: () => {
+              patch(before);
+            },
+            redo: () => {
+              patch(role);
+            },
+          });
+        },
+      },
+    );
+  };
 
   return (
     <SettingsPage label={t("settings.label")} title={t("settings.title")} lead={t("settings.lead")}>
@@ -93,9 +128,7 @@ export function CalendarSettings({ workspaceId, consent, result }: CalendarSetti
         connections={connections.data}
         consent={consent}
         result={result}
-        onShow={(calendar, syncing) => {
-          saveCalendar.mutate({ calendarId: calendar.id, patch: { syncing } });
-        }}
+        onRole={setRole}
         onColour={(calendar, color) => {
           saveCalendar.mutate({ calendarId: calendar.id, patch: { color } });
         }}
@@ -126,14 +159,14 @@ function CalendarsSection({
   connections,
   consent,
   result,
-  onShow,
+  onRole,
   onColour,
 }: {
   calendars: readonly CalendarView[] | undefined;
   connections: Connections | undefined;
   consent: MailboxConsent;
   result: MailboxResult | undefined;
-  onShow: (calendar: CalendarView, syncing: boolean) => void;
+  onRole: (calendar: CalendarView, role: CalendarRole) => void;
   onColour: (calendar: CalendarView, color: string) => void;
 }) {
   const { t } = useTranslation("schedule");
@@ -153,55 +186,69 @@ function CalendarsSection({
       description={t("settings.calendars.description")}
     >
       <Outcome result={result} connections={connections} mailbox={asked ?? only} />
-      {calendars === undefined ? null : (
-        <List label={t("settings.calendars.title")}>
-          {calendars.map((calendar) => {
-            const own = calendar.source === "campbooks";
-            const facts = [
-              own ? t("settings.calendars.campbooks") : undefined,
-              calendar.primary ? t("settings.calendars.primary") : undefined,
-              calendar.source === "provider" && !calendar.writable
-                ? t("settings.calendars.readOnly")
-                : undefined,
-            ].filter((each) => each !== undefined);
-            return (
-              <ListRow
-                key={calendar.id}
-                leading={
-                  own ? (
-                    <CalendarDot color={calendar.color} />
-                  ) : (
-                    <CalendarColour
-                      label={t("settings.calendars.colour", { name: calendar.name })}
-                      color={calendar.color}
-                      onChange={(color) => {
-                        onColour(calendar, color);
-                      }}
-                    />
-                  )
-                }
-                title={calendar.name}
-                meta={facts.length === 0 ? undefined : facts.join(" · ")}
-                trailing={
-                  own ? (
-                    <Text as="span" tone="tertiary" size="sm">
-                      {t("settings.calendars.alwaysOn")}
-                    </Text>
-                  ) : (
-                    <Switch
-                      label={t("settings.calendars.show", { name: calendar.name })}
-                      checked={calendar.syncing}
-                      onChange={(syncing) => {
-                        onShow(calendar, syncing);
-                      }}
-                    />
-                  )
-                }
-              />
-            );
-          })}
-        </List>
-      )}
+      {ROLES.map((role) => {
+        const group = (calendars ?? []).filter((calendar) => calendar.role === role);
+        return group.length === 0 ? null : (
+          <div key={role} className="flex flex-col gap-2">
+            <div className="flex flex-col">
+              <Text as="p" weight="medium">
+                {t(`settings.calendars.roles.${role}`)}
+              </Text>
+              <Text as="p" tone="tertiary" size="sm">
+                {t(`settings.calendars.roleHints.${role}`)}
+              </Text>
+            </div>
+            <List label={t(`settings.calendars.roles.${role}`)}>
+              {group.map((calendar) => {
+                const own = calendar.source === "campbooks";
+                const facts = [
+                  own ? t("settings.calendars.campbooks") : undefined,
+                  calendar.primary ? t("settings.calendars.primary") : undefined,
+                  calendar.owned === false ? t("settings.calendars.shared") : undefined,
+                  calendar.source === "provider" && !calendar.writable
+                    ? t("settings.calendars.readOnly")
+                    : undefined,
+                ].filter((each) => each !== undefined);
+                return (
+                  <ListRow
+                    key={calendar.id}
+                    leading={
+                      own ? (
+                        <CalendarDot color={calendar.color} />
+                      ) : (
+                        <CalendarColour
+                          label={t("settings.calendars.colour", { name: calendar.name })}
+                          color={calendar.color}
+                          onChange={(color) => {
+                            onColour(calendar, color);
+                          }}
+                        />
+                      )
+                    }
+                    title={calendar.name}
+                    meta={facts.length === 0 ? undefined : facts.join(" · ")}
+                    trailing={
+                      own ? null : (
+                        <Segmented
+                          label={t("settings.calendars.role", { name: calendar.name })}
+                          value={calendar.role}
+                          options={ROLES.map((each) => ({
+                            value: each,
+                            label: t(`settings.calendars.roles.${each}`),
+                          }))}
+                          onChange={(next) => {
+                            onRole(calendar, next);
+                          }}
+                        />
+                      )
+                    }
+                  />
+                );
+              })}
+            </List>
+          </div>
+        );
+      })}
       {withoutAccess.length === 0 ? null : (
         <List label={t("settings.calendars.access")}>
           {withoutAccess.map((connection) => (
@@ -322,6 +369,11 @@ function Refusal({ consent, refusal }: { consent: MailboxConsent; refusal: Conse
   }
 }
 
+/** The calendar chosen for a kind, or unset when it is no longer one that takes time. */
+function chosenIn(targets: readonly CalendarView[], chosen: string | undefined): string {
+  return targets.some((each) => each.id === chosen) ? (chosen ?? "") : "";
+}
+
 function KindsSection({
   settings,
   calendars,
@@ -332,7 +384,7 @@ function KindsSection({
   onChange: (patch: { scout_kinds?: EventKind[]; also_add_to?: Record<string, string> }) => void;
 }) {
   const { t } = useTranslation("schedule");
-  const targets = calendars.filter((each) => each.source === "provider" && each.writable);
+  const targets = calendars.filter(takesTime);
   const options = [
     { value: "", label: t("settings.kinds.nowhere") },
     ...targets.map((each) => ({ value: each.id, label: each.name })),
@@ -358,7 +410,7 @@ function KindsSection({
                     <Select
                       hideLabel
                       label={t("settings.kinds.alsoAdd")}
-                      value={settings.also_add_to[kind] ?? ""}
+                      value={chosenIn(targets, settings.also_add_to[kind])}
                       options={options}
                       onChange={(value) => {
                         const others = Object.entries(settings.also_add_to).filter(

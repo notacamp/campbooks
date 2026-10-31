@@ -133,6 +133,15 @@ pub struct ProviderConfig {
     /// Models are addressed by role, so nothing here detects a provider.
     #[serde(default, deserialize_with = "reasoning_effort")]
     pub reasoning_effort: Option<ReasoningEffort>,
+    /// Whether the provider documents the `reasoning` object
+    /// (`CAMPBOOKS_AI__<ROLE>__REASONING=true`; `OpenRouter` does). Only then
+    /// is the effort a feature asks for on one request
+    /// ([`ChatRequest::reasoning_effort`](crate::ChatRequest::reasoning_effort))
+    /// sent; a role with a `reasoning_effort` of its own counts as accepting
+    /// it. Off (the default) a request's effort is dropped, so a strict
+    /// OpenAI-compatible server never sees the object.
+    #[serde(default)]
+    pub reasoning: bool,
 }
 
 /// How much a reasoning model thinks before it answers.
@@ -197,7 +206,22 @@ impl ProviderConfig {
             external_content: ExternalContent::default(),
             logprobs: default_logprobs(),
             reasoning_effort: None,
+            reasoning: false,
         }
+    }
+
+    /// Whether the provider takes the `reasoning` object, so a request's
+    /// own effort is sent.
+    #[must_use]
+    pub fn accepts_reasoning(&self) -> bool {
+        self.reasoning || self.reasoning_effort.is_some()
+    }
+
+    /// The same provider documenting the `reasoning` object.
+    #[must_use]
+    pub fn with_reasoning(mut self) -> Self {
+        self.reasoning = true;
+        self
     }
 
     /// The same provider asking its model for `effort` of reasoning.

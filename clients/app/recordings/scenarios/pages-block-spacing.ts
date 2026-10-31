@@ -14,7 +14,7 @@ export default async function pagesBlockSpacing({ page }: ScenarioContext): Prom
   await page.goto(story(phone ? "every-block-phone-idle" : "every-block-idle"));
   const editor = page.getByRole("textbox", { name: "Page text" });
   await editor.getByText("Notes from the kickoff go below.").waitFor();
-  await caption(page, "Headings have room above them and sit close to their text", 3000);
+  await caption(page, "Paragraphs have a gap between them; headings more above than below", 3000);
 
   const box = await editor.boundingBox();
   if (box !== null) {

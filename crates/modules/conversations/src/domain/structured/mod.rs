@@ -214,6 +214,7 @@ pub fn resolve(
             verb: Verb::Pay,
             amount: due.amount,
             same_as: None,
+            done_by: None,
         });
     }
     (items, asks)

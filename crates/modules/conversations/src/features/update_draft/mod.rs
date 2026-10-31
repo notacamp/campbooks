@@ -19,10 +19,16 @@ use serde::Deserialize;
 use serde_json::json;
 use utoipa::ToSchema;
 
-use crate::features::signature;
+use crate::features::{
+    signature,
+    upload_draft_attachment::{max_attachment_bytes_of, over_limit},
+};
 use crate::{
     domain::{
-        drafts::{self, DraftView, check_limits, shown_to_author, tidy},
+        drafts::{
+            self, DraftView, StoredAttachment, attachment_bytes, check_limits, shown_to_author,
+            tidy,
+        },
         format,
         paths::DraftPath,
         resources, tracked,
@@ -110,6 +116,8 @@ pub struct DraftChanges {
             body = Problem, content_type = "application/problem+json"),
         (status = CONFLICT, description = "Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then save.",
             body = Problem, content_type = "application/problem+json"),
+        (status = PAYLOAD_TOO_LARGE, description = "Moving it to an inbox whose mailbox carries less than the draft's attachments (`attachments_too_large_for_mailbox`; `conversations.list_inboxes` says it as `max_attachment_bytes`): nothing moved.",
+            body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn update(
@@ -180,7 +188,7 @@ pub async fn update(
     }
 
     if let Some(target) = moved {
-        move_row(&mut tx, id, target).await?;
+        move_row(&state, &mut tx, id, target, &attachments).await?;
     }
     sqlx::query!(
         r#"
@@ -230,7 +238,19 @@ pub async fn update(
 /// Put draft `id` in `inbox`. The provider's thread key belongs to the first
 /// mailbox, so it goes; the reply headers stay, and the recipient's mail
 /// still threads the reply.
-async fn move_row(tx: &mut sqlx::PgConnection, id: DraftId, inbox: InboxId) -> Result<()> {
+async fn move_row(
+    state: &AppState,
+    tx: &mut sqlx::PgConnection,
+    id: DraftId,
+    inbox: InboxId,
+    attachments: &[StoredAttachment],
+) -> Result<()> {
+    // The new mailbox may take less than the old one (Microsoft Graph): the
+    // draft does not move with more than it can send.
+    let limit = max_attachment_bytes_of(state, tx, inbox).await?;
+    if attachment_bytes(attachments) > limit {
+        return Err(over_limit(limit));
+    }
     sqlx::query("UPDATE conversations.drafts SET inbox_id = $2, thread_key = NULL WHERE id = $1")
         .bind(id)
         .bind(inbox)

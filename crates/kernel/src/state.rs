@@ -6,6 +6,7 @@ use sqlx::PgPool;
 
 use crate::{
     admin::{AdminAuditPort, AdminProfilesPort, NoAdmins, NoAudit},
+    attachments::{AttachmentBlobsPort, NoAttachmentBlobs},
     auth::TokenVerifier,
     authz,
     binding::Binding,
@@ -95,6 +96,10 @@ pub struct AppState {
     /// Answers which tasks are open for an email ([`tasks`](crate::tasks)).
     /// The server registers the owner of tasks'; until then none is.
     pub open_tasks: OpenTasksPort,
+    /// Answers a mail attachment's blob for a caller who may read its
+    /// message ([`attachments`](crate::attachments)). The server registers
+    /// the `conversations` module's; until then nothing is answered.
+    pub attachment_blobs: AttachmentBlobsPort,
     /// Answers which language a user chose, for the
     /// [`Locale`](crate::i18n::Locale) of their requests. The server
     /// registers the `workspaces` module's implementation; until then
@@ -204,6 +209,7 @@ impl AppState {
             availability: Arc::new(NoAvailability),
             holds: Arc::new(NoHolds),
             open_tasks: Arc::new(NoOpenTasks),
+            attachment_blobs: Arc::new(NoAttachmentBlobs),
             grants: Arc::new(NoGrantIntake),
             consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
@@ -317,6 +323,14 @@ impl AppState {
     #[must_use]
     pub fn with_open_tasks(mut self, open_tasks: OpenTasksPort) -> Self {
         self.open_tasks = open_tasks;
+        self
+    }
+
+    /// The same state, asking `attachment_blobs` for a mail attachment's
+    /// blob.
+    #[must_use]
+    pub fn with_attachment_blobs(mut self, attachment_blobs: AttachmentBlobsPort) -> Self {
+        self.attachment_blobs = attachment_blobs;
         self
     }
 

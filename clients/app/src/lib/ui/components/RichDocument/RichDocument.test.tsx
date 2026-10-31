@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderUi } from "../../../../../test/render";
 
 import { DocCard, DocImage, DocToggle, MentionChip, RichDocument } from "./RichDocument";
+import stylesheet from "./RichDocument.module.css?raw";
 
 describe("RichDocument", () => {
   it("a mention is a link when it can be opened and plain words when it cannot", () => {
@@ -53,5 +54,13 @@ describe("RichDocument", () => {
     renderUi(<DocImage src="/x.png" alt="Diagram" state="closed" />);
     expect(screen.queryByRole("img")).toBeNull();
     expect(screen.getByText("Diagram")).toBeInTheDocument();
+  });
+
+  it("names the editor's own classes only through :global(), so the module keeps them", () => {
+    // In a CSS module a bare `.tiptap` is renamed and never matches the editor.
+    const bare = stylesheet
+      .replaceAll(/:global\([^)]*\)/gu, "")
+      .match(/\.(?:tiptap|ProseMirror[\w-]*|react-renderer|node-[\w-]+)\b/gu);
+    expect(bare).toBeNull();
   });
 });

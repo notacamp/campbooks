@@ -29,7 +29,9 @@
     "editScheduled": "Cet envoi est programmé. Annulez-le pour modifier le brouillon.",
     "cancelAndEdit": "Annuler l’envoi et modifier",
     "keepScheduled": "Garder la programmation",
-    "sendCancelled": "Envoi annulé"
+    "sendCancelled": "Envoi annulé",
+    "shouldHaveLeft": "Aurait dû partir {{time}}",
+    "notSent": "Non envoyé"
   },
   "list": {
     "label": "Conversations",
@@ -109,7 +111,8 @@
     "trash": {
       "title": "Cette conversation est dans la Corbeille.",
       "lead": "Votre fournisseur de messagerie vide la corbeille à son rythme."
-    }
+    },
+    "saveToPageFailed": "Impossible de lire les messages. Rien n’a été enregistré."
   },
   "actions": {
     "star": "Épingler",
@@ -143,7 +146,8 @@
     "reportSpam": "Signaler comme spam",
     "notSpam": "Pas un spam",
     "toInbox": "Remettre dans la boîte de réception",
-    "askScout": "Demander à Scout"
+    "askScout": "Demander à Scout",
+    "saveToPage": "Enregistrer dans une page"
   },
   "toast": {
     "done": "Terminé · {{subject}}",
@@ -169,6 +173,7 @@
   },
   "scout": {
     "label": "Où en sont les choses",
+    "readFailed": "Scout n’a pas pu lire celui-ci.",
     "suggestion": "Suggère {{stream}}",
     "suggestionNote": "Campbooks pense que ceci va dans {{stream}}. C’est une suggestion : rien ne bouge sans votre accord.",
     "prompt": "La déplacer ?",
@@ -193,7 +198,11 @@
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspect",
     "whyMoney": "Paiement",
-    "sortedTaught": "Campbooks l’a rangée dans {{stream}}, selon une règle"
+    "sortedTaught": "Campbooks l’a rangée dans {{stream}}, selon une règle",
+    "taskOpen": "Votre tâche « {{title}} » est toujours ouverte.",
+    "taskPrompt": "Est-elle faite ?",
+    "taskDone": "Faite",
+    "taskNotYet": "Pas encore"
   },
   "reasons": {
     "signals": {
@@ -327,7 +336,11 @@
       "quote": "Impossible de lire l’e-mail pour le citer. Rien n’a été commencé. Réessayez.",
       "send_at_invalid": "Cette heure n’est pas utilisable. Choisissez-en une plus tardive, jusqu’à un an à l’avance.",
       "switch_failed": "Impossible de changer. Votre brouillon est resté tel quel.",
-      "inbox_read_only": "Vous pouvez lire cette boîte, mais pas envoyer depuis celle-ci."
+      "inbox_read_only": "Vous pouvez lire cette boîte, mais pas envoyer depuis celle-ci.",
+      "destination_changed": "Non envoyé : cette boîte a changé après la programmation. Vérifiez et envoyez à nouveau.",
+      "sender_may_not_send": "Non envoyé : vous ne pouvez plus envoyer depuis cette boîte.",
+      "release_lost": "Nous n’avons pas pu confirmer l’envoi. Vérifiez votre dossier Envoyés avant de renvoyer.",
+      "send_at_busy": "Vous avez trop d’envois programmés pour cette minute. Choisissez une autre heure."
     },
     "shortcuts": {
       "newMessage": "Nouveau message"
@@ -343,10 +356,13 @@
         "filename_missing": "Impossible de joindre un fichier sans nom.",
         "attachment_blocked": "{{name}} n’a pas été joint : les fournisseurs de messagerie bloquent ce type de fichier.",
         "attachments_too_large": "{{name}} n’a pas été joint : un message peut contenir {{max}} Mo au plus.",
-        "too_many_attachments": "{{name}} n’a pas été joint : un message peut contenir {{files}} fichiers au plus."
+        "too_many_attachments": "{{name}} n’a pas été joint : un message peut contenir {{files}} fichiers au plus.",
+        "attachments_too_large_for_mailbox": "{{name}} n’a pas été joint : cette boîte aux lettres envoie au plus {{max}} Mo de pièces jointes par message.",
+        "upload_incomplete": "{{name}} n’est pas arrivé en entier. Joignez-le de nouveau.",
+        "request_timed_out": "{{name}} a mis trop de temps à se charger. Réessayez avec une connexion plus rapide, ou joignez un fichier plus petit."
       }
     },
-    "scheduled": "Programmé : {{time}}"
+    "scheduled": "Programmé pour {{time}}"
   },
   "needs": {
     "line": {

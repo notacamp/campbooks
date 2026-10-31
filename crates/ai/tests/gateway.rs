@@ -336,6 +336,83 @@ async fn a_reasoning_effort_is_sent_when_set() {
     }
 }
 
+/// What the `reasoning` field of each request a server received said.
+async fn efforts_sent(server: &MockServer) -> Vec<serde_json::Value> {
+    server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .map(|request| {
+            let sent: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
+            sent.get("reasoning").cloned().unwrap_or_default()
+        })
+        .collect()
+}
+
+async fn ask(gw: &Gateway, request: ChatRequest) {
+    // Streamed, and plain (which this server answers with a stream it cannot
+    // read): only the requests matter here.
+    let _ = all(gw, request.clone()).await;
+    let _ = gw.chat(Role::Complete, request).await;
+}
+
+#[tokio::test]
+async fn a_request_effort_is_sent_to_a_provider_that_takes_it_and_wins_over_the_role() {
+    use campbooks_ai::ReasoningEffort::{High, Low};
+    let server = stream_server(STREAM).await;
+    let gw = gateway([(
+        Role::Complete,
+        provider(&server, "m", None)
+            .with_reasoning()
+            .with_reasoning_effort(High),
+    )]);
+    ask(
+        &gw,
+        ChatRequest::new(vec![Message::user("hi")]).with_reasoning_effort(Low),
+    )
+    .await;
+    let sent = efforts_sent(&server).await;
+    assert_eq!(sent.len(), 2);
+    assert!(
+        sent.iter().all(|s| *s == json!({"effort": "low"})),
+        "{sent:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_request_effort_is_sent_alone_to_a_provider_that_documents_reasoning() {
+    let server = stream_server(STREAM).await;
+    let gw = gateway([(
+        Role::Complete,
+        provider(&server, "m", None).with_reasoning(),
+    )]);
+    ask(
+        &gw,
+        ChatRequest::new(vec![Message::user("hi")])
+            .with_reasoning_effort(campbooks_ai::ReasoningEffort::Low),
+    )
+    .await;
+    for sent in efforts_sent(&server).await {
+        assert_eq!(sent, json!({"effort": "low"}));
+    }
+}
+
+#[tokio::test]
+async fn a_request_effort_is_dropped_for_a_provider_that_does_not_take_it() {
+    let server = stream_server(STREAM).await;
+    let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
+    ask(
+        &gw,
+        ChatRequest::new(vec![Message::user("hi")])
+            .with_reasoning_effort(campbooks_ai::ReasoningEffort::Low),
+    )
+    .await;
+    let sent = efforts_sent(&server).await;
+    assert_eq!(sent.len(), 2);
+    assert!(sent.iter().all(serde_json::Value::is_null), "{sent:?}");
+}
+
 #[tokio::test]
 async fn a_refused_stream_fails_before_any_event_without_the_body() {
     let server = MockServer::start().await;
@@ -374,6 +451,70 @@ async fn a_server_that_ignores_stream_is_read_whole() {
     assert_eq!(events[0], Reasoning("Hm.".into()));
     assert_eq!(events[1], Text("Hi Maya.".into()));
     assert!(matches!(&events[2], Done(s) if s.usage.unwrap().completion_tokens == 4));
+}
+
+fn answer(content: &str, finish: &str) -> ResponseTemplate {
+    ResponseTemplate::new(200).set_body_json(json!({
+        "model": "m",
+        "choices": [{"message": {"role": "assistant", "content": content},
+                     "finish_reason": finish}],
+        "usage": {"prompt_tokens": 3, "completion_tokens": 4}
+    }))
+}
+
+#[tokio::test]
+async fn an_empty_answer_at_the_limit_is_asked_again_with_more_room() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(answer("", "length"))
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .respond_with(answer("Hi Maya.", "stop"))
+        .with_priority(2)
+        .mount(&server)
+        .await;
+    let gw = gateway([(
+        Role::Complete,
+        provider(&server, "m", None).with_reasoning(),
+    )]);
+    let mut request = ChatRequest::new(vec![Message::user("hi")]);
+    request.max_tokens = Some(4096);
+    let response = gw.chat_with_room(Role::Complete, request).await.unwrap();
+    assert_eq!(response.content, "Hi Maya.");
+
+    let sent: Vec<serde_json::Value> = server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .map(|request| serde_json::from_slice(&request.body).unwrap())
+        .collect();
+    assert_eq!(sent.len(), 2);
+    assert_eq!(sent[0]["max_tokens"], 4096);
+    assert!(sent[0].get("reasoning").is_none());
+    assert_eq!(sent[1]["max_tokens"], 8192);
+    assert_eq!(sent[1]["reasoning"], json!({"effort": "low"}));
+}
+
+#[tokio::test]
+async fn an_answer_that_stopped_or_wrote_something_is_not_asked_again() {
+    for (content, finish) in [("Hi.", "stop"), ("Hi", "length"), ("", "stop")] {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .respond_with(answer(content, finish))
+            .mount(&server)
+            .await;
+        let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
+        let response = gw
+            .chat_with_room(Role::Complete, ChatRequest::new(vec![Message::user("hi")]))
+            .await
+            .unwrap();
+        assert_eq!(response.content, content);
+        assert_eq!(server.received_requests().await.unwrap().len(), 1);
+    }
 }
 
 #[tokio::test]
