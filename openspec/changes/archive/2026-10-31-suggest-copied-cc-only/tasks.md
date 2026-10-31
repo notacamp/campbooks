@@ -9,5 +9,5 @@
 ## 2. Close
 
 - [x] 2.1 Changelog entry of #395 says Cc
-- [ ] 2.2 Gates green (CI)
-- [ ] 2.3 `openspec archive suggest-copied-cc-only --yes`
+- [x] 2.2 Gates green (CI)
+- [x] 2.3 `openspec archive suggest-copied-cc-only --yes`

@@ -3559,8 +3559,8 @@ Messages SHALL not be asked their other questions again.
 ### Requirement: Who the caller exchanges mail with
 `GET /api/v1/w/{workspace_id}/correspondents` (`conversations.list_correspondents`,
 `conversations:read`) SHALL list the people the inboxes the caller can read
-exchange mail with: the senders of their inbound mail, the To and Cc
-recipients of their inbound mail, and the To and Cc recipients of their sent
+exchange mail with: the senders of their inbound mail, the Cc
+recipients of their inbound mail (not its other To recipients), and the To and Cc recipients of their sent
 mail. Each person SHALL carry their address (lower-cased), the newest display
 name seen for it in any of these, `wrote` (sent messages that had them in To
 or Cc, each message once) and `received` (inbound messages from them); never
@@ -3571,7 +3571,7 @@ display name seen for them, case- and accent-insensitively, and `%`, `_` and
 `\` in it SHALL match themselves. `limit` SHALL be 1 to 10 (default 10). A
 `q` or `limit` out of range SHALL get 400 `invalid_correspondents_query`.
 There SHALL be no cursor. The answer SHALL be ordered by `wrote`, then
-`received`, then the inbound messages that had them in To or Cc (each
+`received`, then the inbound messages that had them in Cc (each
 message once), all most first, then by address. It SHALL read only the newest
 mail of those inboxes: the last 365 days, at most 5,000 inbound messages
 (not in spam or the trash) and at most 5,000 sent messages, newest first,
@@ -3587,7 +3587,7 @@ under review or holding a `suspicious` answer of `true` no member corrected.
 A person only copied on inbound mail (never written to, never wrote in) SHALL
 be listed only when they are not a no-reply address, none of their own mail
 in the window is flagged as above, and the newest inbound message that had
-them in To or Cc came from a sender who may be written to: that message not
+them in Cc came from a sender who may be written to: that message not
 failing its sender's checks nor refused by their DMARC policy, and none of
 that sender's mail in the window flagged as above. Those checks SHALL run
 person by person in ranking order, only until the answer is full, so their
@@ -3602,6 +3602,10 @@ never what the mail says.
 #### Scenario: Copied on received mail
 - **WHEN** Maya's email to Sam had Leo Park in Cc, and Sam never wrote to Leo and Leo never wrote to Sam
 - **THEN** `q=leo` lists leo@northwind-studio.example as "Leo Park" with `wrote` 0 and `received` 0
+
+#### Scenario: Someone else in To
+- **WHEN** Pia's email to Sam also had Noor Haddad in To, and Sam never wrote to Noor and Noor never wrote to Sam
+- **THEN** `q=haddad` lists nobody
 
 #### Scenario: Copied after those who wrote
 - **WHEN** one Rivera wrote to Sam once, another was copied on three emails Sam received, and a third on one
