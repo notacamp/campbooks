@@ -44,7 +44,7 @@ const MAX_SENDER: usize = 120;
 /// Where an explanation is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum State {
+pub enum ExplanationState {
     /// Asked for; the answer is not stored yet.
     Writing,
     /// Written.
@@ -54,7 +54,7 @@ pub enum State {
     Failed,
 }
 
-impl State {
+impl ExplanationState {
     /// As stored in `explanations.state`.
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -76,7 +76,7 @@ impl State {
 /// Why a request gave no explanation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum Failure {
+pub enum ExplanationFailure {
     /// The workspace used its whole daily AI limit.
     Limit,
     /// The model gave no usable answer.
@@ -85,7 +85,7 @@ pub enum Failure {
     Unavailable,
 }
 
-impl Failure {
+impl ExplanationFailure {
     /// As stored in `explanations.failure`.
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -107,7 +107,7 @@ impl Failure {
 
 /// What someone in the thread wants.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Want {
+pub struct ExplanationWant {
     /// Who wants it, as the thread names them.
     pub who: String,
     /// What they want: one plain line.
@@ -118,7 +118,7 @@ pub struct Want {
 
 /// Something agreed, or still open.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Point {
+pub struct ExplanationPoint {
     /// One plain line.
     pub text: String,
     /// The messages it comes from (one to three).
@@ -127,7 +127,7 @@ pub struct Point {
 
 /// Something on the member.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Duty {
+pub struct ExplanationDuty {
     /// One plain line.
     pub text: String,
     /// The day it is due, as the thread states it.
@@ -143,13 +143,13 @@ pub struct Explanation {
     /// The thread in a sentence or two.
     pub in_short: String,
     /// Who wants what.
-    pub wants: Vec<Want>,
+    pub wants: Vec<ExplanationWant>,
     /// What was agreed.
-    pub agreed: Vec<Point>,
+    pub agreed: Vec<ExplanationPoint>,
     /// What is still open.
-    pub open: Vec<Point>,
+    pub open: Vec<ExplanationPoint>,
     /// What is on the member.
-    pub on_you: Vec<Duty>,
+    pub on_you: Vec<ExplanationDuty>,
 }
 
 impl Explanation {
@@ -174,7 +174,7 @@ impl Explanation {
 
 /// A message an explanation cites, for the chip beside a point.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Cited {
+pub struct ExplanationCited {
     /// The message.
     pub id: MessageId,
     /// Who sent it: their name, else their address.
@@ -185,7 +185,7 @@ pub struct Cited {
 
 /// The newest message, when the thread has moved on since the explanation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Newer {
+pub struct ExplanationNewer {
     /// Who sent it: their name, else their address.
     pub from: String,
     /// When it was sent.
@@ -200,10 +200,10 @@ pub struct Newer {
 )]
 pub struct ExplanationView {
     /// Where it is.
-    pub state: State,
+    pub state: ExplanationState,
     /// Why the last request gave no explanation, when it did not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub failure: Option<Failure>,
+    pub failure: Option<ExplanationFailure>,
     /// The explanation kept: none while the first is being written, and none
     /// after a first request that failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -224,9 +224,9 @@ pub struct ExplanationView {
     pub stale: bool,
     /// The newest message, when the thread has moved on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub newer: Option<Newer>,
+    pub newer: Option<ExplanationNewer>,
     /// The messages the explanation cites, for its chips.
-    pub refs: Vec<Cited>,
+    pub refs: Vec<ExplanationCited>,
 }
 
 /// A conversation's newest message and how many messages it has (spam and
@@ -403,17 +403,19 @@ pub async fn view(
         None => Vec::new(),
     };
     Ok(ExplanationView {
-        state: State::parse(&row.state),
-        failure: row.failure.as_deref().and_then(Failure::parse),
+        state: ExplanationState::parse(&row.state),
+        failure: row.failure.as_deref().and_then(ExplanationFailure::parse),
         locale: body.as_ref().and(row.locale.clone()),
         written_at: body.as_ref().and(row.written_at),
         messages: u32::try_from(row.message_ids.len()).unwrap_or(u32::MAX),
         in_full: u32::try_from(row.in_full).unwrap_or_default(),
         stale: body.is_some() && (moved || other_language),
-        newer: now.filter(|_| body.is_some() && moved).map(|now| Newer {
-            from: shown(&serde_json::to_value(&now.sender).unwrap_or(Value::Null)),
-            sent_at: now.sent_at,
-        }),
+        newer: now
+            .filter(|_| body.is_some() && moved)
+            .map(|now| ExplanationNewer {
+                from: shown(&serde_json::to_value(&now.sender).unwrap_or(Value::Null)),
+                sent_at: now.sent_at,
+            }),
         body,
         refs,
     })
@@ -426,7 +428,7 @@ async fn cited(
     ids: &[MessageId],
     inboxes: &[InboxId],
     conversation: ConversationId,
-) -> Result<Vec<Cited>> {
+) -> Result<Vec<ExplanationCited>> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -439,12 +441,12 @@ async fn cited(
     .bind(inboxes)
     .fetch_all(&mut *conn)
     .await?;
-    let mut by_id: HashMap<MessageId, Cited> = rows
+    let mut by_id: HashMap<MessageId, ExplanationCited> = rows
         .into_iter()
         .map(|(id, sender, sent_at)| {
             (
                 id,
-                Cited {
+                ExplanationCited {
                     id,
                     from: shown(&sender),
                     sent_at,

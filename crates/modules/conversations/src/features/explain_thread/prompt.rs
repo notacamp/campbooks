@@ -23,7 +23,8 @@ use serde_json::json;
 use crate::{
     domain::{
         explanation::{
-            Duty, Explanation, MAX_ENTRIES, MAX_IN_SHORT, MAX_POINT, MAX_REFS, Point, Want,
+            Explanation, ExplanationDuty, ExplanationPoint, ExplanationWant, MAX_ENTRIES,
+            MAX_IN_SHORT, MAX_POINT, MAX_REFS,
         },
         read::tidy,
     },
@@ -255,7 +256,7 @@ pub fn vet(answer: &Answer, labels: &Labels) -> Option<Explanation> {
         .iter()
         .filter_map(|want| {
             let what = tidy(&want.what, MAX_POINT);
-            (!what.is_empty()).then(|| Want {
+            (!what.is_empty()).then(|| ExplanationWant {
                 who: tidy(&want.who, MAX_WHO),
                 what,
                 refs: refs(&want.refs, labels),
@@ -263,11 +264,11 @@ pub fn vet(answer: &Answer, labels: &Labels) -> Option<Explanation> {
         })
         .take(MAX_ENTRIES)
         .collect();
-    let points = |raw: &[RawPoint]| -> Vec<Point> {
+    let points = |raw: &[RawPoint]| -> Vec<ExplanationPoint> {
         raw.iter()
             .filter_map(|point| {
                 let text = tidy(&point.text, MAX_POINT);
-                (!text.is_empty()).then(|| Point {
+                (!text.is_empty()).then(|| ExplanationPoint {
                     text,
                     refs: refs(&point.refs, labels),
                 })
@@ -280,7 +281,7 @@ pub fn vet(answer: &Answer, labels: &Labels) -> Option<Explanation> {
         .iter()
         .filter_map(|duty| {
             let text = tidy(&duty.text, MAX_POINT);
-            (!text.is_empty()).then(|| Duty {
+            (!text.is_empty()).then(|| ExplanationDuty {
                 text,
                 due_on: duty
                     .due_on

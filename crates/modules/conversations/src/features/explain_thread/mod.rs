@@ -43,7 +43,7 @@ use serde_json::Value;
 use self::prompt::{Answer, Input, Labels, Line, You};
 use crate::{
     domain::{
-        explanation::{self, Explanation, Failure},
+        explanation::{self, Explanation, ExplanationFailure},
         plain_text,
     },
     events::ThreadExplained,
@@ -115,7 +115,7 @@ struct Work {
 /// What the request came to.
 enum Outcome {
     Ready(Explanation, String),
-    Failed(Failure),
+    Failed(ExplanationFailure),
 }
 
 impl JobHandler for ExplainThread {
@@ -162,18 +162,20 @@ impl JobHandler for ExplainThread {
                         content_chars = response.content.chars().count(),
                         "the explanation did not parse"
                     );
-                    Outcome::Failed(Failure::Unusable)
+                    Outcome::Failed(ExplanationFailure::Unusable)
                 }
             }
             // The workspace used its whole daily limit: said, not retried.
-            Err(campbooks_ai::Error::OverDailyCap { .. }) => Outcome::Failed(Failure::Limit),
+            Err(campbooks_ai::Error::OverDailyCap { .. }) => {
+                Outcome::Failed(ExplanationFailure::Limit)
+            }
             Err(error) => {
                 tracing::warn!(
                     feature = FEATURE,
                     error = error_kind(&error),
                     "the explanation call failed"
                 );
-                Outcome::Failed(Failure::Unavailable)
+                Outcome::Failed(ExplanationFailure::Unavailable)
             }
         };
         keep(ctx, workspace, payload, &work, outcome, started).await
@@ -508,9 +510,13 @@ async fn keep(
                 conversation_id: *conversation.as_uuid(),
                 outcome: match &outcome {
                     Outcome::Ready(..) => tracking::ExplainOutcome::Ready,
-                    Outcome::Failed(Failure::Limit) => tracking::ExplainOutcome::Limit,
-                    Outcome::Failed(Failure::Unusable) => tracking::ExplainOutcome::Unusable,
-                    Outcome::Failed(Failure::Unavailable) => tracking::ExplainOutcome::Unavailable,
+                    Outcome::Failed(ExplanationFailure::Limit) => tracking::ExplainOutcome::Limit,
+                    Outcome::Failed(ExplanationFailure::Unusable) => {
+                        tracking::ExplainOutcome::Unusable
+                    }
+                    Outcome::Failed(ExplanationFailure::Unavailable) => {
+                        tracking::ExplainOutcome::Unavailable
+                    }
                 },
                 messages: match work.ids.len() {
                     0..=4 => tracking::ExplainMessages::Few,

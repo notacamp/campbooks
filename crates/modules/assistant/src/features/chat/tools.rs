@@ -485,6 +485,7 @@ impl Toolbox {
                     project::conversation(
                         &self.member.read("conversations.get", input).await?,
                         None,
+                        None,
                     )
                 } else {
                     project::events(

@@ -175,10 +175,71 @@ pub fn summary(summary: &Value) -> Value {
     out
 }
 
+/// Most bytes of the member's explanation of a thread handed on with a chat
+/// about it (campbooks-cloud#407).
+pub const EXPLANATION_BYTES: usize = 3 * 1024;
+
+/// The member's own explanation of a thread (`conversations.get_explanation`)
+/// as Scout reads it: its texts without the message ids, when it was
+/// written and whether it is stale, within [`EXPLANATION_BYTES`]. `None`
+/// when there is no explanation to show (none, or one that failed with
+/// nothing kept).
+pub fn explanation(view: &Value) -> Option<Value> {
+    let body = view.get("body").filter(|body| body.is_object())?;
+    let texts = |key: &str, fields: &[&str]| -> Vec<Value> {
+        body[key]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|entry| {
+                let mut out = Map::new();
+                for field in fields {
+                    if let Some(text) = entry[*field].as_str() {
+                        out.insert((*field).to_owned(), short(&Value::String(text.to_owned())));
+                    }
+                }
+                Value::Object(out)
+            })
+            .collect()
+    };
+    let mut out = json!({
+        "note": "Scout's own earlier reading for this member, to be checked against the messages when it is out of date.",
+        "written_at": view["written_at"],
+        "out_of_date": view["stale"],
+        "in_short": short(&body["in_short"]),
+        "who_wants_what": texts("wants", &["who", "what"]),
+        "agreed": texts("agreed", &["text"]),
+        "still_open": texts("open", &["text"]),
+        "on_the_member": texts("on_you", &["text", "due_on"]),
+    });
+    if let Some(newer) = view.get("newer").filter(|newer| newer.is_object()) {
+        out["newer_message"] =
+            json!({ "from": short(&newer["from"]), "sent_at": newer["sent_at"] });
+    }
+    // Within the budget: the last entries of each list go first.
+    while out.to_string().len() > EXPLANATION_BYTES {
+        let longest = ["who_wants_what", "agreed", "still_open", "on_the_member"]
+            .into_iter()
+            .max_by_key(|key| out[*key].as_array().map_or(0, Vec::len))?;
+        let list = out[longest].as_array_mut()?;
+        if list.pop().is_none() {
+            out["in_short"] = Value::String(
+                cut_bytes(
+                    out["in_short"].as_str().unwrap_or_default(),
+                    EXPLANATION_BYTES / 4,
+                )
+                .to_owned(),
+            );
+            break;
+        }
+    }
+    Some(out)
+}
+
 /// A conversation as the model reads what a chat is about, or what
-/// `read_conversation` found: `conversations.get`'s answer, and the history
-/// when given.
-pub fn conversation(detail: &Value, history: Option<&Value>) -> Value {
+/// `read_conversation` found: `conversations.get`'s answer, the history
+/// when given, and the member's explanation of the thread when they have one.
+pub fn conversation(detail: &Value, history: Option<&Value>, explained: Option<&Value>) -> Value {
     let head = &detail["conversation"];
     let all: Vec<&Value> = detail["messages"]
         .as_array()
@@ -260,6 +321,9 @@ pub fn conversation(detail: &Value, history: Option<&Value>) -> Value {
     }
     if let Some(history) = history {
         out["history"] = events(history, ABOUT_EVENTS);
+    }
+    if let Some(explanation) = explained.and_then(explanation) {
+        out["scout_explanation"] = explanation;
     }
     out
 }
@@ -552,7 +616,7 @@ mod tests {
                            "reasons": [{"rule": "model.decide", "evidence": "", "sentence": "Pay by Friday"}]}],
             "need_summary": "Marta asks for the rent.",
         });
-        let out = conversation(&detail, None);
+        let out = conversation(&detail, None, None);
         let newest = out["newest_messages"].as_array().unwrap();
         assert_eq!(newest.len(), 4);
         assert_eq!(newest[0]["id"], "m2");

@@ -34,7 +34,8 @@ use campbooks_kernel::{
 use crate::{
     domain::{
         explanation::{
-            self, ExplanationView, Row, SELECT, SELECT_LOCKED, State as RowState, WRITING_MINUTES,
+            self, ExplanationState as RowState, ExplanationView, Row, SELECT, SELECT_LOCKED,
+            WRITING_MINUTES,
         },
         paths::ConversationPath,
         resources,

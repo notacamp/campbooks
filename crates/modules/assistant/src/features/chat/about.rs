@@ -48,7 +48,14 @@ const PAGE: &str = "pages.page";
 pub const REGISTRY: &[AboutType] = &[
     AboutType {
         record_type: CONVERSATION,
-        reads: &["conversations.get", "conversations.get_history"],
+        // The member's own explanation of the thread, when they asked for
+        // one and may still see it (campbooks-cloud#407): the third read,
+        // whose absence (404) is no error.
+        reads: &[
+            "conversations.get",
+            "conversations.get_history",
+            "conversations.get_explanation",
+        ],
         id_param: "conversation_id",
         lost_line: "chat.about_lost",
     },
@@ -176,13 +183,21 @@ pub async fn read(member: &Member, about: &RecordRef) -> Result<Seen, Unread> {
             {
                 answers.push(Value::Null);
             }
+            // The member has no explanation of the thread (never asked, it
+            // expired, or they lost the messages it was made from): the
+            // conversation is still theirs to ask about.
+            Err(Unread::NotVisible | Unread::Refused)
+                if step == 2 && entry.record_type == CONVERSATION =>
+            {
+                answers.push(Value::Null);
+            }
             Err(Unread::NotVisible | Unread::Refused) => return Ok(Seen::Lost),
             Err(broken) => return Err(broken),
         }
     }
     let first = answers.first().unwrap_or(&Value::Null);
     let projected = match entry.record_type {
-        CONVERSATION => project::conversation(first, answers.get(1)),
+        CONVERSATION => project::conversation(first, answers.get(1), answers.get(2)),
         RULE => project::rule(first),
         RULE_NOTICE => project::rule_notice(first),
         TASK => project::task_detail(first),
