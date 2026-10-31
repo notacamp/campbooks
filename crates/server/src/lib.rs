@@ -168,9 +168,13 @@ impl Composition {
         let (gateway, ai_usage) = ai_gateway(ai, tracker.clone())?;
         let connectors = campbooks_connectors::Deps::from_env(config)?;
         let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
+        // Mail and Scout in pages (campbooks-cloud#364): Scout's tools and
+        // its handbook for pages exist while the pages module offers them.
+        let pages = campbooks_pages::Deps::from_env();
         let assistant = campbooks_assistant::AssistantDeps {
             ai: gateway.clone(),
-            handbook: handbook(),
+            handbook: handbook_for(pages.mail_scout),
+            pages: pages.mail_scout,
         };
         let system = campbooks_system::Deps {
             ai: gateway.clone(),
@@ -188,7 +192,7 @@ impl Composition {
             ),
             system,
             assistant,
-            pages: campbooks_pages::Deps::from_env(),
+            pages,
         })
     }
 }
@@ -268,7 +272,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_attention::module(),
         campbooks_search::module(),
         campbooks_assistant::module(campbooks_assistant::AssistantDeps {
-            handbook: handbook(),
+            handbook: handbook_for(composition.assistant.pages),
             ..composition.assistant.clone()
         }),
         campbooks_tasks::module(),
@@ -282,8 +286,15 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// then each module's own section, in this order. A module Scout should
 /// explain adds its `HANDBOOK` here.
 pub fn handbook() -> campbooks_assistant::Handbook {
+    handbook_for(false)
+}
+
+/// [`handbook`], with the pages module's section while `pages` (mail and
+/// Scout work with pages, `CAMPBOOKS_PAGES__MAIL_SCOUT__ENABLED`): Scout is
+/// never told about tools it was not given.
+pub fn handbook_for(pages: bool) -> campbooks_assistant::Handbook {
     use campbooks_assistant::Section;
-    campbooks_assistant::Handbook::new(vec![
+    let mut sections = vec![
         Section {
             module: campbooks_conversations::NAME,
             text: campbooks_conversations::HANDBOOK,
@@ -300,7 +311,14 @@ pub fn handbook() -> campbooks_assistant::Handbook {
             module: campbooks_schedule::NAME,
             text: campbooks_schedule::HANDBOOK,
         },
-    ])
+    ];
+    if pages {
+        sections.push(Section {
+            module: campbooks_pages::NAME,
+            text: campbooks_pages::HANDBOOK,
+        });
+    }
+    campbooks_assistant::Handbook::new(sections)
 }
 
 /// `state` with the ports modules implement for the kernel registered: the
@@ -330,6 +348,7 @@ pub fn with_ports(state: AppState) -> AppState {
             ],
         )))
         .with_open_tasks(campbooks_tasks::open_tasks())
+        .with_attachment_blobs(campbooks_conversations::attachment_blobs())
         .with_preferences(campbooks_assistant::preferences())
         .with_kept_mail(campbooks_conversations::kept_mail())
         .with_outbound(campbooks_conversations::outbound_requests())
@@ -853,6 +872,19 @@ mod tests {
                 "schedule"
             ]
         );
+        // With mail and Scout in pages, the pages section comes last.
+        let with_pages = handbook_for(true);
+        let modules: Vec<&str> = with_pages.sections().iter().map(|s| s.module).collect();
+        assert_eq!(modules.last(), Some(&"pages"));
+        assert_ne!(handbook.version(), with_pages.version());
+        for section in with_pages.sections() {
+            assert!(
+                section.text.len() <= campbooks_assistant::handbook::MAX_SECTION_BYTES,
+                "{}: {} bytes",
+                section.module,
+                section.text.len()
+            );
+        }
         for section in handbook.sections() {
             assert!(
                 section.text.len() <= campbooks_assistant::handbook::MAX_SECTION_BYTES,
@@ -1827,10 +1859,33 @@ mod tests {
             .map(|(schema, privilege)| (schema.to_owned(), privilege.to_owned())),
             "`{DEFINER_ROLE}` may use the three schemas, and create nothing"
         );
+        // Column grants: exactly these, each narrower than a table grant.
+        let columns: Vec<(String, String)> = sqlx::query_as(
+            "SELECT c.oid::regclass::text || '.' || a.attname, x.privilege_type
+               FROM pg_attribute a
+               JOIN pg_class c ON c.oid = a.attrelid,
+                    aclexplode(a.attacl) x
+              WHERE x.grantee = $1::text::regrole
+              ORDER BY 1, 2",
+        )
+        .bind(DEFINER_ROLE)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert_eq!(
+            columns,
+            [
+                // `conversations.workspaces_with_overdue_sends`
+                // (campbooks-cloud#392): which workspaces, never a draft.
+                ("conversations.drafts.send_at", "SELECT"),
+                ("conversations.drafts.state", "SELECT"),
+                ("conversations.drafts.workspace_id", "SELECT"),
+            ]
+            .map(|(column, privilege)| (column.to_owned(), privilege.to_owned())),
+            "`{DEFINER_ROLE}` reads only the columns its functions need"
+        );
         let elsewhere: i64 = sqlx::query_scalar(
-            "SELECT (SELECT count(*) FROM pg_attribute a, aclexplode(a.attacl) x
-                      WHERE x.grantee = $1::text::regrole)
-                  + (SELECT count(*) FROM pg_proc p, aclexplode(p.proacl) x
+            "SELECT (SELECT count(*) FROM pg_proc p, aclexplode(p.proacl) x
                       WHERE x.grantee = $1::text::regrole AND p.proowner <> x.grantee)
                   + (SELECT count(*) FROM pg_database d, aclexplode(d.datacl) x
                       WHERE x.grantee = $1::text::regrole)",
@@ -1839,7 +1894,7 @@ mod tests {
         .fetch_one(&db)
         .await
         .unwrap();
-        assert_eq!(elsewhere, 0, "no column, function or database grant");
+        assert_eq!(elsewhere, 0, "no function or database grant");
 
         // The functions still work for the runtime role, as their owner.
         let runtime = testing::app_role_pool(&db).await;

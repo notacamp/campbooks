@@ -32,7 +32,7 @@ import {
 } from "../../api/queries";
 import { MEMBER_KINDS, type CalendarView, type EventView, type Response } from "../../api/types";
 import { providerName, whenLong, zoneNote, type T } from "../../labels";
-import { canPush, dayLong, dayOf } from "../../model";
+import { canPush, dayLong, dayOf, takesTime } from "../../model";
 import { AddToCalendar } from "./AddToCalendar";
 import { emailPath, useInAppLink } from "./links";
 
@@ -88,7 +88,7 @@ export function EventPane({
   const provider = providerName(calendar);
   const syncedNote =
     provider === undefined ? t("sheet.synced") : t("sheet.syncedWith", { provider });
-  const writable = calendars.filter((each) => each.source === "provider" && each.writable);
+  const writable = calendars.filter(takesTime);
   const addable = !held && canPush(event, calendars);
   const elsewhere = calendars.find((each) => each.id === lastPushed)?.name;
   const note = zoneNote(t, locale, event, zone);

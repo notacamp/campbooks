@@ -1,5 +1,6 @@
 {
   "errors": {
+    "calendar_followed": "Ce calendrier est un calendrier que vous suivez. Choisissez l’un de vos propres calendriers, ou faites d’abord de celui-ci le vôtre.",
     "calendar_read_only": "Ce calendrier n’accepte pas les modifications. Choisissez l’un de vos calendriers qui le permet.",
     "change_pending": "Une modification précédente de cet événement n’est pas encore arrivée dans le calendrier. Réessayez dans un instant.",
     "invalid_calendar": "Choisissez l’un de vos calendriers, activé et modifiable, ou laissez ce champ vide.",

@@ -149,6 +149,35 @@ fn untouched() -> (String, bool, bool) {
     ("scheduled".to_owned(), false, false)
 }
 
+/// Refused, not silent: failed, nothing minted or written, and the reason named.
+async fn refused(kit: &Kit, draft: DraftId, reason: &str) {
+    assert_eq!(
+        stored(kit, draft).await,
+        ("failed".to_owned(), false, false),
+        "{reason}"
+    );
+    let (named, at): (Option<String>, Option<chrono::DateTime<chrono::Utc>>) =
+        sqlx::query_as("SELECT failure_reason, send_at FROM conversations.drafts WHERE id = $1")
+            .bind(draft)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(named.as_deref(), Some(reason));
+    assert_eq!(at, None, "a stopped send has no time");
+}
+
+/// Scheduled again as it was, for the next attempt.
+async fn rearm(kit: &Kit, draft: DraftId) {
+    sqlx::query(
+        "UPDATE conversations.drafts
+            SET state = 'scheduled', failure_reason = NULL, send_at = now() WHERE id = $1",
+    )
+    .bind(draft)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_planted_draft_is_never_released(db: PgPool) {
     let kit = Kit::new(db).await;
@@ -183,7 +212,8 @@ async fn a_planted_draft_is_never_released(db: PgPool) {
         set_mac(&kit, workspace, forged, mac).await;
         plant_release(&kit, workspace, forged, 1).await;
         assert!(!released(&kit, forged).await, "{mac:?}");
-        assert_eq!(stored(&kit, forged).await, untouched());
+        refused(&kit, forged, "destination_changed").await;
+        rearm(&kit, forged).await;
     }
     assert_eq!(blobs(&kit).await, before, "no document was written");
 
@@ -226,6 +256,8 @@ async fn a_binding_holds_only_for_its_draft_generation_inbox_and_author(db: PgPo
     set_mac(&kit, workspace, one, mac_two.as_deref()).await;
     plant_release(&kit, workspace, one, 1).await;
     assert!(!released(&kit, one).await);
+    refused(&kit, one, "destination_changed").await;
+    rearm(&kit, one).await;
     set_mac(&kit, workspace, one, mac_one.as_deref()).await;
 
     // Another generation (its binding was for the first), another inbox,
@@ -252,6 +284,8 @@ async fn a_binding_holds_only_for_its_draft_generation_inbox_and_author(db: PgPo
         as_runtime(&kit, workspace, tamper, one, changed).await;
         plant_release(&kit, workspace, one, generation).await;
         assert!(!released(&kit, one).await, "{tamper}");
+        refused(&kit, one, "destination_changed").await;
+        rearm(&kit, one).await;
         as_runtime(&kit, workspace, restore, one, original).await;
     }
     assert_eq!(stored(&kit, one).await, untouched());
@@ -324,7 +358,8 @@ async fn editing_what_goes_out_breaks_the_binding(db: PgPool) {
         tx.commit().await.unwrap();
         plant_release(&kit, workspace, draft, 1).await;
         assert!(!released(&kit, draft).await, "{edit}");
-        assert_eq!(stored(&kit, draft).await, untouched(), "{edit}");
+        refused(&kit, draft, "destination_changed").await;
+        rearm(&kit, draft).await;
         // Put back as signed.
         let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
         sqlx::query(
@@ -402,7 +437,7 @@ async fn without_a_key_nothing_is_scheduled_or_released(db: PgPool) {
     let kit = kit.keyless();
     window_ends(&kit).await;
     assert!(!released(&kit, draft).await);
-    assert_eq!(stored(&kit, draft).await, untouched());
+    refused(&kit, draft, "destination_changed").await;
 
     // And no send is scheduled at all.
     let uri = format!("/api/v1/w/{workspace}/drafts");

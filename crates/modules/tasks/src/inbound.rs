@@ -1,13 +1,15 @@
 //! The other modules' events this module consumes, and the blob document it
 //! points at, as their published contracts describe them (modules never
 //! import each other): `contracts/conversations.message_read.v1`,
-//! `contracts/read-texts.v1` and `contracts/schedule.event_created.v1` with
-//! its two siblings (`event_changed`, `event_cancelled`).
+//! `contracts/read-texts.v1`, `contracts/conversations.member_replied.v1`
+//! and `contracts/schedule.event_created.v1` with its two siblings
+//! (`event_changed`, `event_cancelled`).
 //!
 //! Each type reads only the fields this module uses; what the contract adds
 //! later is ignored.
 
 use campbooks_kernel::{DomainEvent, RecordRef, blobs::BlobRef, tenancy::UserId};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 
@@ -25,6 +27,9 @@ pub struct ReadAsk {
     /// The reference of an open task it repeats.
     #[serde(default)]
     pub same_as: Option<String>,
+    /// `reply` or `elsewhere` (checked when used); absent from older reads.
+    #[serde(default)]
+    pub done_by: Option<String>,
 }
 
 /// `conversations.message_read` v1: a read of one message was stored.
@@ -53,6 +58,34 @@ pub struct MessageRead {
 
 impl DomainEvent for MessageRead {
     const NAME: &'static str = "conversations.message_read";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `conversations.member_replied` v1: a message the member sent was stored
+/// in a conversation of their personal inbox (sent from Campbooks, or from
+/// the provider's own client). Ids and a time only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberReplied {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox.
+    pub inbox: String,
+    /// The conversation the message belongs to.
+    pub conversation: String,
+    /// The message the member sent.
+    pub message: Uuid,
+    /// When it was sent.
+    pub sent_at: DateTime<Utc>,
+    /// The inbox's personal owner: the member who sent it.
+    pub owner: UserId,
+}
+
+impl DomainEvent for MemberReplied {
+    const NAME: &'static str = "conversations.member_replied";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

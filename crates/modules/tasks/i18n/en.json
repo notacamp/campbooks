@@ -16,6 +16,7 @@
     "not_handed_off": "This task was not handed to anyone.",
     "invalid_hold": "Hold 15 to 240 minutes that have not started yet.",
     "pay_not_held": "A bill is paid, not worked on: there is no time to hold for it.",
-    "not_held": "No time is held for this task."
+    "not_held": "No time is held for this task.",
+    "no_reply_question": "Nothing is asked about this task right now."
   }
 }

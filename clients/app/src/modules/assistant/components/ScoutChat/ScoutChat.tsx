@@ -27,6 +27,7 @@ import {
   useRuleSubject,
   type ConversationSummary,
 } from "~/modules/conversations";
+import { usePageSubject } from "~/modules/pages";
 import { useTaskSubject } from "~/modules/tasks";
 
 import {
@@ -80,7 +81,7 @@ interface Pending {
 type Problem = "unavailable" | "limit" | "full" | "unreadable";
 
 /** What kind of thing the chat is about, as its copy needs it. */
-type Kind = "conversation" | "rule" | "notice" | "task" | "nothing";
+type Kind = "conversation" | "rule" | "notice" | "task" | "page" | "nothing";
 
 function kindOf(about: RecordRef | null | undefined): Kind | undefined {
   if (about === undefined) {
@@ -98,6 +99,9 @@ function kindOf(about: RecordRef | null | undefined): Kind | undefined {
     }
     case SCOUT_CHAT_ABOUT.task: {
       return "task";
+    }
+    case SCOUT_CHAT_ABOUT.page: {
+      return "page";
     }
     default: {
       return "conversation";
@@ -152,6 +156,7 @@ export function ScoutChat({
   const rule = useRuleSubject(workspaceId, idOf(subject, SCOUT_CHAT_ABOUT.rule));
   const notice = useRuleNoticeSubject(workspaceId, idOf(subject, SCOUT_CHAT_ABOUT.ruleNotice));
   const task = useTaskSubject(workspaceId, idOf(subject, SCOUT_CHAT_ABOUT.task));
+  const page = usePageSubject(workspaceId, idOf(subject, SCOUT_CHAT_ABOUT.page));
   const [recentWanted, setRecentWanted] = useState(false);
   const recent = useRecentChats(workspaceId, recentWanted);
   const [draft, setDraft] = useState("");
@@ -191,6 +196,14 @@ export function ScoutChat({
   const subjectLine =
     head === undefined ? "" : head.subject === "" ? t("chat.noSubject") : head.subject;
   const firstName = inbound?.from.name?.trim().split(/\s+/u, 1)[0] ?? "";
+
+  /** A card sends the member to a page or a thread: a narrow chat is in the way. */
+  const leaveChat = () => {
+    const wide = typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
+    if (!wide) {
+      onClose();
+    }
+  };
 
   const openConversation = (summary: Pick<ConversationSummary, "id" | "stream">) => {
     const wide = typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
@@ -376,12 +389,17 @@ export function ScoutChat({
                 intro: t("chat.taskIntro"),
                 questions: [t("chat.taskLeft"), t("chat.taskWhen"), t("chat.taskWho")],
               }
-            : kind === "nothing"
+            : kind === "page"
               ? {
-                  intro: t("chat.nothingIntro"),
-                  questions: [t("chat.nothingToday"), t("chat.nothingWaiting")],
+                  intro: t("chat.pageIntro"),
+                  questions: [t("chat.pageOpen"), t("chat.pageSummary"), t("chat.pageNext")],
                 }
-              : undefined;
+              : kind === "nothing"
+                ? {
+                    intro: t("chat.nothingIntro"),
+                    questions: [t("chat.nothingToday"), t("chat.nothingWaiting")],
+                  }
+                : undefined;
 
   const log = (
     <>
@@ -414,6 +432,7 @@ export function ScoutChat({
                 onSettled={() => {
                   void cache.refresh(chat.data.id);
                 }}
+                onLeave={leaveChat}
               />
             )
           }
@@ -458,9 +477,11 @@ export function ScoutChat({
           ? t("chat.unreadableNotice")
           : kind === "task"
             ? t("chat.unreadableTask")
-            : kind === "nothing"
-              ? t("chat.unreadableNothing")
-              : t("chat.unreadable");
+            : kind === "page"
+              ? t("chat.unreadablePage")
+              : kind === "nothing"
+                ? t("chat.unreadableNothing")
+                : t("chat.unreadable");
 
   const footer =
     problem === "unavailable" ? (
@@ -523,6 +544,10 @@ export function ScoutChat({
       <ChatAbout label={t("chat.about")}>{t("chat.noticeLine", { sender: notice.text })}</ChatAbout>
     ) : kind === "task" && task.text !== undefined ? (
       <ChatAbout label={t("chat.about")}>{t("chat.taskLine", { title: task.text })}</ChatAbout>
+    ) : kind === "page" && page.text !== undefined ? (
+      <ChatAbout label={t("chat.about")}>
+        {t("chat.pageLine", { title: page.text === "" ? t("chat.pageUntitled") : page.text })}
+      </ChatAbout>
     ) : kind === "nothing" ? (
       <ChatAbout label={t("chat.about")}>{t("chat.aboutNothing")}</ChatAbout>
     ) : undefined;

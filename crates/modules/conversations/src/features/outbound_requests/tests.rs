@@ -87,6 +87,7 @@ fn destination(as_at_deploy: bool) -> Resolved {
             mailbox: String::new(),
         },
         as_at_deploy,
+        max_attachment_bytes: None,
     }
 }
 

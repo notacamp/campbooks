@@ -104,6 +104,7 @@ const OWN: Calendar = {
   primary: false,
   syncing: true,
   writable: true,
+  role: "mine",
   color: null,
   time_zone: HOME_ZONE,
 };
@@ -115,6 +116,7 @@ const WORK: Calendar = {
   primary: true,
   syncing: true,
   writable: true,
+  role: "mine",
   color: "#2f9e6b",
   time_zone: HOME_ZONE,
 };

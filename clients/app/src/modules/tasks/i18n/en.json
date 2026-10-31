@@ -40,7 +40,8 @@
     "fromEmail": "From {{name}} · email",
     "with": "With {{name}}",
     "markDone": "Mark done: {{title}}",
-    "markPaid": "Mark paid: {{title}}"
+    "markPaid": "Mark paid: {{title}}",
+    "repliedAsk": "You replied · Done?"
   },
   "due": {
     "overdue_one": "Overdue · {{count}} day",
@@ -80,9 +81,8 @@
     "tonight": "Tonight",
     "tomorrow": "Tomorrow",
     "nextWeek": "Next week",
-    "source": "Where it came from",
-    "foundByScout": "Scout found this in the email",
     "sourceLine": "{{subject}} · {{date}}",
+    "quote": "“{{quote}}”",
     "openEmail": "Open the email",
     "hand": "Hand it to someone",
     "handFind": "Find a teammate by name",
@@ -95,7 +95,113 @@
     "notNeeded": "Not needed",
     "payNote": "Campbooks never pays for you. This only marks it paid.",
     "holdTime": "Hold time",
-    "release": "Release"
+    "release": "Release",
+    "notYet": "Not yet",
+    "yourReply": "Your reply · {{date}}",
+    "replyQuestion": {
+      "replied": "You replied to {{name}} at {{time}}.",
+      "done": "Is this task done?"
+    },
+    "why": "Why it’s here",
+    "history": "History"
+  },
+  "why": {
+    "scout": "Scout made it",
+    "scoutRest": "on {{date}} at {{time}}, from an email it read in your inbox.",
+    "you": "You made this",
+    "member": "{{name}} made this",
+    "madeRest": "on {{date}} at {{time}}.",
+    "handed": "{{name}} handed it to you on {{date}}.",
+    "handedNoDate": "{{name}} handed it to you."
+  },
+  "history": {
+    "teammate": "A teammate",
+    "scout": "Scout",
+    "calendar": "The calendar",
+    "dueSuffix": ", due {{date}}",
+    "showAll": "Show all {{total}}",
+    "replied": "You replied in the thread. Scout asked if it was done.",
+    "field": {
+      "title": "the title",
+      "task_verb": "the kind",
+      "due": "the due date"
+    },
+    "created": {
+      "you": "You made it",
+      "other": "{{who}} made it",
+      "scoutFrom": "Scout made it from {{name}}’s email"
+    },
+    "edited": {
+      "you": "You changed {{fields}}",
+      "other": "{{who}} changed {{fields}}"
+    },
+    "dueSet": {
+      "you": "You set the due date to {{date}}",
+      "other": "{{who}} set the due date to {{date}}"
+    },
+    "dueRemoved": {
+      "you": "You removed the due date",
+      "other": "{{who}} removed the due date"
+    },
+    "planned": {
+      "you": "You planned it for {{day}}",
+      "other": "{{who}} planned it for {{day}}"
+    },
+    "later": {
+      "you": "You put it off until {{date}}",
+      "other": "{{who}} put it off until {{date}}"
+    },
+    "unplanned": {
+      "you": "You took it off the plan",
+      "other": "{{who}} took it off the plan"
+    },
+    "done": {
+      "you": "You marked it done",
+      "other": "{{who}} marked it done"
+    },
+    "paid": {
+      "you": "You marked it paid",
+      "other": "{{who}} marked it paid"
+    },
+    "notNeeded": {
+      "you": "You marked it not needed",
+      "other": "{{who}} marked it not needed"
+    },
+    "reopened": {
+      "you": "You opened it again",
+      "other": "{{who}} opened it again"
+    },
+    "handedOff": {
+      "you": "You handed it to {{member}}",
+      "other": "{{who}} handed it to {{member}}",
+      "toYou": "{{who}} handed it to you"
+    },
+    "takenBack": {
+      "you": "You took it back from {{member}}",
+      "other": "{{who}} took it back from {{member}}",
+      "fromYou": "{{who}} took it back from you"
+    },
+    "held": {
+      "you": "You held time {{when}}",
+      "other": "{{who}} held time {{when}}",
+      "moved": "The calendar moved the held time to {{when}}"
+    },
+    "released": {
+      "you": "You released the held time",
+      "other": "{{who}} released the held time"
+    },
+    "replyAnswered": {
+      "you": "You said it isn’t done yet",
+      "other": "{{who}} said it isn’t done yet"
+    },
+    "replyUnanswered": {
+      "you": "You undid “Not yet”",
+      "other": "{{who}} undid “Not yet”"
+    },
+    "changed": {
+      "you": "You changed it",
+      "other": "{{who}} changed it"
+    }
   },
   "toast": {
     "done": "Done · {{title}}",
@@ -111,7 +217,8 @@
     "failed": "Couldn’t change {{title}}. It is as it was.",
     "changed": "{{title}} changed in the meantime. Take another look.",
     "held": "Held {{when}} · {{title}}",
-    "released": "Released · {{title}}"
+    "released": "Released · {{title}}",
+    "stillOpen": "Okay, still open · {{title}}"
   },
   "make": {
     "button": "Make it a task",
@@ -141,5 +248,15 @@
   "holdDialog": {
     "title": "Hold time",
     "description": "A busy block on your calendar, in your free time."
+  },
+  "ask": {
+    "replied": "You replied",
+    "meta": "Task · {{kind}} · from {{name}}",
+    "line": "You answered {{name}}’s email. Is this task done?",
+    "whyTitle": "Why Scout asks",
+    "whyText": "You replied in the same thread at {{time}}, after the task was made. Scout didn’t read your reply.",
+    "whyNote": "Nothing changes until you answer.",
+    "openThread": "Open the thread",
+    "openTask": "Open the task"
   }
 }

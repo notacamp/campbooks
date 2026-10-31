@@ -37,6 +37,7 @@ pub async fn list(api: &Calendar<'_>) -> Result<Vec<ListedCalendar>, CalendarErr
             time_zone: entry.time_zone.clone().filter(|z| z.chars().count() <= 64),
             primary: entry.primary,
             writable: entry.writable(),
+            owned: super::owned_by(entry.access_role.as_deref()),
             provider_id: entry.id,
         })
         .collect())

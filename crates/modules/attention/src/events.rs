@@ -134,6 +134,10 @@ pub struct TaskChanged {
     /// The record it came from.
     #[serde(default)]
     pub source: Option<RecordRef>,
+    /// Whether the member is asked "You replied. Is this done?"
+    /// (campbooks-cloud#396): Home keeps the task in front of them.
+    #[serde(default)]
+    pub asks_done: bool,
 }
 
 /// A task's state, as `tasks.task_changed` carries it.

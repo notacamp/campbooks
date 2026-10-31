@@ -21,7 +21,7 @@
 
 use std::{collections::BTreeMap, str::FromStr as _};
 
-use campbooks_ai::{ChatRequest, Message};
+use campbooks_ai::{ChatRequest, Message, ReasoningEffort};
 use campbooks_kernel::i18n::Locale;
 use chrono::{DateTime, NaiveDate, TimeDelta, Utc};
 use chrono_tz::Tz;
@@ -33,8 +33,11 @@ use crate::{
         Amount, MAX_ASKS, MAX_ITEMS, MAX_PLACE, MAX_QUOTE, MAX_TITLE, ReadAsk, ReadItem, When, key,
         tidy,
     },
-    model::{ItemKind, MessageId, ReadLayer, Verb},
+    model::{DoneBy, ItemKind, MessageId, ReadLayer, Verb},
 };
+
+/// The token budget of a read: room for the thinking and the answer.
+pub const MAX_TOKENS: u32 = 8192;
 
 /// Longest summary kept, per language, in characters.
 pub const MAX_CHARS: usize = 400;
@@ -88,8 +91,12 @@ as written; `updates` or `cancels` is the `id` of a known item that this one cha
 cancels, or null. `asks` are every obligation of the recipient, dated or not, at most three: \
 `title` of at most 80 characters, `quote` as above, `due` as `starts` (a date or a time) or \
 null, `verb` is `do` or `pay`, `amount_minor` and `amount_currency` (an ISO 4217 code) only \
-for `pay` and only when the email states the amount, else null, and `same_as` is the \
-`task_ref` of an open task that this is the same obligation as, or null. Rules: only asks of \
+for `pay` and only when the email states the amount, else null, `done_by` is `reply` when \
+replying to this email is itself how the obligation is done (giving an answer, an approval, \
+comments, a confirmation, a choice, information asked for) and `elsewhere` when it is done \
+some other way (paying, signing or sending a document or a form, filing, booking, going \
+somewhere, doing work), and `same_as` is the `task_ref` of an open task that this is the \
+same obligation as, or null. Rules: only asks of \
 the recipient, never of other recipients or of the sender themselves. An expiry with \
 something to do before it (renew a passport, a contract, a domain) is an ask with verb `do`; \
 a plain expiry is an `expiry` item. Money taken automatically (a renewal, a direct debit) is \
@@ -259,7 +266,7 @@ pub fn request_for(input: &Input, waiting: bool) -> ChatRequest {
         "type": "object",
         "additionalProperties": false,
         "required": ["title", "quote", "due", "verb", "amount_minor", "amount_currency",
-                     "same_as"],
+                     "done_by", "same_as"],
         "properties": {
             "title": property,
             "quote": property,
@@ -267,6 +274,7 @@ pub fn request_for(input: &Input, waiting: bool) -> ChatRequest {
             "verb": { "type": "string", "enum": ["do", "pay"] },
             "amount_minor": { "type": ["integer", "null"] },
             "amount_currency": nullable,
+            "done_by": { "type": "string", "enum": ["reply", "elsewhere"] },
             "same_as": nullable,
         },
     });
@@ -294,7 +302,13 @@ pub fn request_for(input: &Input, waiting: bool) -> ChatRequest {
     );
     request.temperature = Some(0.2);
     // The model reasons before it answers and its thinking shares the budget.
-    request.max_tokens = Some(4096);
+    // At the default amount of thinking 3 of 50 reads in a measurement wrote
+    // nothing at 4096 tokens; at low effort none did, at either budget, and
+    // they cost less and ran sooner (crates/ai/evals/complete/
+    // 2026-10-28-read-budget.md, campbooks-cloud#375). The budget is a cap
+    // for the odd long answer, not a cost.
+    request.max_tokens = Some(MAX_TOKENS);
+    request.reasoning_effort = Some(ReasoningEffort::Low);
     request
 }
 
@@ -640,6 +654,13 @@ fn vet_ask(
         }
         None => None,
     };
+    // How it gets done is the model's reading; code only vetoes. A value
+    // outside the set is no value, and a payment is never done by a reply.
+    let done_by = if verb == Verb::Pay {
+        Some(DoneBy::Elsewhere)
+    } else {
+        string(raw, "done_by").and_then(|done_by| DoneBy::from_str(done_by).ok())
+    };
     Ok(ReadAsk {
         key: key(veto.message, ReadLayer::Model, true, position),
         title,
@@ -648,6 +669,7 @@ fn vet_ask(
         verb,
         amount,
         same_as,
+        done_by,
     })
 }
 
@@ -760,7 +782,8 @@ mod tests {
     #[test]
     fn it_asks_for_room_to_think_and_a_strict_answer() {
         let request = request(&input("Hello"));
-        assert_eq!(request.max_tokens, Some(4096));
+        assert_eq!(request.max_tokens, Some(MAX_TOKENS));
+        assert_eq!(request.reasoning_effort, Some(ReasoningEffort::Low));
         let format = serde_json::to_value(request.response_format).unwrap();
         let schema = &format["json_schema"]["schema"];
         let required: Vec<&str> = schema["required"]
@@ -797,6 +820,47 @@ mod tests {
             ask["properties"]["verb"]["enum"],
             serde_json::json!(["do", "pay"])
         );
+        // How it gets done is required and one of two words (campbooks-cloud#396).
+        assert_eq!(
+            ask["properties"]["done_by"]["enum"],
+            serde_json::json!(["reply", "elsewhere"])
+        );
+        assert!(
+            ask["required"]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!("done_by"))
+        );
+    }
+
+    #[test]
+    fn how_an_ask_gets_done_is_kept_when_valid_and_a_payment_is_never_a_reply() {
+        let ask = |done_by: serde_json::Value| {
+            serde_json::json!({
+                "title": "Send the signed contract",
+                "quote": "Please send the signed contract by 20 November", "due": null,
+                "verb": "do", "amount_minor": null, "amount_currency": null,
+                "done_by": done_by, "same_as": null
+            })
+        };
+        let vetted = vet(
+            &with(
+                Vec::new(),
+                vec![
+                    ask(serde_json::json!("reply")),
+                    ask(serde_json::json!("elsewhere")),
+                    ask(serde_json::json!("whenever")),
+                ],
+            ),
+            &veto(),
+        );
+        let kept: Vec<Option<DoneBy>> = vetted.asks.iter().map(|ask| ask.done_by).collect();
+        assert_eq!(kept, [Some(DoneBy::Reply), Some(DoneBy::Elsewhere), None]);
+        // A payment is done elsewhere whatever the model said.
+        let mut pay = pay();
+        pay["done_by"] = serde_json::json!("reply");
+        let vetted = vet(&with(Vec::new(), vec![pay]), &veto());
+        assert_eq!(vetted.asks[0].done_by, Some(DoneBy::Elsewhere));
     }
 
     #[test]

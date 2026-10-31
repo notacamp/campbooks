@@ -2,7 +2,9 @@
 //! grant brings the member one calendar per calendar of the provider
 //! account, owned by the member who granted it; the primary one syncs and
 //! the others wait until the member turns them on. A repeated grant adds only
-//! the calendars the module does not have yet.
+//! the calendars the module does not have yet, and records whether the
+//! account owns one the module had without knowing. A calendar the account
+//! does not own starts as one the member follows.
 
 use campbooks_kernel::{Event, EventHandler, JobContext, JobError, tenancy::WorkspaceId};
 
@@ -65,8 +67,10 @@ impl EventHandler for GrantCalendars {
             let inserted = sqlx::query(
                 "INSERT INTO schedule.calendars
                      (id, workspace_id, member_id, source, connection_id, provider_calendar_id,
-                      name, color, time_zone, syncing, writable, is_primary, provider)
-                 VALUES ($1, $2, $3, 'provider', $4, $5, $6, $7, $8, $9, $10, $9, $11)
+                      name, color, time_zone, syncing, writable, is_primary, provider,
+                      owned, following)
+                 VALUES ($1, $2, $3, 'provider', $4, $5, $6, $7, $8, $9, $10, $9, $11,
+                         $12, $12 IS FALSE)
                  ON CONFLICT (workspace_id, connection_id, provider_calendar_id)
                     WHERE source = 'provider' DO NOTHING",
             )
@@ -81,10 +85,29 @@ impl EventHandler for GrantCalendars {
             .bind(calendar.primary)
             .bind(calendar.writable)
             .bind(provider)
+            .bind(calendar.owned)
             .execute(&mut **tx)
             .await?
             .rows_affected();
             added += inserted;
+            // A calendar the module had: learn whether the account owns it,
+            // and nothing else (the member's role is theirs).
+            if inserted == 0
+                && let Some(owned) = calendar.owned
+            {
+                sqlx::query(
+                    "UPDATE schedule.calendars SET owned = $4, updated_at = now()
+                      WHERE workspace_id = $1 AND connection_id = $2
+                        AND provider_calendar_id = $3 AND source = 'provider'
+                        AND owned IS NULL",
+                )
+                .bind(workspace)
+                .bind(granted.connection)
+                .bind(&calendar.provider_id)
+                .bind(owned)
+                .execute(&mut **tx)
+                .await?;
+            }
             // A calendar the module did not have yet.
             if inserted > 0
                 && let Some(snapshot) = tracked::calendar(tx, id).await?

@@ -406,6 +406,7 @@ fn pay_ask(layer: &str, due: Option<&str>) -> ReadAsk {
         verb: "pay".to_owned(),
         due: due.map(str::to_owned),
         same_as: None,
+        done_by: None,
     }
 }
 

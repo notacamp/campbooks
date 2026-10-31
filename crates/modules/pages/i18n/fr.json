@@ -55,6 +55,14 @@
     "nothing_to_undo": "Il n'y a aucun choix à annuler pour ce conflit.",
     "conflict_gone": "Ce conflit ne concerne plus une colonne de ce tableau.",
     "not_a_database": "Ce n'est pas une base de données Notion que vous pouvez importer.",
-    "no_table_conflict": "Ce tableau n'a pas ce conflit."
+    "no_table_conflict": "Ce tableau n'a pas ce conflit.",
+    "invalid_attachments": "Choisissez entre 1 et 20 fichiers.",
+    "not_a_page": "Ceci est un tableau : il n'a pas de contenu auquel ajouter.",
+    "file_too_large": "Un fichier peut faire 20 Mio au maximum.",
+    "markdown_empty": "Il n'y a rien à ajouter.",
+    "markdown_too_large": "Une section peut faire 16 Kio au maximum.",
+    "too_many_sources": "Une section peut citer 10 sources au maximum.",
+    "markdown_with_document": "Envoyez le contenu soit comme document, soit comme Markdown, pas les deux.",
+    "sources_without_markdown": "Les sources vont avec du Markdown. Ajoutez le Markdown auquel elles appartiennent."
   }
 }

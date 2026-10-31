@@ -378,6 +378,35 @@ async fn a_calendar_turned_off_or_removed_closes_its_invitations(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn following_a_calendar_hides_its_invitations_and_mine_announces_them_again(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let (token, ana) = kit.member("ana", ws);
+    let connection = grant(&kit, ws, ana).await;
+    apply(
+        &kit,
+        ws,
+        connection,
+        vec![invite("offsite", at(3), "needs_action", &joao())],
+        vec![],
+    )
+    .await;
+    let work = calendar(&kit, ana).await;
+    let uri = format!("/api/v1/w/{ws}/schedule/calendars/{work}");
+    let followed = kit.patch(&token, &uri, json!({"role": "following"})).await;
+    assert_eq!(followed.status, StatusCode::OK, "{:?}", followed.json);
+    let events = announced(&kit).await;
+    assert_eq!(events.len(), 2, "{events:?}");
+    assert_eq!(events[1]["closed_because"], "hidden");
+    // Following keeps it hidden when a batch changes the event.
+    let mine = kit.patch(&token, &uri, json!({"role": "mine"})).await;
+    assert_eq!(mine.status, StatusCode::OK, "{:?}", mine.json);
+    let events = announced(&kit).await;
+    assert_eq!(events.len(), 3, "{events:?}");
+    assert!(events[2]["invitation"].is_object());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn invitations_stored_before_are_announced_once_by_the_backfill(db: PgPool) {
     let kit = Kit::new(db).await;
     let ws = WorkspaceId::new();

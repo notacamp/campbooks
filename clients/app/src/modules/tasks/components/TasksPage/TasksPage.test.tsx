@@ -16,9 +16,14 @@ import { W } from "../../../../../test/demo/conversations";
 import {
   ACCOUNTANT,
   ASK_LEASE,
+  ASK_LEASE_HISTORY,
+  ASK_REPLIED,
   BILL,
   INSPECTION,
   LEASE,
+  LEASE_ASK,
+  LEASE_QUOTE,
+  LONG_HISTORY,
   OPEN_TASKS,
   PHOTOS,
   PROPOSAL,
@@ -55,6 +60,7 @@ function Route() {
       taskId={taskId}
       creating={taskId === undefined && search.new === 1}
       useSources={() => SOURCES}
+      useQuote={(_workspace, _conversation, ask) => (ask === LEASE_ASK ? LEASE_QUOTE : undefined)}
       now={TASKS_NOW}
     />
   );
@@ -106,10 +112,24 @@ const dayName = (day: string) =>
 const rowOf = (title: string) =>
   screen.findByRole("button", { name: new RegExp(String.raw`^(Do|Pay)\s+${title}`, "u") });
 
+/** The replied-to task after Not yet, and after Not yet is taken back. */
+const NOT_YET = { ...ASK_REPLIED, asks_done: false, revision: 3 };
+const ASKING_AGAIN = { ...ASK_REPLIED, revision: 4 };
+
 /** The tasks API over a list the calls below change, as the server would. */
-function api(start = OPEN_TASKS, handedOff = [VENUE]) {
+function api(
+  start = OPEN_TASKS,
+  handedOff = [VENUE],
+  histories: Record<string, (typeof ASK_LEASE_HISTORY)[number][]> = {},
+) {
   let tasks = [...start];
   return mockApi({
+    ...Object.fromEntries(
+      Object.entries(histories).map(([id, history]) => [
+        `GET ${W}/tasks/${id}`,
+        () => ({ body: { task: tasks.find((task) => task.id === id), history } }),
+      ]),
+    ),
     [`GET ${W}/members`]: { body: { members: TEAM } },
     [`GET ${W}/tasks`]: (request) =>
       new URL(request.url).searchParams.get("whose") === "handed_off"
@@ -137,6 +157,18 @@ function api(start = OPEN_TASKS, handedOff = [VENUE]) {
       body: { ...LEASE, title: (body as { title: string }).title, revision: 2 },
     }),
     [`POST ${W}/tasks/${LEASE.id}/done`]: { body: { ...LEASE, state: "done", revision: 3 } },
+    [`POST ${W}/tasks/${ASK_REPLIED.id}/reply_answered`]: () => {
+      tasks = tasks.map((task) => (task.id === ASK_REPLIED.id ? NOT_YET : task));
+      return { body: NOT_YET };
+    },
+    [`POST ${W}/tasks/${ASK_REPLIED.id}/reply_unanswered`]: () => {
+      tasks = tasks.map((task) => (task.id === ASK_REPLIED.id ? ASKING_AGAIN : task));
+      return { body: ASKING_AGAIN };
+    },
+    [`POST ${W}/tasks/${ASK_REPLIED.id}/done`]: () => {
+      tasks = tasks.filter((task) => task.id !== ASK_REPLIED.id);
+      return { body: { ...ASK_REPLIED, state: "done", asks_done: false, revision: 3 } };
+    },
     [`POST ${W}/tasks/${VENUE.id}/take_back`]: {
       body: { ...VENUE, assignee: ANA.user_id, handed_by: null, revision: 2 },
     },
@@ -250,7 +282,7 @@ describe("Tasks", () => {
 
     fireEvent.click(await rowOf(LEASE.title));
 
-    expect(await screen.findByText("Where it came from")).toBeVisible();
+    expect(await screen.findByText("Why it’s here")).toBeVisible();
     expect(screen.queryByRole("form", { name: "New task" })).toBeNull();
   });
 
@@ -269,7 +301,7 @@ describe("Tasks", () => {
     const calls = api();
     renderTasks();
     fireEvent.click(await rowOf(LEASE.title));
-    expect(await screen.findByText("Where it came from")).toBeVisible();
+    expect(await screen.findByText("Why it’s here")).toBeVisible();
     expect(screen.getByText(/Walkthrough on Thursday/u)).toBeVisible();
     fireEvent.click(await screen.findByRole("button", { name: /^Later/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Tomorrow" }));
@@ -282,18 +314,124 @@ describe("Tasks", () => {
     });
   });
 
-  it("says Scout found a task in the email, and says nothing for the member's own", async () => {
+  it("says Scout made a task and when, and that the member made their own", async () => {
     api([ASK_LEASE, BILL, PROPOSAL, { ...LEASE, title: "Return Marta’s lease copy" }]);
     renderTasks();
     fireEvent.click(await rowOf(ASK_LEASE.title));
-    expect(await screen.findByText("Scout found this in the email")).toBeVisible();
-    expect(screen.getByText("Where it came from")).toBeVisible();
+    expect(await screen.findByText("Scout made it")).toBeVisible();
+    expect(
+      screen.getByText(
+        (_text, element) =>
+          element?.tagName === "P" &&
+          /^Scout made it on Oct 10 at .*, from an email it read in your inbox\.$/u.test(
+            element.textContent,
+          ),
+      ),
+    ).toBeVisible();
+    expect(screen.getByText("Why it’s here")).toBeVisible();
 
     fireEvent.click(await rowOf("Return Marta’s lease copy"));
-    await waitFor(() => {
-      expect(screen.queryByText("Scout found this in the email")).toBeNull();
-    });
+    expect(await screen.findByText("You made this")).toBeVisible();
+    expect(screen.queryByText("Scout made it")).toBeNull();
     expect(screen.getByText(/Walkthrough on Thursday/u)).toBeVisible();
+  });
+
+  it("quotes the sender's own sentence under their name, and nothing for an older task", async () => {
+    const older = { ...ASK_LEASE, id: ASK_REPLIED.id, title: "Older ask", source_ask: null };
+    api([ASK_LEASE, older, BILL], [VENUE], {
+      [ASK_LEASE.id]: ASK_LEASE_HISTORY,
+      [older.id]: ASK_LEASE_HISTORY,
+    });
+    renderTasks();
+    fireEvent.click(await rowOf(ASK_LEASE.title));
+    const quote = await screen.findByText(`“${LEASE_QUOTE}”`);
+    expect(quote.tagName).toBe("BLOCKQUOTE");
+    expect(quote).not.toHaveAttribute("lang");
+    // Under the sender's line, before the link to the email.
+    expect(screen.getByText("Marta Ferreira")).toBeVisible();
+    fireEvent.click(await rowOf("Older ask"));
+    await screen.findByRole("heading", { name: "History" });
+    expect(screen.queryByText(`“${LEASE_QUOTE}”`)).toBeNull();
+  });
+
+  it("lists what happened to a task, oldest first, with who did it", async () => {
+    api([ASK_LEASE, BILL], [VENUE], { [ASK_LEASE.id]: ASK_LEASE_HISTORY });
+    renderTasks();
+    fireEvent.click(await rowOf(ASK_LEASE.title));
+    const heading = await screen.findByRole("heading", { name: "History" });
+    const lines = within(heading.closest("section") ?? document.body)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent);
+    expect(lines).toHaveLength(7);
+    expect(lines[0]).toMatch(/Scout made it from Marta Ferreira’s email, due Fri 16$/u);
+    expect(lines[1]).toMatch(/You planned it for Wed 14$/u);
+    expect(lines[2]).toMatch(/You held time Wed /u);
+    expect(lines[3]).toMatch(/The calendar moved the held time to Wed /u);
+    expect(lines[4]).toMatch(/You replied in the thread\. Scout asked if it was done\.$/u);
+    expect(lines[5]).toMatch(/You said it isn’t done yet$/u);
+    expect(lines[6]).toMatch(/You marked it done$/u);
+  });
+
+  it("folds a long history to the first entry and the latest six", async () => {
+    api([ASK_LEASE, BILL], [VENUE], { [ASK_LEASE.id]: LONG_HISTORY });
+    renderTasks();
+    fireEvent.click(await rowOf(ASK_LEASE.title));
+    const show = await screen.findByRole("button", { name: "Show all 10" });
+    const section = show.closest("section") ?? document.body;
+    expect(within(section).getAllByRole("listitem")).toHaveLength(7);
+    expect(within(section).getByText(/Sofia Pessoa made it$/u)).toBeVisible();
+    fireEvent.click(show);
+    await waitFor(() => {
+      expect(within(section).getAllByRole("listitem")).toHaveLength(10);
+    });
+    expect(screen.queryByRole("button", { name: /^Show all/u })).toBeNull();
+  });
+
+  it("marks a task that asks Done? after a reply, in its row and with the question in its detail", async () => {
+    const calls = api([ASK_REPLIED, BILL]);
+    renderTasks();
+    // The row says so under the title.
+    const row = await rowOf(ASK_REPLIED.title);
+    expect(within(row).getByText("You replied · Done?")).toBeVisible();
+    expect(within(await rowOf(BILL.title)).queryByText("You replied · Done?")).toBeNull();
+
+    fireEvent.click(row);
+    // The question, above where it came from, with the reply in the source.
+    expect(await screen.findByText(/^You replied to Marta Ferreira at /u)).toBeVisible();
+    expect(screen.getByText("Is this task done?")).toBeVisible();
+    expect(screen.getByText(/^Your reply · /u)).toBeVisible();
+
+    // Not yet: the task stays open and the question is gone, with an Undo.
+    fireEvent.click(screen.getByRole("button", { name: /^Not yet/u }));
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/reply_answered"))?.body).toEqual({
+        revision: 2,
+      });
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Is this task done?")).toBeNull();
+    });
+    expect(await screen.findByText(`Okay, still open · ${ASK_REPLIED.title}`)).toBeVisible();
+    fireEvent.keyDown(document, { key: "z" });
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/reply_unanswered"))?.body).toEqual({
+        revision: 3,
+      });
+    });
+  });
+
+  it("answers the question with Done from the task's detail", async () => {
+    const calls = api([ASK_REPLIED, BILL]);
+    renderTasks(`tasks/${ASK_REPLIED.id}`);
+    expect(await screen.findByText("Is this task done?")).toBeVisible();
+    fireEvent.keyDown(document, { key: "1" });
+    await waitFor(() => {
+      expect(
+        calls.calls.find((c) => c.route.endsWith(`/tasks/${ASK_REPLIED.id}/done`))?.body,
+      ).toEqual({
+        revision: 2,
+      });
+    });
   });
 
   it("takes back a task handed to a teammate from its row, and it stays as mine at once", async () => {
@@ -389,7 +527,7 @@ describe("Tasks", () => {
     const calls = api();
     renderTasks();
     fireEvent.click(await rowOf(LEASE.title));
-    await screen.findByText("Where it came from");
+    await screen.findByText("Why it’s here");
     fireEvent.keyDown(document, { key: "j" });
     fireEvent.keyDown(document, { key: "e" });
     await waitFor(() => {

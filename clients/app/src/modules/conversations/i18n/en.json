@@ -29,7 +29,9 @@
     "editScheduled": "This send is scheduled. Cancel it to edit the draft.",
     "cancelAndEdit": "Cancel send and edit",
     "keepScheduled": "Keep it scheduled",
-    "sendCancelled": "Send cancelled"
+    "sendCancelled": "Send cancelled",
+    "shouldHaveLeft": "Should have left {{time}}",
+    "notSent": "Not sent"
   },
   "list": {
     "label": "Conversations",
@@ -109,7 +111,8 @@
     "trash": {
       "title": "This conversation is in Trash.",
       "lead": "Your mail provider empties the trash on its own schedule."
-    }
+    },
+    "saveToPageFailed": "Couldn’t read the messages. Nothing was saved."
   },
   "actions": {
     "star": "Pin",
@@ -143,7 +146,8 @@
     "reportSpam": "Report spam",
     "notSpam": "Not spam",
     "toInbox": "Move to Inbox",
-    "askScout": "Ask Scout"
+    "askScout": "Ask Scout",
+    "saveToPage": "Save to page"
   },
   "toast": {
     "done": "Done · {{subject}}",
@@ -169,6 +173,7 @@
   },
   "scout": {
     "label": "Where things stand",
+    "readFailed": "Scout couldn’t read this one.",
     "suggestion": "Suggests {{stream}}",
     "suggestionNote": "Campbooks thinks this belongs in {{stream}}. It is a suggestion: nothing moves until you say so.",
     "prompt": "Move it?",
@@ -193,7 +198,11 @@
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspicious",
     "whyMoney": "Payment",
-    "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
+    "sortedTaught": "Campbooks put this in {{stream}}, by a rule",
+    "taskOpen": "Your task “{{title}}” is still open.",
+    "taskPrompt": "Is it done?",
+    "taskDone": "Done",
+    "taskNotYet": "Not yet"
   },
   "reasons": {
     "signals": {
@@ -325,7 +334,11 @@
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
       "content_changed": "This changed since you opened it. Check it and send again.",
       "quote": "Couldn’t read the email to quote it. Nothing was started. Try again.",
-      "send_at_invalid": "This time can’t be used. Pick a later one, up to a year ahead."
+      "send_at_invalid": "This time can’t be used. Pick a later one, up to a year ahead.",
+      "destination_changed": "Not sent: this mailbox changed after you scheduled it. Check it and send it again.",
+      "sender_may_not_send": "Not sent: you can no longer send from this mailbox.",
+      "release_lost": "We couldn’t confirm this was sent. Check your Sent folder before sending it again.",
+      "send_at_busy": "Too many of your sends are scheduled for that minute. Pick another time."
     },
     "shortcuts": {
       "newMessage": "New message"
@@ -341,10 +354,13 @@
         "filename_missing": "A file without a name can't be attached.",
         "attachment_blocked": "{{name}} wasn't attached: mail providers block this kind of file.",
         "attachments_too_large": "{{name}} wasn't attached: a message can carry {{max}} MB at most.",
-        "too_many_attachments": "{{name}} wasn't attached: a message can carry {{files}} files at most."
+        "too_many_attachments": "{{name}} wasn't attached: a message can carry {{files}} files at most.",
+        "attachments_too_large_for_mailbox": "{{name}} wasn't attached: this mailbox can send {{max}} MB of attachments in one message.",
+        "upload_incomplete": "{{name}} didn't arrive whole. Try attaching it again.",
+        "request_timed_out": "{{name}} took too long to upload. Try again on a faster connection, or attach a smaller file."
       }
     },
-    "scheduled": "Scheduled: {{time}}"
+    "scheduled": "Scheduled for {{time}}"
   },
   "needs": {
     "line": {

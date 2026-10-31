@@ -17,6 +17,7 @@ import {
   type Proposal,
   type Settlement,
 } from "../../api/proposals";
+import { PageChangeCard } from "../PageChange/PageChangeCard";
 import { TeachScout } from "../TeachScout/TeachScout";
 
 /** `t` for keys only known at runtime. */
@@ -29,6 +30,8 @@ interface CardsProps {
   proposals: readonly Proposal[];
   /** A card was settled: the chat is read again. */
   onSettled: () => void;
+  /** The member leaves the chat for a page or a thread (a narrow chat closes). */
+  onLeave?: (() => void) | undefined;
 }
 
 /**
@@ -37,7 +40,7 @@ interface CardsProps {
  * facts. Nothing happens until the member chooses: Confirm sends their own
  * request, a rule opens Teach Scout, a reply opens the Reply dialog.
  */
-export function ProposalCards({ workspaceId, chatId, proposals, onSettled }: CardsProps) {
+export function ProposalCards({ workspaceId, chatId, proposals, onSettled, onLeave }: CardsProps) {
   if (proposals.length === 0) {
     return null;
   }
@@ -53,7 +56,12 @@ export function ProposalCards({ workspaceId, chatId, proposals, onSettled }: Car
             return <ReplyCard key={proposal.id} {...props} />;
           }
           default: {
-            return <ChangeCard key={proposal.id} {...props} />;
+            // A page's section or a new page has its own card: the text, who reads it.
+            return proposal.action === "append_section" || proposal.action === "new_page" ? (
+              <PageChangeCard key={proposal.id} {...props} onLeave={onLeave} />
+            ) : (
+              <ChangeCard key={proposal.id} {...props} />
+            );
           }
         }
       })}

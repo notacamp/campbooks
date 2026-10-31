@@ -3,6 +3,7 @@
 // modules ask for it here without importing that module.
 export {
   conversationRef,
+  pageRef,
   ruleNoticeRef,
   ruleRef,
   SCOUT_CHAT_ABOUT,

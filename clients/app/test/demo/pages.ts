@@ -70,6 +70,22 @@ export const OLD_NOTES = page(6, {
   trashed_at: "2026-10-10T09:00:00Z",
 });
 
+/** Where a thread is saved to (campbooks-cloud#364): a workspace page, and a private one Rui reads. */
+export const CLIENT_ONBOARDING = page(7, {
+  title: "Client onboarding",
+  icon: "tasks",
+  place: "workspace",
+  position: "a2",
+  edited_at: "2026-10-13T09:00:00Z",
+});
+export const ACME = page(8, {
+  title: "Acme Studio",
+  icon: "star",
+  place: "private",
+  position: "a2",
+  edited_at: "2026-10-11T09:00:00Z",
+});
+
 export const PAGES: readonly Summary[] = [HANDBOOK, ONBOARDING, HOLIDAYS, IDEAS, BUDGET];
 
 /** A member of the demo workspace who is not in the other demos. */

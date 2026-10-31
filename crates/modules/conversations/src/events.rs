@@ -20,9 +20,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::model::{
-    BlobPointer, Channel, ClearCause, ConnectionId, ConversationId, DraftId, InboxId, ItemKind,
-    LabelId, MessageId, NeedReason, NeedTrust, ReadLayer, RuleId, RuleRunId, RuleState, RunKind,
-    RunState, SendId, Stream, Verb,
+    BlobPointer, Channel, ClearCause, ConnectionId, ConversationId, DoneBy, DraftId, InboxId,
+    ItemKind, LabelId, MessageId, NeedReason, NeedTrust, ReadLayer, RuleId, RuleRunId, RuleState,
+    RunKind, RunState, SendId, Stream, Verb,
 };
 
 /// Record type of an inbox: the container a conversation's changes are
@@ -130,6 +130,39 @@ impl DomainEvent for MessageSent {
 
     fn changes(&self) -> Vec<FeedChange> {
         self.message.changes()
+    }
+}
+
+/// The member sent a message in a conversation of their personal inbox
+/// (`contracts/conversations.member_replied.v1.schema.json`,
+/// campbooks-cloud#396): published once for each outbound message stored for
+/// the first time, whether it was sent from Campbooks or from the provider's
+/// own client. A fact for the tasks module, which asks "Done?" of the open
+/// tasks that came from the conversation. Ids and a time only: never the
+/// message, its addresses or its subject. None for a shared inbox, which has
+/// no one member who replied.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct MemberReplied {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox.
+    pub inbox: InboxId,
+    /// The conversation the message belongs to.
+    pub conversation: ConversationId,
+    /// The message the member sent.
+    pub message: MessageId,
+    /// When it was sent.
+    pub sent_at: DateTime<Utc>,
+    /// The inbox's personal owner: the member who sent it.
+    pub owner: UserId,
+}
+
+impl DomainEvent for MemberReplied {
+    const NAME: &'static str = "conversations.member_replied";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
     }
 }
 
@@ -368,6 +401,9 @@ pub struct ReadAskFacts {
     /// The reference of an open task it repeats.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub same_as: Option<String>,
+    /// How it gets done: by replying, or some other way (an enum, no text).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_by: Option<DoneBy>,
 }
 
 /// A read of a message was stored, of either layer

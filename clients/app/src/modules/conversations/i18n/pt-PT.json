@@ -29,7 +29,9 @@
     "editScheduled": "Este envio está agendado. Cancele-o para editar o rascunho.",
     "cancelAndEdit": "Cancelar envio e editar",
     "keepScheduled": "Manter agendado",
-    "sendCancelled": "Envio cancelado"
+    "sendCancelled": "Envio cancelado",
+    "shouldHaveLeft": "Devia ter saído {{time}}",
+    "notSent": "Não enviado"
   },
   "list": {
     "label": "Conversas",
@@ -109,7 +111,8 @@
     "trash": {
       "title": "Esta conversa está no Lixo.",
       "lead": "O seu fornecedor de correio esvazia o lixo quando entende."
-    }
+    },
+    "saveToPageFailed": "Não foi possível ler as mensagens. Nada foi guardado."
   },
   "actions": {
     "star": "Fixar",
@@ -143,7 +146,8 @@
     "reportSpam": "Denunciar spam",
     "notSpam": "Não é spam",
     "toInbox": "Mover para a Caixa de entrada",
-    "askScout": "Perguntar ao Scout"
+    "askScout": "Perguntar ao Scout",
+    "saveToPage": "Guardar numa página"
   },
   "toast": {
     "done": "Concluída · {{subject}}",
@@ -169,6 +173,7 @@
   },
   "scout": {
     "label": "Ponto da situação",
+    "readFailed": "O Scout não conseguiu ler esta.",
     "suggestion": "Sugere {{stream}}",
     "suggestionNote": "O Campbooks acha que isto pertence a {{stream}}. É uma sugestão: nada sai do sítio sem a sua decisão.",
     "prompt": "Mover?",
@@ -193,7 +198,11 @@
     "whyUrgent": "Urgente",
     "whySuspicious": "Suspeita",
     "whyMoney": "Pagamento",
-    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra"
+    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra",
+    "taskOpen": "A sua tarefa «{{title}}» continua aberta.",
+    "taskPrompt": "Está feita?",
+    "taskDone": "Feita",
+    "taskNotYet": "Ainda não"
   },
   "reasons": {
     "signals": {
@@ -325,7 +334,11 @@
       "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
       "content_changed": "Isto mudou desde que o abriu. Verifique-o e envie de novo.",
       "quote": "Não foi possível ler o email para o citar. Nada foi iniciado. Tente novamente.",
-      "send_at_invalid": "Esta hora não pode ser usada. Escolha uma mais tarde, até um ano de antecedência."
+      "send_at_invalid": "Esta hora não pode ser usada. Escolha uma mais tarde, até um ano de antecedência.",
+      "destination_changed": "Não enviado: esta caixa de correio mudou depois de agendar. Verifique e envie de novo.",
+      "sender_may_not_send": "Não enviado: já não pode enviar a partir desta caixa de correio.",
+      "release_lost": "Não conseguimos confirmar que foi enviado. Verifique a pasta Enviados antes de o enviar de novo.",
+      "send_at_busy": "Tem demasiados envios agendados para esse minuto. Escolha outra hora."
     },
     "shortcuts": {
       "newMessage": "Nova mensagem"
@@ -341,10 +354,13 @@
         "filename_missing": "Não é possível anexar um ficheiro sem nome.",
         "attachment_blocked": "{{name}} não foi anexado: os fornecedores de correio bloqueiam este tipo de ficheiro.",
         "attachments_too_large": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{max}} MB.",
-        "too_many_attachments": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{files}} ficheiros."
+        "too_many_attachments": "{{name}} não foi anexado: uma mensagem pode levar no máximo {{files}} ficheiros.",
+        "attachments_too_large_for_mailbox": "{{name}} não foi anexado: esta caixa de correio só envia {{max}} MB de anexos numa mensagem.",
+        "upload_incomplete": "{{name}} não chegou completo. Tente anexá-lo outra vez.",
+        "request_timed_out": "{{name}} demorou demasiado a carregar. Tente outra vez com uma ligação mais rápida, ou anexe um ficheiro mais pequeno."
       }
     },
-    "scheduled": "Agendado: {{time}}"
+    "scheduled": "Agendado para {{time}}"
   },
   "needs": {
     "line": {

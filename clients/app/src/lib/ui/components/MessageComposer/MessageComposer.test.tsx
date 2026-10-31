@@ -549,10 +549,10 @@ describe("MessageComposer", () => {
       const working = screen.getByRole("button", { name: /Next working day/u });
       expect(tomorrow).toHaveTextContent("Sat");
       expect(tomorrow).toHaveTextContent("31");
-      expect(tomorrow).toHaveTextContent("08:00");
+      expect(tomorrow).toHaveTextContent(/\b8:00/u);
       expect(working).toHaveTextContent("Mon");
       expect(working).toHaveTextContent("2");
-      expect(working).toHaveTextContent("08:00");
+      expect(working).toHaveTextContent(/\b8:00/u);
       expect(screen.getByRole("button", { name: "Pick a time…" })).toBeInTheDocument();
     });
 

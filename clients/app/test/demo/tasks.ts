@@ -27,6 +27,9 @@ const task = (n: number, over: Partial<Task>): Task => ({
   created_by: ANA.user_id,
   handed_by: null,
   source: null,
+  asks_done: false,
+  done_by: null,
+  source_ask: null,
   revision: 1,
   created_at: "2026-10-10T09:00:00Z",
   updated_at: "2026-10-10T09:00:00Z",
@@ -77,12 +80,35 @@ export const VENUE = task(7, {
   handed_by: ANA.user_id,
 });
 
+/** The message of Marta's email that asked for the lease, and the ask Scout read in it. */
+export const LEASE_MESSAGE = "0192f1a0-0000-7000-8000-00000000bb01";
+export const LEASE_ASK = `${LEASE_MESSAGE}:model:ask:1`;
+/** The sender's own sentence, as the message's read serves it to members who may read the email. */
+export const LEASE_QUOTE = "Could you send the signed lease back to me by Friday?";
+
 /** Scout found it in Marta's email: the signed lease, due Friday. */
 export const ASK_LEASE = task(8, {
   title: "Send the signed lease",
   origin: "ask",
   due_on: "2026-10-16",
   source: { type: "conversations.conversation", id: MARTA.id },
+  done_by: "elsewhere",
+  source_ask: LEASE_ASK,
+});
+
+/**
+ * The lease task after Ana replied to Marta's email (campbooks-cloud#396):
+ * Scout asks whether it is done. Not yet is the same task with `asks_done`
+ * off.
+ */
+export const ASK_REPLIED = task(10, {
+  title: "Send the signed lease",
+  origin: "ask",
+  due_on: "2026-10-16",
+  source: { type: "conversations.conversation", id: MARTA.id },
+  asks_done: true,
+  replied: { at: "2026-10-13T14:20:00Z", message: "0192f1a0-0000-7000-8000-00000000aa01" },
+  revision: 2,
 });
 
 /** Scout found it in the energy company's invoice, late. */
@@ -121,3 +147,62 @@ export function taskItem(from: Task, extra: Partial<Schema<"ItemView">> = {}): S
     ...extra,
   };
 }
+
+type Entry = Schema<"TaskHistoryEntry">;
+
+const entry = (n: number, at: string, over: Partial<Entry>): Entry => ({
+  id: `0192f1a0-0000-7000-8000-0000000008${n.toString(16).padStart(2, "0")}`,
+  at,
+  actor: "member",
+  actor_member: ANA.user_id,
+  what: "created",
+  detail: {},
+  ...over,
+});
+
+/**
+ * What happened to the lease task Scout made: made from Marta's email, planned,
+ * held, moved by the calendar, replied to, "Not yet" and done.
+ */
+export const ASK_LEASE_HISTORY: Entry[] = [
+  entry(1, "2026-10-10T09:00:00Z", {
+    actor: "scout",
+    actor_member: null,
+    what: "created",
+    detail: { due_on: "2026-10-16" },
+  }),
+  entry(2, "2026-10-11T08:30:00Z", {
+    what: "planned",
+    detail: { plan: "date", plan_on: "2026-10-14" },
+  }),
+  entry(3, "2026-10-11T08:31:00Z", {
+    what: "held",
+    detail: { held_from: "2026-10-14T10:00:00Z", held_to: "2026-10-14T10:30:00Z" },
+  }),
+  entry(4, "2026-10-12T16:00:00Z", {
+    actor: "calendar",
+    actor_member: null,
+    what: "held",
+    detail: { held_from: "2026-10-14T14:00:00Z", held_to: "2026-10-14T14:30:00Z" },
+  }),
+  entry(5, "2026-10-13T14:20:00Z", { actor: "scout", actor_member: null, what: "replied" }),
+  entry(6, "2026-10-13T14:25:00Z", { what: "reply_answered" }),
+  entry(7, "2026-10-13T15:00:00Z", { what: "done" }),
+];
+
+/** The same task made by Sofia, handed to Ana, with ten changes (the history folds). */
+export const LONG_HISTORY: Entry[] = [
+  entry(10, "2026-10-01T09:00:00Z", { actor_member: SOFIA.user_id, what: "created" }),
+  ...Array.from({ length: 8 }, (_, index) =>
+    entry(11 + index, `2026-10-0${String(index + 2)}T09:00:00Z`, {
+      actor_member: SOFIA.user_id,
+      what: "due_changed",
+      detail: { due_on: `2026-10-${String(10 + index)}` },
+    }),
+  ),
+  entry(30, "2026-10-10T09:00:00Z", {
+    actor_member: SOFIA.user_id,
+    what: "handed_off",
+    detail: { member: ANA.user_id },
+  }),
+];

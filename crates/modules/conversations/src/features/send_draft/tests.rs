@@ -318,13 +318,19 @@ async fn a_scheduled_send_stays_put_once_its_author_left(db: PgPool) {
         .fetch_one(&kit.db)
         .await
         .unwrap();
-    assert_eq!(state, "draft");
+    assert_eq!(state, "failed");
+    let reason: Option<String> =
+        sqlx::query_scalar("SELECT failure_reason FROM conversations.drafts")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(reason.as_deref(), Some("sender_may_not_send"));
     // Tracked as taken back, by the release, on Sam's behalf.
     let back = tracked_events(&kit.db, "conversations.draft_unscheduled").await;
     assert_eq!(back.len(), 1);
     assert_eq!(back[0].envelope["actor"]["type"], "system");
     assert_eq!(back[0].body["reason"], "sender_may_not_send");
-    assert_eq!(back[0].body["draft"]["state"], "draft");
+    assert_eq!(back[0].body["draft"]["state"], "failed");
     assert!(
         tracked_events(&kit.db, "conversations.draft_released")
             .await
@@ -1092,4 +1098,168 @@ async fn a_send_time_in_the_past_or_too_far_is_refused(db: PgPool) {
         );
         nothing_scheduled(&kit, &draft).await;
     }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_scheduled_send_whose_author_lost_the_inbox_says_why_and_is_listed(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let later = (chrono::Utc::now() + chrono::TimeDelta::days(2)).to_rfc3339();
+    let shown = kit.get(&sam, &draft).await.json;
+    let sent = kit
+        .post(
+            &sam,
+            &format!("{draft}/send"),
+            Some(
+                json!({"version": shown["version"], "content_token": shown["content_token"],
+                "send_at": later}),
+            ),
+        )
+        .await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    // Sam is still a member, but only a reader of the inbox when it is due.
+    sqlx::query("UPDATE conversations.inbox_members SET role = 'reader' WHERE inbox_id = $1")
+        .bind(inbox)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    window_ends(&kit).await;
+    assert!(kit.events("conversations.send_requested").await.is_empty());
+    let read = kit.get(&sam, &draft).await;
+    assert_eq!(read.json["state"], "failed", "{:?}", read.json);
+    assert_eq!(read.json["failure_reason"], "sender_may_not_send");
+    assert_eq!(read.json["send_at"], Value::Null);
+    // Listed with the drafts, with its reason.
+    let list = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/drafts"))
+        .await
+        .json;
+    let listed = list["drafts"].as_array().unwrap();
+    assert!(
+        listed
+            .iter()
+            .any(|d| d["failure_reason"] == "sender_may_not_send" && d["state"] == "failed"),
+        "{list}"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_scheduled_send_whose_author_was_removed_from_the_inbox_is_not_sent(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let sent = send(&kit, &sam, &draft).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    sqlx::query("DELETE FROM conversations.inbox_members WHERE inbox_id = $1")
+        .bind(inbox)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    window_ends(&kit).await;
+    assert!(kit.events("conversations.send_requested").await.is_empty());
+    let (state, reason): (String, Option<String>) =
+        sqlx::query_as("SELECT state, failure_reason FROM conversations.drafts")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(state, "failed");
+    assert_eq!(reason.as_deref(), Some("sender_may_not_send"));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_cannot_send_at_a_chosen_time(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let uri = reply(&kit, workspace, &sam).await;
+    let id = uri.rsplit('/').next().unwrap().to_owned();
+    let shown = kit.get(&sam, &uri).await.json;
+    let later = (chrono::Utc::now() + chrono::TimeDelta::days(2)).to_rfc3339();
+    let input = json!({"draft_id": id, "version": shown["version"],
+        "content_token": shown["content_token"], "send_at": later});
+    for confirmed in [false, true] {
+        not_the_assistants(
+            &kit.as_assistant(
+                "sam",
+                workspace,
+                ("conversations.send_draft", input.clone()),
+                confirmed,
+            )
+            .await,
+        );
+    }
+    // Listed for it by mistake, the handler itself refuses.
+    needs_the_member(
+        &kit.as_assistant_listed("sam", workspace, ("conversations.send_draft", input), true)
+            .await,
+    );
+    nothing_scheduled(&kit, &uri).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn sends_for_one_minute_are_capped_at_the_send_rate_per_author(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let (ana, ana_id) = kit.member("ana", workspace);
+    kit.add_to_inbox(inbox, ana_id, crate::model::InboxRole::Sender)
+        .await;
+    let drafts = format!("/api/v1/w/{workspace}/drafts");
+    let new_draft = |token: String| {
+        let kit = &kit;
+        let drafts = drafts.clone();
+        async move {
+            let made = kit
+                .post(
+                    &token,
+                    &drafts,
+                    Some(json!({"kind": "new", "inbox_id": inbox, "subject": "Notes",
+                        "to": [{"address": "leo@example.com"}], "body": "Hi"})),
+                )
+                .await;
+            assert_eq!(made.status, StatusCode::CREATED, "{:?}", made.json);
+            format!("{drafts}/{}", made.json["id"].as_str().unwrap())
+        }
+    };
+    let at = |minutes: i64| {
+        let base = chrono::Utc::now() + chrono::TimeDelta::days(2);
+        let minute = base - chrono::TimeDelta::seconds(i64::from(chrono::Timelike::second(&base)));
+        (minute + chrono::TimeDelta::minutes(minutes) + chrono::TimeDelta::seconds(7)).to_rfc3339()
+    };
+    let schedule = |token: String, uri: String, when: String| {
+        let kit = &kit;
+        async move {
+            let shown = kit.get(&token, &uri).await.json;
+            kit.post(
+                &token,
+                &format!("{uri}/send"),
+                Some(
+                    json!({"version": shown["version"], "content_token": shown["content_token"],
+                    "send_at": when}),
+                ),
+            )
+            .await
+        }
+    };
+    // The default allows 30 in 10 minutes: three in a minute.
+    for _ in 0..3 {
+        let uri = new_draft(sam.clone()).await;
+        let ok = schedule(sam.clone(), uri, at(0)).await;
+        assert_eq!(ok.status, StatusCode::ACCEPTED, "{:?}", ok.json);
+    }
+    let fourth = new_draft(sam.clone()).await;
+    let busy = schedule(sam.clone(), fourth.clone(), at(0)).await;
+    assert_eq!(
+        busy.status,
+        StatusCode::TOO_MANY_REQUESTS,
+        "{:?}",
+        busy.json
+    );
+    assert_eq!(busy.json["code"], "send_at_busy");
+    assert_eq!(kit.get(&sam, &fourth).await.json["state"], "draft");
+    // Another minute is free, and so is another author's same minute.
+    let other = schedule(sam.clone(), fourth, at(1)).await;
+    assert_eq!(other.status, StatusCode::ACCEPTED, "{:?}", other.json);
+    let hers = new_draft(ana.clone()).await;
+    let ok = schedule(ana, hers, at(0)).await;
+    assert_eq!(ok.status, StatusCode::ACCEPTED, "{:?}", ok.json);
 }

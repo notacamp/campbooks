@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/conversations.member_replied.v1.schema.json",
+  "title": "conversations.member_replied v1 (event payload)",
+  "description": "Published by the conversations module once for each outbound message stored for the first time in a conversation of a personal inbox, sent from Campbooks or from the provider's own client (not for a shared inbox, nor for the mail an inbox's first sync reads); the tasks module asks \"Done?\" of the owner's open Do tasks that came from the conversation. A fact: ids and a time only, never a name, an address, a subject or text. Workspace-scoped; also listed in openapi/events.json.",
+  "type": "object",
+  "required": ["workspace", "inbox", "conversation", "message", "sent_at", "owner"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "inbox": { "$ref": "#/$defs/uuid" },
+    "conversation": { "$ref": "#/$defs/uuid" },
+    "message": { "$ref": "#/$defs/uuid", "description": "The message the member sent." },
+    "sent_at": { "type": "string", "format": "date-time", "description": "When it was sent." },
+    "owner": { "$ref": "#/$defs/uuid", "description": "The inbox's personal owner: the member who sent it." }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

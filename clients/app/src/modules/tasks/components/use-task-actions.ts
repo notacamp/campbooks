@@ -214,6 +214,15 @@ export function useTaskActions(
         backward: calls.reopen,
       });
     },
+    /** Not yet: it stays open and is not asked about again until a newer reply. */
+    notYet: (task: TaskView) => {
+      act(task, {
+        label: t("toast.stillOpen", { title: task.title }),
+        optimistic: (current) => ({ ...current, asks_done: false }),
+        forward: calls.replyAnswered,
+        backward: calls.replyUnanswered,
+      });
+    },
     notNeeded: (task: TaskView) => {
       act(task, {
         label: t("toast.notNeeded", { title: task.title }),

@@ -55,6 +55,14 @@
     "nothing_to_undo": "There is no choice to take back for that conflict.",
     "conflict_gone": "That conflict is not about a column of this table any more.",
     "not_a_database": "That is not a Notion database you can import.",
-    "no_table_conflict": "That table has no such conflict."
+    "no_table_conflict": "That table has no such conflict.",
+    "invalid_attachments": "Choose between 1 and 20 files.",
+    "not_a_page": "This is a table: it has no body to add to.",
+    "file_too_large": "A file can be at most 20 MiB.",
+    "markdown_empty": "There is nothing to add.",
+    "markdown_too_large": "A section can be at most 16 KiB.",
+    "too_many_sources": "A section can name at most 10 sources.",
+    "markdown_with_document": "Send the body either as a document or as Markdown, not both.",
+    "sources_without_markdown": "Sources go with Markdown. Add the Markdown they belong to."
   }
 }

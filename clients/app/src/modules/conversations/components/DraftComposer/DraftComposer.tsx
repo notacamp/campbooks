@@ -4,17 +4,19 @@ import { useTranslation } from "react-i18next";
 
 import { MessageComposer, sendTimeLabel, useUndoToast } from "~/lib/ui";
 
-import type { Draft } from "../../api/drafts";
+import { useSendingInboxes, type Draft } from "../../api/drafts";
 import { useSignature } from "../../api/signatures";
 import type { Translate } from "../../model";
 import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS,
+  megabytes,
   refusalOfCode,
   screen,
   type RefusalReason,
 } from "../../compose/attachment-rules";
 import { addressLine, displayName } from "../../compose/quote";
+import { KNOWN_ERRORS } from "../../compose/errors";
 import { useDraftEditor } from "../../compose/use-draft-editor";
 import { useRecipientSuggestions } from "../../compose/use-recipient-suggestions";
 
@@ -36,22 +38,6 @@ export interface DraftComposerProps {
   /** Said beside the quoted history (that it holds only the start of a long email). */
   quotedNote?: string | undefined;
 }
-
-const KNOWN_ERRORS = new Set([
-  "not_saved",
-  "content_changed",
-  "no_recipients",
-  "invalid_address",
-  "attachments_too_large",
-  "send_at_invalid",
-  "draft_not_editable",
-  "not_connected",
-  "needs_reauth",
-  "rejected",
-  "too_large",
-  "unavailable",
-  "unknown_outcome",
-]);
 
 /**
  * A draft in the message composer: saved as you type, sent with an undo
@@ -89,11 +75,20 @@ export function DraftComposer({
   // them (a toast is one line and would cut the reason at 375px).
   const [refusals, setRefusals] = useState<string[]>([]);
 
+  // What the draft's mailbox can send in one message: 25 MiB, or less for
+  // a provider that takes less (Microsoft Graph, campbooks-cloud#391).
+  const inboxes = useSendingInboxes(workspaceId);
+  const budget = Math.min(
+    MAX_ATTACHMENT_BYTES,
+    inboxes.data?.find((inbox) => inbox.id === draft.inbox_id)?.max_attachment_bytes ??
+      MAX_ATTACHMENT_BYTES,
+  );
+
   /** Say, naming the file, why it was not attached. */
   function refuse(file: File, reason: RefusalReason) {
     const said = t(`compose.attach.refused.${reason}`, {
       name: file.name,
-      max: Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024)),
+      max: reason === "attachments_too_large" ? megabytes(MAX_ATTACHMENT_BYTES) : megabytes(budget),
       files: MAX_ATTACHMENTS,
     });
     setRefusals((so) => [...so, said]);
@@ -102,12 +97,16 @@ export function DraftComposer({
   /** Files from the picker, a drop or a paste: refuse what cannot go, upload the rest. */
   function attach(files: File[]) {
     setRefusals([]);
-    const { accepted, refused } = screen(files, {
-      bytes:
-        kept.reduce((sum, a) => sum + a.size, 0) +
-        editor.uploading.reduce((sum, u) => sum + u.size, 0),
-      count: kept.length + editor.uploading.length,
-    });
+    const { accepted, refused } = screen(
+      files,
+      {
+        bytes:
+          kept.reduce((sum, a) => sum + a.size, 0) +
+          editor.uploading.reduce((sum, u) => sum + u.size, 0),
+        count: kept.length + editor.uploading.length,
+      },
+      budget,
+    );
     for (const { file, reason } of refused) {
       refuse(file, reason);
     }
@@ -229,7 +228,7 @@ export function DraftComposer({
       attachments={kept}
       onAttach={attach}
       uploading={editor.uploading.map((u) => ({ key: u.key, filename: u.name, size: u.size }))}
-      attachmentBudget={MAX_ATTACHMENT_BYTES}
+      attachmentBudget={budget}
       onRemoveAttachment={(id) => {
         update({ attachments: fields.attachments.filter((kept) => kept !== id) });
       }}
