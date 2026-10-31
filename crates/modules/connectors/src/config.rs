@@ -708,7 +708,8 @@ impl ZohoMailConfig {
     pub fn warn_unusable(&self) {
         if let Err(Some(_)) = self.read_poll_max() {
             tracing::warn!(
-                "CAMPBOOKS_CONNECTORS__ZOHO__POLL_MAX_SECONDS must be a whole number from 30                  to 14400: using {} seconds",
+                "CAMPBOOKS_CONNECTORS__ZOHO__POLL_MAX_SECONDS must be a whole number from 30 \
+                 to 14400: using {} seconds",
                 Self::POLL_MAX_DEFAULT
             );
         }
