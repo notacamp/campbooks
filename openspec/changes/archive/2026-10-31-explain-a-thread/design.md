@@ -236,4 +236,6 @@ stale.
   else: whether they may ask is `ConversationDetail.explain`.
 - **The expiry counts from `written_at`, or from the last change for a
   request that never wrote one.**
-
+- **Explaining again keeps the earlier explanation in view** and says
+  "Scout is reading the N messages…" above it until the new one arrives,
+  instead of the skeleton, which shows only when there is nothing yet.
