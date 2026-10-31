@@ -275,7 +275,8 @@
     "delete": "Delete, or restore from Trash",
     "reportSpam": "Report spam, or not spam",
     "noticedAsk": "Ask Scout about the suggestion",
-    "noticedSee": "Scout noticed: see the emails"
+    "noticedSee": "Scout noticed: see the emails",
+    "explain": "Explain this thread"
   },
   "compose": {
     "title": {
@@ -929,5 +930,49 @@
       "ownAddress": "This waits on your own address, so there is nobody to nudge."
     },
     "askScout": "Ask Scout about this email"
+  },
+  "explain": {
+    "button": "Explain this thread",
+    "title": "Scout’s explanation",
+    "hide": "Hide the explanation",
+    "show": "Show",
+    "again": "Explain again",
+    "tryAgain": "Try again",
+    "stop": "Stop",
+    "reading_one": "Scout is reading the message…",
+    "reading_other": "Scout is reading the {{count}} messages…",
+    "meta_one": "From {{count}} message · written {{when}}",
+    "meta_other": "From {{count}} messages · written {{when}}",
+    "inShort": "In short",
+    "wants": "Who wants what",
+    "agreed": "Agreed",
+    "open": "Still open",
+    "onYou": "On you",
+    "by": "by {{date}}",
+    "chip": "{{name}} · {{date}}",
+    "more": "Who wants what, agreed, open",
+    "less": "Show less",
+    "followUp": "Ask a follow-up",
+    "reply": "Reply",
+    "privacy": "Only you see this. Scout read the messages’ own words, not the quoted history.",
+    "long": "From {{total}} messages: the newest {{full}} in full, the {{earlier}} before them from Scout’s notes.",
+    "newer": "{{name}} wrote since, at {{when}}. This explanation is from before.",
+    "otherLanguage": "Written in {{language}}.",
+    "limit": "This workspace has used today’s AI. Scout can explain this thread again tomorrow.",
+    "failed": "Scout couldn’t explain this thread.",
+    "slow": "Scout is taking long. You can leave this open or try again.",
+    "line": {
+      "kept_one": "Your explanation from {{when}} · from {{count}} message",
+      "kept_other": "Your explanation from {{when}} · from {{count}} messages",
+      "newer": "Your explanation from {{when}} · {{name}} wrote since, at {{at}}",
+      "writing": "Scout is still reading this thread",
+      "none": "Your explanation of this thread"
+    },
+    "refused": {
+      "not_explainable": "Scout can’t explain this thread.",
+      "unavailable": "Scout can’t read mail on this server, so it can’t explain threads.",
+      "limit": "You asked for many explanations. Try again in an hour.",
+      "failed": "Scout couldn’t explain this thread. Try again."
+    }
   }
 }

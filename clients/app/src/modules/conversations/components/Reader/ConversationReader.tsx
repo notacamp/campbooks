@@ -69,6 +69,7 @@ import {
 import { saveThreadOf } from "../../save-thread";
 import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 import { ruleLine } from "../../rules-text";
+import { useThreadExplanation } from "../Explanation/ThreadExplanation";
 import { useNeedActions } from "../Needs/use-need-actions";
 import { useTeachOnce } from "../TeachOnce/TeachOnce";
 import { useRuleActions } from "../TeachOnce/use-rule-actions";
@@ -436,6 +437,40 @@ export function ConversationReader({
     // Asking changes nothing: a reader of the inbox asks too.
     { enabled: scout !== undefined && conversation !== undefined },
   );
+  // Scout's explanation of the thread, only when the member asks
+  // (campbooks-cloud#407): the one thing the reader asks the server for
+  // beyond the thread is whether they asked before.
+  const explanation = useThreadExplanation({
+    workspaceId,
+    conversationId,
+    offered: detail?.explain === true && !binned,
+    messageCount: conversation?.message_count ?? messages.length,
+    onOpenMessage: (messageId) => {
+      setOpened((current) => new Set([...current, messageId]));
+      // After the message has opened in its place.
+      globalThis.setTimeout(() => {
+        document.getElementById(`message-${messageId}`)?.scrollIntoView({ block: "center" });
+      }, 50);
+    },
+    onFollowUp: askScout,
+    onReply: renderReplySlot === undefined ? undefined : openReply,
+    now,
+  });
+  useShortcut("conversations.explain", explanation.ask, {
+    enabled: explanation.offered && !explanation.busy && !offering,
+  });
+  const explainButton =
+    explanation.offered && !explanation.asked ? (
+      <Button
+        variant="ghost"
+        icon="preview"
+        shortcut="conversations.explain"
+        disabled={explanation.busy}
+        onClick={explanation.ask}
+      >
+        {t("explain.button")}
+      </Button>
+    ) : null;
   /** Save to page: the messages' words first (some come later), then the dialog. */
   const saveToPage = () => {
     if (conversation === undefined || !mailScout || savingThread !== undefined) {
@@ -716,6 +751,16 @@ export function ConversationReader({
       onSelect: saveToPage,
     });
   }
+  // Asking for an explanation changes no mail: offered to a reader too.
+  if (explanation.offered) {
+    moreActions.push({
+      id: "explain",
+      label: t("explain.button"),
+      icon: "preview",
+      shortcut: "conversations.explain",
+      onSelect: explanation.ask,
+    });
+  }
   // Asking changes nothing: offered to a reader of the inbox too.
   if (scout !== undefined) {
     moreActions.push({
@@ -853,12 +898,13 @@ export function ConversationReader({
               ? {}
               : { chips: <ExpiredChip /> })}
             footer={footerLine(conversation)}
-            {...(suggestedReply === null && stopButton === null
+            {...(suggestedReply === null && stopButton === null && explainButton === null
               ? {}
               : {
                   actions: (
                     <>
                       {suggestedReply}
+                      {explainButton}
                       {stopButton}
                     </>
                   ),
@@ -992,13 +1038,21 @@ export function ConversationReader({
                             >
                               {t("needs.actions.notNeeded")}
                             </Button>
+                            {explainButton}
                             {stopButton}
                           </>
                         ),
                       }
-                    : stopButton === null
+                    : stopButton === null && explainButton === null
                       ? {}
-                      : { actions: stopButton }),
+                      : {
+                          actions: (
+                            <>
+                              {explainButton}
+                              {stopButton}
+                            </>
+                          ),
+                        }),
                 }
               : {
                   actions: (
@@ -1029,6 +1083,7 @@ export function ConversationReader({
                             : "needs.actions.notNeeded",
                         )}
                       </Button>
+                      {explainButton}
                       {stopButton}
                     </>
                   ),
@@ -1052,6 +1107,7 @@ export function ConversationReader({
             })}
           </Note>
         )}
+        {explanation.element}
         {thread.map((entry) =>
           entry.kind === "more" ? (
             <MoreMessages
@@ -1062,43 +1118,44 @@ export function ConversationReader({
               }}
             />
           ) : (
-            <ThreadMessage
-              key={entry.message.id}
-              workspaceId={workspaceId}
-              conversationId={conversationId}
-              message={entry.message}
-              open={open.has(entry.message.id)}
-              onOpen={() => {
-                setOpened((current) => new Set([...current, entry.message.id]));
-              }}
-              showImages={!inSpam && images.has(entry.message.id)}
-              onShowImages={() => {
-                setImages((current) => new Set([...current, entry.message.id]));
-              }}
-              onTrustImages={
-                trustable && entry.message.direction === "inbound"
-                  ? (domain) => {
-                      trustImages(entry.message, domain);
-                    }
-                  : undefined
-              }
-              trustKey={active && trusting === null && entry.message.id === newestInbound?.id}
-              sharedInbox={inbox?.shared === true}
-              kind={entry.message.direction === "outbound" ? "person" : kind}
-              inertLinks={inSpam || conversation.need?.question === "suspicious"}
-              spam={inSpam}
-              found={
-                entry.message.direction === "inbound"
-                  ? renderFound?.({
-                      workspaceId,
-                      conversationId,
-                      messageId: entry.message.id,
-                      subject: entry.message.subject,
-                    })
-                  : undefined
-              }
-              now={now}
-            />
+            <div key={entry.message.id} id={`message-${entry.message.id}`}>
+              <ThreadMessage
+                workspaceId={workspaceId}
+                conversationId={conversationId}
+                message={entry.message}
+                open={open.has(entry.message.id)}
+                onOpen={() => {
+                  setOpened((current) => new Set([...current, entry.message.id]));
+                }}
+                showImages={!inSpam && images.has(entry.message.id)}
+                onShowImages={() => {
+                  setImages((current) => new Set([...current, entry.message.id]));
+                }}
+                onTrustImages={
+                  trustable && entry.message.direction === "inbound"
+                    ? (domain) => {
+                        trustImages(entry.message, domain);
+                      }
+                    : undefined
+                }
+                trustKey={active && trusting === null && entry.message.id === newestInbound?.id}
+                sharedInbox={inbox?.shared === true}
+                kind={entry.message.direction === "outbound" ? "person" : kind}
+                inertLinks={inSpam || conversation.need?.question === "suspicious"}
+                spam={inSpam}
+                found={
+                  entry.message.direction === "inbound"
+                    ? renderFound?.({
+                        workspaceId,
+                        conversationId,
+                        messageId: entry.message.id,
+                        subject: entry.message.subject,
+                      })
+                    : undefined
+                }
+                now={now}
+              />
+            </div>
           ),
         )}
       </ReaderBody>

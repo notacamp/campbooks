@@ -107,6 +107,15 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.star",
   },
   {
+    // Scout explains the open thread, only when asked (campbooks-cloud#407).
+    // E is Done, so W: what is going on here.
+    id: "conversations.explain",
+    keys: "w",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.explain",
+  },
+  {
     id: "conversations.resolve_need",
     keys: "x",
     scope: "item",

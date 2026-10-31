@@ -275,7 +275,8 @@
     "delete": "Supprimer, ou restaurer depuis la Corbeille",
     "reportSpam": "Signaler comme spam, ou pas un spam",
     "noticedAsk": "Demander à Scout à propos de la suggestion",
-    "noticedSee": "Scout a remarqué : voir les e-mails"
+    "noticedSee": "Scout a remarqué : voir les e-mails",
+    "explain": "Expliquer la conversation"
   },
   "compose": {
     "title": {
@@ -929,5 +930,49 @@
       "ownAddress": "Ceci attend votre propre adresse : il n’y a personne à relancer."
     },
     "askScout": "Demander à Scout à propos de cet e-mail"
+  },
+  "explain": {
+    "button": "Expliquer cette conversation",
+    "title": "Explication de Scout",
+    "hide": "Masquer l’explication",
+    "show": "Afficher",
+    "again": "Expliquer à nouveau",
+    "tryAgain": "Réessayer",
+    "stop": "Arrêter",
+    "reading_one": "Scout lit le message…",
+    "reading_other": "Scout lit les {{count}} messages…",
+    "meta_one": "De {{count}} message · rédigée {{when}}",
+    "meta_other": "De {{count}} messages · rédigée {{when}}",
+    "inShort": "En bref",
+    "wants": "Qui veut quoi",
+    "agreed": "Convenu",
+    "open": "Encore ouvert",
+    "onYou": "À vous",
+    "by": "avant le {{date}}",
+    "chip": "{{name}} · {{date}}",
+    "more": "Qui veut quoi, convenu, ouvert",
+    "less": "Afficher moins",
+    "followUp": "Poser une autre question",
+    "reply": "Répondre",
+    "privacy": "Vous seul voyez ceci. Scout a lu les mots de chaque message, pas l’historique cité.",
+    "long": "De {{total}} messages : les {{full}} plus récents en entier et les {{earlier}} précédents d’après les notes de Scout.",
+    "newer": "{{name}} a écrit depuis ({{when}}). Cette explication est antérieure.",
+    "otherLanguage": "Rédigée en {{language}}.",
+    "limit": "Cet espace de travail a utilisé l’IA du jour. Scout pourra réexpliquer cette conversation demain.",
+    "failed": "Scout n’a pas pu expliquer cette conversation.",
+    "slow": "Scout met du temps. Vous pouvez laisser ceci ouvert ou réessayer.",
+    "line": {
+      "kept_one": "Votre explication du {{when}} · de {{count}} message",
+      "kept_other": "Votre explication du {{when}} · de {{count}} messages",
+      "newer": "Votre explication du {{when}} · {{name}} a écrit depuis ({{at}})",
+      "writing": "Scout lit encore cette conversation",
+      "none": "Votre explication de cette conversation"
+    },
+    "refused": {
+      "not_explainable": "Scout ne peut pas expliquer cette conversation.",
+      "unavailable": "Scout ne peut pas lire le courrier sur ce serveur, il ne peut donc pas expliquer de conversations.",
+      "limit": "Vous avez demandé beaucoup d’explications. Réessayez dans une heure.",
+      "failed": "Scout n’a pas pu expliquer cette conversation. Réessayez."
+    }
   }
 }
