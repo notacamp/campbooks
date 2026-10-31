@@ -791,6 +791,7 @@ export function MessageComposer({
         {scout === undefined ? null : (
           <ScoutMenu
             scout={scout}
+            compact={compact}
             active={active}
             editor={editor}
             onWriting={setWriting}

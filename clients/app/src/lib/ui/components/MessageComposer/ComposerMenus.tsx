@@ -123,6 +123,12 @@ export interface ScoutMenuProps {
   editor: Editor;
   writing: boolean;
   onWriting: (writing: boolean) => void;
+  /**
+   * A narrow composer: the trigger is Scout's mark and its chevron, named
+   * for screen readers, so the formatting toolbar keeps its four buttons in
+   * one row (⌘J still opens it).
+   */
+  compact?: boolean | undefined;
 }
 
 /**
@@ -130,7 +136,14 @@ export interface ScoutMenuProps {
  * the text in place while the text is read-only, with a toast whose Undo
  * (and the editor's own ⌘Z) puts the previous text back.
  */
-export function ScoutMenu({ scout, active, editor, writing, onWriting }: ScoutMenuProps) {
+export function ScoutMenu({
+  scout,
+  active,
+  editor,
+  writing,
+  onWriting,
+  compact = false,
+}: ScoutMenuProps) {
   const { t } = useTranslation("ui");
   const [open, setOpen] = useState(false);
 
@@ -176,12 +189,12 @@ export function ScoutMenu({ scout, active, editor, writing, onWriting }: ScoutMe
           {...trigger}
           variant="ghost"
           ai
-          shortcut="compose.draft"
+          shortcut={compact ? undefined : "compose.draft"}
           disabled={writing}
           aria-label={t("composer.scout.menu")}
         >
           <span className={styles["scoutLabel"]}>
-            {t("composer.scout.label")}
+            {compact ? null : t("composer.scout.label")}
             <Icon name="chevron-down" />
           </span>
         </Button>
