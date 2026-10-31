@@ -10,17 +10,16 @@ import { caption } from "./inbox.ts";
 const story = (id: string) => `/iframe.html?id=screens-tables--${id}&viewMode=story`;
 
 export default async function pagesTablesPolish({ page }: ScenarioContext): Promise<void> {
-  await page.setViewportSize({ width: 1440, height: 900 });
+  // The recorder runs this at 375px and on the desktop: the same story shows
+  // the narrow number column and the footer's New row at each width.
   await page.goto(story("narrow-number-idle"));
-  const number = page.getByText("€9,600.00").first();
-  await number.waitFor();
+  await page.getByText("€9,600.00").first().waitFor();
   await caption(page, "A narrow number column ends in an ellipsis, not a clipped digit", 2800);
-  await number.hover();
-  await caption(page, "Hover it: the whole value is in its title", 2800);
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto(story("narrow-number-phone-idle"));
-  await page.getByRole("button", { name: /^New row/u }).waitFor();
-  await caption(page, "On a phone, New row has one +, and Add a column stays in the header", 3200);
-  await page.getByRole("button", { name: "Add a column" }).click();
-  await caption(page, "The add-column + still opens its menu", 2400);
+  await page.getByText("€9,600.00").first().hover();
+  await caption(page, "The whole value is in the cell's title", 2400);
+  await page
+    .getByRole("button", { name: /^New row/u })
+    .first()
+    .scrollIntoViewIfNeeded();
+  await caption(page, "New row has one +, and Add a column stays in the header", 3000);
 }
