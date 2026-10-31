@@ -9,8 +9,8 @@
 - [x] 2.3 i18n en / pt-PT / es-ES / fr; `pnpm test:fit`; stories + tests; recording scenario
 ## 3. Finish
 - [x] 3.1 OpenAPI and client types regenerated
-- [ ] 3.2 Tracking plan regenerated (Coverage rows for both operations)
+- [x] 3.2 Tracking plan regenerated (Coverage rows for both operations)
 - [x] 3.3 Changelog entry `changelog/unreleased/added/393-signatures.md`
 - [ ] 3.4 Gates green in CI
-- [ ] 3.5 Recording at 375 px and desktop
+- [x] 3.5 Recording at 375 px and desktop
 - [ ] 3.6 `openspec archive signatures --yes` before merge
