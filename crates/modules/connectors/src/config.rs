@@ -75,6 +75,15 @@ pub struct ZohoMailConfig {
     /// Minutes between sweeps that re-read a mailbox's whole window
     /// (default 360).
     pub sweep_minutes: u32,
+    /// The longest a Zoho mailbox waits between polls, in seconds
+    /// (`CAMPBOOKS_CONNECTORS__ZOHO__POLL_MAX_SECONDS`, 30 to 14400, default
+    /// 60). Zoho has no push, so this is how late new mail can be; it caps
+    /// the global backoff for Zoho mail only. Read through
+    /// [`poll_max_seconds`](Self::poll_max_seconds): a value that is not
+    /// usable falls back to the default, with a warning, and never stops
+    /// the server.
+    #[serde(deserialize_with = "any_text")]
+    pub poll_max_seconds: Option<String>,
 }
 
 /// `CAMPBOOKS_CONNECTORS__CALENDAR__*`.
@@ -666,6 +675,42 @@ impl Default for ZohoMailConfig {
             run_budget_bytes: 64 * 1024 * 1024,
             requests_per_minute: 60,
             sweep_minutes: 360,
+            poll_max_seconds: None,
+        }
+    }
+}
+
+impl ZohoMailConfig {
+    /// The default and the bounds of [`poll_max_seconds`](Self::poll_max_seconds).
+    const POLL_MAX_DEFAULT: u32 = 60;
+    const POLL_MAX_RANGE: std::ops::RangeInclusive<u32> = 30..=14_400;
+
+    /// The longest a Zoho mailbox waits between polls, in seconds: the
+    /// setting when it is a whole number from 30 to 14400, else 60.
+    pub fn poll_max_seconds(&self) -> u32 {
+        self.read_poll_max().unwrap_or(Self::POLL_MAX_DEFAULT)
+    }
+
+    /// The setting, if it is set and usable. `Err` holds the text that is
+    /// not (for [`warn_unusable`](Self::warn_unusable)).
+    fn read_poll_max(&self) -> Result<u32, Option<&str>> {
+        let Some(text) = self.poll_max_seconds.as_deref().map(str::trim) else {
+            return Err(None);
+        };
+        text.parse::<u32>()
+            .ok()
+            .filter(|n| Self::POLL_MAX_RANGE.contains(n))
+            .ok_or(Some(text))
+    }
+
+    /// Say once, at startup, that the poll maximum was set to something
+    /// unusable and the default is used instead.
+    pub fn warn_unusable(&self) {
+        if let Err(Some(_)) = self.read_poll_max() {
+            tracing::warn!(
+                "CAMPBOOKS_CONNECTORS__ZOHO__POLL_MAX_SECONDS must be a whole number from 30                  to 14400: using {} seconds",
+                Self::POLL_MAX_DEFAULT
+            );
         }
     }
 }
@@ -1048,6 +1093,57 @@ mod tests {
 
     fn figment(value: serde_json::Value) -> Figment {
         Figment::from(Serialized::defaults(value))
+    }
+
+    #[test]
+    fn zoho_mail_is_polled_at_most_a_minute_apart_unless_told_otherwise() {
+        let zoho = |value: serde_json::Value| {
+            ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {"zoho": {"poll_max_seconds": value}}
+            })))
+            .unwrap()
+            .zoho
+            .poll_max_seconds()
+        };
+        let none = ConnectorsConfig::from_figment(&Figment::new()).unwrap();
+        assert_eq!(none.zoho.poll_max_seconds(), 60);
+        assert_eq!(zoho(serde_json::json!("45")), 45);
+        assert_eq!(zoho(serde_json::json!(45)), 45);
+        assert_eq!(zoho(serde_json::json!("30")), 30);
+        assert_eq!(zoho(serde_json::json!("14400")), 14_400);
+        // Unusable: the default, and the server still starts.
+        for bad in [
+            serde_json::json!("abc"),
+            serde_json::json!("0"),
+            serde_json::json!("29"),
+            serde_json::json!("14401"),
+            serde_json::json!("-5"),
+            serde_json::json!(""),
+            serde_json::json!(99_999),
+            serde_json::json!(true),
+            serde_json::json!(["a"]),
+        ] {
+            assert_eq!(zoho(bad.clone()), 60, "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_bad_zoho_poll_maximum_never_stops_a_server_with_production_poll_bounds() {
+        // Production's settings (campbooks-cloud#409): the poll bounds it
+        // sets, whatever the new variable is, and not tied to them.
+        for value in ["abc", "0", "99999", "45", "150"] {
+            let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+                "connectors": {
+                    "poll": {"min_seconds": 60, "max_seconds": 120},
+                    "zoho": {"poll_max_seconds": value}
+                }
+            })))
+            .unwrap();
+            assert_eq!(
+                (config.poll.min_seconds, config.poll.max_seconds),
+                (60, 120)
+            );
+        }
     }
 
     #[test]

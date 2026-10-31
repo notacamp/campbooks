@@ -29,6 +29,13 @@ pub const LEASE: TimeDelta = TimeDelta::minutes(15);
 /// every minute).
 pub const OVERDUE: TimeDelta = TimeDelta::minutes(5);
 
+/// How far ahead of a poll's due time it is made due. A run ends a second
+/// or two after the dispatcher's tick, so a due time of exactly `interval`
+/// later lands just after the tick that interval reaches and waits a whole
+/// extra minute for the next. Due this much earlier, the poll is taken by
+/// the tick the interval reaches.
+pub const TICK_SLACK: TimeDelta = TimeDelta::seconds(15);
+
 /// Most streams one dispatcher tick enqueues.
 pub const DISPATCH_BATCH: i64 = 500;
 
@@ -177,6 +184,20 @@ pub fn next_interval(current_seconds: i32, changed: bool, poll: &PollConfig) -> 
     } else {
         current_seconds.saturating_mul(2).clamp(min, max)
     }
+}
+
+/// When a stream polled at `now` is next due: `interval_seconds` on, less
+/// [`TICK_SLACK`], and never sooner than `least_wait_seconds` on (a wait
+/// that must be kept whole: a request budget, an IDLE or notification
+/// safety poll), nor before `now`.
+pub fn next_poll(
+    now: DateTime<Utc>,
+    interval_seconds: i32,
+    least_wait_seconds: i32,
+) -> DateTime<Utc> {
+    let interval = TimeDelta::seconds(i64::from(interval_seconds)) - TICK_SLACK;
+    let least = TimeDelta::seconds(i64::from(least_wait_seconds));
+    now + interval.max(least).max(TimeDelta::zero())
 }
 
 /// The budget key of one connection's own requests (a Zoho login).
@@ -449,6 +470,60 @@ mod tests {
         assert_eq!(next_interval(600, false, &poll), 600);
         assert_eq!(next_interval(600, true, &poll), 60);
         assert_eq!(next_interval(1, false, &poll), 60);
+    }
+
+    #[test]
+    fn a_poll_is_due_a_tick_slack_early() {
+        let now = Utc::now();
+        assert_eq!(next_poll(now, 120, 0), now + TimeDelta::seconds(105));
+        assert_eq!(next_poll(now, 60, 0), now + TimeDelta::seconds(45));
+    }
+
+    #[test]
+    fn a_wait_that_must_be_kept_is_kept_whole() {
+        let now = Utc::now();
+        // The least wait beats the interval less the slack, and is not cut.
+        assert_eq!(next_poll(now, 60, 300), now + TimeDelta::seconds(300));
+        assert_eq!(next_poll(now, 120, 110), now + TimeDelta::seconds(110));
+        // A smaller least wait changes nothing.
+        assert_eq!(next_poll(now, 120, 30), now + TimeDelta::seconds(105));
+    }
+
+    #[test]
+    fn an_interval_under_the_slack_is_never_due_before_now() {
+        let now = Utc::now();
+        assert_eq!(next_poll(now, 10, 0), now);
+        assert_eq!(next_poll(now, 0, 0), now);
+        assert_eq!(next_poll(now, -5, 0), now);
+    }
+
+    #[test]
+    fn a_quiet_stream_runs_on_the_tick_its_interval_reaches() {
+        // The dispatcher ticks at :02 of each minute. A run taken at the
+        // tick ends a second later.
+        let tick = |minute: i64, second: i64| {
+            DateTime::<Utc>::from_timestamp(
+                1_700_000_000 - 1_700_000_000 % 60 + minute * 60 + second,
+                0,
+            )
+            .unwrap()
+        };
+        let ended = tick(0, 3);
+        let ticks_after = |from: DateTime<Utc>, due: DateTime<Utc>| {
+            // The first tick at or after `due`.
+            (0..100)
+                .map(|m| tick(m, 2))
+                .find(|t| *t >= due && *t > from)
+                .unwrap()
+        };
+        let before = ended + TimeDelta::seconds(120);
+        assert_eq!(
+            ticks_after(ended, before),
+            tick(3, 2),
+            "without the slack the stream waits 180 s"
+        );
+        let due = next_poll(ended, 120, 0);
+        assert_eq!(ticks_after(ended, due), tick(2, 2));
     }
 
     /// The dispatcher's enqueues each run in their stream's workspace, and
