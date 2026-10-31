@@ -12,7 +12,7 @@ use campbooks_kernel::{
     db::BeginFor as _,
     tenancy::{Role, WorkspaceId},
 };
-use chrono::TimeDelta;
+use chrono::{DateTime, TimeDelta, Utc};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -252,6 +252,35 @@ async fn backfill_then_only_what_is_new(db: PgPool) {
         fresh.as_str()
     );
     assert_eq!(kit.zoho.raw_fetches(&invoice), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_quiet_zoho_mailbox_is_read_every_minute_whatever_the_global_maximum(db: PgPool) {
+    // campbooks-cloud#409: the global maximum is 10 minutes, Zoho's own
+    // is the default 60 s, and the next read is due a tick's slack early.
+    let mut config = crate::config::ConnectorsConfig::default();
+    config.poll.max_seconds = 600;
+    // The login's budget refills in real time, which a test that moves a
+    // fake clock does not wait for: keep it out of the way.
+    config.zoho.requests_per_minute = 100_000;
+    let kit = Kit::with_config(db, config).await;
+    connected(&kit).await;
+    for _ in 0..4 {
+        kit.next_run().await;
+        assert_eq!(kit.stream().await["interval_seconds"], 60);
+    }
+    let due: DateTime<Utc> = serde_json::from_value(kit.stream().await["due_at"].clone()).unwrap();
+    assert_eq!(due, kit.clock.now() + TimeDelta::seconds(60 - 15));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_zoho_poll_maximum_can_be_lowered_below_the_global_minimum(db: PgPool) {
+    let mut config = crate::config::ConnectorsConfig::default();
+    config.zoho.poll_max_seconds = Some("30".to_owned());
+    let kit = Kit::with_config(db, config).await;
+    connected(&kit).await;
+    kit.next_run().await;
+    assert_eq!(kit.stream().await["interval_seconds"], 30);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

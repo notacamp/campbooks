@@ -489,7 +489,7 @@ impl SyncStream {
             )
             .await?;
         } else {
-            let next = now + TimeDelta::seconds(i64::from(interval));
+            let next = schedule::next_poll(now, interval, 0);
             schedule::set_due(tx, workspace, target.stream, next).await?;
         }
         metrics::sync_finished(target.provider, SyncOutcome::Ok);
