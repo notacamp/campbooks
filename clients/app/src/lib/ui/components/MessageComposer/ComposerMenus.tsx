@@ -180,8 +180,10 @@ export function ScoutMenu({ scout, active, editor, writing, onWriting }: ScoutMe
           disabled={writing}
           aria-label={t("composer.scout.menu")}
         >
-          {t("composer.scout.label")}
-          <Icon name="chevron-down" />
+          <span className={styles["scoutLabel"]}>
+            {t("composer.scout.label")}
+            <Icon name="chevron-down" />
+          </span>
         </Button>
       )}
     >

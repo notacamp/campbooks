@@ -6,3 +6,11 @@
   min-width: 0;
   padding: var(--space-2);
 }
+
+/* The word and its chevron stay on one line, whatever the toolbar's width. */
+.scoutLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
