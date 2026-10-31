@@ -228,6 +228,28 @@ describe("the small parts of a cell", () => {
     expect(screen.getByRole("button", { name: "Summarise: Sum 4" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Summarise Signed" })).toBeTruthy();
   });
+
+  it("carries the whole value in a title, for the ellipsis that cuts it short", () => {
+    renderUi(
+      <div>
+        <CellLine end>€9,600.00</CellLine>
+        <CellLine title="Whole">Part</CellLine>
+        <OptionTag color="blue">Proposal sent</OptionTag>
+        <CellLink href="https://example.com">example.com</CellLink>
+        <SummaryButton label="Summary of Value" text="Sum €28,400.00" />
+      </div>,
+    );
+    expect(screen.getByText("€9,600.00")).toHaveAttribute("title", "€9,600.00");
+    expect(screen.getByText("Part")).toHaveAttribute("title", "Whole");
+    expect(screen.getByText("Proposal sent")).toHaveAttribute("title", "Proposal sent");
+    expect(screen.getByRole("link", { name: "example.com" })).toHaveAttribute(
+      "title",
+      "example.com",
+    );
+    expect(
+      screen.getByRole("button", { name: "Summary of Value: Sum €28,400.00" }),
+    ).toHaveAttribute("title", "Summary of Value: Sum €28,400.00");
+  });
 });
 
 describe("the toolbar", () => {
@@ -608,6 +630,12 @@ describe("the grid", () => {
     expect(screen.getByText("foot Value")).toBeTruthy();
     expect(screen.getByText("New row")).toBeTruthy();
     expect(screen.getByRole("button", { name: "add column" })).toBeTruthy();
+  });
+
+  it("gives the add-column cell a track of its own, so its plus never lands under a column", () => {
+    renderUi(<Grid />);
+    const scroller = must(screen.getByRole("grid").parentElement);
+    expect(scroller.style.getPropertyValue("--grid-end")).toBe("var(--size-hit)");
   });
 
   it("edits on Enter, F2, a double click, a typed character and a click on the active cell", () => {

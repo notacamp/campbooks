@@ -235,6 +235,21 @@ function longViews(held: TablesServer) {
   }
 }
 
+/** The Value column as narrow as the grid lets it get: the number and its sum no longer fit. */
+function narrowValue(held: TablesServer) {
+  const table = held.table(CLIENTS_ID);
+  for (const view of table?.views ?? []) {
+    view.config = {
+      ...view.config,
+      properties: (table?.properties ?? []).map((property) => ({
+        property: property.id,
+        visible: true,
+        ...(property.id === P.value ? { width: 64 } : {}),
+      })),
+    };
+  }
+}
+
 /** Whether a click on the element would land on it: nothing sits over its middle. */
 function clickable(element: HTMLElement) {
   element.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -315,6 +330,32 @@ export const ToolbarFitsOnAPhone: Story = {
   },
 };
 
+/**
+ * A narrow number column ends in an ellipsis with the whole value in its title, and the phone's
+ * footer shows one "+" in "New row" (the add-column "+" sits in the header, not over it).
+ */
+export const NarrowNumberAndNewRowOnAPhone: Story = {
+  args: { path: TABLE, prepare: narrowValue },
+  ...at("phone", 375, 812),
+  parameters: { ...at("phone", 375, 812).parameters, cutOnPurpose: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const cell = await canvas.findByText("€9,600.00");
+    await expect(cell).toHaveAttribute("title", "€9,600.00");
+    await expect(getComputedStyle(cell).textOverflow).toBe("ellipsis");
+    // The footer's New row, in the grid (the toolbar has its own on a phone).
+    const grid = within(await canvas.findByRole("grid"));
+    const row = must(grid.getByRole("button", { name: /^New row/u }).closest("[role=row]"));
+    const add = canvas.getByRole("button", { name: "Add a column" });
+    const head = must(add.closest("[role=row]"));
+    await expect(head.getBoundingClientRect().height).toBeLessThan(
+      must(row.parentElement).getBoundingClientRect().height,
+    );
+    await expect(row.querySelectorAll("button")[0]?.querySelectorAll("svg")).toHaveLength(1);
+    await expect(clickable(add)).toBe(true);
+  },
+};
+
 // The same screens with nothing done yet: the recording does the typing,
 // picking, filtering and moving (no `play`).
 
@@ -341,3 +382,17 @@ export const RowPeekPhoneIdle: Story = { args: { path: PEEK }, ...at("phone", 37
 
 /** A page with a table in it, on a phone. */
 export const InlineTablePhoneIdle: Story = { args: { path: INLINE }, ...at("phone", 375, 812) };
+
+/** The narrow number column on a phone (the recording shows its ellipsis and the one "+"). */
+export const NarrowNumberPhoneIdle: Story = {
+  args: { path: TABLE, prepare: narrowValue },
+  ...at("phone", 375, 812),
+  parameters: { ...at("phone", 375, 812).parameters, cutOnPurpose: true },
+};
+
+/** The narrow number column on the desktop (the recording hovers a number for its title). */
+export const NarrowNumberIdle: Story = {
+  args: { path: TABLE, prepare: narrowValue },
+  ...at("desktop", 1440, 900),
+  parameters: { ...at("desktop", 1440, 900).parameters, cutOnPurpose: true },
+};
