@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { useWorkspaces } from "~/modules/workspaces";
 
 import { ConnectNotion } from "./components/ConnectNotion/ConnectNotion";
+import { ConnectionsPage } from "./components/ConnectionsPage/ConnectionsPage";
 import { MailboxesPage } from "./components/MailboxesPage/MailboxesPage";
 import type { UseMailboxConsent } from "./consent";
 import { mailboxResult } from "./model";
@@ -41,7 +42,7 @@ export interface ConnectorsRouteOptions {
 }
 
 /**
- * Settings → Mailboxes, inside a workspace. The result the front door came
+ * Settings → Mailboxes and Settings → Connections, inside a workspace. The result the front door came
  * back with is read once, then cleared from the address bar (a reload
  * shows the list).
  */
@@ -72,12 +73,34 @@ export function buildConnectorsRoutes<TParent extends AnyRoute>(
         consent={consent}
         result={result}
         adding={adding}
-        onImport={() => {
-          void navigate({
-            to: "/w/$workspaceId/pages",
-            params: { workspaceId: workspace.id },
-            search: { import: "notion" },
-          });
+        onNavigate={(href) => {
+          void navigate({ to: href });
+        }}
+      />
+    );
+  }
+
+  /** Settings → Connections: Notion comes back here, with the same result in the address. */
+  function ConnectionsRoute() {
+    const { workspaceId } = useParams({ strict: false });
+    const search: MailboxesSearch = useSearch({ strict: false });
+    const { pathname } = useLocation();
+    const navigate = useNavigate();
+    const workspaces = useWorkspaces();
+    const [result] = useState(() => mailboxResult(search));
+    const hasResult = Object.keys(search).length > 0;
+    useEffect(() => {
+      if (hasResult) {
+        void navigate({ to: pathname, search: {}, replace: true });
+      }
+    }, [hasResult, navigate, pathname]);
+    const workspace = workspaces.data?.find((candidate) => candidate.id === workspaceId);
+    return workspace === undefined ? null : (
+      <ConnectionsPage
+        workspace={workspace}
+        result={result}
+        onNavigate={(href) => {
+          void navigate({ to: href });
         }}
       />
     );
@@ -89,7 +112,13 @@ export function buildConnectorsRoutes<TParent extends AnyRoute>(
     validateSearch: validateMailboxesSearch,
     component: MailboxesRoute,
   });
-  return [mailboxes] as const;
+  const connections = createRoute({
+    getParentRoute: () => parent,
+    path: "/settings/connections",
+    validateSearch: validateMailboxesSearch,
+    component: ConnectionsRoute,
+  });
+  return [mailboxes, connections] as const;
 }
 
 /**

@@ -24,7 +24,8 @@
       "title": "The mailboxes didn't load",
       "lead": "Nothing changed. Try again in a moment.",
       "retry": "Try again"
-    }
+    },
+    "elsewhere": "Notion and other apps are in <to>Connections</to>."
   },
   "row": {
     "byYou": "Connected by you",
@@ -352,7 +353,7 @@
     "description": "Bring the Notion pages you choose into Pages and keep them in step both ways. Only the pages you pick in Notion’s own screen are shared, and you can change that in Notion at any time.",
     "bullets": {
       "mine": "Your connection is yours, and imported pages start in your Private place.",
-      "sync": "Edits sync about a minute after they happen, in either direction.",
+      "sync": "Campbooks checks Notion for changes every few minutes, and sends your edits back as you make them.",
       "stop": "Disconnect any time: the pages stay in Campbooks but stop syncing."
     },
     "connect": "Connect Notion",
@@ -374,9 +375,22 @@
       "lead": "Its pages stay in Campbooks and no longer sync. Nothing was deleted in Notion."
     },
     "disconnect": {
-      "question": "Disconnect {{name}}?",
-      "lead": "Its pages stay in Campbooks but stop syncing. Nothing is deleted in Notion.",
-      "failed": "Couldn’t disconnect {{name}}. Nothing was changed."
+      "failed": "Couldn’t disconnect {{name}}. Nothing was changed.",
+      "title": "Disconnect Notion ({{name}})?",
+      "stops": {
+        "title": "What stops",
+        "changes": "Changes in Notion no longer come in",
+        "edits": "Your edits no longer go back to Notion",
+        "access": "Campbooks forgets its access to your Notion"
+      },
+      "stays": {
+        "title": "What stays",
+        "pages": "The pages you imported, in Pages, as they are now",
+        "notion": "Everything in Notion: nothing is deleted there"
+      },
+      "again": "You can connect Notion again at any time from here.",
+      "keep": "Keep connected",
+      "confirm": "Disconnect"
     },
     "refusal": {
       "failed": "Connecting Notion couldn’t start. Try again.",
@@ -386,7 +400,27 @@
     "unavailable": {
       "title": "Notion isn’t available on this instance.",
       "lead": "Whoever runs this Campbooks hasn’t turned it on."
-    }
+    },
+    "card": {
+      "title": "Notion · {{name}}"
+    },
+    "checked": "checked Notion {{ago}}",
+    "notConnected": "Not connected",
+    "facts": {
+      "brings": {
+        "label": "What it brings in",
+        "value": "Pages you imported, in your Private place in Pages"
+      },
+      "sync": {
+        "label": "How it stays in step",
+        "value": "Campbooks checks Notion for changes every few minutes, and sends your edits back to Notion as you make them."
+      },
+      "shares": {
+        "label": "What Notion shares",
+        "value": "Only the pages you picked in Notion’s own screen. Change that in Notion at any time."
+      }
+    },
+    "openPages": "Open in Pages"
   },
   "connectNotion": {
     "opening": "Opening Notion…",
@@ -417,5 +451,10 @@
         "lead": "Nothing was changed. Try again."
       }
     }
+  },
+  "connections": {
+    "title": "Connections",
+    "lead": "Apps that aren’t mail, connected to your Campbooks. Each connection is yours: teammates don’t see it or what it brings in.",
+    "elsewhere": "Mail lives in <mail>Mailboxes</mail>. Calendars come with their mailbox, in <calendar>Calendar</calendar>."
   }
 }
