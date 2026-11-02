@@ -363,7 +363,18 @@
         "request_timed_out": "{{name}} took too long to upload. Try again on a faster connection, or attach a smaller file."
       }
     },
-    "scheduled": "Scheduled for {{time}}"
+    "scheduled": "Scheduled for {{time}}",
+    "switch": {
+      "dropsFiles_one": "Switching to {{kind}} starts a new draft, and your file can’t come along: {{names}}.",
+      "dropsFiles_other": "Switching to {{kind}} starts a new draft, and your {{count}} files can’t come along: {{names}}.",
+      "dropAndSwitch": "Switch without them",
+      "keep": "Keep this draft",
+      "kind": {
+        "reply": "Reply",
+        "reply_all": "Reply all",
+        "forward": "Forward"
+      }
+    }
   },
   "needs": {
     "line": {

@@ -47,7 +47,8 @@ pub struct DraftChanges {
     pub version: u32,
     /// The `content_token` that came with the draft on screen (its last
     /// save's answer, or the draft as read). Every save keeps fields it
-    /// cannot set (the inbox, the reply headers, the attachments' files),
+    /// does not name (the inbox, unless it moves the draft; the reply headers;
+    /// the attachments' files),
     /// so every save names what it was shown: missing, another member's, or
     /// not the draft as it is now answers 409 `content_changed` and nothing
     /// is saved (campbooks-cloud#242).
@@ -85,6 +86,8 @@ pub struct DraftChanges {
     /// author's for the new inbox. The inbox must be in this workspace with
     /// the `sender` or `manager` role and not read-only: a `reader` gets
     /// 403 `inbox_read_only`, any other inbox 404. Choosing From sends nothing.
+    /// Only the member's own request moves a draft: the assistant gets 403
+    /// `from_needs_you`.
     #[serde(default)]
     pub inbox_id: Option<InboxId>,
 }
@@ -110,7 +113,7 @@ pub struct DraftChanges {
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, or you only read its inbox.",
+        (status = FORBIDDEN, description = "Missing scope, you only read its inbox or the one it would move to, or a move that is not your own request (`from_needs_you`): the assistant never changes From.",
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such draft, or it is not yours.",
             body = Problem, content_type = "application/problem+json"),
@@ -165,27 +168,26 @@ pub async fn update(
         &row,
         changes.inbox_id,
         changes.signature,
+        workspace.invoked_by.is_some(),
     )
     .await?;
     check_limits(to.len() + cc.len() + bcc.len(), &subject, &body, &quoted)?;
 
-    let mut attachments = row.stored_attachments()?;
-    let attachments_before = attachments.clone();
-    if let Some(keep) = changes.attachments {
-        let keep: HashSet<AttachmentId> = keep.into_iter().collect();
-        let (kept, dropped): (Vec<_>, Vec<_>) =
-            attachments.into_iter().partition(|a| keep.contains(&a.id));
-        let still: HashSet<_> = kept.iter().map(|a| a.blob.hash).collect();
-        let ws = access.workspace.to_string();
-        let owner = BlobOwner::new(DRAFT_RECORD, id);
-        for gone in dropped.iter().filter(|a| !still.contains(&a.blob.hash)) {
-            state
-                .blobs
-                .detach(&mut tx, &ws, &gone.blob.hash, &owner)
-                .await?;
+    let attachments_before = row.stored_attachments()?;
+    let attachments = match changes.attachments {
+        Some(keep) => {
+            keep_only(
+                &state,
+                &mut tx,
+                access.workspace,
+                id,
+                &attachments_before,
+                keep,
+            )
+            .await?
         }
-        attachments = kept;
-    }
+        None => attachments_before.clone(),
+    };
 
     if let Some(target) = moved {
         move_row(&state, &mut tx, id, target, &attachments).await?;
@@ -235,6 +237,30 @@ pub async fn update(
     Ok(Json(draft))
 }
 
+/// The attachments of draft `id` that `keep` names; the draft's hold on the
+/// file of each other one is released (unless a kept one has the same file).
+async fn keep_only(
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    workspace: WorkspaceId,
+    id: DraftId,
+    attachments: &[StoredAttachment],
+    keep: Vec<AttachmentId>,
+) -> Result<Vec<StoredAttachment>> {
+    let keep: HashSet<AttachmentId> = keep.into_iter().collect();
+    let (kept, dropped): (Vec<_>, Vec<_>) = attachments
+        .iter()
+        .cloned()
+        .partition(|a| keep.contains(&a.id));
+    let still: HashSet<_> = kept.iter().map(|a| a.blob.hash).collect();
+    let ws = workspace.to_string();
+    let owner = BlobOwner::new(DRAFT_RECORD, id);
+    for gone in dropped.iter().filter(|a| !still.contains(&a.blob.hash)) {
+        state.blobs.detach(tx, &ws, &gone.blob.hash, &owner).await?;
+    }
+    Ok(kept)
+}
+
 /// Put draft `id` in `inbox`. The provider's thread key belongs to the first
 /// mailbox, so it goes; the reply headers stay, and the recipient's mail
 /// still threads the reply.
@@ -263,7 +289,10 @@ async fn move_row(
 ///
 /// From is another inbox the author may send from (the catalogue decides: a
 /// reader 403, anything else outside their inboxes 404); `None` when it
-/// stays. The signature follows the author to the new inbox when it was on
+/// stays. Who a message is from is the member's own choice: a message the
+/// assistant read could otherwise have it move a reply to another mailbox
+/// unseen, so the assistant's move is 403 `from_needs_you` (naming the inbox
+/// it is in already changes nothing). The signature follows the author to the new inbox when it was on
 /// (off stays off), unless the save says `true` (the author's current one
 /// for the inbox) or `false` (none).
 async fn from_and_signature(
@@ -273,9 +302,13 @@ async fn from_and_signature(
     row: &drafts::DraftRow,
     to: Option<InboxId>,
     signed: Option<bool>,
+    assistant: bool,
 ) -> Result<(Option<InboxId>, String)> {
     let moved = to.filter(|target| *target != row.inbox_id);
     if let Some(target) = moved {
+        if assistant {
+            return Err(Error::Denied(crate::MESSAGES.reason("from_needs_you")));
+        }
         resources::authorize(state, tx, access, Action::Send, &resources::inbox(target)).await?;
     }
     let inbox = moved.unwrap_or(row.inbox_id);

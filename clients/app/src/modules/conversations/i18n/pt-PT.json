@@ -363,7 +363,18 @@
         "request_timed_out": "{{name}} demorou demasiado a carregar. Tente outra vez com uma ligação mais rápida, ou anexe um ficheiro mais pequeno."
       }
     },
-    "scheduled": "Agendado para {{time}}"
+    "scheduled": "Agendado para {{time}}",
+    "switch": {
+      "dropsFiles_one": "Mudar para {{kind}} cria um novo rascunho, e o seu ficheiro não pode passar para ele: {{names}}.",
+      "dropsFiles_other": "Mudar para {{kind}} cria um novo rascunho, e os seus {{count}} ficheiros não podem passar para ele: {{names}}.",
+      "dropAndSwitch": "Mudar sem eles",
+      "keep": "Manter este rascunho",
+      "kind": {
+        "reply": "Responder",
+        "reply_all": "Responder a todos",
+        "forward": "Reencaminhar"
+      }
+    }
   },
   "needs": {
     "line": {

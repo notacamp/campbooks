@@ -363,7 +363,18 @@
         "request_timed_out": "{{name}} tardó demasiado en subirse. Inténtalo de nuevo con una conexión más rápida o adjunta un archivo más pequeño."
       }
     },
-    "scheduled": "Programado para el {{time}}"
+    "scheduled": "Programado para el {{time}}",
+    "switch": {
+      "dropsFiles_one": "Cambiar a {{kind}} crea un borrador nuevo, y tu archivo no puede pasar a él: {{names}}.",
+      "dropsFiles_other": "Cambiar a {{kind}} crea un borrador nuevo, y tus {{count}} archivos no pueden pasar a él: {{names}}.",
+      "dropAndSwitch": "Cambiar sin ellos",
+      "keep": "Mantener este borrador",
+      "kind": {
+        "reply": "Responder",
+        "reply_all": "Responder a todos",
+        "forward": "Reenviar"
+      }
+    }
   },
   "needs": {
     "line": {

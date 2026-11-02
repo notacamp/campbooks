@@ -10,8 +10,11 @@
 - clears `thread_key`, and keeps `in_reply_to`, `references`,
   `conversation_id` and `message_id`;
 - recomputes the From address and name;
-- is a member's request or the assistant's: `update_draft` is already
-  assistant-callable, and choosing From doesn't send anything.
+- is the member's own request only. `update_draft` stays
+  assistant-callable for the text, but a call the assistant makes that
+  names another inbox gets 403 `from_needs_you`. Mail the assistant read
+  could otherwise have it move a reply from a personal mailbox to a shared
+  one, and nothing would show the change (security review of #732).
 
 The content hash already includes `inbox_address`, so the next send must
 name the token issued after the move. The client lists inboxes with
@@ -28,9 +31,22 @@ Choosing one runs four steps:
 1. `createDraft({ kind, message_id, quoted })`, with the quote built as
    `ReplyComposer` builds it today;
 2. `saveDraft` of the new draft with `body` (and `subject` if the member
-   changed it);
+   changed it), From (`inbox_id`, when the member had moved the draft) and
+   the recipients with the member's own changes kept (`compose/switch-mode`):
+   the people they added stay in the field they put them in, the people
+   they removed stay out, the people in Bcc stay only there, and the rest is
+   what the new kind fills in. What the old kind had filled in is worked out
+   the way `create_draft` fills it;
 3. `deleteDraft` of the old one, best effort;
 4. open the new draft in the composer.
+
+Files can't come along: an uploaded file belongs to the old draft, and a new
+draft can't take another draft's files. When the draft holds any (attached
+or still uploading), the composer names them first: "Switching to Forward
+starts a new draft, and your file can't come along: lease.pdf", with
+"Switch without them" and "Keep this draft". Nothing starts until the member
+chooses (security review of #732: a switch must never lose what the member
+wrote silently).
 
 If step 1 or 2 fails, the old draft stays open, with an error. The text is
 carried over as marks, unchanged.

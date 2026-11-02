@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
 import {
+  Button,
   MessageComposer,
   sendTimeLabel,
   useUndoToast,
@@ -28,6 +29,18 @@ import { KNOWN_ERRORS } from "../../compose/errors";
 import { useDraftEditor } from "../../compose/use-draft-editor";
 import { useRecipientSuggestions } from "../../compose/use-recipient-suggestions";
 
+/** What a switch of kind carries to the new draft. */
+export interface SwitchCarried {
+  body: string;
+  /** The subject, when the member changed it. */
+  subject: string | undefined;
+  /** From: the inbox the draft is in now. */
+  inboxId: string;
+  to: Draft["to"];
+  cc: Draft["cc"];
+  bcc: Draft["bcc"];
+}
+
 export interface DraftComposerProps {
   workspaceId: string;
   draft: Draft;
@@ -46,16 +59,13 @@ export interface DraftComposerProps {
   /** Said beside the quoted history (that it holds only the start of a long email). */
   quotedNote?: string | undefined;
   /**
-   * Switch this reply to Reply, Reply all or Forward, carrying the text: the
-   * conversation's composer starts a draft of the new kind and drops this one.
-   * Omit where the kind cannot change (a new message, a nudge).
+   * Switch this reply to Reply, Reply all or Forward, carrying what the
+   * member wrote: the conversation's composer starts a draft of the new kind
+   * and drops this one. Its files can't come along, so the composer asks
+   * first when it has any. Omit where the kind cannot change (a new message,
+   * a nudge).
    */
-  onSwitchMode?:
-    | ((
-        mode: ComposerMode,
-        carried: { body: string; subject: string | undefined },
-      ) => Promise<void>)
-    | undefined;
+  onSwitchMode?: ((mode: ComposerMode, carried: SwitchCarried) => Promise<void>) | undefined;
 }
 
 /**
@@ -179,6 +189,10 @@ export function DraftComposer({
   }
 
   const kept = editor.shown.attachments.filter((a) => fields.attachments.includes(a.id));
+  // A switch of kind waiting for the member to agree to leave the files
+  // (attached, or still on their way).
+  const [switching, setSwitching] = useState<ComposerMode | undefined>();
+  const files = [...kept.map((a) => a.filename), ...editor.uploading.map((u) => u.name)];
 
   // Why the files last added were not attached, said in the composer beside
   // them (a toast is one line and would cut the reason at 375px).
@@ -269,13 +283,67 @@ export function DraftComposer({
     onDone();
   }
 
+  // Switch kind, carrying what was typed (saved first: the new draft starts
+  // from it).
+  function switchTo(mode: ComposerMode) {
+    if (onSwitchMode === undefined) {
+      return;
+    }
+    setSwitching(undefined);
+    setNotice(undefined);
+    void (async () => {
+      await editor.flush();
+      try {
+        await onSwitchMode(mode, {
+          body: fields.body,
+          subject: fields.subject === draft.subject ? undefined : fields.subject,
+          inboxId: editor.shown.inboxId,
+          to: fields.to,
+          cc: fields.cc,
+          bcc: fields.bcc,
+        });
+      } catch {
+        // The old draft stays open, as it was.
+        setNotice(t("compose.errors.switch_failed"));
+      }
+    })();
+  }
+
   const said = [...refusals, ...(notice === undefined ? [] : [notice])];
   const error =
-    editor.error === undefined
-      ? said.length === 0
-        ? undefined
-        : said.join(" ")
-      : t(`compose.errors.${KNOWN_ERRORS.has(editor.error) ? editor.error : "unknown"}`);
+    switching === undefined ? (
+      editor.error === undefined ? (
+        said.length === 0 ? undefined : (
+          said.join(" ")
+        )
+      ) : (
+        t(`compose.errors.${KNOWN_ERRORS.has(editor.error) ? editor.error : "unknown"}`)
+      )
+    ) : (
+      <>
+        {t("compose.switch.dropsFiles", {
+          count: files.length,
+          names: files.join(", "),
+          kind: t(`compose.switch.kind.${switching}`),
+        })}{" "}
+        <Button
+          variant="secondary"
+          onClick={() => {
+            switchTo(switching);
+          }}
+        >
+          {t("compose.switch.dropAndSwitch")}
+        </Button>{" "}
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setSwitching(undefined);
+          }}
+        >
+          {t("compose.switch.keep")}
+        </Button>
+      </>
+    );
 
   return (
     <MessageComposer
@@ -343,20 +411,13 @@ export function DraftComposer({
           ? {
               value: draft.kind,
               onChange: (mode) => {
-                setNotice(undefined);
-                void (async () => {
-                  // What was typed is saved first; the new draft starts from it.
-                  await editor.flush();
-                  try {
-                    await onSwitchMode(mode, {
-                      body: fields.body,
-                      subject: fields.subject === draft.subject ? undefined : fields.subject,
-                    });
-                  } catch {
-                    // The old draft stays open, as it was.
-                    setNotice(t("compose.errors.switch_failed"));
-                  }
-                })();
+                // Files can't come along: say which before they are dropped.
+                if (files.length > 0) {
+                  setNotice(undefined);
+                  setSwitching(mode);
+                } else {
+                  switchTo(mode);
+                }
               },
             }
           : undefined

@@ -1868,6 +1868,100 @@ async fn a_disconnected_mailbox_answers_as_declared(db: PgPool) {
     assert!(checks > 100, "only {checks} calls checked");
 }
 
+/// Moving a draft checks its author's right to send from the target
+/// (campbooks-cloud#394): the generic matrix saves a draft without moving
+/// it, so the target's Send check is asked here, for each role the author
+/// may hold there, an inbox of another workspace and a kept inbox.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_draft_moves_only_to_an_inbox_its_author_may_send_from(db: PgPool) {
+    use campbooks_conversations::model::InboxId;
+    let world = World::new(db).await;
+    let sender = world.users[&Who::Sender];
+    let home = world.instances["conversations.inbox"].clone();
+    let uri = format!(
+        "/api/v1/w/{}/drafts/{}",
+        world.a, world.instances["conversations.draft"]
+    );
+    let token = world.token(Who::Sender.subject());
+    let mv = |inbox: String| {
+        let world = &world;
+        let (uri, token) = (uri.clone(), token.clone());
+        async move {
+            let (_, read, _) = world.call(Some(&token), "GET", &uri, None).await;
+            let read: Value = serde_json::from_slice(&read).unwrap();
+            let body = json!({"version": read["version"], "content_token": read["content_token"],
+                "inbox_id": inbox});
+            let (status, bytes, _) = world.call(Some(&token), "PATCH", &uri, Some(&body)).await;
+            let answer: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+            (status, answer)
+        }
+    };
+    let target = |address: &'static str, roles: Vec<(UserId, InboxRole)>, workspace| {
+        let state = world.state.clone();
+        async move {
+            let inbox: InboxId = dev::create_inbox(&state, workspace, address, &roles)
+                .await
+                .unwrap();
+            inbox.to_string()
+        }
+    };
+    for (address, role, allowed) in [
+        ("none@example.com", None, StatusCode::NOT_FOUND),
+        (
+            "reads@example.com",
+            Some(InboxRole::Reader),
+            StatusCode::FORBIDDEN,
+        ),
+        ("sends@example.com", Some(InboxRole::Sender), StatusCode::OK),
+        (
+            "manages@example.com",
+            Some(InboxRole::Manager),
+            StatusCode::OK,
+        ),
+    ] {
+        let roles = role.map(|role| vec![(sender, role)]).unwrap_or_default();
+        let to = target(address, roles, world.a).await;
+        let (status, answer) = mv(to.clone()).await;
+        assert_eq!(status, allowed, "{role:?}: {answer}");
+        if status == StatusCode::OK {
+            assert_eq!(answer["inbox_id"], to, "{role:?}");
+            let (back, answer) = mv(home.clone()).await;
+            assert_eq!(back, StatusCode::OK, "back home: {answer}");
+        } else if status == StatusCode::FORBIDDEN {
+            assert_eq!(answer["code"], "inbox_read_only", "{role:?}");
+        }
+    }
+    // Another workspace's inbox, even one the author is in: not there.
+    let away = target(
+        "away@example.com",
+        vec![(sender, InboxRole::Sender)],
+        world.b,
+    )
+    .await;
+    let (status, answer) = mv(away).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{answer}");
+    // A kept inbox (its mailbox removed, its mail kept): read-only, even for
+    // its sender.
+    let kept = target(
+        "kept@example.com",
+        vec![(sender, InboxRole::Sender)],
+        world.a,
+    )
+    .await;
+    sqlx::query("UPDATE conversations.inboxes SET detached_at = now() WHERE id = $1::uuid")
+        .bind(&kept)
+        .execute(&world.db)
+        .await
+        .unwrap();
+    let (status, answer) = mv(kept).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{answer}");
+    assert_eq!(answer["code"], "inbox_read_only");
+    // Nothing that was refused moved it.
+    let (_, read, _) = world.call(Some(&token), "GET", &uri, None).await;
+    let read: Value = serde_json::from_slice(&read).unwrap();
+    assert_eq!(read["inbox_id"], home);
+}
+
 /// A scheduled send against the real membership (`workspaces`'
 /// `role_held`): released while its author is a member; back to a draft
 /// once they are not, even before their departure is handled.

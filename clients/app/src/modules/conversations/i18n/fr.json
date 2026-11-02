@@ -363,7 +363,18 @@
         "request_timed_out": "{{name}} a mis trop de temps à se charger. Réessayez avec une connexion plus rapide, ou joignez un fichier plus petit."
       }
     },
-    "scheduled": "Programmé pour {{time}}"
+    "scheduled": "Programmé pour {{time}}",
+    "switch": {
+      "dropsFiles_one": "Passer à {{kind}} crée un nouveau brouillon, et votre fichier ne peut pas suivre : {{names}}.",
+      "dropsFiles_other": "Passer à {{kind}} crée un nouveau brouillon, et vos {{count}} fichiers ne peuvent pas suivre : {{names}}.",
+      "dropAndSwitch": "Changer sans eux",
+      "keep": "Garder ce brouillon",
+      "kind": {
+        "reply": "Répondre",
+        "reply_all": "Répondre à tous",
+        "forward": "Transférer"
+      }
+    }
   },
   "needs": {
     "line": {

@@ -1,7 +1,7 @@
 //! Moving a draft to another inbox (campbooks-cloud#394).
 
 use axum::http::StatusCode;
-use campbooks_kernel::tenancy::WorkspaceId;
+use campbooks_kernel::{operations::InvokeError, tenancy::WorkspaceId};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -280,44 +280,97 @@ async fn the_signature_follows_the_author_to_the_new_inbox_and_off_stays_off(db:
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn the_assistant_may_choose_from_and_it_sends_nothing(db: PgPool) {
+async fn the_assistant_never_changes_from(db: PgPool) {
     let w = world(db).await;
     let (uri, shown) = w.reply().await;
     let id = uri.rsplit('/').next().unwrap();
-    let result = w
-        .kit
-        .as_assistant(
-            "sam",
-            w.workspace,
-            (
-                "conversations.update_draft",
-                json!({"draft_id": id, "version": shown["version"],
-                    "content_token": shown["content_token"], "inbox_id": w.office}),
-            ),
-            false,
+    let call = |inbox: InboxId| {
+        (
+            "conversations.update_draft",
+            json!({"draft_id": id, "version": shown["version"],
+                "content_token": shown["content_token"], "inbox_id": inbox,
+                "body": "Thursday works for me."}),
         )
+    };
+    let refused = w
+        .kit
+        .as_assistant("sam", w.workspace, call(w.office), false)
+        .await;
+    match &refused {
+        Err(InvokeError::Failed {
+            status, problem, ..
+        }) => {
+            assert_eq!(*status, StatusCode::FORBIDDEN, "{problem}");
+            assert_eq!(problem["code"], "from_needs_you", "{problem}");
+        }
+        other => panic!("not refused: {other:?}"),
+    }
+    let read = w.kit.get(&w.sam, &uri).await.json;
+    assert_eq!(read["inbox_id"], w.personal.to_string());
+    assert_eq!(
+        read["body"], "Thursday works.",
+        "nothing of the call was saved"
+    );
+    assert_eq!(read["version"], shown["version"]);
+
+    // Naming the inbox it is in moves nothing, so the assistant's text is saved.
+    let kept = w
+        .kit
+        .as_assistant("sam", w.workspace, call(w.personal), false)
         .await
         .unwrap();
+    assert_eq!(kept.body["inbox_id"], w.personal.to_string());
+    assert_eq!(kept.body["body"], "Thursday works for me.");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_kept_inbox_takes_no_draft_even_from_its_sender(db: PgPool) {
+    let w = world(db).await;
+    // Its mailbox was removed: what it holds is kept, read-only.
+    sqlx::query("UPDATE conversations.inboxes SET detached_at = now() WHERE id = $1")
+        .bind(w.office)
+        .execute(&w.kit.db)
+        .await
+        .unwrap();
+    let (uri, shown) = w.reply().await;
+    let refused = w.move_to(&uri, &shown, w.office).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "inbox_read_only");
+    let read = w.kit.get(&w.sam, &uri).await.json;
+    assert_eq!(read["inbox_id"], w.personal.to_string());
+    assert_eq!(read["version"], shown["version"]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_scheduled_draft_does_not_move(db: PgPool) {
+    let w = world(db).await;
+    let (uri, shown) = w.reply().await;
+    let tomorrow = (chrono::Utc::now() + chrono::Duration::days(1)).to_rfc3339();
+    let scheduled = w
+        .kit
+        .post(
+            &w.sam,
+            &format!("{uri}/send"),
+            Some(
+                json!({"version": shown["version"], "content_token": shown["content_token"],
+                "send_at": tomorrow}),
+            ),
+        )
+        .await;
     assert_eq!(
-        result.body["inbox_id"],
-        w.office.to_string(),
-        "{}",
-        result.body
+        scheduled.status,
+        StatusCode::ACCEPTED,
+        "{:?}",
+        scheduled.json
     );
-    assert_eq!(result.body["state"], "draft");
-    let queued: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM kernel.jobs WHERE kind = 'conversations.release_send'",
-    )
-    .fetch_one(&w.kit.db)
-    .await
-    .unwrap();
-    assert_eq!(queued, 0);
-    assert!(
-        w.kit
-            .events("conversations.send_requested")
-            .await
-            .is_empty()
-    );
+    let now = w.kit.get(&w.sam, &uri).await.json;
+    assert_eq!(now["state"], "scheduled");
+    let refused = w.move_to(&uri, &now, w.office).await;
+    assert_eq!(refused.status, StatusCode::CONFLICT, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "draft_not_editable");
+    let read = w.kit.get(&w.sam, &uri).await.json;
+    assert_eq!(read["inbox_id"], w.personal.to_string());
+    assert_eq!(read["state"], "scheduled");
 }
 
 /// Where inboxes send from in these tests: the ones named carry at most the

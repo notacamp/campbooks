@@ -14,9 +14,10 @@ import {
 } from "../../api/drafts";
 import { useMessageWords, withWords } from "../../api/queries";
 import { displayName, forwardQuote, replyQuote, type QuoteWords } from "../../compose/quote";
+import { carryRecipients, filledFor } from "../../compose/switch-mode";
 import { useDeleteDraft } from "../../compose/use-delete-draft";
 import type { Translate } from "../../model";
-import { DraftComposer } from "../DraftComposer/DraftComposer";
+import { DraftComposer, type SwitchCarried } from "../DraftComposer/DraftComposer";
 import type { ReplyRequest, ReplySlotContext } from "../Reader/ReplySlot";
 
 /** A draft the member can still change. */
@@ -130,14 +131,12 @@ export function ReplyComposer({
     }
   }, [request, drafts.data]);
 
-  // Reply ▾ in the title: a draft of the new kind with the text carried over,
-  // then the old one deleted (best effort). If the new one cannot be made or
-  // written, it is dropped and the old one stays as it was.
-  const switchMode = async (
-    old: Draft,
-    mode: ComposerMode,
-    carried: { body: string; subject: string | undefined },
-  ) => {
+  // Reply ▾ in the title: a draft of the new kind with what the member wrote
+  // carried over (From, their changes to the recipients, the subject and the
+  // text), then the old one deleted (best effort). If the new one cannot be
+  // made or written, it is dropped and the old one stays as it was. Files
+  // can't come along (the composer asks before it drops them).
+  const switchMode = async (old: Draft, mode: ComposerMode, carried: SwitchCarried) => {
     const message = messages.find((m) => m.id === old.message_id);
     if (message === undefined) {
       throw new Error("the message answered is not here");
@@ -148,13 +147,23 @@ export function ReplyComposer({
         ? forwardQuote(full, i18n.language, words)
         : replyQuote(full, i18n.language, words);
     const made = await createDraft(workspaceId, { kind: mode, message_id: full.id, quoted });
+    // The new draft is in the message's inbox, whose address both kinds
+    // left out when they were filled in.
+    const recipients = carryRecipients(carried, filledFor(old.kind, full, made.from.address), {
+      to: made.to,
+      cc: made.cc,
+      bcc: made.bcc,
+    });
     let ready = made;
     try {
       ready = await saveDraft(workspaceId, made.id, {
         version: made.version,
         content_token: made.content_token ?? null,
         body: carried.body,
+        ...recipients,
         ...(carried.subject === undefined ? {} : { subject: carried.subject }),
+        // From stays what the member chose.
+        ...(carried.inboxId === made.inbox_id ? {} : { inbox_id: carried.inboxId }),
       });
     } catch (error) {
       void removeDraft(workspaceId, made.id).catch(() => null);

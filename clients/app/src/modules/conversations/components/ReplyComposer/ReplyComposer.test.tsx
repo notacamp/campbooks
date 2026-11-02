@@ -632,6 +632,85 @@ describe("ReplyComposer", () => {
       expect(await screen.findByRole("region", { name: "Reply all" })).toBeVisible();
     });
 
+    it("carries From and the member's recipients, and asks before leaving a file behind", async () => {
+      // Sam copied Lea, attached a PDF and chose to send from the office.
+      const OFFICE = "0192f1a0-0000-7000-8000-0000000000b2";
+      const LEA = { name: "Lea", address: "lea@example.com" };
+      const EDITED = {
+        ...REPLY,
+        inbox_id: OFFICE,
+        from: { name: "Office", address: "office@example.com" },
+        cc: [LEA],
+        attachments: [
+          {
+            id: "0192f1a0-0000-7000-8000-0000000000f1",
+            filename: "lease.pdf",
+            content_type: "application/pdf",
+            size: 1200,
+            source: "uploaded" as const,
+          },
+        ],
+      };
+      const FORWARD = {
+        ...REPLY,
+        id: "0192f1a0-0000-7000-8000-000000000198",
+        kind: "forward" as const,
+        to: [],
+        subject: `Fwd: ${Q4.subject}`,
+      };
+      let stored: (typeof REPLY)[] = [EDITED];
+      const api = mockApi({
+        [`GET ${D}`]: () => ({ body: { drafts: stored } }),
+        [`POST ${D}`]: () => {
+          stored = [FORWARD, ...stored];
+          return { status: 201, body: FORWARD };
+        },
+        [`PATCH ${D}/${REPLY.id}`]: (_request, body) => ({
+          body: { ...EDITED, ...(body as object), version: 2 },
+        }),
+        [`PATCH ${D}/${FORWARD.id}`]: (_request, body) => ({
+          body: { ...FORWARD, ...(body as object), version: 2 },
+        }),
+        [`DELETE ${D}/${REPLY.id}`]: () => {
+          stored = stored.filter((d) => d.id !== REPLY.id);
+          return { status: 204 };
+        },
+      });
+      renderWithProviders(slot(null));
+      const box = await screen.findByRole("textbox", { name: "Message" });
+      replaceText(box, "See the lease.");
+      const forward = () => {
+        fireEvent.click(screen.getByRole("button", { name: "Change reply type" }));
+        fireEvent.click(screen.getByRole("menuitemradio", { name: /Forward/u }));
+      };
+
+      // The file can't come along: the composer says so, and nothing starts.
+      forward();
+      expect(await screen.findByText(/your file can’t come along: lease\.pdf/u)).toBeVisible();
+      expect(api.calls.some((call) => call.route === `POST ${D}`)).toBe(false);
+      fireEvent.click(screen.getByRole("button", { name: "Keep this draft" }));
+      expect(screen.queryByText(/can’t come along/u)).toBeNull();
+      expect(screen.getByRole("region", { name: "Reply to Maya Okafor" })).toBeVisible();
+
+      // Agreed: the forward keeps From, Lea and the text; Maya, whom the
+      // reply filled in, is not carried to a forward.
+      forward();
+      fireEvent.click(await screen.findByRole("button", { name: "Switch without them" }));
+      await waitFor(() => {
+        expect(api.calls.some((call) => call.route === `DELETE ${D}/${REPLY.id}`)).toBe(true);
+      });
+      expect(
+        api.calls.find((call) => call.route === `PATCH ${D}/${FORWARD.id}`)?.body,
+      ).toMatchObject({
+        version: 1,
+        body: "See the lease.",
+        inbox_id: OFFICE,
+        to: [],
+        cc: [LEA],
+        bcc: [],
+      });
+    });
+
     it("keeps the old draft, and says so, when the switch fails", async () => {
       const api = mockApi({
         [`GET ${D}`]: { body: { drafts: [REPLY] } },
