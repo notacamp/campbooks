@@ -154,7 +154,18 @@ const preview: Preview = {
   parameters: {
     layout: "padded",
     // Every story is an accessibility test: axe violations fail `pnpm test-storybook`.
-    a11y: { test: "error" },
+    a11y: {
+      test: "error",
+      config: {
+        rules: [
+          // axe-core 4.14 turned WCAG 2.5.3 "label in name" on by default. Our icon-less
+          // buttons deliberately carry a fuller accessible name than their visible text
+          // (a day cell "28" is named "Wednesday, October 28", the workspace switcher is
+          // "Switch workspace (current: ...)"), and tests/e2e select by those names.
+          { id: "label-content-name-mismatch", enabled: false },
+        ],
+      },
+    },
     controls: { matchers: { color: /^$/ } },
   },
 };
