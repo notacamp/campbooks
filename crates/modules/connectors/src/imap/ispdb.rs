@@ -123,17 +123,17 @@ pub fn parse(xml: &str) -> Option<ProviderConfig> {
     loop {
         match reader.read_event().ok()? {
             Event::Start(start) => {
-                let name = String::from_utf8_lossy(start.local_name().as_ref()).into_owned();
+                let name = start.local_name().as_ref().to_owned();
                 let kind = start
                     .try_get_attribute("type")
                     .ok()
                     .flatten()
-                    .map(|a| String::from_utf8_lossy(&a.value).to_ascii_lowercase());
+                    .map(|a| a.value.to_ascii_lowercase());
                 match (name.as_str(), kind.as_deref()) {
                     ("emailProvider", _) => {
                         found = true;
                         if let Some(id) = start.try_get_attribute("id").ok().flatten() {
-                            config.id = String::from_utf8_lossy(&id.value).to_ascii_lowercase();
+                            config.id = id.value.to_ascii_lowercase();
                         }
                     }
                     ("incomingServer", Some("imap")) => {
@@ -148,7 +148,7 @@ pub fn parse(xml: &str) -> Option<ProviderConfig> {
                 stack.push(name);
                 text.clear();
             }
-            Event::Text(chunk) => text.push_str(&chunk.decode().ok()?),
+            Event::Text(chunk) => text.push_str(&chunk),
             // An entity in a value: not a value Campbooks uses (host names,
             // ports and placeholders never hold one).
             Event::GeneralRef(_) => text.push('\u{fffd}'),
