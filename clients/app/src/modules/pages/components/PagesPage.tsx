@@ -357,7 +357,7 @@ export function PagesPage({
           workspaceId={workspaceId}
           open={importOpen}
           useSource={notion.useSource}
-          settingsHref={`/w/${workspaceId}/settings/mailboxes`}
+          settingsHref={`/w/${workspaceId}/settings/connections`}
           onClose={() => {
             setImportOpen(false);
             if (importing) {

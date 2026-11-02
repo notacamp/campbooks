@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { useTranslation } from "react-i18next";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Trans, useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   Banner,
   Button,
+  ButtonLink,
   ChoiceCards,
   EmptyState,
   InlineConfirm,
@@ -17,6 +18,7 @@ import {
   SettingsSection,
   SkeletonList,
   StatusText,
+  Text,
 } from "~/lib/ui";
 import { useMembers, type Member, type Workspace } from "~/modules/workspaces";
 
@@ -29,8 +31,8 @@ import {
   type MailChoice,
 } from "../../api/queries";
 import type { MailboxConsent, WayInFate } from "../../consent";
+import { followIn } from "../../follow";
 import { ConnectMailbox, StepUp } from "../ConnectMailbox/ConnectMailbox";
-import { NotionCard } from "../NotionCard/NotionCard";
 import {
   firstChoice,
   healthTone,
@@ -47,8 +49,8 @@ export interface MailboxesPageProps {
   result?: MailboxResult | undefined;
   /** Open Add a mailbox at once (`?add=1`). */
   adding?: boolean | undefined;
-  /** Open Pages with the import from Notion (without a reload). */
-  onImport?: (() => void) | undefined;
+  /** Follow an in-app address without a reload (the router's; absent: a normal link). */
+  onNavigate?: ((href: string) => void) | undefined;
   /**
    * Your signature for each mailbox you can send from (the conversations
    * module's, handed over by the app shell: connectors may not import it).
@@ -77,7 +79,7 @@ export function MailboxesPage({
   consent,
   result,
   adding = false,
-  onImport,
+  onNavigate,
   signatures,
 }: MailboxesPageProps) {
   const { t } = useTranslation("connectors");
@@ -277,19 +279,22 @@ export function MailboxesPage({
           </Button>
         </div>
       </SettingsSection>
-      <NotionCard
-        workspaceId={workspace.id}
-        connections={notion.data}
-        returnTo={`/w/${workspace.id}/settings/mailboxes`}
-        importHref={`/w/${workspace.id}/pages?import=notion`}
-        onImport={(event: MouseEvent<HTMLElement>) => {
-          if (onImport === undefined || event.metaKey || event.ctrlKey || event.button !== 0) {
-            return;
-          }
-          event.preventDefault();
-          onImport();
-        }}
-      />
+      <Text tone="tertiary" size="sm">
+        <Trans
+          t={t}
+          i18nKey="mailboxes.elsewhere"
+          components={{
+            to: (
+              <ButtonLink
+                variant="link"
+                {...followIn(onNavigate, `/w/${workspace.id}/settings/connections`)}
+              >
+                …
+              </ButtonLink>
+            ),
+          }}
+        />
+      </Text>
       <ConnectMailbox
         workspaceId={workspace.id}
         consent={consent}

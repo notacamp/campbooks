@@ -24,7 +24,8 @@
       "title": "Les boîtes mail n’ont pas pu être chargées",
       "lead": "Rien n’a changé. Réessayez dans un instant.",
       "retry": "Réessayer"
-    }
+    },
+    "elsewhere": "Notion et d’autres applications sont dans <to>Connexions</to>."
   },
   "row": {
     "byYou": "Reliée par vous",
@@ -352,7 +353,7 @@
     "description": "Faites venir dans Pages les pages Notion que vous choisissez et gardez-les synchronisées dans les deux sens. Seules les pages que vous choisissez dans l’écran propre à Notion sont partagées, et vous pouvez le modifier dans Notion à tout moment.",
     "bullets": {
       "mine": "La connexion est la vôtre et les pages importées commencent dans votre espace Privé.",
-      "sync": "Les modifications se synchronisent environ une minute après avoir été faites, dans un sens comme dans l’autre.",
+      "sync": "Campbooks vérifie les changements dans Notion toutes les quelques minutes et renvoie vos modifications au fil de l’eau.",
       "stop": "Déconnectez-vous quand vous voulez : les pages restent dans Campbooks mais cessent de se synchroniser."
     },
     "connect": "Connecter Notion",
@@ -374,9 +375,22 @@
       "lead": "Ses pages restent dans Campbooks et ne se synchronisent plus. Rien n’a été supprimé dans Notion."
     },
     "disconnect": {
-      "question": "Déconnecter {{name}} ?",
-      "lead": "Ses pages restent dans Campbooks mais cessent de se synchroniser. Rien n’est supprimé dans Notion.",
-      "failed": "Impossible de déconnecter {{name}}. Rien n’a été modifié."
+      "failed": "Impossible de déconnecter {{name}}. Rien n’a été modifié.",
+      "title": "Déconnecter Notion ({{name}}) ?",
+      "stops": {
+        "title": "Ce qui s’arrête",
+        "changes": "Les changements dans Notion n’arrivent plus",
+        "edits": "Vos modifications ne repartent plus vers Notion",
+        "access": "Campbooks oublie son accès à votre Notion"
+      },
+      "stays": {
+        "title": "Ce qui reste",
+        "pages": "Les pages importées, dans Pages, telles qu’elles sont maintenant",
+        "notion": "Tout ce qui est dans Notion : rien n’y est supprimé"
+      },
+      "again": "Vous pouvez reconnecter Notion à tout moment depuis ici.",
+      "keep": "Garder connecté",
+      "confirm": "Déconnecter"
     },
     "refusal": {
       "failed": "La connexion à Notion n’a pas pu démarrer. Réessayez.",
@@ -386,7 +400,27 @@
     "unavailable": {
       "title": "Notion n’est pas disponible sur cette instance.",
       "lead": "La personne qui gère ce Campbooks ne l’a pas activé."
-    }
+    },
+    "card": {
+      "title": "Notion · {{name}}"
+    },
+    "checked": "vérifié sur Notion {{ago}}",
+    "notConnected": "Non connecté",
+    "facts": {
+      "brings": {
+        "label": "Ce qu’elle apporte",
+        "value": "Les pages que vous avez importées, dans votre espace Privé de Pages"
+      },
+      "sync": {
+        "label": "Comment elle reste à jour",
+        "value": "Campbooks vérifie les changements dans Notion toutes les quelques minutes et renvoie vos modifications à Notion au fil de l’eau."
+      },
+      "shares": {
+        "label": "Ce que Notion partage",
+        "value": "Seulement les pages choisies dans l’écran propre à Notion. Vous pouvez le modifier dans Notion à tout moment."
+      }
+    },
+    "openPages": "Ouvrir dans Pages"
   },
   "connectNotion": {
     "opening": "Ouverture de Notion…",
@@ -421,5 +455,10 @@
   "signature": {
     "title": "Votre signature",
     "lead": "Ajoutée sous votre texte dans chaque nouveau message d’une boîte depuis laquelle vous pouvez envoyer. Chaque membre signe avec la sienne."
+  },
+  "connections": {
+    "title": "Connexions",
+    "lead": "Des applications qui ne sont pas du courrier, connectées à votre Campbooks. Chaque connexion est la vôtre : vos collègues ne la voient pas, ni ce qu’elle apporte.",
+    "elsewhere": "Le courrier est dans <mail>Boîtes mail</mail>. Les agendas arrivent avec leur boîte mail, dans <calendar>Agenda</calendar>."
   }
 }

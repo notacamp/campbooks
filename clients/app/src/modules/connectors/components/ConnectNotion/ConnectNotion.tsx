@@ -107,7 +107,7 @@ function StartIn({
   const begin = () => {
     setRefused(undefined);
     start.mutate(
-      { return_to: `/w/${workspace.id}/settings/mailboxes` },
+      { return_to: `/w/${workspace.id}/settings/connections` },
       {
         onSuccess: (answer) => {
           leave(answer.authorize_url);

@@ -135,3 +135,33 @@ export function connectError(error: unknown): ConnectError {
   }
   return errorStatus(error) === 429 ? "rate_limited" : "unknown";
 }
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/** "now", "5 min ago", "3 hr ago", "2 days ago": how long before `now` a time was. */
+export function agoLabel(when: string | Date, now: Date, locale: string): string {
+  const ms = Math.max(0, now.getTime() - new Date(when).getTime());
+  const format = new Intl.RelativeTimeFormat(locale, { numeric: "auto", style: "short" });
+  if (ms < MINUTE) {
+    return format.format(0, "second");
+  }
+  if (ms < HOUR) {
+    return format.format(-Math.floor(ms / MINUTE), "minute");
+  }
+  if (ms < DAY) {
+    return format.format(-Math.floor(ms / HOUR), "hour");
+  }
+  return format.format(-Math.floor(ms / DAY), "day");
+}
+
+/** When a run of any of the connection's streams last finished, if one ever did. */
+export function lastCheckedAt(connection: {
+  streams: readonly { last_synced_at?: string | null | undefined }[];
+}): string | undefined {
+  const times = connection.streams
+    .map((stream) => stream.last_synced_at)
+    .filter((time): time is string => typeof time === "string");
+  return times.toSorted((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+}
