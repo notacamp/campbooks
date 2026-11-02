@@ -141,7 +141,7 @@ async fn a_readers_attachments_become_the_pages_files_without_copying_a_byte(db:
         &[
             ("blob", docs::s(blob)),
             ("name", docs::s("Kickoff agenda.pdf")),
-            ("size", Any::Number(11.0)),
+            ("size", Any::Number(yrs::Number::Int(11))),
         ],
         None,
     );

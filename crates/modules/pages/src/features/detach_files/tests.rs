@@ -109,7 +109,7 @@ async fn a_file_a_block_names_stays(db: PgPool) {
         &[
             ("blob", docs::s(&f.agenda)),
             ("name", docs::s("Agenda.pdf")),
-            ("size", Any::Number(11.0)),
+            ("size", Any::Number(yrs::Number::Int(11))),
         ],
         None,
     );
