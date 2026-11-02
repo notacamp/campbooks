@@ -350,8 +350,8 @@ fn router() -> OpenApiRouter<AppState> {
         get_explanation, get_history, get_message_body, get_message_read, labels,
         list_conversations, list_correspondents, list_drafts, list_inboxes, list_labels,
         list_senders, list_streams, mark_read, move_to_stream, needs, person_notes, reply,
-        request_message_read, rule_notices, rules, send_draft, signature, spam, star, suggest_rules, trash,
-        update_draft, upload_draft_attachment,
+        request_message_read, rule_notices, rules, send_draft, signature, spam, star,
+        suggest_rules, trash, update_draft, upload_draft_attachment,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
