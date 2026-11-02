@@ -29,10 +29,12 @@ use crate::{
         attachments::in_body,
         blobs::{Budget, cut, words_until},
         conversation::{ConversationSummary, summary},
+        explanation,
         plain_text::Quotes,
         policy::Policy,
         suggestions::{self, DecisionView},
     },
+    features::explain::Explainer,
     model::{Address, AttachmentId, ConversationId, Direction, InboxId, MessageId},
     scopes::ConversationsRead,
 };
@@ -148,6 +150,13 @@ pub struct ConversationDetail {
     /// pending or done, or the need is a phishing warning.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub need_read_failed: bool,
+    /// You may ask Scout to explain this thread (campbooks-cloud#407): a
+    /// model that may read mail is available here, and the thread is not in
+    /// spam or the trash, in an inbox kept read-only, empty, or a phishing
+    /// warning. The reader never probes; it offers "Explain this thread"
+    /// only while this is true, and shows nothing until you ask.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub explain: bool,
 }
 
 /// The summary of the email behind the conversation's open need; none for
@@ -233,6 +242,7 @@ pub async fn handler(
     State(state): State<AppState>,
     Extension(policy): Extension<Policy>,
     Extension(settings): Extension<ActionSettings>,
+    Extension(explainer): Extension<Explainer>,
     workspace: Workspace<ConversationsRead>,
     locale: Locale,
     extract::Path(path): extract::Path<ConversationPath>,
@@ -294,6 +304,7 @@ pub async fn handler(
         .bind(crate::features::read_message::MAX_CALLS)
         .fetch_one(&mut *tx)
         .await?;
+    let explain = explainer.available && explanation::explainable(&mut tx, id).await?;
     let ids: Vec<MessageId> = rows.iter().map(|r| r.id).collect();
     let mut attachments = attachments_of(&mut tx, &ids).await?;
     tx.commit().await?;
@@ -333,6 +344,7 @@ pub async fn handler(
         decisions,
         need_summary,
         need_read_failed,
+        explain,
     }))
 }
 

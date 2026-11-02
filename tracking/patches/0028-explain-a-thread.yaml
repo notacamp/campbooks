@@ -1,0 +1,69 @@
+# Scout explains a thread (campbooks-cloud#407, OpenSpec change
+# explain-a-thread): a member asks, and one model call writes an explanation
+# of the thread for them alone. One tracked event, when the request has come to
+# something (a written explanation, or why there is none), and Coverage for
+# every operation and job of the change. The event carries the outcome, a
+# bucket of the message count, a bucket of the duration and whether it
+# replaced an earlier explanation; never a word of the explanation or of the
+# mail. Applied with
+# `cargo run -q -p campbooks-tracking-plan -- apply tracking/patches/0028-explain-a-thread.yaml`.
+changelog:
+  - date: "2026-10-31"
+    plan_version: 28
+    change: "Scout explains a thread (campbooks-cloud#407): conversations.explanation_completed (the outcome of a member's request to explain a thread, buckets of the message count and the duration, whether it replaced an earlier explanation); Coverage for conversations.explain, conversations.get_explanation, conversations.forget_explanation, conversations.explain_thread, conversations.dispatch_expire_explanations and conversations.expire_explanations."
+    pr: "#711"
+
+events:
+  - name: "conversations.explanation_completed"
+    version: 1
+    module: "conversations"
+    object: "explanation"
+    action: "completed"
+    scope: "workspace"
+    status: "live"
+    actor_types: [system]
+    description: "A member's request to explain a thread came to something: Scout's explanation was written, or the request failed (the workspace's daily AI limit, no usable answer, the model could not be reached). Never a word of the explanation or of the mail: the outcome, buckets of the message count and the duration, and whether an earlier explanation of the thread was replaced."
+    fires_when: "conversations.explain_thread stores the explanation or the failure in the member's row, in the transaction that stores it. A request that changes nothing (the row was deleted with the member's access, or asked again) tracks nothing."
+    added_in: 28
+    openspec_change: "explain-a-thread"
+
+properties:
+  - { event: "conversations.explanation_completed", version: 1, property: "conversation_id", type: "id", required: true, classification: "id", description: "The conversation." }
+  - { event: "conversations.explanation_completed", version: 1, property: "outcome", type: "enum", of: "conversations.explain_outcome", required: true, classification: "operational", description: "What the request came to." }
+  - { event: "conversations.explanation_completed", version: 1, property: "messages", type: "enum", of: "conversations.explain_messages", required: true, classification: "operational", description: "How many messages the explanation was made from." }
+  - { event: "conversations.explanation_completed", version: 1, property: "duration", type: "enum", of: "conversations.explain_duration", required: true, classification: "operational", description: "How long the request took, from the job starting to the answer." }
+  - { event: "conversations.explanation_completed", version: 1, property: "replaced", type: "bool", required: true, classification: "operational", description: "Whether an earlier explanation of the thread was kept in the member's row when the request was made." }
+
+enums:
+  - { enum: "conversations.explain_outcome", value: "ready", description: "Scout's explanation was written." }
+  - { enum: "conversations.explain_outcome", value: "limit", description: "The workspace had used its daily AI limit." }
+  - { enum: "conversations.explain_outcome", value: "unusable", description: "The model gave no usable answer." }
+  - { enum: "conversations.explain_outcome", value: "unavailable", description: "The model could not be reached." }
+  - { enum: "conversations.explain_messages", value: "few", description: "1 to 4 messages." }
+  - { enum: "conversations.explain_messages", value: "some", description: "5 to 9 messages." }
+  - { enum: "conversations.explain_messages", value: "many", description: "10 to 19 messages." }
+  - { enum: "conversations.explain_messages", value: "long", description: "20 messages or more." }
+  - { enum: "conversations.explain_duration", value: "quick", description: "Under 5 seconds." }
+  - { enum: "conversations.explain_duration", value: "normal", description: "5 to 14 seconds." }
+  - { enum: "conversations.explain_duration", value: "slow", description: "15 to 39 seconds." }
+  - { enum: "conversations.explain_duration", value: "very_slow", description: "40 seconds or more." }
+
+coverage:
+  - kind: "operation"
+    name: "conversations.explain"
+    exemption: "asks for an explanation and queues conversations.explain_thread, which tracks what the request came to (conversations.explanation_completed); a request that is coalesced with one being written, or answered from the kept explanation, changes nothing"
+  - kind: "operation"
+    name: "conversations.get_explanation"
+    exemption: "a read of the member's own explanation; the only change it can make is deleting a row whose messages are gone, which is a clean-up with nothing to record"
+  - kind: "operation"
+    name: "conversations.forget_explanation"
+    exemption: "deletes the member's own explanation of a thread (privacy); the explanation was tracked when it was written (conversations.explanation_completed) and holds nothing the plan records"
+  - kind: "job"
+    name: "conversations.explain_thread"
+    events: [conversations.explanation_completed]
+  - kind: "schedule"
+    name: "conversations.dispatch_expire_explanations"
+    exemption: "enqueues conversations.expire_explanations in each workspace holding an old explanation; it reads ids and times and changes nothing"
+  - kind: "job"
+    name: "conversations.expire_explanations"
+    exemption: "deletes explanations written more than 30 days ago, as the expiry of the member's own private data; nothing is recorded"
