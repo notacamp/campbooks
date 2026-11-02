@@ -6,7 +6,9 @@ import {
   Banner,
   Button,
   ButtonLink,
-  InlineConfirm,
+  Dialog,
+  Fact,
+  FactList,
   List,
   ListRow,
   ProviderMark,
@@ -18,7 +20,7 @@ import {
 
 import { notionStartError, useStartNotion, type NotionStartError } from "../../api/notion";
 import { useDisconnect, type Connection } from "../../api/queries";
-import { healthTone } from "../../model";
+import { agoLabel, healthTone, lastCheckedAt } from "../../model";
 
 /** Navigate the whole page (the consent leaves the app for Notion); tests pass a spy. */
 const leavePage = (url: string) => {
@@ -35,14 +37,22 @@ export interface NotionCardProps {
   importHref: string;
   /** Follow `importHref` without a reload. */
   onImport: (event: MouseEvent<HTMLElement>) => void;
+  /** The Pages place, for "Open in Pages". */
+  pagesHref: string;
+  /** Follow `pagesHref` without a reload. */
+  onOpenPages: (event: MouseEvent<HTMLElement>) => void;
+  /** The time "checked Notion …" counts from (tests pin it). */
+  now?: Date | undefined;
   leave?: ((url: string) => void) | undefined;
 }
 
 /**
  * Settings → Connections → Notion: what connecting shares, Connect Notion
  * (members only; Notion opens and asks which pages to share), then the
- * connection with Import pages, Reconnect when it needs you, and Disconnect
- * (the pages stay in Campbooks and stop syncing; nothing is deleted in
+ * connection with what it brings in, how it stays in step and what Notion
+ * shares, and one row of actions: Import pages, Open in Pages, Reconnect when
+ * it needs you, and Disconnect (asked in a dialog saying what stops and what
+ * stays: the pages stay in Campbooks and stop syncing; nothing is deleted in
  * Notion). An instance that does not offer Notion says so.
  */
 export function NotionCard({
@@ -51,6 +61,9 @@ export function NotionCard({
   returnTo,
   importHref,
   onImport,
+  pagesHref,
+  onOpenPages,
+  now,
   leave = leavePage,
 }: NotionCardProps) {
   const { t } = useTranslation("connectors");
@@ -108,6 +121,9 @@ export function NotionCard({
               confirming={confirming === connection.id}
               importHref={importHref}
               onImport={onImport}
+              pagesHref={pagesHref}
+              onOpenPages={onOpenPages}
+              now={now}
               onReconnect={() => {
                 begin(connection.id);
               }}
@@ -128,6 +144,7 @@ export function NotionCard({
         </SettingsEmpty>
       ) : (
         <div className="flex flex-col gap-3">
+          <Text tone="secondary">{t("notion.notConnected")}</Text>
           <ul className="flex list-disc flex-col gap-1 pl-5">
             {(["mine", "sync", "stop"] as const).map((point) => (
               <li key={point}>
@@ -137,7 +154,7 @@ export function NotionCard({
           </ul>
           <div className="flex flex-wrap items-center gap-3">
             <Button
-              variant="secondary"
+              variant="primary"
               icon="plus"
               disabled={busy}
               onClick={() => {
@@ -163,10 +180,16 @@ interface NotionRowProps {
   confirming: boolean;
   importHref: string;
   onImport: (event: MouseEvent<HTMLElement>) => void;
+  pagesHref: string;
+  onOpenPages: (event: MouseEvent<HTMLElement>) => void;
+  now: Date | undefined;
   onReconnect: () => void;
   onConfirm: (open: boolean) => void;
   onDisconnected: () => void;
 }
+
+/** Phones get 44px targets; the actions sit two by two there. */
+const TOUCH = "max-sm:min-h-11 max-sm:justify-center";
 
 function NotionRow({
   workspaceId,
@@ -175,11 +198,14 @@ function NotionRow({
   confirming,
   importHref,
   onImport,
+  pagesHref,
+  onOpenPages,
+  now,
   onReconnect,
   onConfirm,
   onDisconnected,
 }: NotionRowProps) {
-  const { t } = useTranslation("connectors");
+  const { t, i18n } = useTranslation("connectors");
   const disconnect = useDisconnect(workspaceId);
   const [failed, setFailed] = useState(false);
   const mine = connection.granted_by_you;
@@ -201,39 +227,65 @@ function NotionRow({
       }
     }
   })();
+  // A pull every few minutes, never "live": when a run last finished.
+  const checkedAt = connection.health === "ok" ? lastCheckedAt(connection) : undefined;
+  const status =
+    checkedAt === undefined
+      ? health
+      : `${health} · ${t("notion.checked", {
+          ago: agoLabel(checkedAt, now ?? new Date(), i18n.language),
+        })}`;
 
   return (
     <ListRow
       leading={<ProviderMark name={t("provider.notion")} size="lg" />}
-      title={name}
-      meta={`${t("provider.notion")} · ${mine ? t("row.byYou") : t("row.byAnother")}`}
-      trailing={
-        <>
-          {mine && !needsYou ? (
+      title={t("notion.card.title", { name })}
+      meta={mine ? t("row.byYou") : t("row.byAnother")}
+    >
+      <div className="flex flex-col gap-3">
+        <StatusText tone={healthTone(connection.health)}>{status}</StatusText>
+        <FactList>
+          <Fact label={t("notion.facts.brings.label")}>{t("notion.facts.brings.value")}</Fact>
+          <Fact label={t("notion.facts.sync.label")}>{t("notion.facts.sync.value")}</Fact>
+          <Fact label={t("notion.facts.shares.label")}>{t("notion.facts.shares.value")}</Fact>
+        </FactList>
+        {mine ? (
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+            {needsYou ? null : (
+              <ButtonLink
+                variant="secondary"
+                className={TOUCH}
+                href={importHref}
+                onClick={onImport}
+                aria-label={t("notion.importLabel", { name })}
+              >
+                {t("notion.import")}
+              </ButtonLink>
+            )}
             <ButtonLink
               variant="secondary"
-              href={importHref}
-              onClick={onImport}
-              aria-label={t("notion.importLabel", { name })}
+              className={TOUCH}
+              href={pagesHref}
+              onClick={onOpenPages}
             >
-              {t("notion.import")}
+              {t("notion.openPages")}
             </ButtonLink>
-          ) : null}
-          {mine && needsYou ? (
+            {needsYou ? (
+              <Button
+                variant="secondary"
+                className={TOUCH}
+                disabled={busy}
+                aria-label={t("notion.reconnectLabel", { name })}
+                onClick={onReconnect}
+              >
+                {t("row.reconnect")}
+              </Button>
+            ) : null}
             <Button
               variant="secondary"
-              disabled={busy}
-              aria-label={t("notion.reconnectLabel", { name })}
-              onClick={onReconnect}
-            >
-              {t("row.reconnect")}
-            </Button>
-          ) : null}
-          {mine ? (
-            <Button
-              variant="ghost"
+              className={`${TOUCH} sm:ml-auto`}
               aria-label={t("notion.disconnectLabel", { name })}
-              aria-expanded={confirming}
+              aria-haspopup="dialog"
               onClick={() => {
                 setFailed(false);
                 onConfirm(true);
@@ -241,38 +293,90 @@ function NotionRow({
             >
               {t("row.disconnect")}
             </Button>
-          ) : null}
-        </>
-      }
-    >
-      <StatusText tone={healthTone(connection.health)}>{health}</StatusText>
-      {confirming ? (
-        <InlineConfirm
-          confirmLabel={t("disconnect.confirm")}
-          cancelLabel={t("disconnect.cancel")}
-          busy={disconnect.isPending}
-          onCancel={() => {
-            onConfirm(false);
-          }}
-          onConfirm={() => {
-            // Notion has no mail: what is kept is the pages, in Campbooks.
-            disconnect.mutate(
-              { connectionId: connection.id, mail: "keep" },
+          </div>
+        ) : null}
+      </div>
+      <Dialog
+        open={confirming}
+        onClose={() => {
+          onConfirm(false);
+        }}
+        title={t("notion.disconnect.title", { name })}
+        visor={null}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              keys="escape"
+              onClick={() => {
+                onConfirm(false);
+              }}
+            >
+              {t("notion.disconnect.keep")}
+            </Button>
+            <Button
+              variant="danger"
+              keys="enter"
+              data-autofocus=""
+              disabled={disconnect.isPending}
+              onClick={() => {
+                // Notion has no mail: what is kept is the pages, in Campbooks.
+                disconnect.mutate(
+                  { connectionId: connection.id, mail: "keep" },
+                  {
+                    onSuccess: onDisconnected,
+                    onError: (error) => {
+                      onConfirm(false);
+                      setFailed(errorStatus(error) !== 404);
+                    },
+                  },
+                );
+              }}
+            >
+              {t("notion.disconnect.confirm")}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {[
               {
-                onSuccess: onDisconnected,
-                onError: (error) => {
-                  onConfirm(false);
-                  setFailed(errorStatus(error) !== 404);
-                },
+                id: "stops",
+                title: t("notion.disconnect.stops.title"),
+                points: [
+                  t("notion.disconnect.stops.changes"),
+                  t("notion.disconnect.stops.edits"),
+                  t("notion.disconnect.stops.access"),
+                ],
               },
-            );
-          }}
-        >
-          <span>{t("notion.disconnect.question", { name })}</span>
-          <br />
-          <span>{t("notion.disconnect.lead")}</span>
-        </InlineConfirm>
-      ) : null}
+              {
+                id: "stays",
+                title: t("notion.disconnect.stays.title"),
+                points: [t("notion.disconnect.stays.pages"), t("notion.disconnect.stays.notion")],
+              },
+            ].map((group) => (
+              <section key={group.id} className="flex flex-col gap-2">
+                <h3>
+                  <Text tone="secondary" size="sm">
+                    {group.title}
+                  </Text>
+                </h3>
+                <ul className="flex list-disc flex-col gap-1 pl-5">
+                  {group.points.map((point) => (
+                    <li key={point}>
+                      <Text>{point}</Text>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+          <Text tone="tertiary" size="sm">
+            {t("notion.disconnect.again")}
+          </Text>
+        </div>
+      </Dialog>
       {failed ? (
         <Banner tone="danger" role="alert" title={t("notion.disconnect.failed", { name })} />
       ) : null}
