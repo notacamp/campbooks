@@ -209,7 +209,7 @@ async fn forged_updates_are_refused_and_the_page_is_left_as_it_was(db: PgPool) {
         &[
             ("blob", s(&"a".repeat(64))),
             ("name", s("x.png")),
-            ("size", Any::Number(10.0)),
+            ("size", Any::Number(yrs::Number::Int(10))),
         ],
         None,
     );
@@ -382,7 +382,7 @@ async fn a_file_uploaded_to_the_page_can_be_named_and_one_from_a_stranger_cannot
             &[
                 ("blob", s(&blob)),
                 ("name", s("diagram.png")),
-                ("size", Any::Number(26.0)),
+                ("size", Any::Number(yrs::Number::Int(26))),
             ],
             None,
         )

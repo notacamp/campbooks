@@ -42,7 +42,7 @@ fn an_honest_page_is_accepted_and_read() {
     let page = PAGE;
     let update = edit(&ana, |txn, fragment| {
         let heading = fragment.push_back(txn, XmlElementPrelim::empty("heading"));
-        heading.insert_attribute(txn, "level", Any::Number(2.0));
+        heading.insert_attribute(txn, "level", Any::Number(yrs::Number::Int(2)));
         heading.push_back(txn, XmlTextPrelim::new("Weekly plan"));
         let line = fragment.push_back(txn, XmlElementPrelim::empty("paragraph"));
         let run = line.push_back(txn, XmlTextPrelim::new(""));
@@ -61,7 +61,7 @@ fn an_honest_page_is_accepted_and_read() {
         let file = fragment.push_back(txn, XmlElementPrelim::empty("file"));
         file.insert_attribute(txn, "blob", s(BLOB));
         file.insert_attribute(txn, "name", s("Offer.pdf"));
-        file.insert_attribute(txn, "size", Any::Number(1234.0));
+        file.insert_attribute(txn, "size", Any::Number(yrs::Number::Int(1234)));
         let child = fragment.push_back(txn, XmlElementPrelim::empty("pageLink"));
         child.insert_attribute(txn, "page", s(page));
     });
@@ -178,7 +178,7 @@ fn an_unknown_mark_element_or_attribute_is_refused() {
 
     // Known names, wrong kinds and out-of-range values.
     for (tag, key, value) in [
-        ("heading", "level", Any::Number(4.0)),
+        ("heading", "level", Any::Number(yrs::Number::Int(4))),
         ("heading", "level", s("1")),
         ("callout", "tone", s("danger")),
         ("codeBlock", "language", s("brainfuck")),

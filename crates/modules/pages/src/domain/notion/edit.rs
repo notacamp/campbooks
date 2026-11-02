@@ -322,7 +322,9 @@ pub fn fill(
             element.insert_attribute(
                 txn,
                 "level",
-                Any::Number(f64::from(block.level.unwrap_or(1).clamp(1, 3))),
+                Any::Number(yrs::Number::Int(i64::from(
+                    block.level.unwrap_or(1).clamp(1, 3),
+                ))),
             );
             write_runs(txn, element, &block.runs, resolver);
         }
@@ -356,7 +358,7 @@ pub fn fill(
                     reason = "a file's size is far below 2^53"
                 )]
                 let size = file.size as f64;
-                element.insert_attribute(txn, "size", Any::Number(size));
+                element.insert_attribute(txn, "size", Any::Number(yrs::Number::try_i64(size)));
             }
         }
         Kind::PageLink => {
@@ -456,7 +458,9 @@ pub fn rewrite(
                     element.insert_attribute(
                         txn,
                         "level",
-                        Any::Number(f64::from(block.level.unwrap_or(1).clamp(1, 3))),
+                        Any::Number(yrs::Number::Int(i64::from(
+                            block.level.unwrap_or(1).clamp(1, 3),
+                        ))),
                     );
                     write_runs(txn, element, &block.runs, resolver);
                 }
@@ -504,7 +508,7 @@ pub fn rewrite(
                     reason = "a file's size is far below 2^53"
                 )]
                 let size = file.size as f64;
-                element.insert_attribute(txn, "size", Any::Number(size));
+                element.insert_attribute(txn, "size", Any::Number(yrs::Number::try_i64(size)));
             }
         }
         Kind::External => {

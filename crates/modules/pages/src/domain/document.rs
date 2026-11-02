@@ -339,16 +339,11 @@ fn text_of(value: &Any) -> Option<&str> {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the value is finite, whole and within 2^53 just above"
-)]
 fn whole_of(value: &Any) -> Option<i64> {
     match value {
-        Any::Number(number) if number.is_finite() && number.fract() == 0.0 => {
-            (number.abs() < 9.0e15).then_some(*number as i64)
-        }
-        Any::BigInt(number) => Some(*number),
+        Any::Number(number) => number
+            .as_i64()
+            .filter(|whole| whole.unsigned_abs() < 9_000_000_000_000_000),
         _ => None,
     }
 }

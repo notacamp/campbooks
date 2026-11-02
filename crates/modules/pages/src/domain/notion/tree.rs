@@ -180,15 +180,9 @@ fn bool_attribute(attributes: &BTreeMap<String, Any>, key: &str) -> Option<bool>
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "a small whole number the schema already bounded"
-)]
 fn number_attribute(attributes: &BTreeMap<String, Any>, key: &str) -> Option<u64> {
     match attributes.get(key) {
-        Some(Any::Number(number)) if number.is_finite() && *number >= 0.0 => Some(*number as u64),
-        Some(Any::BigInt(number)) => u64::try_from(*number).ok(),
+        Some(Any::Number(number)) => number.as_i64().and_then(|whole| u64::try_from(whole).ok()),
         _ => None,
     }
 }

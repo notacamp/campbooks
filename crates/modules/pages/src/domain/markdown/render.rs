@@ -73,12 +73,7 @@ fn cut(text: &mut String, cap: usize) {
 
 fn whole(attributes: &std::collections::BTreeMap<String, Any>, key: &str) -> Option<i64> {
     match attributes.get(key) {
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "a heading level or a list start, checked small by the schema"
-        )]
-        Some(Any::Number(number)) if number.is_finite() => Some(*number as i64),
-        Some(Any::BigInt(number)) => Some(*number),
+        Some(Any::Number(number)) => number.as_i64(),
         _ => None,
     }
 }
