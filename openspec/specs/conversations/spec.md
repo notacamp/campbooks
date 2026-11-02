@@ -4358,8 +4358,8 @@ An explanation SHALL belong to the member who asked for it and SHALL be
 served (`conversations.get_explanation`) only to them, and only when, at
 that moment, they may read the conversation and every message it was made
 from is still in it (not in spam or the trash) and in an inbox they can see,
-and the thread is still one that may be explained (a phishing warning can
-land after it was written); otherwise the answer SHALL be 404 and the
+and the thread raised no phishing warning (one can land after it was
+written; a thread since kept read-only or binned stays readable); otherwise the answer SHALL be 404 and the
 explanation SHALL be deleted. The same check SHALL apply when a request is
 answered from a kept explanation, and before the job stores a new one, which
 SHALL keep nothing for a thread that became unexplainable. When the thread has a newer

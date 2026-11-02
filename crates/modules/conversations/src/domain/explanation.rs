@@ -305,6 +305,26 @@ pub async fn explainable(conn: &mut PgConnection, conversation: ConversationId) 
     Ok(ok.unwrap_or(false))
 }
 
+/// Whether the thread raised a phishing warning (an open need whose question
+/// is `suspicious`, or a `suspicious` answer of the decide pass): what Scout
+/// must never retell, however late the warning lands.
+pub async fn phishing_warned(
+    conn: &mut PgConnection,
+    conversation: ConversationId,
+) -> Result<bool> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM conversations.needs n
+                         WHERE n.conversation_id = $1 AND n.state = 'open'
+                           AND n.question = 'suspicious')
+             OR EXISTS (SELECT 1 FROM conversations.decisions d
+                         WHERE d.conversation_id = $1 AND d.question = 'suspicious'
+                           AND d.value = 'true'::jsonb)",
+    )
+    .bind(conversation)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
 /// A stored explanation row.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Row {
@@ -538,8 +558,8 @@ pub async fn member_sees(
 
 /// Whether a kept explanation may still be served to `member`: every message
 /// it was made from is still in the conversation (not in spam or the trash),
-/// in an inbox they see, and the thread is still one that may be explained (a
-/// phishing warning can land after it was written). When not, the row is
+/// in an inbox they see, and the thread raised no phishing warning (one can
+/// land after it was written). When not, the row is
 /// deleted on the spot and this answers `false`; the caller commits.
 pub async fn still_servable(
     conn: &mut PgConnection,
@@ -550,7 +570,7 @@ pub async fn still_servable(
     inboxes: &[InboxId],
 ) -> Result<bool> {
     let ok = messages_still_there(conn, ids, inboxes, conversation).await?
-        && explainable(conn, conversation).await?;
+        && !phishing_warned(conn, conversation).await?;
     if !ok {
         forget(conn, access, member, conversation).await?;
     }
