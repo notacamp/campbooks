@@ -1,6 +1,7 @@
 //! `conversations.forget_member` ← `workspaces.member_left`: a member who
 //! leaves (or is removed) loses every inbox membership, their drafts and
-//! what they told Scout about people are deleted, and they stop owning the
+//! what they told Scout about people and Scout's explanations of their
+//! threads are deleted, and they stop owning the
 //! inboxes their connections fed (which the connectors module removes,
 //! deleting or keeping their mail). Coming back to the workspace never
 //! brings any of it back. Idempotent.
@@ -20,6 +21,7 @@ impl EventHandler for ForgetMember {
     const NAME: &'static str = "conversations.forget_member";
     const QUEUE: &'static str = "default";
 
+    #[allow(clippy::too_many_lines)]
     async fn handle(ctx: &mut JobContext, event: Event<MemberLeft>) -> Result<(), JobError> {
         let left = event.payload;
         // Only what existed when they left: a member who came back since
@@ -72,6 +74,7 @@ impl EventHandler for ForgetMember {
         .execute(&mut **tx)
         .await?
         .rows_affected();
+        let explanations = forget_explanations(tx, workspace, left.user, before).await?;
         // Whatever held their rules off ends with their membership: they
         // can only come back by signing in, so they are not suspended then.
         // Recorded as of their departure, so a suspension that took effect
@@ -129,8 +132,30 @@ impl EventHandler for ForgetMember {
             inboxes = inboxes.len(),
             drafts = drafts.len(),
             notes,
-            "a departed member's inbox access, drafts and notes removed"
+            explanations,
+            "a departed member's inbox access, drafts, notes and explanations removed"
         );
         Ok(())
     }
+}
+
+/// Their explanations of threads (campbooks-cloud#407): what Scout wrote
+/// about their mail is theirs alone. One asked for since they came back
+/// stays.
+async fn forget_explanations(
+    tx: &mut sqlx::PgConnection,
+    workspace: WorkspaceId,
+    user: campbooks_kernel::tenancy::UserId,
+    before: chrono::DateTime<chrono::Utc>,
+) -> Result<u64, JobError> {
+    Ok(sqlx::query(
+        "DELETE FROM conversations.explanations
+          WHERE workspace_id = $1 AND member_id = $2 AND created_at <= $3",
+    )
+    .bind(workspace.as_uuid())
+    .bind(user.as_uuid())
+    .bind(before)
+    .execute(tx)
+    .await?
+    .rows_affected())
 }

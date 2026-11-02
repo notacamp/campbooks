@@ -40,6 +40,8 @@ export interface MessageCardProps {
   quoted?: ReactNode | undefined;
   /** What was read from it (the calendar's "Scout noticed" strip), under the header. */
   found?: ReactNode | undefined;
+  /** The element's id, so a link or a chip can scroll to the message. */
+  anchor?: string | undefined;
 }
 
 /** One message of a conversation. */
@@ -59,10 +61,11 @@ export function MessageCard({
   files: fileList,
   quoted,
   found,
+  anchor,
 }: MessageCardProps) {
   const files = attachment === undefined ? attachments : [attachment, ...attachments];
   return (
-    <article className={styles["message"]} data-side={side}>
+    <article id={anchor} className={styles["message"]} data-side={side}>
       <Avatar name={from} {...avatar} />
       <div className={styles["body"]}>
         <div className={styles["head"]}>
@@ -102,6 +105,8 @@ export function MessageCard({
 }
 
 export interface FoldedMessageProps {
+  /** The element's id, so a link or a chip can scroll to the message. */
+  anchor?: string | undefined;
   from: string;
   /** After the sender, for a message of yours: "→ Marta Silva". */
   addressee?: string | undefined;
@@ -125,9 +130,11 @@ export function FoldedMessage({
   dateTime,
   snippet,
   onOpen,
+  anchor,
 }: FoldedMessageProps) {
   return (
     <button
+      id={anchor}
       type="button"
       className={styles["folded"]}
       data-side={side}

@@ -86,6 +86,10 @@ When the next move is someone else's, Campbooks keeps a Waiting need. Waiting is
 - If the member writes to that person, the wait starts again from that message.
 - Archiving does not end a wait. Trash, spam and the member resolving it do.
 
+### Explaining a thread
+
+Only when a member asks ("Explain this thread"), Scout reads a whole thread once and writes who wants what, what was agreed, what is still open and what is on the member, each point citing the messages it comes from. It is kept for that member alone, for 30 days, and nothing is explained again on its own. When newer mail arrives or the member's language changes, it is marked out of date until they choose "Explain again". A thread in Spam or Trash, in a read-only inbox, or with a phishing warning is never explained. An explanation is Scout's own earlier reading, so check it against the messages when it is out of date.
+
 ### Remote images
 
 Remote images in a message are held back. They load only when the member chooses Show images, or when the member trusts the sender with "Always show images from". Trusting works only for a sender the receiving provider authenticates, and never for mail that looks suspicious. Tracking pixels are always removed. Mail in Spam never shows remote images.

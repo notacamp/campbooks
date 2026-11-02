@@ -180,6 +180,12 @@
       "date": "2026-10-31",
       "plan_version": 27,
       "pr": "#713"
+    },
+    {
+      "change": "Scout explains a thread (campbooks-cloud#407): conversations.explanation_completed (the outcome of a member's request to explain a thread, buckets of the message count and the duration, whether it replaced an earlier explanation); Coverage for conversations.explain, conversations.get_explanation, conversations.forget_explanation, conversations.explain_thread, conversations.dispatch_expire_explanations and conversations.expire_explanations.",
+      "date": "2026-10-31",
+      "plan_version": 28,
+      "pr": "#711"
     }
   ],
   "coverage": [
@@ -730,6 +736,20 @@
     },
     {
       "events": [],
+      "exemption": "deletes explanations written more than 30 days ago, as the expiry of the member's own private data; nothing is recorded",
+      "kind": "job",
+      "name": "conversations.expire_explanations"
+    },
+    {
+      "events": [
+        "conversations.explanation_completed"
+      ],
+      "exemption": "",
+      "kind": "job",
+      "name": "conversations.explain_thread"
+    },
+    {
+      "events": [],
       "exemption": "maintenance, no action of anyone: subject templates filled in for older mail",
       "kind": "job",
       "name": "conversations.fill_templates"
@@ -1242,6 +1262,24 @@
       "exemption": "",
       "kind": "operation",
       "name": "conversations.dismiss_rule_suggestion"
+    },
+    {
+      "events": [],
+      "exemption": "asks for an explanation and queues conversations.explain_thread, which tracks what the request came to (conversations.explanation_completed); a request that is coalesced with one being written, or answered from the kept explanation, changes nothing",
+      "kind": "operation",
+      "name": "conversations.explain"
+    },
+    {
+      "events": [],
+      "exemption": "deletes the member's own explanation of a thread (privacy); the explanation was tracked when it was written (conversations.explanation_completed) and holds nothing the plan records",
+      "kind": "operation",
+      "name": "conversations.forget_explanation"
+    },
+    {
+      "events": [],
+      "exemption": "a read of the member's own explanation; the only change it can make is deleting a row whose messages are gone, which is a clean-up with nothing to record",
+      "kind": "operation",
+      "name": "conversations.get_explanation"
     },
     {
       "events": [
@@ -2276,6 +2314,12 @@
       "exemption": "maintenance, no action of anyone: only enqueues the runs that are due, which track",
       "kind": "schedule",
       "name": "connectors.dispatch_due"
+    },
+    {
+      "events": [],
+      "exemption": "enqueues conversations.expire_explanations in each workspace holding an old explanation; it reads ids and times and changes nothing",
+      "kind": "schedule",
+      "name": "conversations.dispatch_expire_explanations"
     },
     {
       "events": [],
@@ -3417,6 +3461,66 @@
       "description": "The provider sent it (the draft is gone).",
       "enum": "conversations.draft_state",
       "value": "sent"
+    },
+    {
+      "description": "5 to 14 seconds.",
+      "enum": "conversations.explain_duration",
+      "value": "normal"
+    },
+    {
+      "description": "Under 5 seconds.",
+      "enum": "conversations.explain_duration",
+      "value": "quick"
+    },
+    {
+      "description": "15 to 39 seconds.",
+      "enum": "conversations.explain_duration",
+      "value": "slow"
+    },
+    {
+      "description": "40 seconds or more.",
+      "enum": "conversations.explain_duration",
+      "value": "very_slow"
+    },
+    {
+      "description": "1 to 4 messages.",
+      "enum": "conversations.explain_messages",
+      "value": "few"
+    },
+    {
+      "description": "20 messages or more.",
+      "enum": "conversations.explain_messages",
+      "value": "long"
+    },
+    {
+      "description": "10 to 19 messages.",
+      "enum": "conversations.explain_messages",
+      "value": "many"
+    },
+    {
+      "description": "5 to 9 messages.",
+      "enum": "conversations.explain_messages",
+      "value": "some"
+    },
+    {
+      "description": "The workspace had used its daily AI limit.",
+      "enum": "conversations.explain_outcome",
+      "value": "limit"
+    },
+    {
+      "description": "Scout's explanation was written.",
+      "enum": "conversations.explain_outcome",
+      "value": "ready"
+    },
+    {
+      "description": "The model could not be reached.",
+      "enum": "conversations.explain_outcome",
+      "value": "unavailable"
+    },
+    {
+      "description": "The model gave no usable answer.",
+      "enum": "conversations.explain_outcome",
+      "value": "unusable"
     },
     {
       "description": "A member.",
@@ -10961,6 +11065,84 @@
           "draft"
         ],
         "title": "conversations.draft_updated",
+        "type": "object"
+      },
+      "scope": "workspace",
+      "status": "live",
+      "version": 1
+    },
+    {
+      "action": "completed",
+      "actor_types": [
+        "system"
+      ],
+      "added_in": 28,
+      "description": "A member's request to explain a thread came to something: Scout's explanation was written, or the request failed (the workspace's daily AI limit, no usable answer, the model could not be reached). Never a word of the explanation or of the mail: the outcome, buckets of the message count and the duration, and whether an earlier explanation of the thread was replaced.",
+      "fires_when": "conversations.explain_thread stores the explanation or the failure in the member's row, in the transaction that stores it. A request that changes nothing (the row was deleted with the member's access, or asked again) tracks nothing.",
+      "module": "conversations",
+      "name": "conversations.explanation_completed",
+      "object": "explanation",
+      "openspec_change": "explain-a-thread",
+      "rust_type": "ExplanationCompleted",
+      "schema": {
+        "$id": "urn:campbooks:tracking:conversations.explanation_completed:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "A member's request to explain a thread came to something: Scout's explanation was written, or the request failed (the workspace's daily AI limit, no usable answer, the model could not be reached). Never a word of the explanation or of the mail: the outcome, buckets of the message count and the duration, and whether an earlier explanation of the thread was replaced.",
+        "properties": {
+          "conversation_id": {
+            "description": "The conversation.",
+            "format": "uuid",
+            "type": "string",
+            "x-classification": "id"
+          },
+          "duration": {
+            "description": "How long the request took, from the job starting to the answer.",
+            "enum": [
+              "normal",
+              "quick",
+              "slow",
+              "very_slow"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "messages": {
+            "description": "How many messages the explanation was made from.",
+            "enum": [
+              "few",
+              "long",
+              "many",
+              "some"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "outcome": {
+            "description": "What the request came to.",
+            "enum": [
+              "limit",
+              "ready",
+              "unavailable",
+              "unusable"
+            ],
+            "type": "string",
+            "x-classification": "operational"
+          },
+          "replaced": {
+            "description": "Whether an earlier explanation of the thread was kept in the member's row when the request was made.",
+            "type": "boolean",
+            "x-classification": "operational"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "duration",
+          "messages",
+          "outcome",
+          "replaced"
+        ],
+        "title": "conversations.explanation_completed",
         "type": "object"
       },
       "scope": "workspace",
@@ -25393,7 +25575,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-31",
-  "plan_version": 27,
+  "plan_version": 28,
   "properties": [
     {
       "classification": "operational",
@@ -26602,6 +26784,71 @@
       "property": "draft",
       "required": true,
       "type": "record",
+      "version": 1
+    },
+    {
+      "classification": "id",
+      "description": "The conversation.",
+      "event": "conversations.explanation_completed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "conversation_id",
+      "required": true,
+      "type": "id",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How long the request took, from the job starting to the answer.",
+      "event": "conversations.explanation_completed",
+      "example": "",
+      "list": false,
+      "of": "conversations.explain_duration",
+      "pattern": "",
+      "property": "duration",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "How many messages the explanation was made from.",
+      "event": "conversations.explanation_completed",
+      "example": "",
+      "list": false,
+      "of": "conversations.explain_messages",
+      "pattern": "",
+      "property": "messages",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "What the request came to.",
+      "event": "conversations.explanation_completed",
+      "example": "",
+      "list": false,
+      "of": "conversations.explain_outcome",
+      "pattern": "",
+      "property": "outcome",
+      "required": true,
+      "type": "enum",
+      "version": 1
+    },
+    {
+      "classification": "operational",
+      "description": "Whether an earlier explanation of the thread was kept in the member's row when the request was made.",
+      "event": "conversations.explanation_completed",
+      "example": "",
+      "list": false,
+      "of": "",
+      "pattern": "",
+      "property": "replaced",
+      "required": true,
+      "type": "bool",
       "version": 1
     },
     {
