@@ -26,7 +26,7 @@ export default defineConfig({
       fileName: (_format, entry) => `${entry}.js`,
       cssFileName: "ui",
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: (id) => PEERS.test(id),
     },
   },
