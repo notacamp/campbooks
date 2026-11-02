@@ -751,7 +751,7 @@ name = "campbooks-connectors"
 version = "0.1.0"
 dependencies = [
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "boon",
  "campbooks-kernel",
  "chrono",
@@ -787,7 +787,7 @@ version = "0.1.0"
 dependencies = [
  "ammonia",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "boon",
  "campbooks-ai",
  "campbooks-kernel",
@@ -819,7 +819,7 @@ version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "campbooks-kernel",
  "chrono",
  "ciborium",
@@ -851,7 +851,7 @@ version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bytes",
  "chrono",
  "figment",
@@ -890,7 +890,7 @@ name = "campbooks-pages"
 version = "0.1.0"
 dependencies = [
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "boon",
  "campbooks-kernel",
  "chrono",
@@ -935,7 +935,7 @@ name = "campbooks-search"
 version = "0.1.0"
 dependencies = [
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "campbooks-kernel",
  "chrono",
  "serde",
@@ -954,7 +954,7 @@ name = "campbooks-server"
 version = "0.1.0"
 dependencies = [
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "campbooks-admin",
  "campbooks-ai",
  "campbooks-assistant",
@@ -1060,7 +1060,7 @@ version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "campbooks-kernel",
  "chrono",
  "secrecy",

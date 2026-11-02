@@ -220,7 +220,7 @@ boon = "0.6.1"
 # already in the graph as the rustls / jsonwebtoken crypto backend.
 aws-lc-rs = "1.18.1"
 # Hand-crafting forged JWTs in auth tests; already in the graph via jsonwebtoken.
-base64 = "0.22.1"
+base64 = "0.23.1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
