@@ -471,7 +471,9 @@ export const ConnectionsConnected: Story = {
     await expect(canvas.getByRole("link", { name: "Open in Pages" })).toBeVisible();
     await expect(canvas.getByRole("link", { name: "Import pages from Acme" })).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Disconnect Acme" })).toBeVisible();
-    await expect(canvas.getByRole("link", { name: "Mailboxes" })).toBeVisible();
+    // The page's closing line links back to Mailboxes (the sidebar has its own link too).
+    const back = canvas.getAllByRole("link", { name: "Mailboxes" });
+    await expect(back).toHaveLength(2);
   },
 };
 
@@ -484,7 +486,10 @@ export const ConnectionsDisconnectDialog: Story = {
     const dialog = await within(canvasElement.ownerDocument.body).findByRole("dialog", {
       name: "Disconnect Notion (Acme)?",
     });
-    await expect(within(dialog).getByText("What stops")).toBeVisible();
+    // The dialog fades in: wait until it is shown.
+    await waitFor(async () => {
+      await expect(within(dialog).getByText("What stops")).toBeVisible();
+    });
     await expect(within(dialog).getByText("What stays")).toBeVisible();
     await expect(
       within(dialog).getByText("Everything in Notion: nothing is deleted there"),

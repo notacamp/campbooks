@@ -145,9 +145,10 @@ export function NotionCard({
       ) : (
         <div className="flex flex-col gap-3">
           <Text tone="secondary">{t("notion.notConnected")}</Text>
-          <ul className="flex list-disc flex-col gap-1 pl-5">
+          {/* The indent sits on each item: the base reset zeroes a list's own padding. */}
+          <ul className="flex list-disc flex-col gap-1">
             {(["mine", "sync", "stop"] as const).map((point) => (
-              <li key={point}>
+              <li key={point} className="ml-5">
                 <Text tone="secondary">{t(`notion.bullets.${point}`)}</Text>
               </li>
             ))}
@@ -362,9 +363,9 @@ function NotionRow({
                     {group.title}
                   </Text>
                 </h3>
-                <ul className="flex list-disc flex-col gap-1 pl-5">
+                <ul className="flex list-disc flex-col gap-1">
                   {group.points.map((point) => (
-                    <li key={point}>
+                    <li key={point} className="ml-5">
                       <Text>{point}</Text>
                     </li>
                   ))}
