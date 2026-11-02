@@ -49,18 +49,16 @@ export const KICKOFF_THREAD: SaveThread = {
 /** The same thread with a file over 20 MiB. */
 export const HEAVY_THREAD: SaveThread = {
   ...KICKOFF_THREAD,
-  messages: [
-    ...KICKOFF_THREAD.messages.map((message, index) =>
-      index === 0
-        ? {
-            ...message,
-            attachments: [
-              { id: "0192f1a0-0000-7000-8000-00000000c003", name: "footage.mov", size: 48_000_000 },
-            ],
-          }
-        : message,
-    ),
-  ],
+  messages: KICKOFF_THREAD.messages.map((message, index) =>
+    index === 0
+      ? {
+          ...message,
+          attachments: [
+            { id: "0192f1a0-0000-7000-8000-00000000c003", name: "footage.mov", size: 48_000_000 },
+          ],
+        }
+      : message,
+  ),
 };
 
 const MEMBERS = [ANA, SOFIA, RUI, JONAS];

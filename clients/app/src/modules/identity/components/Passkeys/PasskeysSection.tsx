@@ -43,7 +43,7 @@ function useDateFormat() {
   return (iso: string) => format.format(new Date(iso));
 }
 
-const here = () => `${globalThis.location.pathname}${globalThis.location.search}`;
+const here = () => `${location.pathname}${location.search}`;
 
 /** What adding a passkey can come back with, as the section explains it. */
 type AddProblem =
@@ -109,10 +109,12 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
   // Adding the first passkey swaps the empty panel for the list, which
   // re-creates the button: put focus back on it.
   useEffect(() => {
-    if (refocus.current && add.isSuccess && !none) {
-      refocus.current = false;
-      addRef.current?.focus();
+    if (!(refocus.current && add.isSuccess) || none) {
+      return;
     }
+
+    refocus.current = false;
+    addRef.current?.focus();
   }, [add.isSuccess, none]);
   const addButton = (
     <Button

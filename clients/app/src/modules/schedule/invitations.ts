@@ -106,14 +106,14 @@ export function invitationWindow(
   const last =
     refs
       .map((ref) => ref.on ?? today)
-      .toSorted()
+      .toSorted((a, b) => a.localeCompare(b))
       .at(-1) ?? today;
   const to = addDays(last, 1);
-  if (to <= week) {
-    return { from: today, to: week };
-  }
-  // The earlier of the two (dates sort as text).
-  return { from: today, to: [to, year].toSorted()[0] ?? year };
+  // Else the earlier of the two (dates sort as text).
+  return {
+    from: today,
+    to: to <= week ? week : ([to, year].toSorted((a, b) => a.localeCompare(b))[0] ?? year),
+  };
 }
 
 /** The organiser in words: their name, else address, else the calendar's name. */
@@ -123,10 +123,9 @@ function askedBy(event: EventView, calendars: readonly CalendarView[]): string {
     return name;
   }
   const address = event.organizer?.address?.trim();
-  if (address !== undefined && address !== "") {
-    return address;
-  }
-  return calendars.find((calendar) => calendar.id === event.calendar_id)?.name ?? "";
+  return address === undefined || address === ""
+    ? (calendars.find((calendar) => calendar.id === event.calendar_id)?.name ?? "")
+    : address;
 }
 
 /** "Accepted: Offsite planning", the row's confirmation and the toast. */

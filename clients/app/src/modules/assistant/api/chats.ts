@@ -176,7 +176,7 @@ function isTool(value: unknown): value is ChatTool {
 /** The member's IANA time zone, for "today" and "Thursday afternoon". */
 function timeZone(): string | null {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return new Intl.DateTimeFormat().resolvedOptions().timeZone;
   } catch {
     return null;
   }

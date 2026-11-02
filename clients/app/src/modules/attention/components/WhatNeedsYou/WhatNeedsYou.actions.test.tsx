@@ -647,7 +647,7 @@ describe("What needs you: the actions Scout picked", () => {
   it("opens nothing when the drafts can't be read while a forward starts", async () => {
     api([PHISH, ranked(MARTA, [{ actions: ["forward"], likelihood: 88 }]), ...others]);
     // The draft's creation waits; meanwhile the drafts can no longer be read.
-    const mocked = globalThis.fetch;
+    const mocked = fetch;
     let release!: () => void;
     const held = new Promise<void>((resolve) => {
       release = resolve;

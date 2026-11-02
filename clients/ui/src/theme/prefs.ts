@@ -15,7 +15,7 @@ export interface ThemePrefs {
 
 function storage(): Storage | null {
   try {
-    return globalThis.localStorage;
+    return localStorage;
   } catch {
     // Blocked storage (privacy mode, sandboxed iframe) behaves as empty.
     return null;

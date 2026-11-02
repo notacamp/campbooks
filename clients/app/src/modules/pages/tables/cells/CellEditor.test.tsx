@@ -85,7 +85,7 @@ describe("a text field in a cell", () => {
         fireEvent.keyDown(field(), { key: leave === "enter" ? "Enter" : "Tab" });
       }
       expect(onCommit).toHaveBeenCalledWith([{ text: "New words" }]);
-      document.body.innerHTML = "";
+      document.body.replaceChildren();
     }
   });
 
@@ -94,7 +94,7 @@ describe("a text field in a cell", () => {
     fireEvent.keyDown(field(), { key: "Enter" });
     expect(first.onCommit).not.toHaveBeenCalled();
     expect(first.onCancel).toHaveBeenCalledTimes(1);
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     const second = edit(property({ type: "text" }), [{ text: "Same" }]);
     fireEvent.change(field(), { target: { value: "Other" } });
     fireEvent.keyDown(field(), { key: "Escape" });
@@ -119,7 +119,7 @@ describe("a text field in a cell", () => {
     fireEvent.change(field(), { target: { value: "https://example.com/x" } });
     fireEvent.keyDown(field(), { key: "Enter" });
     expect(good.onCommit).toHaveBeenCalledWith("https://example.com/x");
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     for (const bad of ["javascript:alert(1)", "mailto:a@b.co", "example.com", "ftp://x.example"]) {
       const refused = edit(property({ type: "url" }), null);
       fireEvent.change(field(), { target: { value: bad } });
@@ -129,7 +129,7 @@ describe("a text field in a cell", () => {
       // Leaving the field with something that is no address leaves the cell as it was.
       fireEvent.blur(field());
       expect(refused.onCancel).toHaveBeenCalled();
-      document.body.innerHTML = "";
+      document.body.replaceChildren();
     }
   });
 
@@ -138,22 +138,22 @@ describe("a text field in a cell", () => {
     fireEvent.change(field(), { target: { value: "ana@example.com" } });
     fireEvent.keyDown(field(), { key: "Enter" });
     expect(email.onCommit).toHaveBeenCalledWith("ana@example.com");
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     const phone = edit(property({ type: "phone" }), "+351 912");
     fireEvent.change(field(), { target: { value: "" } });
     fireEvent.keyDown(field(), { key: "Enter" });
     expect(phone.onCommit).toHaveBeenCalledWith(null);
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     const number = edit(property({ type: "number" }), "5");
     fireEvent.change(field(), { target: { value: "7,5" } });
     fireEvent.keyDown(field(), { key: "Enter" });
     expect(number.onCommit).toHaveBeenCalledWith("7.5");
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     const cleared = edit(property({ type: "number" }), "5");
     fireEvent.change(field(), { target: { value: "" } });
     fireEvent.keyDown(field(), { key: "Enter" });
     expect(cleared.onCommit).toHaveBeenCalledWith(null);
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     const bad = edit(property({ type: "email" }), null);
     fireEvent.change(field(), { target: { value: "not an address" } });
     fireEvent.keyDown(field(), { key: "Enter" });
@@ -209,7 +209,7 @@ describe("a picker in a cell", () => {
     await waitFor(() => {
       expect(changed.onCommit).toHaveBeenCalledWith(["a", "b"]);
     });
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     const same = edit(multi, ["a"]);
     fireEvent.keyDown(await screen.findByRole("combobox", { name: "Search options" }), {
       key: "Escape",
@@ -276,7 +276,7 @@ describe("a picker in a cell", () => {
       expect(onCommit).toHaveBeenCalledWith("new");
     });
     expect(sent[0]).toContainEqual(expect.objectContaining({ name: "Blocked", group: "todo" }));
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     edit(status, "a", undefined, { canEditOptions: false });
     fireEvent.change(await screen.findByRole("combobox", { name: "Search options" }), {
       target: { value: "Whatever" },
@@ -291,7 +291,7 @@ describe("a picker in a cell", () => {
     fireEvent.keyDown(search, { key: "ArrowDown" });
     fireEvent.keyDown(search, { key: "Enter" });
     expect(onCommit).toHaveBeenCalledWith("b");
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     const again = edit(status, "a");
     const box = await screen.findByRole("combobox", { name: "Search options" });
     fireEvent.keyDown(box, { key: "ArrowUp" });

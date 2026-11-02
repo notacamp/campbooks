@@ -99,10 +99,9 @@ export function zoneNote(
 /** The second line of a row: the place, else the calendar's name. */
 export function metaLine(event: EventView, calendars: readonly CalendarView[]): string {
   const place = event.place?.trim();
-  if (place !== undefined && place !== "") {
-    return place;
-  }
-  return calendars.find((calendar) => calendar.id === event.calendar_id)?.name ?? "";
+  return place === undefined || place === ""
+    ? (calendars.find((calendar) => calendar.id === event.calendar_id)?.name ?? "")
+    : place;
 }
 
 /** "Pay · EDP bill", or "Do · Send the lease". */

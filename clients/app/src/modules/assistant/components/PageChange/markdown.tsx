@@ -41,13 +41,15 @@ export function parseBlocks(markdown: string): Block[] {
       blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
       paragraph = [];
     }
-    if (quote !== undefined) {
-      blocks.push({
-        kind: "quote",
-        paragraphs: quote.filter((part) => part.length > 0).map((part) => part.join(" ")),
-      });
-      quote = undefined;
+    if (quote === undefined) {
+      return;
     }
+
+    blocks.push({
+      kind: "quote",
+      paragraphs: quote.filter((part) => part.length > 0).map((part) => part.join(" ")),
+    });
+    quote = undefined;
   };
   const item = (ordered: boolean, rest: string) => {
     flush();

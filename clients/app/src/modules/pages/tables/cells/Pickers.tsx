@@ -141,7 +141,7 @@ export function RowPicker({ ctx, table, selected, onChange }: RowPickerProps) {
   }));
   // What is already chosen stays on the list even when the search does not find it.
   for (const id of selected) {
-    if (!items.some((item) => item.id === id)) {
+    if (items.every((item) => item.id !== id)) {
       items.unshift({
         id,
         text: id,
@@ -179,7 +179,7 @@ const KIND_OF = {
   "pages.page": "page",
 } as const satisfies Record<MentionType, string>;
 
-const keyOf = (link: LinkRef) => `${link.type}\u0000${link.id}`;
+const keyOf = (link: LinkRef) => `${link.type}\0${link.id}`;
 
 export interface LinkPickerProps {
   ctx: CellContext;

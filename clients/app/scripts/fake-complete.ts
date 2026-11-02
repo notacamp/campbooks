@@ -60,10 +60,9 @@ const SIGN_IN_SUBJECT = "Your Brightloop sign-in link";
 
 /** When the demo sign-in link lapses: ten minutes after it was sent. */
 function lapsesAt(input: SummaryInput): string | null {
-  if (input.subject !== SIGN_IN_SUBJECT || input.sent_at === undefined) {
-    return null;
-  }
-  return new Date(new Date(input.sent_at).getTime() + 10 * 60_000).toISOString();
+  return input.subject !== SIGN_IN_SUBJECT || input.sent_at === undefined
+    ? null
+    : new Date(new Date(input.sent_at).getTime() + 10 * 60_000).toISOString();
 }
 
 /** The same canned summary in each shipped language, from the sender and subject only. */

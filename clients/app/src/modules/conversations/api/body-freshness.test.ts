@@ -16,7 +16,7 @@ const plain = { html: "<p>Hi</p>", images_trusted: false, images_held: null };
 describe("a message body's freshness (campbooks-cloud#236)", () => {
   it("lasts until a live rule change on the web", () => {
     for (const body of [trusted, held, offered, plain]) {
-      expect(bodyStaleTime(body, true)).toBe(Number.POSITIVE_INFINITY);
+      expect(bodyStaleTime(body, true)).toBe(Infinity);
       expect(bodyRefetchInterval(body, true)).toBe(false);
       expect(refetchBodyOnFocus(body, true)).toBe(false);
     }
@@ -39,7 +39,7 @@ describe("a message body's freshness (campbooks-cloud#236)", () => {
 
   it("never expires for a body without remote-image state, even without a live feed", () => {
     for (const body of [plain, undefined, { content: "words only", truncated: false }]) {
-      expect(bodyStaleTime(body, false)).toBe(Number.POSITIVE_INFINITY);
+      expect(bodyStaleTime(body, false)).toBe(Infinity);
       expect(bodyRefetchInterval(body, false)).toBe(false);
       expect(refetchBodyOnFocus(body, false)).toBe(false);
     }

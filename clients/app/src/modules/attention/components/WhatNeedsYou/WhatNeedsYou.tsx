@@ -260,20 +260,19 @@ const DIALOG_STEPS: ReadonlySet<ActionId> = new Set([
 const NARROW = "(width < 48rem)";
 
 function subscribeNarrow(change: () => void): () => void {
-  if (typeof globalThis.matchMedia !== "function") {
+  if (typeof matchMedia !== "function") {
     return () => {
       // Nothing was listened to.
     };
   }
-  const query = globalThis.matchMedia(NARROW);
+  const query = matchMedia(NARROW);
   query.addEventListener("change", change);
   return () => {
     query.removeEventListener("change", change);
   };
 }
 
-const isNarrow = () =>
-  typeof globalThis.matchMedia === "function" && globalThis.matchMedia(NARROW).matches;
+const isNarrow = () => typeof matchMedia === "function" && matchMedia(NARROW).matches;
 
 /** "Ana", for a button ("Nudge Ana…"); an address stays whole. */
 const firstNameOf = (name: string) =>
@@ -633,10 +632,12 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     // waits on them for the member (campbooks-cloud#378).
     onWaiting: (conversation) => {
       const waiting = conversation.need;
-      if (waiting?.reason === "waiting" && (waiting.waiting_on ?? null) !== null) {
-        nudge({ conversation, need: waiting, name: displayName(waiting.waiting_on) });
-        ahead.offer(conversation, { kind: "waiting" });
+      if (waiting?.reason !== "waiting" || (waiting.waiting_on ?? null) === null) {
+        return;
       }
+
+      nudge({ conversation, need: waiting, name: displayName(waiting.waiting_on) });
+      ahead.offer(conversation, { kind: "waiting" });
     },
     onReported: (conversation) => {
       ahead.offer(conversation, { kind: "report" });
@@ -1327,16 +1328,17 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
     const index = nav.findIndex((row) => idOf(row) === selectedId);
     const target = Math.min(nav.length - 1, Math.max(0, index + step));
     const next = nav[target];
-    if (next !== undefined) {
-      setSelection({ id: idOf(next), index: target });
-      setHighlight(undefined);
-      // The row stepped onto opens, as a click on it does.
-      setExpandedId(idOf(next));
-      const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
-        document.getElementById(itemId(idOf(next)));
-      // Not every environment scrolls (tests run without layout).
-      element?.scrollIntoView?.({ block: "nearest" });
+    if (next === undefined) {
+      return;
     }
+    setSelection({ id: idOf(next), index: target });
+    setHighlight(undefined);
+    // The row stepped onto opens, as a click on it does.
+    setExpandedId(idOf(next));
+    const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
+      document.getElementById(itemId(idOf(next)));
+    // Not every environment scrolls (tests run without layout).
+    element?.scrollIntoView?.({ block: "nearest" });
   };
   const walk = (step: 1 | -1) => {
     if (selectedActions === undefined) {
@@ -1652,10 +1654,12 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
         }}
         onNotWaiting={(row) => {
           const wait = waiting.find((each) => each.row.id === row.id);
-          if (wait !== undefined) {
-            showWait(wait.target.conversation, false);
-            needActions.notNeeded(wait.target.conversation);
+          if (wait === undefined) {
+            return;
           }
+
+          showWait(wait.target.conversation, false);
+          needActions.notNeeded(wait.target.conversation);
         }}
         onAsk={
           scout === undefined
@@ -2193,10 +2197,12 @@ export function WhatNeedsYou({ workspaceId, now, offer, holdSources }: WhatNeeds
             const entry = laterFor;
             const option = times.find((o) => o.key === key);
             setLaterFor(undefined);
-            if (entry !== undefined && option !== undefined) {
-              hide(entry, tt("toast.later", { title: entry.task.title, when: when(option.until) }));
-              taskActions.later(entry.task, option.until);
+            if (entry === undefined || option === undefined) {
+              return;
             }
+
+            hide(entry, tt("toast.later", { title: entry.task.title, when: when(option.until) }));
+            taskActions.later(entry.task, option.until);
           }}
         />
       </Dialog>

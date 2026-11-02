@@ -383,7 +383,7 @@ describe("ReplyComposer", () => {
       },
     });
     // The words arrive only once the reading state was seen.
-    const fetched = globalThis.fetch;
+    const fetched = fetch;
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
       if (new URL(request.url).searchParams.get("words") === "true") {

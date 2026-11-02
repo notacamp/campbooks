@@ -99,7 +99,12 @@ describe("importTree", () => {
     ];
     // A page under itself, or two under each other, is not a tree: none is lost.
     const built = importTree(pages);
-    expect(ids(allNodes(built)).toSorted()).toEqual(["a", "b", "c", "d"]);
+    expect(ids(allNodes(built)).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+    ]);
   });
 });
 
@@ -107,7 +112,9 @@ describe("ticking", () => {
   it("takes the sub-pages along, and they are not asked for on their own", () => {
     const ticked = toggle(tree, new Set(), ROADMAP);
     const choice = choiceOf(tree, ticked);
-    expect([...choice.included].toSorted()).toEqual([ROADMAP, OKRS, RETRO].toSorted());
+    expect([...choice.included].toSorted((a, b) => a.localeCompare(b))).toEqual(
+      [ROADMAP, OKRS, RETRO].toSorted((a, b) => a.localeCompare(b)),
+    );
     expect(importRequest(tree, ticked)).toEqual([
       { notion_page: ROADMAP, title: "Product roadmap" },
     ]);

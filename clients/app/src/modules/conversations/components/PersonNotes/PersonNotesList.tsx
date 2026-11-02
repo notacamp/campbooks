@@ -99,10 +99,12 @@ function NoteRow({
   const name = note.name ?? note.address;
 
   useEffect(() => {
-    if (!editing && back.current) {
-      back.current = false;
-      edit.current?.focus();
+    if (editing || !back.current) {
+      return;
     }
+
+    back.current = false;
+    edit.current?.focus();
   }, [editing]);
 
   const failed = () => {

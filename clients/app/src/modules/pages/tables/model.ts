@@ -322,10 +322,7 @@ export function startingValue(
     case "select":
     case "status":
     case "multi_select": {
-      if (operator === "is_any_of") {
-        return [];
-      }
-      return optionsOf(property)[0]?.id ?? "";
+      return operator === "is_any_of" ? [] : (optionsOf(property)[0]?.id ?? "");
     }
     case "campbooks_link": {
       return undefined;
@@ -467,12 +464,9 @@ export function nextColor(options: readonly ChoiceOption[]): OptionColor {
 
 /** A text cell's runs as plain text. */
 export function plainText(value: unknown): string {
-  if (!Array.isArray(value)) {
-    return "";
-  }
-  return (value as unknown[])
-    .map((run) => (isRecord(run) ? (text(run["text"]) ?? "") : ""))
-    .join("");
+  return Array.isArray(value)
+    ? (value as unknown[]).map((run) => (isRecord(run) ? (text(run["text"]) ?? "") : "")).join("")
+    : "";
 }
 
 /** A plain string as a text cell's value; nothing when blank. */
@@ -483,10 +477,7 @@ export function runsOf(content: string): unknown {
 
 /** The ids a person, relation, select or multi-select cell holds. */
 export function idsOf(value: unknown): string[] {
-  if (typeof value === "string") {
-    return [value];
-  }
-  return list(value, text);
+  return typeof value === "string" ? [value] : list(value, text);
 }
 
 export interface LinkRef {
@@ -543,10 +534,9 @@ export function dateOf(value: unknown): DateValue | undefined {
     return undefined;
   }
   const start = text(value["start"]);
-  if (start === undefined) {
-    return undefined;
-  }
-  return { start, end: text(value["end"]), timeZone: text(value["time_zone"]) };
+  return start === undefined
+    ? undefined
+    : { start, end: text(value["end"]), timeZone: text(value["time_zone"]) };
 }
 
 /** The wire value of a date. */
@@ -631,7 +621,7 @@ export function formatNumber(
       return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
     }
     if (format === "percent") {
-      return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 9 }).format(amount)}\u202F%`;
+      return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 9 }).format(amount)}\u{202F}%`;
     }
     return new Intl.NumberFormat(locale, { maximumFractionDigits: 9 }).format(amount);
   } catch {
@@ -807,7 +797,7 @@ export function formatSummary(
     return Number(value).toLocaleString(locale);
   }
   if (kind === "percent_checked") {
-    return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(value))}\u202F%`;
+    return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(value))}\u{202F}%`;
   }
   if (property.type === "date" || property.type === "created" || property.type === "edited") {
     return hasTime(value) ? formatInstant(value, locale) : formatWhen(value, locale);

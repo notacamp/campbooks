@@ -223,10 +223,12 @@ export function SaveToPageDialog({ workspaceId, thread, open, onClose }: SaveToP
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      void submit();
+    if (!(event.key === "Enter" && (event.metaKey || event.ctrlKey))) {
+      return;
     }
+
+    event.preventDefault();
+    void submit();
   };
 
   const options = [
@@ -273,7 +275,7 @@ export function SaveToPageDialog({ workspaceId, thread, open, onClose }: SaveToP
               void submit();
             }}
           >
-            {what === "summary" ? t("saveToPage.preview") : t("saveToPage.save")}
+            {t(what === "summary" ? "saveToPage.preview" : "saveToPage.save")}
           </Button>
         </>
       }

@@ -67,7 +67,7 @@ export function TaskStory({ workspaceId, task, me, source, quote }: TaskStoryPro
         ? t("why.you")
         : t("why.member", { name: someone(task.created_by) })
       : t("why.scout");
-  const rest = task.origin === "own" ? t("why.madeRest", when) : t("why.scoutRest", when);
+  const rest = t(task.origin === "own" ? "why.madeRest" : "why.scoutRest", when);
   const handedAt = history.findLast((entry) => entry.what === "handed_off")?.at;
   const handedToMe =
     task.handed_by !== null && task.handed_by !== undefined && task.handed_by !== me;

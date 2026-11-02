@@ -181,7 +181,7 @@ export const DefaultPhone: Story = {
     await canvas.findByText(DENTIST.title);
     await expect(canvas.queryByRole("region", { name: "Week" })).toBeNull();
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
   },
 };
@@ -215,7 +215,7 @@ export const WeekPhone: Story = {
     const canvas = within(canvasElement);
     await canvas.findByRole("region", { name: "Week" });
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
   },
 };
@@ -228,7 +228,7 @@ export const AgendaPhone: Story = {
     const canvas = within(canvasElement);
     await canvas.findByText(DENTIST.title);
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
   },
 };
@@ -241,7 +241,7 @@ export const SheetPhone: Story = {
     const canvas = within(canvasElement);
     await canvas.findByRole("complementary", { name: FLIGHT.title });
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
   },
 };
@@ -443,7 +443,7 @@ export const MonthPhone: Story = {
     const canvas = within(canvasElement);
     await canvas.findByRole("group", { name: "Month" });
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
   },
 };
@@ -561,7 +561,7 @@ export const ReaderScoutReadPhone: Story = {
   play: async ({ canvasElement }) => {
     await within(canvasElement).findByRole("region", { name: "Scout noticed" });
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
   },
 };
@@ -717,7 +717,7 @@ export const SettingsPhone: Story = {
   play: async ({ canvasElement }) => {
     await within(canvasElement).findByRole("heading", { name: "Calendars" });
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
   },
 };

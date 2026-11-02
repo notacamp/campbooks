@@ -68,10 +68,9 @@ export function parseFrame(kind: string, data: string): ChangeFrame | undefined 
   }
   try {
     const body: unknown = JSON.parse(data);
-    if (typeof body !== "object" || body === null) {
-      return undefined;
-    }
-    return { ...body, kind } as ChangeFrame;
+    return typeof body !== "object" || body === null
+      ? undefined
+      : ({ ...body, kind } as ChangeFrame);
   } catch {
     return undefined;
   }
@@ -87,7 +86,7 @@ type EventSourceFactory = (url: string) => EventSource;
  * (not a member, signed out), which is reported as closed.
  */
 export function createWebChangeSource(
-  origin: string = globalThis.location.origin,
+  origin: string = location.origin,
   connect: EventSourceFactory = (url) => new EventSource(url),
 ): ChangeSource {
   return {
@@ -331,10 +330,12 @@ export function createCacheBinding(queryClient: QueryClient, workspace: string) 
       });
     },
     dispose() {
-      if (timer !== undefined) {
-        clearTimeout(timer);
-        flush();
+      if (timer === undefined) {
+        return;
       }
+
+      clearTimeout(timer);
+      flush();
     },
   };
 }
@@ -364,7 +365,7 @@ export function subscribeToChanges({
   queryClient,
   workspace,
   source,
-  page = globalThis.document,
+  page = document,
 }: SubscribeOptions): () => void {
   const cache = createCacheBinding(queryClient, workspace);
   let cursor: string | undefined;

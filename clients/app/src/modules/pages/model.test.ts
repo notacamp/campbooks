@@ -49,7 +49,9 @@ describe("buildSections", () => {
       ],
       ME,
     );
-    expect(sections.shared.map((node) => node.page.id).toSorted()).toEqual(["leaf", "theirs"]);
+    expect(
+      sections.shared.map((node) => node.page.id).toSorted((a, b) => a.localeCompare(b)),
+    ).toEqual(["leaf", "theirs"]);
     expect(sections.private).toEqual([]);
   });
 });

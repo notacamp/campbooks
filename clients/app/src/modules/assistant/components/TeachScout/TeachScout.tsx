@@ -103,9 +103,7 @@ export function TeachScout({ workspaceId, initial, onSaved }: TeachScoutProps) {
   if (builder !== undefined || noModel) {
     const lead = noModel
       ? t("memory.builder.noModel")
-      : builder === "failed"
-        ? t("memory.builder.byHand")
-        : t("memory.builder.lead");
+      : t(builder === "failed" ? "memory.builder.byHand" : "memory.builder.lead");
     return (
       <div className="flex flex-col gap-3">
         <Note visor={noModel || builder === "failed" ? "unsure" : "idle"} label={lead}>
@@ -251,12 +249,13 @@ function Understood({
       </div>
     );
   }
-  const message =
+  const message = t(
     result.outcome === "unsupported" &&
-    result.unsupported !== null &&
-    result.unsupported !== undefined
-      ? t(`memory.teach.unsupported.${result.unsupported}`)
-      : t("memory.teach.unclear");
+      result.unsupported !== null &&
+      result.unsupported !== undefined
+      ? `memory.teach.unsupported.${result.unsupported}`
+      : "memory.teach.unclear",
+  );
   return (
     <div className="flex flex-col gap-3">
       <Note
@@ -306,7 +305,7 @@ function ProposalCard({
         visor="unsure"
         label={t("memory.teach.who", { phrase: who.phrase })}
         choice={{
-          prompt: who.matched ? t("memory.teach.whoLead") : t("memory.teach.whoNoMatch"),
+          prompt: t(who.matched ? "memory.teach.whoLead" : "memory.teach.whoNoMatch"),
           options: who.candidates.map((candidate) => ({
             label:
               candidate.name === null || candidate.name === undefined

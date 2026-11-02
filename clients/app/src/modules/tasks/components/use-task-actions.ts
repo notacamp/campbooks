@@ -153,11 +153,11 @@ export function useTaskActions(
       // As it was: the server's view, fetched again.
       onFailed?.(task);
       settled();
-      if (problemCode(error) === "task_changed") {
-        undo.fail({ label: t("toast.changed", { title: task.title }) });
-      } else {
-        undo.fail({ label: t("toast.failed", { title: task.title }), retry });
-      }
+      undo.fail(
+        problemCode(error) === "task_changed"
+          ? { label: t("toast.changed", { title: task.title }) }
+          : { label: t("toast.failed", { title: task.title }), retry },
+      );
     };
     // What each way shows at once and tells the page about.
     const showing = {

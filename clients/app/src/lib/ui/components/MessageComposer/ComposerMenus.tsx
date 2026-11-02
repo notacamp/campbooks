@@ -44,12 +44,14 @@ export function ComposerHeaderMenus({ modes }: { modes: ComposerModes }) {
           aria-label={t("composer.mode.label")}
           onKeyDown={(event: KeyboardEvent) => {
             const found = MODES.find((m) => m.key === event.key);
-            if (found !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
-              event.preventDefault();
-              close();
-              if (found.mode !== modes.value) {
-                modes.onChange(found.mode);
-              }
+            if (found === undefined || event.metaKey || event.ctrlKey || event.altKey) {
+              return;
+            }
+
+            event.preventDefault();
+            close();
+            if (found.mode !== modes.value) {
+              modes.onChange(found.mode);
             }
           }}
         >

@@ -8,10 +8,10 @@ import type { paths } from "./schema.gen";
  * browser's cookies, never to a token. Built per call so it always uses the
  * current `fetch`.
  */
-export function webRoutes(origin: string = globalThis.location.origin) {
+export function webRoutes(origin: string = location.origin) {
   return createClient<paths>({
     baseUrl: origin,
     credentials: "same-origin",
-    fetch: (request) => globalThis.fetch(request),
+    fetch: (request) => fetch(request),
   });
 }

@@ -39,7 +39,7 @@ export function PageTreeGroup({ name, action, empty, children }: PageTreeGroupPr
         {action}
       </div>
       {hasRows ? <div className={styles["rows"]}>{children}</div> : null}
-      {!hasRows && empty !== undefined ? <p className={styles["empty"]}>{empty}</p> : null}
+      {hasRows || empty === undefined ? null : <p className={styles["empty"]}>{empty}</p>}
     </section>
   );
 }

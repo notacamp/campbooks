@@ -314,10 +314,12 @@ export function ReplyDialog({
         }
       })
       .finally(() => {
-        if (current()) {
-          setRewriting(undefined);
-          setStreaming(false);
+        if (!current()) {
+          return;
         }
+
+        setRewriting(undefined);
+        setStreaming(false);
       });
   };
 
@@ -333,10 +335,12 @@ export function ReplyDialog({
       return;
     }
     const timer = setTimeout(() => {
-      if (!started.current) {
-        started.current = true;
-        write(startWith.slice(0, MAX_ASK_CHARS));
+      if (started.current) {
+        return;
       }
+
+      started.current = true;
+      write(startWith.slice(0, MAX_ASK_CHARS));
     }, 0);
     return () => {
       clearTimeout(timer);
@@ -355,10 +359,12 @@ export function ReplyDialog({
     // A draft already saved (a send that failed) is never reused for the
     // next pick, which may answer another message: the next save is a fresh
     // draft, and that one goes (campbooks-cloud#257).
-    if (saved !== undefined) {
-      replaced.current = saved;
-      setSaved(undefined);
+    if (saved === undefined) {
+      return;
     }
+
+    replaced.current = saved;
+    setSaved(undefined);
   };
 
   /**
@@ -669,7 +675,7 @@ export function ReplyDialog({
     if (suggestions.isError) {
       return t("reply.suggestionsFailed");
     }
-    return intents.length === 0 ? t("reply.noSuggestions") : t("reply.choose");
+    return t(intents.length === 0 ? "reply.noSuggestions" : "reply.choose");
   };
 
   return (

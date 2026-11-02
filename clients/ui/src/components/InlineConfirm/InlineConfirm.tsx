@@ -40,11 +40,13 @@ export function InlineConfirm({
     cancel.current?.focus();
     const element = root.current;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        event.preventDefault();
-        onCancelRef.current();
+      if (event.key !== "Escape") {
+        return;
       }
+
+      event.stopPropagation();
+      event.preventDefault();
+      onCancelRef.current();
     };
     element?.addEventListener("keydown", onKeyDown);
     return () => {

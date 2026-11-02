@@ -230,10 +230,9 @@ async function answer(route: Route): Promise<void> {
     return json({ rules: [ruleView()] });
   }
   if (path === `${API}/rules/${RULE}/confirm` && method === "POST") {
-    if (sent["content_token"] !== ruleView().content_token) {
-      return changed();
-    }
-    return json({ ...ruleView(), state: "active" });
+    return sent["content_token"] === ruleView().content_token
+      ? json({ ...ruleView(), state: "active" })
+      : changed();
   }
   if (path === `${API}/assistant/profile`) {
     return json({ proactivity: "ask_first", asked_at: "2026-10-01T09:00:00Z", revision: 1 });

@@ -31,7 +31,7 @@ const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 /** The OS colour-scheme query, or null where matchMedia is missing (jsdom). */
 function darkQuery(): MediaQueryList | null {
-  return typeof globalThis.matchMedia === "function" ? globalThis.matchMedia(DARK_QUERY) : null;
+  return typeof matchMedia === "function" ? matchMedia(DARK_QUERY) : null;
 }
 
 function subscribeToScheme(onChange: () => void): () => void {

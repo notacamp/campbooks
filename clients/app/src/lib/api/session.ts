@@ -14,7 +14,7 @@ type Session = components["schemas"]["SessionInfo"];
  * the native side owns sign-in. A signed-out browser gets
  * `{ authenticated: false }`, not an error.
  */
-const sessionQuery = (origin: string = globalThis.location.origin) =>
+const sessionQuery = (origin: string = location.origin) =>
   queryOptions({
     queryKey: ["bff", "session"],
     queryFn: async ({ signal }): Promise<Session> => {
@@ -42,7 +42,7 @@ export function useSession() {
  * clears its cookie. Resolves to the identity provider's end-session URL to
  * navigate to next, or null when the provider has none.
  */
-export async function signOut(origin: string = globalThis.location.origin): Promise<string | null> {
+export async function signOut(origin: string = location.origin): Promise<string | null> {
   const result = await webRoutes(origin).POST("/bff/logout", {
     // The BFF refuses unsafe requests without its CSRF header.
     params: { header: { "x-campbooks-csrf": "1" } },
@@ -58,7 +58,7 @@ export async function signOut(origin: string = globalThis.location.origin): Prom
  */
 export async function signOutAndLeave(
   leave: (url: string) => void = (url) => {
-    globalThis.location.assign(url);
+    location.assign(url);
   },
 ): Promise<void> {
   const logoutUrl = await signOut();

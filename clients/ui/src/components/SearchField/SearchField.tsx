@@ -76,12 +76,12 @@ export function SearchField({
             onValueChange(event.target.value);
           }}
         />
-        {onClear !== undefined && value !== "" ? (
+        {onClear === undefined || value === "" ? null : (
           <button type="button" className={styles["clear"]} onClick={onClear}>
             <Icon name="close" />
             <span className={styles["hidden"]}>{t("searchField.clear")}</span>
           </button>
-        ) : null}
+        )}
         {shortcut === undefined && keys === undefined ? null : (
           <KbdHint shortcut={shortcut} keys={keys} />
         )}

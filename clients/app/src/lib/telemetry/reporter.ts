@@ -48,7 +48,7 @@ export function createReporter(
   send: Send,
   now: () => Date = () => new Date(),
   schedule: (flush: () => void, ms: number) => void = (flush, ms) => {
-    globalThis.setTimeout(flush, ms);
+    setTimeout(flush, ms);
   },
 ): Reporter {
   let stopped = false;
@@ -86,10 +86,12 @@ export function createReporter(
   };
 
   const later = () => {
-    if (!scheduled && !stopped) {
-      scheduled = true;
-      schedule(flush, FLUSH_DELAY_MS);
+    if (scheduled || stopped) {
+      return;
     }
+
+    scheduled = true;
+    schedule(flush, FLUSH_DELAY_MS);
   };
 
   return {

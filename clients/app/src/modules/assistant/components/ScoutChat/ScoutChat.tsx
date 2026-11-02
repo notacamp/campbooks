@@ -199,14 +199,14 @@ export function ScoutChat({
 
   /** A card sends the member to a page or a thread: a narrow chat is in the way. */
   const leaveChat = () => {
-    const wide = typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
+    const wide = typeof matchMedia === "function" && matchMedia(WIDE).matches;
     if (!wide) {
       onClose();
     }
   };
 
   const openConversation = (summary: Pick<ConversationSummary, "id" | "stream">) => {
-    const wide = typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
+    const wide = typeof matchMedia === "function" && matchMedia(WIDE).matches;
     if (!wide) {
       onClose();
     }
@@ -273,12 +273,14 @@ export function ScoutChat({
         }
       }
     }
-    if (!controller.signal.aborted) {
-      await cache.refresh(id).catch(() => {
-        // The answer was stored; the chat shows it once asked for again.
-      });
-      setPending(undefined);
+    if (controller.signal.aborted) {
+      return;
     }
+
+    await cache.refresh(id).catch(() => {
+      // The answer was stored; the chat shows it once asked for again.
+    });
+    setPending(undefined);
   };
 
   // A first question handed over (⌘K) is asked once the chat is open, as if
@@ -479,9 +481,7 @@ export function ScoutChat({
             ? t("chat.unreadableTask")
             : kind === "page"
               ? t("chat.unreadablePage")
-              : kind === "nothing"
-                ? t("chat.unreadableNothing")
-                : t("chat.unreadable");
+              : t(kind === "nothing" ? "chat.unreadableNothing" : "chat.unreadable");
 
   const footer =
     problem === "unavailable" ? (
@@ -508,7 +508,7 @@ export function ScoutChat({
       <div className="flex flex-col gap-2">
         {rateLimited ? <ChatNotice>{t("chat.rate")}</ChatNotice> : null}
         <ChatField
-          label={kind === "nothing" ? t("chat.fieldNothing") : t("chat.field")}
+          label={t(kind === "nothing" ? "chat.fieldNothing" : "chat.field")}
           value={draft}
           onChange={setDraft}
           onAsk={() => {

@@ -37,11 +37,13 @@ export function NewView({ properties, onCreate }: NewViewProps) {
       placement="bottom-start"
       layer="top"
       onOpenChange={(open) => {
-        if (!open) {
-          setName("");
-          setType("table");
-          setGroupBy(undefined);
+        if (open) {
+          return;
         }
+
+        setName("");
+        setType("table");
+        setGroupBy(undefined);
       }}
       renderTrigger={(trigger) => (
         <IconButton {...trigger} icon="plus" label={t("tables.view.add")} />

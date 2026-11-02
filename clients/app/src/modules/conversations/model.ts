@@ -223,10 +223,9 @@ export function reasonText(
   reason: ReasonView,
 ): string {
   const key = `reasons.${reason.rule}`;
-  if (exists(key)) {
-    return t(key, { evidence: reason.evidence });
-  }
-  return t("reasons.other", { rule: reason.rule, evidence: reason.evidence });
+  return exists(key)
+    ? t(key, { evidence: reason.evidence })
+    : t("reasons.other", { rule: reason.rule, evidence: reason.evidence });
 }
 
 /** Questions whose "yes" the note mentions, with their phrase and "Why?" label. */
@@ -242,10 +241,9 @@ const FLAGS = [
 const URGENT_LEVEL = 2;
 
 function holds(decision: DecisionView): boolean {
-  if (decision.question === "urgency") {
-    return typeof decision.value === "number" && decision.value >= URGENT_LEVEL;
-  }
-  return decision.value === true;
+  return decision.question === "urgency"
+    ? typeof decision.value === "number" && decision.value >= URGENT_LEVEL
+    : decision.value === true;
 }
 
 /** The yes answers among `decisions`, in asking order. */
@@ -272,11 +270,10 @@ export function repliedSince(messages: readonly MessageView[]): string | null {
   const replies = messages.filter(
     (message) => message.direction === "outbound" && time(message) > newestInbound,
   );
-  if (replies.length === 0) {
-    return null;
-  }
-  return replies.reduce((newest, message) => (time(message) > time(newest) ? message : newest))
-    .sent_at;
+  return replies.length === 0
+    ? null
+    : replies.reduce((newest, message) => (time(message) > time(newest) ? message : newest))
+        .sent_at;
 }
 
 /** The yes answers the note still says once the member replied: only a warning stands. */
@@ -419,10 +416,9 @@ export function splitQuoted(text: string): { own: string; quoted: string | undef
     start -= 1;
   }
   const own = lines.slice(0, start).join("\n").trimEnd();
-  if (quotedLines === 0 || own.trim() === "") {
-    return { own: text, quoted: undefined };
-  }
-  return { own, quoted: lines.slice(start).join("\n").trim() };
+  return quotedLines === 0 || own.trim() === ""
+    ? { own: text, quoted: undefined }
+    : { own, quoted: lines.slice(start).join("\n").trim() };
 }
 
 /** Raster images: decoded by an `<img>` and nothing else (the server's list). */

@@ -204,6 +204,6 @@ describe("alternate keys", () => {
 
     press("ArrowDown", at("row"));
     expect(handler).toHaveBeenCalledOnce();
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
   });
 });

@@ -125,12 +125,14 @@ export function ScoutNoticed({ workspaceId }: ScoutNoticedProps) {
   // focus comes back to where it was asked from on close.
   const scout = useScoutChat();
   const ask = () => {
-    if (notice !== undefined) {
-      const active = document.activeElement;
-      scout?.(ruleNoticeRef(notice.id), {
-        from: active instanceof HTMLElement && active !== document.body ? active : null,
-      });
+    if (notice === undefined) {
+      return;
     }
+
+    const active = document.activeElement;
+    scout?.(ruleNoticeRef(notice.id), {
+      from: active instanceof HTMLElement && active !== document.body ? active : null,
+    });
   };
   // See the N emails: the search for the sender's mail in the window counted.
   const seeEmails = () => {

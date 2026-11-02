@@ -528,10 +528,12 @@ function LoadedTable({
             label={detail.page.title === "" ? t("untitled") : detail.page.title}
             href={`/w/${workspaceId}/pages/${tableId}`}
             onOpen={(event) => {
-              if (!event.metaKey && !event.ctrlKey && event.button === 0) {
-                event.preventDefault();
-                open(`/w/${workspaceId}/pages/${tableId}`);
+              if (!(!event.metaKey && !event.ctrlKey && event.button === 0)) {
+                return;
               }
+
+              event.preventDefault();
+              open(`/w/${workspaceId}/pages/${tableId}`);
             }}
           />
         ) : null}

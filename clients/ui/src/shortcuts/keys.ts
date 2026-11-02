@@ -86,7 +86,7 @@ export function chordFromEvent(event: KeyboardEvent, platform: Platform): Chord 
     key,
     mod: platform === "apple" ? event.metaKey : event.ctrlKey,
     // A symbol like "?" already encodes Shift in the character itself.
-    shift: byDigit || !isPrintableSymbol(key) ? event.shiftKey : false,
+    shift: (byDigit || !isPrintableSymbol(key)) && event.shiftKey,
     alt: event.altKey,
   };
 }

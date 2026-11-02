@@ -26,9 +26,10 @@ export function dueText(
   if (days === 0) {
     return { text: t("due.today"), late: false };
   }
-  return days === 1
-    ? { text: t("due.tomorrow"), late: false }
-    : { text: t("due.on", { date: dayLabel(task.due_on, locale) }), late: false };
+  return {
+    text: days === 1 ? t("due.tomorrow") : t("due.on", { date: dayLabel(task.due_on, locale) }),
+    late: false,
+  };
 }
 
 /** Its plan, in words: "Planned Wed 28", "Later · Mon 2 Nov"; nothing for no plan (or a hold). */

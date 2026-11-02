@@ -1051,7 +1051,9 @@ export function describeMailbox(mailbox: Mailbox): { subject: string; labels: st
     .toSorted((a, b) => b.internalDate - a.internalDate)
     .map((message) => ({
       subject: subjectOf(message),
-      labels: message.labelIds.map((id) => names.get(id) ?? id).toSorted(),
+      labels: message.labelIds
+        .map((id) => names.get(id) ?? id)
+        .toSorted((a, b) => a.localeCompare(b)),
     }));
 }
 

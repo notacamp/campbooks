@@ -141,10 +141,12 @@ export function OptionPicker({
                     updated === undefined
                       ? undefined
                       : optionsOf(updated).find((option) => option.name === made.name);
-                  if (created !== undefined) {
-                    setQuery("");
-                    onToggle(created.id);
+                  if (created === undefined) {
+                    return;
                   }
+
+                  setQuery("");
+                  onToggle(created.id);
                 });
               },
             }
@@ -183,10 +185,12 @@ function OptionEditor({ option, onBack, onSave, onDelete }: OptionEditorProps) {
           setName(event.target.value);
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && valid) {
-            event.preventDefault();
-            void onSave({ ...option, name: name.trim(), color });
+          if (!(event.key === "Enter" && valid)) {
+            return;
           }
+
+          event.preventDefault();
+          void onSave({ ...option, name: name.trim(), color });
         }}
       />
       <Select

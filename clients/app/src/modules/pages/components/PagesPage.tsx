@@ -100,12 +100,14 @@ export function PagesPage({
 
   const make = async (parent?: string, place: PagePlace = "private") => {
     const made = await actions.create(parent === undefined ? { place } : { parent });
-    if (made !== undefined) {
-      if (parent !== undefined) {
-        setOpen((current) => new Set([...current, parent]));
-      }
-      go(made.id);
+    if (made === undefined) {
+      return;
     }
+
+    if (parent !== undefined) {
+      setOpen((current) => new Set([...current, parent]));
+    }
+    go(made.id);
   };
 
   const makeTable = async (place: PagePlace = "private") => {

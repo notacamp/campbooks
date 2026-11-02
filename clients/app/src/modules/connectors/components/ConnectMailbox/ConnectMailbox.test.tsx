@@ -353,7 +353,7 @@ describe("ConnectMailbox", () => {
   it("links only to the providers' own HTTPS help pages", () => {
     const hosts = new Set(GUIDE_LINKS.map((link) => new URL(link).host));
     expect(GUIDE_LINKS.every((link) => link.startsWith("https://"))).toBe(true);
-    expect([...hosts].toSorted()).toEqual([
+    expect([...hosts].toSorted((a, b) => a.localeCompare(b))).toEqual([
       "help.aol.com",
       "help.yahoo.com",
       "hilfe.gmx.net",

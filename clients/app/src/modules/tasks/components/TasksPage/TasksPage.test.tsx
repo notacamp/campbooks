@@ -131,10 +131,11 @@ function api(
       ]),
     ),
     [`GET ${W}/members`]: { body: { members: TEAM } },
-    [`GET ${W}/tasks`]: (request) =>
-      new URL(request.url).searchParams.get("whose") === "handed_off"
-        ? { body: { tasks: handedOff } }
-        : { body: { tasks } },
+    [`GET ${W}/tasks`]: (request) => ({
+      body: {
+        tasks: new URL(request.url).searchParams.get("whose") === "handed_off" ? handedOff : tasks,
+      },
+    }),
     [`POST ${W}/tasks`]: (_request, body) => {
       const made = {
         ...PHOTOS,

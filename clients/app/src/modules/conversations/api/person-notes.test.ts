@@ -29,7 +29,7 @@ describe("answeredPerson", () => {
       'x"@y.example',
       String.raw`x\y@z.example`,
       "marta @clientes.example",
-      "marta@clientes.example\u0007",
+      "marta@clientes.example\u{7}",
     ]) {
       expect(
         answeredPerson({ direction: "inbound", from: { address }, to: [SAM] }),

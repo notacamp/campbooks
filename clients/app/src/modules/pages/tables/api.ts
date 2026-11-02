@@ -84,7 +84,7 @@ export function useRowsById(
   tableId: string | undefined,
   ids: readonly string[],
 ) {
-  const wanted = [...new Set(ids)].toSorted().slice(0, ROWS_PER_PAGE);
+  const wanted = [...new Set(ids)].toSorted((a, b) => a.localeCompare(b)).slice(0, ROWS_PER_PAGE);
   return useQuery({
     queryKey: operationKey(QUERY_TABLE, {
       workspace_id: workspaceId,

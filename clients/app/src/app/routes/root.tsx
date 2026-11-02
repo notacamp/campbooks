@@ -54,7 +54,7 @@ function RootLayout() {
     if (workspaceId === undefined) {
       return;
     }
-    if (typeof globalThis.matchMedia === "function" && globalThis.matchMedia(PHONE).matches) {
+    if (typeof matchMedia === "function" && matchMedia(PHONE).matches) {
       setMenuOpen(false);
       void navigate({ to: "/w/$workspaceId/search", params: { workspaceId } });
     } else {

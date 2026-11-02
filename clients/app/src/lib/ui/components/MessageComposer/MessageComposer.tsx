@@ -176,20 +176,19 @@ const COMPACT_REM = 32;
 const WIDE = "(width >= 48rem)";
 
 function subscribeWide(change: () => void): () => void {
-  if (typeof globalThis.matchMedia !== "function") {
+  if (typeof matchMedia !== "function") {
     return () => {
       // Nothing was listened to.
     };
   }
-  const query = globalThis.matchMedia(WIDE);
+  const query = matchMedia(WIDE);
   query.addEventListener("change", change);
   return () => {
     query.removeEventListener("change", change);
   };
 }
 
-const isWide = () =>
-  typeof globalThis.matchMedia !== "function" || globalThis.matchMedia(WIDE).matches;
+const isWide = () => typeof matchMedia !== "function" || matchMedia(WIDE).matches;
 
 /** Whether the element is narrower than {@link COMPACT_REM}; unknown (not laid out) is not. */
 function useCompact(ref: React.RefObject<HTMLElement | null>, placement: unknown): boolean {
@@ -511,11 +510,13 @@ export function MessageComposer({
       return;
     }
     const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.isComposing && !event.defaultPrevented) {
-        event.preventDefault();
-        event.stopPropagation();
-        escape.current();
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) {
+        return;
       }
+
+      event.preventDefault();
+      event.stopPropagation();
+      escape.current();
     };
     const cancel = (event: Event) => {
       event.preventDefault();
@@ -628,10 +629,12 @@ export function MessageComposer({
       ? {}
       : {
           onDragEnter: (event: React.DragEvent) => {
-            if (carriesFiles(event)) {
-              dragDepth.current += 1;
-              setDropping(true);
+            if (!carriesFiles(event)) {
+              return;
             }
+
+            dragDepth.current += 1;
+            setDropping(true);
           },
           onDragOver: (event: React.DragEvent) => {
             if (carriesFiles(event)) {
@@ -639,18 +642,22 @@ export function MessageComposer({
             }
           },
           onDragLeave: (event: React.DragEvent) => {
-            if (carriesFiles(event)) {
-              dragDepth.current = Math.max(0, dragDepth.current - 1);
-              setDropping(dragDepth.current > 0);
+            if (!carriesFiles(event)) {
+              return;
             }
+
+            dragDepth.current = Math.max(0, dragDepth.current - 1);
+            setDropping(dragDepth.current > 0);
           },
           onDrop: (event: React.DragEvent) => {
-            if (carriesFiles(event)) {
-              event.preventDefault();
-              dragDepth.current = 0;
-              setDropping(false);
-              onAttach([...event.dataTransfer.files]);
+            if (!carriesFiles(event)) {
+              return;
             }
+
+            event.preventDefault();
+            dragDepth.current = 0;
+            setDropping(false);
+            onAttach([...event.dataTransfer.files]);
           },
         };
 

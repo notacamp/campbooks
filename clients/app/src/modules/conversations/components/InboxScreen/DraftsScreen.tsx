@@ -131,10 +131,12 @@ export function DraftsScreen({
           }}
           onCancelAndEdit={(draft) => {
             void takeBack(draft).then((back) => {
-              if (back !== undefined) {
-                toast.notify(t("drafts.sendCancelled"));
-                open(back);
+              if (back === undefined) {
+                return;
               }
+
+              toast.notify(t("drafts.sendCancelled"));
+              open(back);
             });
           }}
           now={now}

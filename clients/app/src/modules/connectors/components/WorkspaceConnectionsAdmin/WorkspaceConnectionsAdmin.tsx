@@ -69,7 +69,7 @@ function ConnectionFact({ connection }: { connection: AdminConnection }) {
   const lastSynced = connection.streams
     .map((stream) => stream.last_synced_at)
     .filter((at): at is string => typeof at === "string")
-    .toSorted()
+    .toSorted((a, b) => a.localeCompare(b))
     .at(-1);
   const failures = Math.max(0, ...connection.streams.map((s) => s.consecutive_failures));
   const paused = connection.streams.some((stream) => stream.paused);

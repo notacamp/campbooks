@@ -243,15 +243,15 @@ export function useThreadExplanation({
     const newer = view.newer ?? undefined;
     const text = writing
       ? t("explain.line.writing")
-      : newer !== undefined && written !== undefined
-        ? t("explain.line.newer", {
+      : newer === undefined || written === undefined
+        ? written === undefined
+          ? t("explain.line.none")
+          : t("explain.line.kept", { when: written, count: view.messages })
+        : t("explain.line.newer", {
             when: written,
             name: firstNameOf(newer.from),
             at: stamp(newer.sent_at),
-          })
-        : written === undefined
-          ? t("explain.line.none")
-          : t("explain.line.kept", { when: written, count: view.messages });
+          });
     return {
       ask,
       offered,
@@ -388,9 +388,7 @@ export function useThreadExplanation({
         actions={
           <>
             {view.stale || (failure !== undefined && failure !== "limit")
-              ? again(
-                  failure !== undefined && !view.stale ? t("explain.tryAgain") : t("explain.again"),
-                )
+              ? again(t(failure === undefined || view.stale ? "explain.again" : "explain.tryAgain"))
               : null}
             <Button variant={view.stale ? "ghost" : "secondary"} onClick={onFollowUp}>
               {t("explain.followUp")}

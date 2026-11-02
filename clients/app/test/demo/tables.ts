@@ -459,7 +459,7 @@ export class TablesServer {
     }
     const value = r.cells[propertyId]?.value;
     if (property.type === "number") {
-      return Number(value ?? Number.NEGATIVE_INFINITY);
+      return Number(value ?? -Infinity);
     }
     if (property.type === "date") {
       return text(record(value)["start"]);

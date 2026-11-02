@@ -40,11 +40,13 @@ export function Overlay({ open, onClose, label, children }: OverlayProps) {
     // Escape closes the dialog, and only the dialog: it stops here so the
     // global shortcut listener never sees it.
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        event.preventDefault();
-        close.current();
+      if (event.key !== "Escape") {
+        return;
       }
+
+      event.stopPropagation();
+      event.preventDefault();
+      close.current();
     };
     scrimElement.addEventListener("mousedown", onScrimDown);
     dialogElement.addEventListener("keydown", onKeyDown);

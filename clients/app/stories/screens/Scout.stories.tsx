@@ -101,10 +101,12 @@ function api(overrides: Record<string, MockRoute> = {}): Record<string, MockRout
       url.searchParams.get("state") === "cleared"
         ? { body: { items: CLEARED, counts: [] } }
         : { body: { items: ITEMS, counts: COUNTS } },
-    [`GET ${W}/conversations`]: (_body, url) =>
-      url.searchParams.has("ids")
-        ? { body: { conversations: [...NEEDS, SOFIA, PEDRO], next_cursor: null } }
-        : { body: { conversations: PRIMARY, next_cursor: null } },
+    [`GET ${W}/conversations`]: (_body, url) => ({
+      body: {
+        conversations: url.searchParams.has("ids") ? [...NEEDS, SOFIA, PEDRO] : PRIMARY,
+        next_cursor: null,
+      },
+    }),
     [`GET ${W}/conversations/${MARTA.id}`]: { body: MARTA_DETAIL },
     [`GET ${W}/conversations/${PHISH.id}`]: { body: PHISH_DETAIL },
     [`GET ${W}/conversations/${Q4.id}`]: { body: Q4_DETAIL },
@@ -368,10 +370,14 @@ function everywhere(): Record<string, MockRoute> {
       }
       return { body: { items: ITEMS, counts: COUNTS } };
     },
-    [`GET ${W}/conversations`]: (_body, url) =>
-      url.searchParams.has("ids")
-        ? { body: { conversations: [...NEEDS, SOFIA, PEDRO, RUI, INES], next_cursor: null } }
-        : { body: { conversations: [...PRIMARY, RUI, INES], next_cursor: null } },
+    [`GET ${W}/conversations`]: (_body, url) => ({
+      body: {
+        conversations: url.searchParams.has("ids")
+          ? [...NEEDS, SOFIA, PEDRO, RUI, INES]
+          : [...PRIMARY, RUI, INES],
+        next_cursor: null,
+      },
+    }),
     [`GET ${W}/conversations/${RUI.id}`]: { body: RUI_DETAIL },
     [`GET ${W}/rule-notices`]: { body: { notices: [BUILDS_NOTICE] } },
     [`GET ${W}/rule-notices/${BUILDS_NOTICE.id}`]: { body: BUILDS_NOTICE },

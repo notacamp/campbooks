@@ -173,10 +173,12 @@ export function TasksPage({
     goTo(base);
   };
   useEffect(() => {
-    if (!creating && refocusNew.current) {
-      refocusNew.current = false;
-      newButton.current?.focus();
+    if (creating || !refocusNew.current) {
+      return;
     }
+
+    refocusNew.current = false;
+    newButton.current?.focus();
   }, [creating]);
   useShortcut("tasks.create", openForm);
 
@@ -208,12 +210,13 @@ export function TasksPage({
   const move = (step: number) => {
     const index = order.findIndex((task) => task.id === selected?.id);
     const next = order[Math.min(order.length - 1, Math.max(0, index + step))];
-    if (next !== undefined) {
-      setCursor(next.id);
-      const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
-        document.getElementById(rowId(next.id));
-      element?.scrollIntoView?.({ block: "nearest" });
+    if (next === undefined) {
+      return;
     }
+    setCursor(next.id);
+    const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
+      document.getElementById(rowId(next.id));
+    element?.scrollIntoView?.({ block: "nearest" });
   };
   const hasRows = selected !== undefined;
   useShortcut(
@@ -269,12 +272,14 @@ export function TasksPage({
   useShortcut(
     "item.snooze",
     () => {
-      if (holdable(subject)) {
-        if (taskId !== subject.id) {
-          openTask(subject);
-        }
-        setOfferLater(true);
+      if (!holdable(subject)) {
+        return;
       }
+
+      if (taskId !== subject.id) {
+        openTask(subject);
+      }
+      setOfferLater(true);
     },
     { enabled: holdable(subject) },
   );
@@ -282,13 +287,15 @@ export function TasksPage({
   useShortcut(
     "item.hold",
     () => {
-      if (subject !== undefined) {
-        if (taskId !== subject.id) {
-          openTask(subject);
-        }
-        setOfferLater(false);
-        setOfferHold(true);
+      if (subject === undefined) {
+        return;
       }
+
+      if (taskId !== subject.id) {
+        openTask(subject);
+      }
+      setOfferLater(false);
+      setOfferHold(true);
     },
     { enabled: offersHold },
   );
@@ -445,7 +452,7 @@ export function TasksPage({
         </div>
       </ListPane>
       <ReaderPane
-        label={creating ? t("form.label") : t("detail.label")}
+        label={t(creating ? "form.label" : "detail.label")}
         narrow={taskId === undefined && !creating ? "hidden" : "shown"}
       >
         {creating ? (

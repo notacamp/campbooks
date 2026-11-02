@@ -50,7 +50,7 @@ describe("createReporter", () => {
       timestamp: "2026-10-17T10:00:00.000Z",
     });
     expect(report?.measurements?.[0]?.values).toEqual({ lcp: 1234.5, delta: 1234.5 });
-    expect(JSON.stringify(report)).not.toContain(globalThis.location.href);
+    expect(JSON.stringify(report)).not.toContain(location.href);
   });
 
   it("sends nothing of a value thrown that is not an Error", async () => {

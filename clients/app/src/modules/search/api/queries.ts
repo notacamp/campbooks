@@ -23,7 +23,7 @@ const PAGE = 20;
 /** The member's zone, for `before:` and `after:`. */
 function zone(): { tz?: string } {
   try {
-    return { tz: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    return { tz: new Intl.DateTimeFormat().resolvedOptions().timeZone };
   } catch {
     return {};
   }

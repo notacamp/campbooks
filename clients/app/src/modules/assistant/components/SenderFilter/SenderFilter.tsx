@@ -133,10 +133,12 @@ export function SenderFilter({
   const tickFirst = () => {
     const first = listed.find((sender) => !value.includes(sender.address));
     const pick = first?.address ?? newOne?.value;
-    if (pick !== undefined) {
-      onChange([...value, pick], first);
-      setDraft("");
+    if (pick === undefined) {
+      return;
     }
+
+    onChange([...value, pick], first);
+    setDraft("");
   };
 
   return (

@@ -132,7 +132,7 @@ describe("JobsAdminPanel", () => {
       [FAILED]: (request) => {
         const url = new URL(request.url);
         return {
-          body: url.searchParams.get("after") === null ? FAILED_JOBS_FIRST_PAGE : FAILED_JOBS,
+          body: url.searchParams.has("after") ? FAILED_JOBS : FAILED_JOBS_FIRST_PAGE,
         };
       },
     });

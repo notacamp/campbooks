@@ -76,10 +76,7 @@ export function dayOf(time: string): Ymd {
 
 /** Minutes after midnight on the wall clock of an event time; 0 for a plain date. */
 export function minutesOf(time: string): number {
-  if (time.length < 16) {
-    return 0;
-  }
-  return Number(time.slice(11, 13)) * 60 + Number(time.slice(14, 16));
+  return time.length < 16 ? 0 : Number(time.slice(11, 13)) * 60 + Number(time.slice(14, 16));
 }
 
 /** What the calendar shows at once, from `from` up to (not including) `to`. */
@@ -223,8 +220,7 @@ export function lastDay(event: EventView): Ymd {
   if (event.all_day) {
     const last = addDays(dayOf(event.ends), -1);
     const first = dayOf(event.starts);
-    if (last < first) return first;
-    return last;
+    return last < first ? first : last;
   }
   const end = dayOf(event.ends);
   // Ending exactly at midnight belongs to the day before.

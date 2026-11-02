@@ -177,10 +177,12 @@ export class ShortcutRegistry {
     return () => {
       const current = this.#handlers.get(id) ?? [];
       const position = current.lastIndexOf(entry);
-      if (position !== -1) {
-        current.splice(position, 1);
-        this.#changed();
+      if (position === -1) {
+        return;
       }
+
+      current.splice(position, 1);
+      this.#changed();
     };
   }
 

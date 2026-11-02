@@ -220,19 +220,21 @@ function at(name: string, width: number, height: number) {
 function longViews(held: TablesServer) {
   const table = held.table(CLIENTS_ID);
   const [first, second] = table?.views ?? [];
-  if (first !== undefined && second !== undefined) {
-    first.name = "All clients with a signed contract";
-    second.name = "By stage, with every owner";
-    first.config = {
-      ...first.config,
-      filter: {
-        and: [
-          { property: P.stage, operator: "is_not", value: "o-paused" },
-          { property: P.signed, operator: "is", value: true },
-        ],
-      },
-    };
+  if (first === undefined || second === undefined) {
+    return;
   }
+
+  first.name = "All clients with a signed contract";
+  second.name = "By stage, with every owner";
+  first.config = {
+    ...first.config,
+    filter: {
+      and: [
+        { property: P.stage, operator: "is_not", value: "o-paused" },
+        { property: P.signed, operator: "is", value: true },
+      ],
+    },
+  };
 }
 
 /** The Value column as narrow as the grid lets it get: the number and its sum no longer fit. */

@@ -121,7 +121,7 @@ function sameAddressing(draft: Draft, shown: { to: Address[]; cc: Address[] }): 
   const key = (parties: Address[]) =>
     parties
       .map((party) => party.address.trim().toLowerCase())
-      .toSorted()
+      .toSorted((a, b) => a.localeCompare(b))
       .join(",");
   return key(draft.to) === key(shown.to) && key(draft.cc) === key(shown.cc);
 }
@@ -494,11 +494,12 @@ export function NudgeDialog({
       <Banner
         tone={calm ? "neutral" : "danger"}
         role={calm ? undefined : "alert"}
-        title={
+        title={t(
           calm || shownProblem === "addressed"
-            ? t(`nudge.errors.${shownProblem}`, { name: person })
-            : t(`reply.${shownProblem}`, { name: person })
-        }
+            ? `nudge.errors.${shownProblem}`
+            : `reply.${shownProblem}`,
+          { name: person },
+        )}
         action={
           problem === undefined && firstProblem !== undefined && !notWaiting ? (
             <Button

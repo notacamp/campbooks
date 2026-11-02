@@ -167,10 +167,12 @@ export function ConversationReader({
     },
     onWaiting: (summary) => {
       const waiting = summary.need;
-      if (waiting?.reason === "waiting" && (waiting.waiting_on ?? null) !== null) {
-        setNudging((current) => ({ need: waiting, opened: (current?.opened ?? 0) + 1 }));
-        ahead.offer(summary, { kind: "waiting" });
+      if (waiting?.reason !== "waiting" || (waiting.waiting_on ?? null) === null) {
+        return;
       }
+
+      setNudging((current) => ({ need: waiting, opened: (current?.opened ?? 0) + 1 }));
+      ahead.offer(summary, { kind: "waiting" });
     },
   });
   // An inbox kept as history after its mailbox was disconnected (or one you
@@ -292,14 +294,14 @@ export function ConversationReader({
   const readOnce = useRef<string | null>(null);
   useEffect(() => {
     if (
-      conversation !== undefined &&
-      writable &&
-      conversation.unread_count > 0 &&
-      readOnce.current !== conversation.id
+      !(conversation !== undefined && writable && conversation.unread_count > 0) ||
+      readOnce.current === conversation.id
     ) {
-      readOnce.current = conversation.id;
-      actions.markRead(conversation);
+      return;
     }
+
+    readOnce.current = conversation.id;
+    actions.markRead(conversation);
   }, [conversation, actions, writable]);
 
   const messages = detail?.messages ?? [];
@@ -329,15 +331,17 @@ export function ConversationReader({
   const repliedOnce = useRef(false);
   useEffect(() => {
     if (
-      startReply &&
-      !repliedOnce.current &&
-      newest !== undefined &&
-      renderReplySlot !== undefined
+      !startReply ||
+      repliedOnce.current ||
+      newest === undefined ||
+      renderReplySlot === undefined
     ) {
-      repliedOnce.current = true;
-      nonce.current += 1;
-      setReply({ mode: "reply", messageId: replyTarget ?? newest.id, nonce: nonce.current });
+      return;
     }
+
+    repliedOnce.current = true;
+    nonce.current += 1;
+    setReply({ mode: "reply", messageId: replyTarget ?? newest.id, nonce: nonce.current });
   }, [startReply, newest, renderReplySlot, replyTarget]);
   const showAllImages = () => {
     setImages(new Set(messages.map((message) => message.id)));
@@ -456,7 +460,7 @@ export function ConversationReader({
     onOpenMessage: (messageId) => {
       setOpened((current) => new Set([...current, messageId]));
       // After the message has opened in its place.
-      globalThis.setTimeout(() => {
+      setTimeout(() => {
         document.getElementById(`message-${messageId}`)?.scrollIntoView({ block: "center" });
       }, 50);
     },
@@ -717,7 +721,7 @@ export function ConversationReader({
           : []),
         {
           id: "star",
-          label: conversation.starred ? t("actions.unstar") : t("actions.star"),
+          label: t(conversation.starred ? "actions.unstar" : "actions.star"),
           icon: conversation.starred ? "pin-filled" : "pin",
           shortcut: "conversations.star",
           pressed: conversation.starred,
@@ -740,7 +744,7 @@ export function ConversationReader({
             ]),
         {
           id: "read",
-          label: unread ? t("actions.read") : t("actions.unread"),
+          label: t(unread ? "actions.read" : "actions.unread"),
           icon: unread ? "check" : "unread",
           shortcut: "conversations.mark_unread",
           onSelect: () => {

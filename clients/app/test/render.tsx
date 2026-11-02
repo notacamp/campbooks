@@ -102,10 +102,9 @@ export function stubApi(routes: Record<string, { status?: number; body: unknown 
   globalThis.fetch = (input: RequestInfo | URL) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     const route = routes[url.pathname];
-    if (route === undefined) {
-      return Promise.reject(new TypeError(`Network error: no stub for ${url.pathname}`));
-    }
-    return Promise.resolve(Response.json(route.body, { status: route.status ?? 200 }));
+    return route === undefined
+      ? Promise.reject(new TypeError(`Network error: no stub for ${url.pathname}`))
+      : Promise.resolve(Response.json(route.body, { status: route.status ?? 200 }));
   };
 }
 

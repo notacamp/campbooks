@@ -5,14 +5,14 @@ import { forgetPrefs, readPref, writePref } from "./prefs";
 describe("prefs", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    globalThis.localStorage.clear();
+    localStorage.clear();
   });
 
   it("round-trips a preference under a namespaced key", () => {
     writePref("locale", "pt");
 
     expect(readPref("locale")).toBe("pt");
-    expect(globalThis.localStorage.getItem("campbooks.pref.locale")).toBe("pt");
+    expect(localStorage.getItem("campbooks.pref.locale")).toBe("pt");
   });
 
   it("forgets every key under a prefix and nothing else", () => {

@@ -771,7 +771,7 @@ function CheckStep({
         <Banner tone="danger" role="alert" title={t(retryFailure(again.error))} />
       ) : null}
       <Actions>
-        {!verified && !checking ? (
+        {verified || checking ? null : (
           <Button
             variant="secondary"
             disabled={again.isPending}
@@ -781,7 +781,7 @@ function CheckStep({
           >
             {t("add.check.retry")}
           </Button>
-        ) : null}
+        )}
         <Button variant="primary" keys="enter" data-autofocus="" onClick={onDone}>
           {t("add.check.done")}
         </Button>

@@ -253,22 +253,24 @@ export class NotionTablesServer extends TablesServer {
         return handler(body, url);
       };
     };
-    let found: RegExpExecArray | null;
     if (method === "GET" && path === `/tables/${CLIENTS_ID}/notion`) {
       return log(() => ({ body: this.body() }));
     }
+    let found: RegExpExecArray | null;
     if (
       (found = new RegExp(`^/tables/${uuid}/notion/conflicts/${uuid}(/undo)?$`, "u").exec(path)) !==
         null &&
       method === "POST"
     ) {
       const conflictId = found[2] ?? "";
-      return found[3] === undefined
-        ? log((body) => {
-            const keep = (body as { keep?: string }).keep;
-            return this.resolve(conflictId, keep === "theirs" ? "theirs" : "ours");
-          })
-        : log(() => this.undo(conflictId));
+      return log(
+        found[3] === undefined
+          ? (body) => {
+              const keep = (body as { keep?: string }).keep;
+              return this.resolve(conflictId, keep === "theirs" ? "theirs" : "ours");
+            }
+          : () => this.undo(conflictId),
+      );
     }
     if (method === "POST" && path === `/tables/${CLIENTS_ID}/notion/stop`) {
       return log(() => {

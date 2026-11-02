@@ -79,10 +79,11 @@ export function EventDialog({
   const valid = title.trim() !== "" && day !== "" && (allDay || (start !== "" && end !== ""));
   const changeStart = (next: string) => {
     setStart(next);
-    if (end !== "" && end <= next) {
-      const length = start === "" ? 0 : minutesOf(end) - minutesOf(start);
-      setEnd(timeOf(Math.min(LAST_MINUTE, minutesOf(next) + (length > 0 ? length : 60))));
+    if (end === "" || end > next) {
+      return;
     }
+    const length = start === "" ? 0 : minutesOf(end) - minutesOf(start);
+    setEnd(timeOf(Math.min(LAST_MINUTE, minutesOf(next) + (length > 0 ? length : 60))));
   };
   const save = () => {
     if (!valid) {

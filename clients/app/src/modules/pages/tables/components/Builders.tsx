@@ -429,7 +429,7 @@ export function SortBuilder({ properties, sorts, onApply, onClose }: SortBuilder
   const { t } = useTranslation("pages");
   const usable = properties.filter((property) => sortable(property));
   const [draft, setDraft] = useState<SortSpec[]>([...sorts]);
-  const free = usable.filter((property) => !draft.some((sort) => sort.property === property.id));
+  const free = usable.filter((property) => draft.every((sort) => sort.property !== property.id));
   return (
     <div className="flex flex-col gap-3 p-3">
       {draft.length === 0 ? <p>{t("tables.sort.none")}</p> : null}
@@ -448,7 +448,7 @@ export function SortBuilder({ properties, sorts, onApply, onClose }: SortBuilder
               .filter(
                 (property) =>
                   property.id === sort.property ||
-                  !draft.some((other) => other.property === property.id),
+                  draft.every((other) => other.property !== property.id),
               )
               .map((property) => ({ value: property.id, label: property.name }))}
             onChange={(value) => {

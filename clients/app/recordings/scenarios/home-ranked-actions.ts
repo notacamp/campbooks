@@ -106,8 +106,10 @@ export default async function homeRankedActions({ page }: ScenarioContext): Prom
   const pedro = await open(page, "Pedro Alves");
   await pedro.getByRole("button", { name: /^Open attachment/u }).click();
   await caption(page, "Open attachment opens the item on its file; Enter previews it", 2600);
-  if (!phone) {
-    await page.keyboard.press("Escape");
-    await caption(page, "Without Scout's ranking, Home offers the same actions as before", 2400);
+  if (phone) {
+    return;
   }
+
+  await page.keyboard.press("Escape");
+  await caption(page, "Without Scout's ranking, Home offers the same actions as before", 2400);
 }

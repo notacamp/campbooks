@@ -9,7 +9,7 @@ import { notionStartError, useStartNotion, type NotionStartError } from "../../a
 
 /** Navigate the whole page (the consent leaves the app for Notion); tests pass a spy. */
 const leavePage = (url: string) => {
-  globalThis.location.assign(url);
+  location.assign(url);
 };
 
 export interface ConnectNotionProps {
@@ -123,10 +123,12 @@ function StartIn({
     latest.current = begin;
   });
   useEffect(() => {
-    if (!started.current) {
-      started.current = true;
-      latest.current();
+    if (started.current) {
+      return;
     }
+
+    started.current = true;
+    latest.current();
   }, []);
 
   if (refused === undefined) {

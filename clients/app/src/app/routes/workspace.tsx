@@ -381,7 +381,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
               label={tNav("nav.settings")}
               icon="settings"
               shortcut="nav.settings"
-              current={inSettings && !sections.some((section) => section.current)}
+              current={inSettings && sections.every((section) => !section.current)}
               {...link(membersPath)}
             />
             {inSettings

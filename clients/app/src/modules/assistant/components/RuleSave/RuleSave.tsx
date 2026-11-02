@@ -212,7 +212,7 @@ export function RuleSave({
           shortcut={primary ? "scout.save_rule" : undefined}
           disabled={create.isPending || targets.length === 0}
         >
-          {failed ? t("memory.teach.retry") : t("memory.teach.save")}
+          {t(failed ? "memory.teach.retry" : "memory.teach.save")}
         </Button>
         <Button variant="ghost" shortcut="overlay.close" onClick={onDone}>
           {t("memory.teach.cancel")}

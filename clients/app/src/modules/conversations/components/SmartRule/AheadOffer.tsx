@@ -224,10 +224,10 @@ function Asking({
         actions={
           <>
             <Button variant="secondary" shortcut="item.choice1" onClick={accept}>
-              {waiting ? t("ahead.waitingAccept") : t("ahead.accept")}
+              {t(waiting ? "ahead.waitingAccept" : "ahead.accept")}
             </Button>
             <Button variant="secondary" shortcut="overlay.close" onClick={dismiss}>
-              {waiting ? t("ahead.waitingAsk") : t("rules.offer.justThis")}
+              {t(waiting ? "ahead.waitingAsk" : "rules.offer.justThis")}
             </Button>
           </>
         }

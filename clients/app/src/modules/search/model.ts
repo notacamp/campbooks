@@ -57,11 +57,8 @@ function tokenOf(tokens: readonly string[], filter: SearchFilter): number {
   const value = filter.value.toLowerCase();
   const parsed = tokens.map(operatorToken);
   const exact = parsed.findIndex((p) => p?.operator === operator && p.value === value);
-  if (exact !== -1) {
-    return exact;
-  }
   // The server may normalise a value (a date, a case): fall back to the operator.
-  return parsed.findIndex((p) => p?.operator === operator);
+  return exact === -1 ? parsed.findIndex((p) => p?.operator === operator) : exact;
 }
 
 /** The query without the token a filter came from (the server stays the only parser). */

@@ -75,10 +75,12 @@ export class PageSync {
   private state: SaveState = "saved";
   private readonly listeners = new Set<(state: SaveState) => void>();
   private readonly onUpdate = (_update: Uint8Array, origin: unknown) => {
-    if (origin !== REMOTE && this.state !== "rejected") {
-      this.edits += 1;
-      this.schedule();
+    if (origin === REMOTE || this.state === "rejected") {
+      return;
     }
+
+    this.edits += 1;
+    this.schedule();
   };
 
   /**
@@ -94,10 +96,12 @@ export class PageSync {
     this.refused = options.refused ?? (() => false);
     doc.on("update", this.onUpdate);
     // Anything typed before this started is not on the server yet.
-    if (writesBeyond(doc, serverVector)) {
-      this.edits += 1;
-      this.schedule();
+    if (!writesBeyond(doc, serverVector)) {
+      return;
     }
+
+    this.edits += 1;
+    this.schedule();
   }
 
   /** The state now. */
@@ -141,11 +145,13 @@ export class PageSync {
   }
 
   private set(state: SaveState): void {
-    if (state !== this.state) {
-      this.state = state;
-      for (const listener of this.listeners) {
-        listener(state);
-      }
+    if (state === this.state) {
+      return;
+    }
+
+    this.state = state;
+    for (const listener of this.listeners) {
+      listener(state);
     }
   }
 

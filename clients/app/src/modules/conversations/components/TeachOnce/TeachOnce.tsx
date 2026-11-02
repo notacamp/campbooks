@@ -497,15 +497,13 @@ function Running({ workspaceId, state, setState, announce, focused }: StepProps<
     title =
       changed > 0
         ? t("rules.run.stopped", { count: changed, n: number(changed) })
-        : removedElsewhere
-          ? t("rules.run.removed")
-          : t("rules.run.stoppedNone");
+        : t(removedElsewhere ? "rules.run.removed" : "rules.run.stoppedNone");
   } else if (reverting && revertRun === undefined) {
     // Removed; the run putting mail back has not shown up yet.
     title = t("rules.run.undoing");
     progress = { value: 0, max: 0, line: t("rules.run.counting") };
   } else if (shown?.counted !== true) {
-    title = reverting ? t("rules.run.undoing") : t("rules.run.finding");
+    title = t(reverting ? "rules.run.undoing" : "rules.run.finding");
     progress = { value: 0, max: 0, line: t("rules.run.counting") };
   } else if (ended) {
     title = t(`rules.run.done.${kind}`, {
@@ -615,10 +613,12 @@ function Question({
   };
   // A question about a rule that cannot be read is no question: say so.
   useEffect(() => {
-    if (rule.isError) {
-      undo.notify(t("rules.run.loadFailed"));
-      setState({ step: "idle" });
+    if (!rule.isError) {
+      return;
     }
+
+    undo.notify(t("rules.run.loadFailed"));
+    setState({ step: "idle" });
   }, [rule.isError, setState, t, undo]);
   const canDrop = data?.may_change === true && data.state !== "removed";
   // Only whoever may change the rule is asked about it.

@@ -80,13 +80,13 @@ describe("the Notion calls", () => {
     renderWithProviders(<Calls />);
     screen.getByRole("button", { name: "go" }).click();
     await waitFor(() => {
-      expect(mocked.calls.map((call) => call.route).toSorted()).toEqual(
+      expect(mocked.calls.map((call) => call.route).toSorted((a, b) => a.localeCompare(b))).toEqual(
         [
           `POST ${base}/notion/imports`,
           `POST ${base}/p/notion/conflicts/b`,
           `POST ${base}/p/notion/resolutions/r/undo`,
           `POST ${base}/p/notion/stop`,
-        ].toSorted(),
+        ].toSorted((a, b) => a.localeCompare(b)),
       );
     });
     expect(mocked.calls.find((c) => c.route.endsWith("/conflicts/b"))?.body).toEqual({

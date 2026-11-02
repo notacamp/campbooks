@@ -56,10 +56,12 @@ export function LinkChip({ ctx, link }: { ctx: CellContext; link: LinkRef }) {
       label={state === "closed" ? t("mention.closed") : label.label}
       href={href}
       onOpen={(event: MouseEvent<HTMLAnchorElement>) => {
-        if (href !== undefined && !event.metaKey && !event.ctrlKey && event.button === 0) {
-          event.preventDefault();
-          ctx.open(href);
+        if (!(href !== undefined && !event.metaKey && !event.ctrlKey && event.button === 0)) {
+          return;
         }
+
+        event.preventDefault();
+        ctx.open(href);
       }}
     />
   );
@@ -101,10 +103,12 @@ function RelationChips({
             }
             href={state === "ready" ? href : undefined}
             onOpen={(event) => {
-              if (!event.metaKey && !event.ctrlKey && event.button === 0) {
-                event.preventDefault();
-                ctx.open(href);
+              if (!(!event.metaKey && !event.ctrlKey && event.button === 0)) {
+                return;
               }
+
+              event.preventDefault();
+              ctx.open(href);
             }}
           />
         );

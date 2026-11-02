@@ -353,8 +353,8 @@ const busy: Pick<Story, "args" | "play"> = {
     page.scrollTop = page.scrollHeight;
     await waitFor(() => expect(page.scrollTop).toBeGreaterThan(0));
     // …while the page itself stays the window's height and the sidebar stays put.
-    await expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(globalThis.innerHeight);
-    await expect(sidebar?.getBoundingClientRect().bottom).toBe(globalThis.innerHeight);
+    await expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(innerHeight);
+    await expect(sidebar?.getBoundingClientRect().bottom).toBe(innerHeight);
   },
 };
 
@@ -439,7 +439,7 @@ export const WaitingPhone: Story = {
     const canvas = within(canvasElement);
     await expect(await canvas.findByText("Waiting on others · 2")).toBeVisible();
     await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
-      globalThis.innerWidth,
+      innerWidth,
     );
   },
 };
@@ -507,7 +507,7 @@ export const BandsPhone: Story = {
     const canvas = within(canvasElement);
     await canvas.findByText("Tiago has waited 4 days");
     await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
-      globalThis.innerWidth,
+      innerWidth,
     );
   },
 };
@@ -598,7 +598,7 @@ export const YourDayPhone: Story = {
     const canvas = within(canvasElement);
     await canvas.findByRole("heading", { level: 2, name: "Coming up" });
     await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
-      globalThis.innerWidth,
+      innerWidth,
     );
   },
 };
@@ -661,7 +661,7 @@ export const ScoutIsntSurePhone: Story = {
     await copiedPlay(context);
     await expect(
       context.canvasElement.ownerDocument.documentElement.scrollWidth,
-    ).toBeLessThanOrEqual(globalThis.innerWidth);
+    ).toBeLessThanOrEqual(innerWidth);
   },
 };
 
@@ -920,7 +920,7 @@ export const InvitationsPhone: Story = {
     const canvas = within(canvasElement);
     await canvas.findByText("Invitation: Offsite planning · Office, 3rd floor");
     await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
-      globalThis.innerWidth,
+      innerWidth,
     );
   },
 };

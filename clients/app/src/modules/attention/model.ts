@@ -170,11 +170,8 @@ export function snoozeOptions(now: Date): { key: SnoozeKey; until: Date }[] {
     { key: "monday", until: at(toMonday, 8) },
     { key: "nextWeek", until: at(7, 8) },
   ];
-  return options.filter(
-    (option, index) =>
-      !options
-        .slice(0, index)
-        .some((earlier) => earlier.until.getTime() === option.until.getTime()),
+  return options.filter((option, index) =>
+    options.slice(0, index).every((earlier) => earlier.until.getTime() !== option.until.getTime()),
   );
 }
 
@@ -289,10 +286,9 @@ export function remindTime(
   const [year, month, day] = dueOn.split("-").map(Number);
   const due = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
   const before = at(due, -2);
-  if (before.getTime() > now.getTime()) {
-    return { until: before, kind: "before" };
-  }
-  return { until: at(now, 1), kind: "tomorrow" };
+  return before.getTime() > now.getTime()
+    ? { until: before, kind: "before" }
+    : { until: at(now, 1), kind: "tomorrow" };
 }
 
 /** Which sentence Done today uses for an item, and how it can be undone. */
@@ -410,21 +406,21 @@ export function rowChoices(
     const skipped =
       steps.length === 0 ||
       (kind === "toPay" && steps.includes("to_pay")) ||
-      (kind === "warning" && !steps.every((step) => WARNING_ANSWERS.has(step))) ||
+      (kind === "warning" && steps.some((step) => !WARNING_ANSWERS.has(step))) ||
       steps.filter((step) => FOLLOW_UPS.has(step)).length > 1;
     if (skipped) {
       continue;
     }
     const id = steps.join("+");
-    if (!own.some((choice) => choice.id === id)) {
+    if (own.every((choice) => choice.id !== id)) {
       own.push({ id, steps });
     }
   }
   if (own.length === 0) {
     return fallback;
   }
-  const missing = (REQUIRED[kind] ?? []).filter(
-    (id) => !own.some((choice) => choice.steps.length === 1 && choice.steps[0] === id),
+  const missing = (REQUIRED[kind] ?? []).filter((id) =>
+    own.every((choice) => !(choice.steps.length === 1 && choice.steps[0] === id)),
   );
   const all = [...missing.map((id) => ({ id, steps: [id] })), ...own];
   return { own: all.slice(0, MAX_OWN), universal: fixed.universal, picked: true };

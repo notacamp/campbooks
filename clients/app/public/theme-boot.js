@@ -12,7 +12,7 @@
   };
   function read(key) {
     try {
-      return globalThis.localStorage.getItem(prefix + key);
+      return localStorage.getItem(prefix + key);
     } catch {
       return null;
     }

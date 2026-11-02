@@ -90,7 +90,7 @@ export function DatePicker({
   const { t, i18n } = useTranslation("ui");
   const ids = useFieldIds(id);
   const valueId = useId();
-  const chosen = value !== undefined && parseDay(value) !== undefined ? value : undefined;
+  const chosen = value === undefined || parseDay(value) === undefined ? undefined : value;
   const today = todayOf(now ?? new Date());
 
   if (inline) {

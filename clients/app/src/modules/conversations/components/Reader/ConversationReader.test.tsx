@@ -73,7 +73,7 @@ describe("ConversationReader", () => {
     routes(OPEN_NEED, { need_read_failed: true });
     renderWithProviders(<Reader />);
     await waitFor(() => {
-      expect(screen.getByText("Scout couldn\u2019t read this one.")).toBeInTheDocument();
+      expect(screen.getByText("Scout couldn\u{2019}t read this one.")).toBeInTheDocument();
     });
   });
 
@@ -81,7 +81,7 @@ describe("ConversationReader", () => {
     routes(OPEN_NEED);
     renderWithProviders(<Reader />);
     await screen.findByRole("region", { name: "Where things stand" });
-    expect(screen.queryByText("Scout couldn\u2019t read this one.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Scout couldn\u{2019}t read this one.")).not.toBeInTheDocument();
   });
 
   it("offers Ask Scout on ., opening the chat about this conversation", async () => {

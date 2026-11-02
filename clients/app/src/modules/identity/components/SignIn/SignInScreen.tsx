@@ -115,10 +115,12 @@ function StartSignIn({
     }
   }, [error, signedIn, returnTo, router]);
   useEffect(() => {
-    if (starting) {
-      rememberReturnTo(returnTo);
-      leave(loginUrl(returnTo));
+    if (!starting) {
+      return;
     }
+
+    rememberReturnTo(returnTo);
+    leave(loginUrl(returnTo));
   }, [starting, returnTo, leave]);
 
   if (error !== undefined) {
@@ -131,13 +133,12 @@ function StartSignIn({
       />
     );
   }
-  if (session.isError) {
-    // Can't tell whether the browser is signed in: try signing in anyway.
-    return (
-      <StartAgain title={t("signIn.failed.title")} lead={t("signIn.failed.lead")} leave={leave} />
-    );
-  }
-  return <Waiting title={t("signIn.starting")} />;
+  // Can't tell whether the browser is signed in: try signing in anyway.
+  return session.isError ? (
+    <StartAgain title={t("signIn.failed.title")} lead={t("signIn.failed.lead")} leave={leave} />
+  ) : (
+    <Waiting title={t("signIn.starting")} />
+  );
 }
 
 function WaitingRequest({

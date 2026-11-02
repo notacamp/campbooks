@@ -97,12 +97,12 @@ export function stubWebAuthn({ autofill = false }: { autofill?: boolean } = {}):
     get: vi.fn(() => Promise.resolve(ASSERTION)),
     create: vi.fn(() => Promise.resolve(ATTESTATION)),
   };
-  Object.defineProperty(globalThis.navigator, "credentials", {
+  Object.defineProperty(navigator, "credentials", {
     value: fake,
     configurable: true,
   });
   onTestFinished(() => {
-    Reflect.deleteProperty(globalThis.navigator, "credentials");
+    Reflect.deleteProperty(navigator, "credentials");
   });
   return fake;
 }

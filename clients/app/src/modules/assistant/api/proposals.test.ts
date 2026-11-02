@@ -31,7 +31,7 @@ const FAKE: Readonly<Record<string, Runnable>> = {
 
 describe("the client's own actions", () => {
   it("are the server's action table and its undos", () => {
-    expect(Object.keys(RUNNABLE).toSorted()).toEqual(
+    expect(Object.keys(RUNNABLE).toSorted((a, b) => a.localeCompare(b))).toEqual(
       [
         "attention.snooze",
         "attention.unsnooze",
@@ -67,7 +67,7 @@ describe("the client's own actions", () => {
         "tasks.reopen",
         "tasks.take_back",
         "tasks.update",
-      ].toSorted(),
+      ].toSorted((a, b) => a.localeCompare(b)),
     );
   });
 

@@ -69,10 +69,12 @@ export function FoundInMessage({
   const { mutate } = request;
   useEffect(() => {
     // Once per opening: a failure shows "Try again" instead of asking again.
-    if (wantsRead && !asked.current) {
-      asked.current = true;
-      mutate();
+    if (!wantsRead || asked.current) {
+      return;
     }
+
+    asked.current = true;
+    mutate();
   }, [wantsRead, mutate]);
 
   if (data === undefined) {

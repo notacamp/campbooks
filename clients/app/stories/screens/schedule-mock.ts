@@ -155,7 +155,7 @@ export function scheduleApi(
 
 /** Pins `new Date()` and `Date.now()` to `iso` until the returned function is called (stories only). */
 export function pinClock(iso: string): () => void {
-  const real = globalThis.Date;
+  const real = Date;
   const fixed = new real(iso).getTime();
   globalThis.Date = new Proxy(real, {
     construct(target, args: unknown[], newTarget) {

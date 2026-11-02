@@ -98,7 +98,7 @@ export const Bid = Extension.create({
       new Plugin({
         key: new PluginKey("bid"),
         appendTransaction: (transactions, _before, state) => {
-          if (!editor.isEditable || !transactions.some((tr) => tr.docChanged)) {
+          if (!editor.isEditable || transactions.every((tr) => !tr.docChanged)) {
             return null;
           }
           const remote = transactions.every(

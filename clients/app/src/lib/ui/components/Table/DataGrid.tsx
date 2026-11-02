@@ -439,10 +439,12 @@ export function DataGrid({
                       onFocus={(event) => {
                         // Tabbing in lands on the active cell; a click or a script focus
                         // on another one makes that the active cell.
-                        if (event.target === event.currentTarget && !isActive) {
-                          setActive({ row: rowIndex, column: columnIndex });
-                          onActiveChange?.(position(rowIndex, columnIndex));
+                        if (event.target !== event.currentTarget || isActive) {
+                          return;
                         }
+
+                        setActive({ row: rowIndex, column: columnIndex });
+                        onActiveChange?.(position(rowIndex, columnIndex));
                       }}
                     >
                       {renderCell(row, column, { active: isActive, editing: isEditing })}
@@ -515,17 +517,21 @@ function ResizeHandle({ label, width, onChange, onCommit }: ResizeHandleProps) {
         }
       }}
       onPointerUp={(event) => {
-        if (start.current !== undefined) {
-          onCommit(clamp(start.current.width + event.clientX - start.current.x));
-          start.current = undefined;
+        if (start.current === undefined) {
+          return;
         }
+
+        onCommit(clamp(start.current.width + event.clientX - start.current.x));
+        start.current = undefined;
       }}
       onKeyDown={(event) => {
-        if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-          event.preventDefault();
-          event.stopPropagation();
-          onCommit(clamp(width + (event.key === "ArrowRight" ? RESIZE_STEP : -RESIZE_STEP)));
+        if (!(event.key === "ArrowRight" || event.key === "ArrowLeft")) {
+          return;
         }
+
+        event.preventDefault();
+        event.stopPropagation();
+        onCommit(clamp(width + (event.key === "ArrowRight" ? RESIZE_STEP : -RESIZE_STEP)));
       }}
     />
   );

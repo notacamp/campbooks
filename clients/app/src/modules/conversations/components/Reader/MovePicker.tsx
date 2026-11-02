@@ -51,12 +51,14 @@ export function MovePicker({ current, open, onOpenChange, onMove }: MovePickerPr
                 // 1–4 pick a stream while the menu has focus; the keys stay here.
                 onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
                   const target = STREAMS[Number(event.key) - 1];
-                  if (target !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (target !== current) {
-                      pick(target, close);
-                    }
+                  if (target === undefined || event.metaKey || event.ctrlKey || event.altKey) {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (target !== current) {
+                    pick(target, close);
                   }
                 }}
               >

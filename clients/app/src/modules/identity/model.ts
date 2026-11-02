@@ -36,8 +36,7 @@ export function startUrl(method: Provider, request: string): string {
  * sign-in screen (that would loop). Anything else becomes `/`.
  */
 export function safeReturnTo(path: string | null | undefined): string {
-  if (
-    path === null ||
+  return path === null ||
     path === undefined ||
     !path.startsWith("/") ||
     path.startsWith("//") ||
@@ -45,10 +44,8 @@ export function safeReturnTo(path: string | null | undefined): string {
     path === "/sign-in" ||
     path.startsWith("/sign-in/") ||
     path.startsWith("/sign-in?")
-  ) {
-    return "/";
-  }
-  return path;
+    ? "/"
+    : path;
 }
 
 /** Remembers, for this tab, where signing in should come back to. */
@@ -90,7 +87,7 @@ export function signInError(code: string): SignInError {
 
 /** Navigates the whole page (to the BFF, a provider, the issuer). */
 export function leavePage(url: string): void {
-  globalThis.location.assign(url);
+  location.assign(url);
 }
 
 /** How the front door came back to the Ways to sign in page (`?linked=`, `?connected=`, `?link_error=`). */
