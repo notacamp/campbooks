@@ -763,7 +763,7 @@ dependencies = [
  "mail-parser",
  "opentelemetry",
  "psl",
- "quick-xml 0.41.0",
+ "quick-xml 0.42.0",
  "reqwest",
  "rustls-platform-verifier",
  "secrecy",
@@ -1529,7 +1529,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d045de693cb712d0b22c6a64be5b953f67b3ce00ab5ad3dd5d8b441886ab8e1a"
 dependencies = [
  "quote",
- "syn 3.0.8",
+ "syn 2.0.119",
 ]
 
 [[package]]
