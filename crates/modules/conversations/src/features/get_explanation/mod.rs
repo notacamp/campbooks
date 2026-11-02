@@ -87,9 +87,16 @@ pub async fn handler(
         .fetch_optional(&mut *tx)
         .await?;
     let row = row.ok_or(Error::NotFound)?;
-    if !explanation::messages_still_there(&mut tx, &row.message_ids, &inboxes, conversation).await?
+    if !explanation::still_servable(
+        &mut tx,
+        access,
+        member,
+        conversation,
+        &row.message_ids,
+        &inboxes,
+    )
+    .await?
     {
-        explanation::forget(&mut tx, access, member, conversation).await?;
         tx.commit().await?;
         return Err(Error::NotFound);
     }

@@ -1323,3 +1323,140 @@ async fn the_tracked_event_carries_the_outcome_and_buckets_never_words(db: PgPoo
         assert_eq!(event.body.as_object().unwrap().len(), 5, "{body}");
     }
 }
+
+// --- Fixes after review ------------------------------------------------------
+
+/// The decide pass marks the thread's newest message a phishing warning.
+async fn flag_phishing(kit: &Kit, conversation: &str) {
+    sqlx::query(
+        "INSERT INTO conversations.decisions
+             (id, workspace_id, message_id, conversation_id, question, source, strategy, value,
+              model, acted, state_version)
+         SELECT gen_random_uuid(), workspace_id, id, conversation_id, 'suspicious', 'model',
+                'scripted', 'true'::jsonb, 'scripted', true, 1
+           FROM conversations.messages WHERE conversation_id = $1::uuid
+          ORDER BY sent_at DESC LIMIT 1
+         ON CONFLICT (message_id, question, source) DO UPDATE SET value = 'true'::jsonb",
+    )
+    .bind(conversation)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_phishing_flag_that_lands_after_the_explanation_removes_it(db: PgPool) {
+    let server = model(&good()).await;
+    let kit = kit(db, &server).await;
+    let w = world(&kit, 9).await;
+    kit.post(&w.ana, &w.uri, None).await;
+    kit.run_jobs().await;
+    assert_eq!(kit.get(&w.ana, &w.uri).await.status, StatusCode::OK);
+
+    flag_phishing(&kit, &w.conversation).await;
+    // Neither GET (so neither the chat, which reads through it) nor POST's
+    // coalesced answer serves it; the row is gone.
+    assert_eq!(kit.get(&w.ana, &w.uri).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(explanations(&kit).await, 0);
+    assert_eq!(
+        kit.post(&w.ana, &w.uri, None).await.status,
+        StatusCode::CONFLICT
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_phishing_flag_that_lands_while_scout_writes_keeps_nothing(db: PgPool) {
+    let server = model(&good()).await;
+    let kit = kit(db, &server).await;
+    let w = world(&kit, 9).await;
+    assert_eq!(
+        kit.post(&w.ana, &w.uri, None).await.status,
+        StatusCode::ACCEPTED
+    );
+    flag_phishing(&kit, &w.conversation).await;
+    kit.run_jobs().await;
+    assert_eq!(explanations(&kit).await, 0);
+    assert_eq!(kit.get(&w.ana, &w.uri).await.status, StatusCode::NOT_FOUND);
+    assert!(
+        kit.events("conversations.thread_explained")
+            .await
+            .is_empty()
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn post_does_not_serve_back_an_explanation_whose_message_moved_away(db: PgPool) {
+    let server = model(&good()).await;
+    let kit = kit(db, &server).await;
+    let w = world(&kit, 9).await;
+    kit.post(&w.ana, &w.uri, None).await;
+    kit.run_jobs().await;
+    kit.ingest_value(
+        w.workspace,
+        w.inbox,
+        &json!({"changes": [change("other-1", "thr-other", JONAS, 2, "Lunch", "Lunch?")]}),
+    )
+    .await;
+    let other = kit.conversation_of("other-1").await;
+    sqlx::query(
+        "UPDATE conversations.messages SET conversation_id = $1::uuid
+          WHERE provider_message_id = 'kick-7'",
+    )
+    .bind(&other)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let again = kit.post(&w.ana, &w.uri, None).await;
+    // Not the old body with a 200: a fresh request.
+    assert_eq!(again.status, StatusCode::ACCEPTED, "{:?}", again.json);
+    assert!(again.json["body"].is_null(), "{:?}", again.json);
+    kit.run_jobs().await;
+    assert_eq!(calls(&server).await, 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_cited_message_in_the_trash_or_spam_counts_as_gone(db: PgPool) {
+    let server = model(&good()).await;
+    let kit = kit(db, &server).await;
+    for column in ["in_trash", "in_spam"] {
+        let w = world_of(&kit, column.trim_start_matches("in_"), 9).await;
+        kit.post(&w.ana, &w.uri, None).await;
+        kit.run_jobs().await;
+        assert_eq!(kit.get(&w.ana, &w.uri).await.status, StatusCode::OK);
+        let sql = format!(
+            "UPDATE conversations.messages SET {column} = true WHERE provider_message_id = '{}-7'",
+            column.trim_start_matches("in_")
+        );
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&kit.db)
+            .await
+            .unwrap();
+        assert_eq!(
+            kit.get(&w.ana, &w.uri).await.status,
+            StatusCode::NOT_FOUND,
+            "{column}"
+        );
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_assistant_never_spends_the_workspaces_ai_on_an_explanation(db: PgPool) {
+    let server = model(&good()).await;
+    let kit = kit(db, &server).await;
+    let w = world(&kit, 9).await;
+    let refused = kit
+        .as_assistant_listed(
+            "ana",
+            w.workspace,
+            (
+                "conversations.explain",
+                json!({"conversation_id": w.conversation}),
+            ),
+            true,
+        )
+        .await;
+    assert!(refused.is_err());
+    kit.run_jobs().await;
+    assert_eq!(calls(&server).await, 0);
+    assert_eq!(explanations(&kit).await, 0);
+}

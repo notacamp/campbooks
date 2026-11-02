@@ -452,6 +452,12 @@ async fn keep(
     let tracker = ctx.state().tracker.clone();
     let tx = ctx.tx().await?;
     let version = work.current.version();
+    // A phishing warning may have landed while the model wrote: Scout must
+    // not retell the scam, so nothing is kept and the row goes.
+    if !explanation::explainable(tx, conversation).await? {
+        explanation::forget_row(tx, workspace, member, conversation).await?;
+        return Ok(());
+    }
     let stored = match &outcome {
         Outcome::Ready(body, model) => sqlx::query(
             "UPDATE conversations.explanations

@@ -4314,6 +4314,10 @@ anything not sent dropped. An answer without "in short" SHALL be stored as
 failed. A request for a conversation in spam or the trash, in an inbox kept
 read-only, with a phishing warning or without messages SHALL be refused
 (409), and with no `complete` role that may receive mail SHALL answer 503.
+Only the member's own first-party request SHALL ask: an app's client token
+and the assistant or an automation acting for the member SHALL be refused
+(403 `members_only`, as send refuses them) because it spends the workspace's
+AI, while reading the explanation stays open under the read scope.
 Requests SHALL be limited per member (20 an hour), and a request while the
 member's explanation of the same thread state and language is being written
 or is ready SHALL make no call. Failures SHALL be logged by kind only; the
@@ -4345,12 +4349,20 @@ one.
 - **WHEN** the thread raised a phishing warning
 - **THEN** it cannot be explained and the reader does not offer it
 
+#### Scenario: An app or the assistant asks
+- **WHEN** an app's token, or the assistant acting for Ana, asks to explain a thread
+- **THEN** the answer is 403 `members_only` and no call is made
+
 ### Requirement: Who may see an explanation
 An explanation SHALL belong to the member who asked for it and SHALL be
 served (`conversations.get_explanation`) only to them, and only when, at
 that moment, they may read the conversation and every message it was made
-from is still in it and in an inbox they can see; otherwise the answer SHALL
-be 404 and the explanation SHALL be deleted. When the thread has a newer
+from is still in it (not in spam or the trash) and in an inbox they can see,
+and the thread is still one that may be explained (a phishing warning can
+land after it was written); otherwise the answer SHALL be 404 and the
+explanation SHALL be deleted. The same check SHALL apply when a request is
+answered from a kept explanation, and before the job stores a new one, which
+SHALL keep nothing for a thread that became unexplainable. When the thread has a newer
 message, or the member's language changed, it SHALL be served marked stale
 with the newest message's sender and time, and SHALL never be written again
 on its own. No other member, role or owner SHALL read it. The conversation
@@ -4363,6 +4375,10 @@ detail SHALL say whether the member may ask for one.
 #### Scenario: Access removed
 - **WHEN** Ana is taken off the inbox the thread is in
 - **THEN** her explanation is not served and is deleted
+
+#### Scenario: A phishing warning lands later
+- **WHEN** the decide pass marks the thread's newest message a phishing warning after Ana's explanation was written, or while Scout is writing it
+- **THEN** the explanation is not served or stored, is deleted, and Scout's chat about the thread no longer carries it
 
 #### Scenario: A teammate
 - **WHEN** Rui, who reads the same inbox, opens the thread

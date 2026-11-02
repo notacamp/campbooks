@@ -22,6 +22,7 @@ use std::time::Duration;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, RecordRef, Result, Risk,
+    auth::PrincipalKind,
     authz::Action,
     db::BeginFor as _,
     extract,
@@ -79,7 +80,7 @@ pub struct Explainer {
             body = ExplanationView),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope.", body = Problem,
+        (status = FORBIDDEN, description = "Missing scope, or not your own request (`members_only`): an app and the assistant never ask, it spends the workspace's AI.", body = Problem,
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such conversation, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
@@ -121,6 +122,13 @@ pub async fn handler(
             }
             Err(other) => return Err(other),
         };
+    // Only the member's own first-party request spends the workspace's AI:
+    // not an app's token, and not the assistant or an automation acting for
+    // them (the way send is). Read access to the thread stays open to them.
+    if workspace.invoked_by.is_some() || workspace.principal.kind == PrincipalKind::Client {
+        tracing::warn!(workspace = %workspace.id, "an explanation was refused: not the member's own request");
+        return Err(Error::Denied(crate::MESSAGES.reason("members_only")));
+    }
     if !explanation::explainable(&mut tx, conversation).await? {
         return Err(Error::Conflict(crate::MESSAGES.reason("not_explainable")));
     }
@@ -140,6 +148,21 @@ pub async fn handler(
         .map(str::trim)
         .filter(|name| !name.is_empty())
         .map(|name| name.chars().take(NAME_CHARS).collect());
+
+    // A kept explanation whose messages are gone is not served back: it is
+    // deleted, and this request starts a fresh one.
+    let kept: Option<Vec<crate::model::MessageId>> = sqlx::query_scalar(
+        "SELECT message_ids FROM conversations.explanations
+          WHERE workspace_id = $1 AND member_id = $2 AND conversation_id = $3",
+    )
+    .bind(access.workspace.as_uuid())
+    .bind(member.as_uuid())
+    .bind(conversation)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some(ids) = kept {
+        explanation::still_servable(&mut tx, access, member, conversation, &ids, &inboxes).await?;
+    }
 
     // The member's row for this conversation, locked: a second click or tab
     // waits here and then finds the first one's row.

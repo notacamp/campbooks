@@ -1511,6 +1511,12 @@ fn expected(
     {
         return Decision::NotFound;
     }
+    // Asking Scout to explain a thread spends the workspace's AI: only the
+    // member's own session may (campbooks-cloud#407). An app's token that can
+    // read the thread is refused, as send refuses it.
+    if id == "conversations.explain" && decision == Decision::Allow && who == Who::Agent {
+        return Decision::Forbidden;
+    }
     // Importing from Notion goes through a Notion connection of the caller's
     // own: through anyone else's, the answer is that there is none.
     if id == "pages.import_from_notion" && decision == Decision::Allow && who != Who::Connector {

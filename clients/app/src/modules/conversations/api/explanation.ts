@@ -20,6 +20,30 @@ const keys = {
     }),
 };
 
+/** When each explanation was first seen being written, by thread: the 90 s limit counts from here. */
+const firstSeenWriting = new Map<string, number>();
+const seenKey = (workspaceId: string, conversationId: string) => `${workspaceId}:${conversationId}`;
+
+/**
+ * How long to wait before asking again for an explanation in `state`: 1.5 s
+ * while it is being written, until 90 s after it was first seen so; then
+ * never (the card says Scout is slow). Pure for tests.
+ */
+export function pollDelay(
+  state: string | undefined,
+  key: string,
+  now: number,
+  seen: Map<string, number> = firstSeenWriting,
+): number | false {
+  if (state !== "writing") {
+    seen.delete(key);
+    return false;
+  }
+  const since = seen.get(key) ?? now;
+  seen.set(key, since);
+  return now - since < POLL_LIMIT_MS ? POLL_MS : false;
+}
+
 /**
  * `conversations.get_explanation`: your own explanation of a thread, or null
  * when you never asked (404). Asked once when the thread opens and the server
@@ -49,11 +73,8 @@ export function useExplanation(
       }
       return unwrap(result);
     },
-    refetchInterval: (query) => {
-      const view = query.state.data;
-      const started = query.state.dataUpdatedAt;
-      return view?.state === "writing" && Date.now() - started < POLL_LIMIT_MS ? POLL_MS : false;
-    },
+    refetchInterval: (query) =>
+      pollDelay(query.state.data?.state, seenKey(workspaceId, conversationId), Date.now()),
   });
 }
 
@@ -90,6 +111,8 @@ export function useExplain(workspaceId: string, conversationId: string) {
         }),
       ),
     onSuccess: (view) => {
+      // A new request: the 90 s count starts again.
+      firstSeenWriting.delete(seenKey(workspaceId, conversationId));
       queryClient.setQueryData(keys.explanation(workspaceId, conversationId), view);
     },
   });

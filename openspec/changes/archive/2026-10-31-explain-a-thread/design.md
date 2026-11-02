@@ -239,3 +239,13 @@ stale.
 - **Explaining again keeps the earlier explanation in view** and says
   "Scout is reading the N messages…" above it until the new one arrives,
   instead of the skeleton, which shows only when there is nothing yet.
+- **Only the member's own session asks.** `conversations.explain` answers
+  403 `members_only` to an app's client token and to the assistant or an
+  automation (`invoked_by`), as send does, because it spends the
+  workspace's AI; `get_explanation` stays readable under the read scope.
+- **Read-time checks are one function** (`still_servable`): messages still
+  in the thread and not in spam or the trash, in a visible inbox, and the
+  thread still explainable. GET, the coalesced answers of POST and the job
+  before it stores all use it; a late phishing flag deletes the row.
+- **Polling stops 90 s after the row was first seen writing**, not after the
+  last fetch, and the card then shows its "slow" notice.

@@ -470,7 +470,8 @@ pub async fn messages_still_there(
     }
     let found: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM conversations.messages
-          WHERE id = ANY($1) AND conversation_id = $2 AND inbox_id = ANY($3)",
+          WHERE id = ANY($1) AND conversation_id = $2 AND inbox_id = ANY($3)
+            AND NOT in_spam AND NOT in_trash",
     )
     .bind(ids)
     .bind(conversation)
@@ -533,4 +534,44 @@ pub async fn member_sees(
         return Err(Error::NotFound);
     }
     Ok((user, inboxes))
+}
+
+/// Whether a kept explanation may still be served to `member`: every message
+/// it was made from is still in the conversation (not in spam or the trash),
+/// in an inbox they see, and the thread is still one that may be explained (a
+/// phishing warning can land after it was written). When not, the row is
+/// deleted on the spot and this answers `false`; the caller commits.
+pub async fn still_servable(
+    conn: &mut PgConnection,
+    access: &Access,
+    member: UserId,
+    conversation: ConversationId,
+    ids: &[MessageId],
+    inboxes: &[InboxId],
+) -> Result<bool> {
+    let ok = messages_still_there(conn, ids, inboxes, conversation).await?
+        && explainable(conn, conversation).await?;
+    if !ok {
+        forget(conn, access, member, conversation).await?;
+    }
+    Ok(ok)
+}
+
+/// Delete the row of `member` for `conversation` in `workspace`.
+pub async fn forget_row(
+    conn: &mut PgConnection,
+    workspace: campbooks_kernel::tenancy::WorkspaceId,
+    member: UserId,
+    conversation: ConversationId,
+) -> Result<u64> {
+    Ok(sqlx::query(
+        "DELETE FROM conversations.explanations
+          WHERE workspace_id = $1 AND member_id = $2 AND conversation_id = $3",
+    )
+    .bind(workspace.as_uuid())
+    .bind(member.as_uuid())
+    .bind(conversation)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected())
 }
