@@ -9,7 +9,7 @@ import {
 import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { CONNECTION } from "../../../test/demo/identity";
+import { CONNECTION, NOTION_CONNECTION } from "../../../test/demo/identity";
 import { ANA, DUARTE, SESSION } from "../../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../../test/render";
 
@@ -30,7 +30,9 @@ function renderAt(path: string) {
   mockApi({
     "GET /bff/session": { body: SESSION },
     "GET /bff/api/v1/workspaces": { body: { workspaces: [DUARTE] } },
-    [`GET /bff/api/v1/w/${DUARTE.id}/connections`]: { body: { connections: [CONNECTION] } },
+    [`GET /bff/api/v1/w/${DUARTE.id}/connections`]: {
+      body: { connections: [CONNECTION, NOTION_CONNECTION] },
+    },
     [`GET /bff/api/v1/w/${DUARTE.id}/members`]: { body: { members: [ANA] } },
   });
   const root = createRootRoute({ component: Outlet });
@@ -71,6 +73,19 @@ describe("buildConnectorsRoutes", () => {
     const { history } = renderAt(`${PAGE}?connected=${CONNECTION.id}`);
 
     expect(await screen.findByText("Gmail ana@example.com is connected")).toBeVisible();
+    await waitFor(() => {
+      expect(history.location.search).toBe("");
+    });
+  });
+
+  it("mounts Settings → Connections, with the Notion card, coming back to it", async () => {
+    const { history } = renderAt(
+      `/w/${DUARTE.id}/settings/connections?connected=${NOTION_CONNECTION.id}`,
+    );
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Connections" })).toBeVisible();
+    expect(await screen.findByText("Notion (Acme) is connected")).toBeVisible();
+    expect(screen.getByRole("list", { name: "Notion connections" })).toBeVisible();
     await waitFor(() => {
       expect(history.location.search).toBe("");
     });

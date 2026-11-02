@@ -354,39 +354,18 @@ describe("MailboxesPage", () => {
     expect(await screen.findByText(/Vê as caixas de correio que ligou/u)).toBeVisible();
   });
 
-  it("keeps Notion out of the mailboxes and in its own card", async () => {
+  it("keeps Notion out of the mailboxes, with a line to Connections", async () => {
     api([CONNECTION, NOTION_CONNECTION]);
-    renderPage();
+    const onNavigate = vi.fn();
+    renderPage({ onNavigate });
 
-    const mailboxes = await rows();
-    expect(mailboxes).toHaveLength(1);
-    const [first] = mailboxes;
-    expect(first).toBeDefined();
-    if (first === undefined) {
-      return;
-    }
-    expect(within(first).getByText("ana@example.com")).toBeVisible();
-    const card = await screen.findByRole("list", { name: "Notion connections" });
-    expect(within(card).getByText("Acme")).toBeVisible();
-    expect(within(card).getByRole("link", { name: "Import pages from Acme" })).toHaveAttribute(
-      "href",
-      `/w/${DUARTE.id}/pages?import=notion`,
-    );
-  });
-
-  it("opens the import from Notion without a reload", async () => {
-    api([NOTION_CONNECTION]);
-    const onImport = vi.fn();
-    renderPage({ onImport });
-
-    fireEvent.click(await screen.findByRole("link", { name: "Import pages from Acme" }));
-    expect(onImport).toHaveBeenCalled();
-  });
-
-  it("offers Connect Notion when it is not connected", async () => {
-    api([CONNECTION]);
-    renderPage();
-    expect(await screen.findByRole("button", { name: "Connect Notion" })).toBeVisible();
+    expect(await rows()).toHaveLength(1);
+    expect(screen.queryByRole("list", { name: "Notion connections" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Connect Notion" })).toBeNull();
+    const link = screen.getByRole("link", { name: "Connections" });
+    expect(link).toHaveAttribute("href", `/w/${DUARTE.id}/settings/connections`);
+    fireEvent.click(link);
+    expect(onNavigate).toHaveBeenCalledWith(`/w/${DUARTE.id}/settings/connections`);
   });
 
   it("says Notion is connected when the browser comes back from it", async () => {

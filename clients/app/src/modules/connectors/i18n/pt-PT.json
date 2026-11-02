@@ -24,7 +24,8 @@
       "title": "Não foi possível carregar as caixas de correio",
       "lead": "Nada mudou. Tente novamente daqui a pouco.",
       "retry": "Tentar novamente"
-    }
+    },
+    "elsewhere": "O Notion e outras aplicações estão em <to>Ligações</to>."
   },
   "row": {
     "byYou": "Ligada por si",
@@ -352,7 +353,7 @@
     "description": "Traga para as Páginas as páginas do Notion que escolher e mantenha-as sincronizadas nos dois sentidos. Só são partilhadas as páginas que escolher no ecrã do próprio Notion, e pode alterá-lo no Notion a qualquer momento.",
     "bullets": {
       "mine": "A ligação é sua e as páginas importadas começam no seu espaço Privado.",
-      "sync": "As edições sincronizam cerca de um minuto depois de acontecerem, nos dois sentidos.",
+      "sync": "O Campbooks vê no Notion se há alterações de poucos em poucos minutos e envia as suas edições à medida que as faz.",
       "stop": "Desligue quando quiser: as páginas ficam no Campbooks, mas deixam de sincronizar."
     },
     "connect": "Ligar o Notion",
@@ -374,9 +375,22 @@
       "lead": "As suas páginas ficam no Campbooks e deixam de sincronizar. Nada foi apagado no Notion."
     },
     "disconnect": {
-      "question": "Desligar {{name}}?",
-      "lead": "As suas páginas ficam no Campbooks, mas deixam de sincronizar. Nada é apagado no Notion.",
-      "failed": "Não foi possível desligar {{name}}. Nada foi alterado."
+      "failed": "Não foi possível desligar {{name}}. Nada foi alterado.",
+      "title": "Desligar o Notion ({{name}})?",
+      "stops": {
+        "title": "O que deixa de acontecer",
+        "changes": "As alterações no Notion deixam de entrar",
+        "edits": "As suas edições deixam de voltar para o Notion",
+        "access": "O Campbooks esquece o acesso ao seu Notion"
+      },
+      "stays": {
+        "title": "O que fica",
+        "pages": "As páginas que importou, em Páginas, tal como estão agora",
+        "notion": "Tudo no Notion: lá não se apaga nada"
+      },
+      "again": "Pode voltar a ligar o Notion quando quiser, a partir daqui.",
+      "keep": "Manter ligado",
+      "confirm": "Desligar"
     },
     "refusal": {
       "failed": "Não foi possível começar a ligar o Notion. Tente novamente.",
@@ -386,7 +400,27 @@
     "unavailable": {
       "title": "O Notion não está disponível nesta instância.",
       "lead": "Quem gere este Campbooks ainda não o ativou."
-    }
+    },
+    "card": {
+      "title": "Notion · {{name}}"
+    },
+    "checked": "verificado no Notion {{ago}}",
+    "notConnected": "Não ligado",
+    "facts": {
+      "brings": {
+        "label": "O que traz",
+        "value": "Páginas que importou, no seu espaço Privado em Páginas"
+      },
+      "sync": {
+        "label": "Como se mantém em sintonia",
+        "value": "O Campbooks vê no Notion se há alterações de poucos em poucos minutos e envia as suas edições para o Notion à medida que as faz."
+      },
+      "shares": {
+        "label": "O que o Notion partilha",
+        "value": "Só as páginas que escolheu no ecrã do próprio Notion. Pode alterá-lo no Notion a qualquer momento."
+      }
+    },
+    "openPages": "Abrir em Páginas"
   },
   "connectNotion": {
     "opening": "A abrir o Notion…",
@@ -421,5 +455,10 @@
   "signature": {
     "title": "A sua assinatura",
     "lead": "Junta-se ao fim de cada nova mensagem de uma caixa de correio a partir da qual pode enviar. Cada membro assina com a sua."
+  },
+  "connections": {
+    "title": "Ligações",
+    "lead": "Aplicações que não são correio, ligadas ao seu Campbooks. Cada ligação é sua: os colegas não a veem, nem veem o que ela traz.",
+    "elsewhere": "O correio está nas <mail>Caixas de correio</mail>. Os calendários vêm com a sua caixa de correio, em <calendar>Calendário</calendar>."
   }
 }

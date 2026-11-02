@@ -31,7 +31,8 @@ import { ANA, DUARTE, HOUSEHOLD, SESSION } from "../../test/demo/workspaces";
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
 
 // Notion in the real app (router, session gate, workspace frame) against a
-// small in-memory fake Notion: Settings → Notion (connect), the import
+// small in-memory fake Notion: Settings → Connections (Notion: connect, what it
+// brings in, what disconnecting stops and keeps), the import
 // (pick pages, sub-pages come along), a synced page with a conflict (three
 // choices and Undo), a block kept in Notion, stopping the sync, and
 // `/connect/notion` (the listing's installation address). The mock keeps its
@@ -41,7 +42,7 @@ import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
 
 const W = `/bff/api/v1/w/${DUARTE.id}`;
 const P = `${W}/pages`;
-const SETTINGS = `/w/${DUARTE.id}/settings/mailboxes`;
+const SETTINGS = `/w/${DUARTE.id}/settings/connections`;
 const PAGES_PATH = `/w/${DUARTE.id}/pages`;
 const story = (id: string) => `/iframe.html?id=screens-notion--${id}&viewMode=story`;
 
@@ -430,6 +431,25 @@ export const NotConnected: Story = {
   },
 };
 
+/** The connection as the server reports it a few minutes after a check. */
+const checkedNotion = () => ({
+  ...NOTION_CONNECTION,
+  streams: [
+    {
+      capability: "pages" as const,
+      paused: false,
+      phase: "incremental" as const,
+      last_synced_at: new Date(Date.now() - 4 * 60_000).toISOString(),
+    },
+  ],
+});
+
+/** Settings → Connections with Notion connected and checked a few minutes ago. */
+const connectedApi = () => ({
+  ...server({ connected: true }),
+  [`GET ${W}/connections`]: () => ({ body: { connections: [CONNECTION, checkedNotion()] } }),
+});
+
 /** Connected: the connection, with Import pages. */
 export const Connected: Story = {
   args: { path: SETTINGS, api: server({ connected: true }) },
@@ -437,6 +457,56 @@ export const Connected: Story = {
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole("link", { name: "Import pages from Acme" })).toBeVisible();
     await expect(canvas.queryByRole("button", { name: "Connect Notion" })).toBeNull();
+  },
+};
+
+/** Connections, connected: what it brings in, how it stays in step, one row of actions. */
+export const ConnectionsConnected: Story = {
+  args: { path: SETTINGS, api: connectedApi() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Notion · Acme")).toBeVisible();
+    await expect(await canvas.findByText(/checked Notion 4 min/u)).toBeVisible();
+    await expect(canvas.getByText("What it brings in")).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "Open in Pages" })).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "Import pages from Acme" })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Disconnect Acme" })).toBeVisible();
+    // The page's closing line links back to Mailboxes (the sidebar has its own link too).
+    const back = canvas.getAllByRole("link", { name: "Mailboxes" });
+    await expect(back).toHaveLength(2);
+  },
+};
+
+/** Disconnect asks what stops and what stays. */
+export const ConnectionsDisconnectDialog: Story = {
+  args: { path: SETTINGS, api: connectedApi() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Disconnect Acme" }));
+    const dialog = await within(canvasElement.ownerDocument.body).findByRole("dialog", {
+      name: "Disconnect Notion (Acme)?",
+    });
+    // The dialog fades in: wait until it is shown.
+    await waitFor(async () => {
+      await expect(within(dialog).getByText("What stops")).toBeVisible();
+    });
+    await expect(within(dialog).getByText("What stays")).toBeVisible();
+    await expect(
+      within(dialog).getByText("Everything in Notion: nothing is deleted there"),
+    ).toBeVisible();
+    await expect(within(dialog).getByRole("button", { name: /Keep connected/u })).toBeVisible();
+  },
+};
+
+/** The phone: sections as chips, the four actions two by two. */
+export const ConnectionsPhone: Story = {
+  args: { path: SETTINGS, api: connectedApi() },
+  ...at("phone", 375, 812),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Notion · Acme")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Disconnect Acme" })).toBeVisible();
+    await expect(canvasElement.ownerDocument.documentElement.scrollWidth <= 375).toBe(true);
   },
 };
 
@@ -550,6 +620,18 @@ export const ConnectNotionUnavailable: Story = {
 export const NotConnectedIdle: Story = {
   args: { path: SETTINGS, api: server() },
   ...at("desktop", 1440, 900),
+};
+
+/** Settings → Connections, connected, checked a few minutes ago. */
+export const ConnectionsConnectedIdle: Story = {
+  args: { path: SETTINGS, api: connectedApi() },
+  ...at("desktop", 1440, 900),
+};
+
+/** Settings → Connections, connected, on a phone. */
+export const ConnectionsPhoneIdle: Story = {
+  args: { path: SETTINGS, api: connectedApi() },
+  ...at("phone", 375, 812),
 };
 
 /** Settings → Notion, connected. */

@@ -55,7 +55,7 @@ describe("ConnectNotion", () => {
     });
     expect(screen.getByText("Opening Notion…")).toBeVisible();
     expect(mocked.calls.find((c) => c.route.startsWith("POST"))?.body).toEqual({
-      return_to: `/w/${DUARTE.id}/settings/mailboxes`,
+      return_to: `/w/${DUARTE.id}/settings/connections`,
     });
     // Asked once, though the page rendered more than once.
     expect(mocked.calls.filter((c) => c.route.startsWith("POST"))).toHaveLength(1);
@@ -75,7 +75,7 @@ describe("ConnectNotion", () => {
       expect(leave).toHaveBeenCalledWith("/auth/start/notion?ticket=abc");
     });
     expect(mocked.calls.find((c) => c.route.startsWith("POST"))?.body).toEqual({
-      return_to: `/w/${HOUSEHOLD.id}/settings/mailboxes`,
+      return_to: `/w/${HOUSEHOLD.id}/settings/connections`,
     });
   });
 

@@ -135,6 +135,7 @@ export function WorkspaceLayout() {
 const SETTINGS_SECTIONS = [
   { id: "members", path: "members" },
   { id: "mailboxes", path: "mailboxes" },
+  { id: "connections", path: "connections" },
   { id: "calendar", path: "calendar" },
   { id: "waysIn", path: "sign-in" },
   { id: "memory", path: "memory" },
