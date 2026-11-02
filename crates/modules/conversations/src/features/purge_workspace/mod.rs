@@ -66,6 +66,11 @@ impl Job for PurgeWorkspace {
             .bind(workspace.as_uuid())
             .execute(&mut **tx)
             .await?;
+        // Nor their signatures (campbooks-cloud#393).
+        sqlx::query("DELETE FROM conversations.signatures WHERE workspace_id = $1")
+            .bind(workspace.as_uuid())
+            .execute(&mut **tx)
+            .await?;
         tracing::info!(
             inboxes = deleted,
             "conversations purged for a deleted workspace"
@@ -110,6 +115,16 @@ mod tests {
             .execute(&db)
             .await
             .unwrap();
+            // A member's signature for the inbox.
+            sqlx::query(
+                "INSERT INTO conversations.signatures (workspace_id, inbox_id, user_id, text)
+                 SELECT $1, id, gen_random_uuid(), 'Sam Rivers' FROM conversations.inboxes
+                  WHERE workspace_id = $1",
+            )
+            .bind(workspace.as_uuid())
+            .execute(&db)
+            .await
+            .unwrap();
         }
         let mut tx = kit.state.db.begin().await.unwrap();
         campbooks_kernel::db::set_workspace(&mut tx, &gone.to_string())
@@ -148,5 +163,11 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(notes, [kept.to_string()]);
+        let signatures: Vec<String> =
+            sqlx::query_scalar("SELECT workspace_id::text FROM conversations.signatures")
+                .fetch_all(&db)
+                .await
+                .unwrap();
+        assert_eq!(signatures, [kept.to_string()]);
     }
 }

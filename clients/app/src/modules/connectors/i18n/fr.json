@@ -452,6 +452,10 @@
       }
     }
   },
+  "signature": {
+    "title": "Votre signature",
+    "lead": "Ajoutée sous votre texte dans chaque nouveau message d’une boîte depuis laquelle vous pouvez envoyer. Chaque membre signe avec la sienne."
+  },
   "connections": {
     "title": "Connexions",
     "lead": "Des applications qui ne sont pas du courrier, connectées à votre Campbooks. Chaque connexion est la vôtre : vos collègues ne la voient pas, ni ce qu’elle apporte.",

@@ -27,6 +27,16 @@ horizontally at 375px.
 - **WHEN** a page is opened at 375px
 - **THEN** the cards stack in one column and nothing scrolls sideways
 
+### Requirement: Your signature in Settings
+Settings → Mailboxes SHALL give each mailbox the member can send from a
+"Your signature" editor with bold, italic and links. It SHALL save with
+Save or ⌘↵, confirm with "Signature saved", and say when the text is too
+long.
+
+#### Scenario: Save a signature
+- **WHEN** the user writes "Sam Rivers" with "Rivers Lettings" in bold and presses Save
+- **THEN** "Signature saved" shows, and the next reply from that mailbox carries it
+
 ### Requirement: Connections section
 Settings SHALL have a Connections section (`/settings/connections`) between
 Mailboxes and Calendar, in the sidebar and on the phone's chip row, for apps

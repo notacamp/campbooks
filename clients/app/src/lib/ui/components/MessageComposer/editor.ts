@@ -52,8 +52,9 @@ const ComposerKit = StarterKit.extend({
  * The composer's fixed schema (paragraphs, line breaks, bold, italic,
  * strikethrough, links, bulleted and numbered lists, quotes, undo and redo),
  * not the Pages set. Anything pasted that the schema lacks is dropped.
+ * `compact` is a signature's: no lists, quotes or strikethrough.
  */
-export function composerExtensions(): Extensions {
+export function composerExtensions(options: { compact?: boolean } = {}): Extensions {
   const send = () => {
     // Replaced by the composer once it has the editor (see `onSend` there).
   };
@@ -88,6 +89,17 @@ export function composerExtensions(): Extensions {
   return [
     Send,
     ComposerKit.configure({
+      // A signature: bold, italic and links, in lines; nothing a list or a
+      // quote would add.
+      ...(options.compact === true
+        ? {
+            bulletList: false,
+            orderedList: false,
+            listItem: false,
+            blockquote: false,
+            strike: false,
+          }
+        : {}),
       heading: false,
       code: false,
       codeBlock: false,

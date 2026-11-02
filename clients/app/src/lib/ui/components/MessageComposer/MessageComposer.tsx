@@ -16,6 +16,7 @@ import { useShortcut, type ShortcutId } from "~/lib/shortcuts";
 import {
   formatSize,
   Button,
+  ButtonLink,
   Icon,
   IconButton,
   OverflowActions,
@@ -31,6 +32,7 @@ import {
 import { composerExtensions } from "./editor";
 import { LinkForm } from "./LinkForm";
 import { SendLater } from "./SendLater";
+import { SignatureText } from "./SignatureText";
 import { fromMarks, toMarks, type DocNode } from "./marks";
 import styles from "./MessageComposer.module.css";
 
@@ -42,6 +44,22 @@ export interface ComposerAttachment {
   size: number;
   /** Where it came from; a forward's own files and the member's uploads look alike. */
   source?: "forwarded" | "uploaded" | undefined;
+}
+
+/** The signature under the text (campbooks-cloud#393). */
+export interface ComposerSignature {
+  /** The signature the draft carries, as marks; empty when it is left off or there is none. */
+  text: string;
+  /** The member has a signature for this mailbox, so a left-off one can be added back. */
+  available: boolean;
+  /** Leave it off this message. */
+  onLeaveOff: () => void;
+  /** Add the member's current signature back. */
+  onAdd: () => void;
+  /** Settings → Mailboxes, where it is edited. */
+  settingsHref: string;
+  /** Follow `settingsHref` without a reload. */
+  onOpenSettings?: ((event: React.MouseEvent<HTMLElement>) => void) | undefined;
 }
 
 /** A file on its way to the server. */
@@ -103,6 +121,8 @@ export interface MessageComposerProps {
   uploading?: readonly ComposerUpload[] | undefined;
   /** Most bytes of attachments in all; with it, the total is said once something is attached. */
   attachmentBudget?: number | undefined;
+  /** The signature under the text; omit for a composer that has none. */
+  signature?: ComposerSignature | undefined;
   /** "Saved", "Saving…": said politely next to Send. */
   status?: ReactNode | undefined;
   /** Why it cannot be sent (shown above the buttons, announced). */
@@ -209,6 +229,7 @@ export function MessageComposer({
   quotedNote,
   attachments = [],
   onRemoveAttachment,
+  signature,
   onAttach,
   uploading = [],
   attachmentBudget,
@@ -747,6 +768,47 @@ export function MessageComposer({
       )}
 
       <EditorContent editor={editor} className={styles["text"]} />
+
+      {signature === undefined ? null : (
+        <div
+          className={styles["signature"]}
+          aria-label={t("composer.signature.label")}
+          role="group"
+        >
+          {signature.text === "" ? null : (
+            <div className={styles["signed"]}>
+              <span className={styles["dash"]} aria-hidden="true">
+                {"—"}
+              </span>
+              <SignatureText marks={signature.text} />
+            </div>
+          )}
+          <div className={styles["signatureActions"]}>
+            {signature.text === "" ? (
+              signature.available ? (
+                <Button variant="ghost" onClick={signature.onAdd}>
+                  {t("composer.signature.add")}
+                </Button>
+              ) : null
+            ) : (
+              <Button variant="ghost" onClick={signature.onLeaveOff}>
+                {t("composer.signature.leaveOff")}
+              </Button>
+            )}
+            <ButtonLink
+              variant="link"
+              href={signature.settingsHref}
+              {...(signature.onOpenSettings === undefined
+                ? {}
+                : { onClick: signature.onOpenSettings })}
+            >
+              {signature.text !== "" || signature.available
+                ? t("composer.signature.edit")
+                : t("composer.signature.create")}
+            </ButtonLink>
+          </div>
+        </div>
+      )}
 
       {quoted === undefined || quoted === "" ? null : (
         <div className={styles["quoted"]}>

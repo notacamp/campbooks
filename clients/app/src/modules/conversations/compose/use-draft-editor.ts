@@ -61,10 +61,12 @@ function fieldsOf(draft: Draft): DraftFields {
 export interface DraftShown {
   from: Draft["from"];
   attachments: Draft["attachments"];
+  /** The signature the draft carries, as marks; empty when it carries none. */
+  signature: string;
 }
 
 function shownOf(draft: Draft): DraftShown {
-  return { from: draft.from, attachments: draft.attachments };
+  return { from: draft.from, attachments: draft.attachments, signature: draft.signature ?? "" };
 }
 
 function changesOf(
@@ -307,6 +309,51 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
   );
 
   /**
+   * Leave the signature off (`false`) or add the member's current one back
+   * (`true`): a save of its own, after any in flight and after what was typed
+   * is saved, naming the version and token on screen. A draft changed
+   * elsewhere is handled as a save's is.
+   */
+  const setSignature = useCallback(
+    async (on: boolean): Promise<void> => {
+      await flush();
+      const run = async () => {
+        setSaveState("saving");
+        try {
+          const answer = await saveDraft(workspaceId, draft.id, {
+            version: version.current,
+            content_token: shownToken.current ?? null,
+            signature: on,
+          });
+          version.current = answer.version;
+          shownToken.current = answer.content_token;
+          setShown(shownOf(answer));
+          setSaveState(latest.current === saved.current ? "saved" : "unsaved");
+        } catch (thrown) {
+          if (!changedElsewhere(thrown)) {
+            setSaveState("failed");
+            return;
+          }
+          try {
+            const fresh = await fetchDraft(workspaceId, draft.id);
+            version.current = fresh.version;
+            shownToken.current = fresh.content_token;
+            setShown(shownOf(fresh));
+          } catch {
+            // The next save asks again.
+          }
+          setSaveState("unsaved");
+          setError("content_changed");
+        }
+      };
+      inFlight.current = run();
+      await inFlight.current;
+      inFlight.current = null;
+    },
+    [draft.id, flush, workspaceId],
+  );
+
+  /**
    * Send: save first, then schedule, to leave when the undo window ends or at
    * `sendAt`. Resolves with the scheduled draft, or undefined.
    */
@@ -416,6 +463,7 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     update,
     attach,
     uploading,
+    setSignature,
     saveState,
     error,
     sending,

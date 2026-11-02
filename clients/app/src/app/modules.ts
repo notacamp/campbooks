@@ -18,6 +18,7 @@ import {
   CONVERSATIONS_SHORTCUTS,
   PersonNotesList,
   RulesList,
+  SignatureSettings,
   useAskQuote,
   useConversationSources,
 } from "~/modules/conversations";
@@ -107,7 +108,10 @@ export function buildModuleRoutes<
       ...buildConversationsRoutes(workspace),
       ...buildSearchRoutes(workspace),
       // `identity` is the front door for connecting a mailbox (as on the server).
-      ...buildConnectorsRoutes(workspace, { useConsent: useMailboxConsent }),
+      ...buildConnectorsRoutes(workspace, {
+        useConsent: useMailboxConsent,
+        Signatures: SignatureSettings,
+      }),
       ...assistant.workspace,
       // Tasks made from emails say where they came from: the conversations module knows;
       // Hold time reads the schedule module's free time and calendars.

@@ -6,7 +6,7 @@ import {
   useSearch,
   type AnyRoute,
 } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 
 import { useWorkspaces } from "~/modules/workspaces";
 
@@ -39,6 +39,11 @@ function validateMailboxesSearch(search: Record<string, unknown>): MailboxesSear
 export interface ConnectorsRouteOptions {
   /** The front door: `identity`'s `useMailboxConsent`, handed over by the app shell. */
   useConsent: UseMailboxConsent;
+  /**
+   * Your signatures: the conversations module's settings, handed over by the
+   * app shell (connectors and conversations may not import each other).
+   */
+  Signatures?: ComponentType<{ workspaceId: string }>;
 }
 
 /**
@@ -48,7 +53,7 @@ export interface ConnectorsRouteOptions {
  */
 export function buildConnectorsRoutes<TParent extends AnyRoute>(
   parent: TParent,
-  { useConsent }: ConnectorsRouteOptions,
+  { useConsent, Signatures }: ConnectorsRouteOptions,
 ) {
   function MailboxesRoute() {
     const { workspaceId } = useParams({ strict: false });
@@ -73,6 +78,9 @@ export function buildConnectorsRoutes<TParent extends AnyRoute>(
         consent={consent}
         result={result}
         adding={adding}
+        signatures={
+          Signatures === undefined ? undefined : <Signatures workspaceId={workspace.id} />
+        }
         onNavigate={(href) => {
           void navigate({ to: href });
         }}

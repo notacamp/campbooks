@@ -452,6 +452,10 @@
       }
     }
   },
+  "signature": {
+    "title": "Your signature",
+    "lead": "Added under your text in each new message from a mailbox you can send from. Each member signs with their own."
+  },
   "connections": {
     "title": "Connections",
     "lead": "Apps that aren’t mail, connected to your Campbooks. Each connection is yours: teammates don’t see it or what it brings in.",

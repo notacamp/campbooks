@@ -1,0 +1,43 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.box:focus-within {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.text {
+  min-width: 0;
+}
+
+.editor {
+  min-width: 0;
+  min-height: calc(var(--space-12) * 1.5);
+  outline: 0;
+  color: var(--text-primary);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.editor p {
+  margin: 0 0 var(--space-1);
+}
+
+.editor a {
+  color: var(--accent-text);
+  text-decoration: underline;
+}

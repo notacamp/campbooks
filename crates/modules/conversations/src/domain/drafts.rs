@@ -110,6 +110,11 @@ pub struct DraftView {
     pub quoted: String,
     /// The attachments, forwarded and uploaded.
     pub attachments: Vec<DraftAttachment>,
+    /// The author's signature this draft carries (campbooks-cloud#393): text
+    /// with the marks a message may carry, copied when the draft was made
+    /// or added back; empty when it carries none.
+    #[serde(default)]
+    pub signature: String,
     /// Bumped by every save; name it when saving.
     pub version: u32,
     /// Where it is in its life.
@@ -150,6 +155,7 @@ pub struct DraftRow {
     pub reference_ids: Vec<String>,
     pub thread_key: Option<String>,
     pub attachments: serde_json::Value,
+    pub signature: String,
     pub version: i32,
     pub state: String,
     pub send_generation: i32,
@@ -219,6 +225,7 @@ impl DraftRow {
                     size: a.size,
                 })
                 .collect(),
+            signature: self.signature.clone(),
             version: u32::try_from(self.version).unwrap_or_default(),
             state: self.state()?,
             send_at: self.send_at.filter(|_| self.state == "scheduled"),
@@ -294,7 +301,7 @@ pub async fn find(
                    d.conversation_id AS "conversation_id: ConversationId",
                    d.source_message_id AS "source_message_id: MessageId",
                    d.to_recipients, d.cc_recipients, d.bcc_recipients, d.subject, d.body,
-                   d.quoted, d.in_reply_to, d.reference_ids, d.thread_key, d.attachments,
+                   d.quoted, d.in_reply_to, d.reference_ids, d.thread_key, d.attachments, d.signature,
                    d.version, d.state, d.send_generation, d.send_at,
                    d.failure_reason, d.created_at, d.updated_at
               FROM conversations.drafts d
@@ -316,7 +323,7 @@ pub async fn find(
                    d.conversation_id AS "conversation_id: ConversationId",
                    d.source_message_id AS "source_message_id: MessageId",
                    d.to_recipients, d.cc_recipients, d.bcc_recipients, d.subject, d.body,
-                   d.quoted, d.in_reply_to, d.reference_ids, d.thread_key, d.attachments,
+                   d.quoted, d.in_reply_to, d.reference_ids, d.thread_key, d.attachments, d.signature,
                    d.version, d.state, d.send_generation, d.send_at,
                    d.failure_reason, d.created_at, d.updated_at
               FROM conversations.drafts d

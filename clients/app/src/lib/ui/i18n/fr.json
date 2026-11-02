@@ -71,6 +71,13 @@
         "past": "Cette heure est passée. Choisissez-en une plus tardive.",
         "tooFar": "Les envois peuvent être programmés jusqu’à un an à l’avance."
       }
+    },
+    "signature": {
+      "label": "Signature",
+      "leaveOff": "Retirer",
+      "add": "Ajouter la signature",
+      "edit": "Modifier dans les paramètres",
+      "create": "Ajoutez une signature dans les paramètres"
     }
   },
   "attachments": {

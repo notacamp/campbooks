@@ -22,6 +22,7 @@ use serde_json::json;
 use utoipa::ToSchema;
 
 use crate::domain::resources;
+use crate::features::signature;
 use crate::{
     domain::{
         access::visible_inboxes,
@@ -158,14 +159,18 @@ pub async fn handler(
     let quoted = body.quoted.unwrap_or_default();
     check_limits(to.len() + cc.len() + bcc.len(), &subject, &text, &quoted)?;
 
+    // The author's own signature for this inbox, as it reads now: the draft
+    // keeps it, whatever is set later (campbooks-cloud#393).
+    let signature = signature::own(&mut tx, filled.inbox, access.user).await?;
+
     let id = DraftId::new();
     sqlx::query!(
         r#"
         INSERT INTO conversations.drafts
             (id, workspace_id, inbox_id, author, kind, conversation_id, source_message_id,
              to_recipients, cc_recipients, bcc_recipients, subject, body, quoted, in_reply_to,
-             reference_ids, thread_key, attachments)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+             reference_ids, thread_key, attachments, signature)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
         "#,
         id as DraftId,
         access.workspace.as_uuid(),
@@ -184,6 +189,7 @@ pub async fn handler(
         &filled.references,
         filled.thread_key,
         json!(filled.attachments),
+        signature,
     )
     .execute(&mut *tx)
     .await?;

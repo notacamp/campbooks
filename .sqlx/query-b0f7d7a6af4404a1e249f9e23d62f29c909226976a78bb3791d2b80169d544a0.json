@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE conversations.drafts\n           SET to_recipients = $2, cc_recipients = $3, bcc_recipients = $4, subject = $5,\n               body = $6, quoted = $7, attachments = $8, signature = $10, version = version + 1,\n               state = $9, failure_reason = NULL, updated_at = now()\n         WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b0f7d7a6af4404a1e249f9e23d62f29c909226976a78bb3791d2b80169d544a0"
+}

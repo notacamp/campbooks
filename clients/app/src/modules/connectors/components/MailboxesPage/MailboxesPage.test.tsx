@@ -60,6 +60,20 @@ async function row(index: number): Promise<HTMLElement> {
 }
 
 describe("MailboxesPage", () => {
+  it("shows the signatures the app hands it, under their own heading (campbooks-cloud#393)", async () => {
+    api([CONNECTION]);
+    renderPage({ signatures: <p>Signature editors</p> });
+    expect(await screen.findByRole("heading", { name: "Your signature" })).toBeVisible();
+    expect(screen.getByText("Signature editors")).toBeVisible();
+  });
+
+  it("has no signature section when it is given none", async () => {
+    api([CONNECTION]);
+    renderPage();
+    await row(0);
+    expect(screen.queryByRole("heading", { name: "Your signature" })).toBeNull();
+  });
+
   it("lists each mailbox with who connected it and how it is doing", async () => {
     api([CONNECTION, ZOHO_CONNECTION, SOFIA_CONNECTION]);
     renderPage();

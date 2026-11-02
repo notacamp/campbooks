@@ -956,6 +956,15 @@
     },
     "askScout": "Perguntar ao Scout sobre este email"
   },
+  "signature": {
+    "title": "As suas assinaturas",
+    "for": "A sua assinatura para {{address}}",
+    "save": "Guardar",
+    "saved": "Assinatura guardada",
+    "chars": "{{chars}} de {{max}} caracteres",
+    "tooLong": "Uma assinatura pode ter no máximo {{max}} caracteres.",
+    "failed": "Não foi possível guardar a assinatura. Tente de novo."
+  },
   "explain": {
     "button": "Explicar esta conversa",
     "title": "Explicação do Scout",

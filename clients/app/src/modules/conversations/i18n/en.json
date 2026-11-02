@@ -956,6 +956,15 @@
     },
     "askScout": "Ask Scout about this email"
   },
+  "signature": {
+    "title": "Your signatures",
+    "for": "Your signature for {{address}}",
+    "save": "Save",
+    "saved": "Signature saved",
+    "chars": "{{chars}} of {{max}} characters",
+    "tooLong": "A signature can have {{max}} characters at most.",
+    "failed": "Couldn’t save the signature. Try again."
+  },
   "explain": {
     "button": "Explain this thread",
     "title": "Scout’s explanation",

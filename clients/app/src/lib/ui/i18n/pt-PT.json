@@ -71,6 +71,13 @@
         "past": "Essa hora já passou. Escolha uma mais tarde.",
         "tooFar": "Os envios podem ser agendados até um ano de antecedência."
       }
+    },
+    "signature": {
+      "label": "Assinatura",
+      "leaveOff": "Deixar de fora",
+      "add": "Adicionar assinatura",
+      "edit": "Editar nas definições",
+      "create": "Adicione uma assinatura nas definições"
     }
   },
   "attachments": {

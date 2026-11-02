@@ -452,6 +452,10 @@
       }
     }
   },
+  "signature": {
+    "title": "Tu firma",
+    "lead": "Se añade bajo tu texto en cada mensaje nuevo desde un buzón desde el que puedes enviar. Cada miembro firma con la suya."
+  },
   "connections": {
     "title": "Conexiones",
     "lead": "Aplicaciones que no son correo, conectadas a tu Campbooks. Cada conexión es tuya: tus compañeros no la ven, ni lo que trae.",

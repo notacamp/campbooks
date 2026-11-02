@@ -41,16 +41,44 @@ pub fn to_html_parts(parts: &[(&str, Marks)]) -> String {
 }
 
 /// The HTML and plain-text parts of a message: the member's `body` with all
-/// the marks, then the `quoted` history with the quoted ones only.
-pub fn message(body: &str, quoted: &str) -> (String, String) {
-    if quoted.trim().is_empty() {
+/// the marks, then their `signature` (also all the marks: it is their own
+/// text) after a `-- ` line in the plain text and in its own block in the
+/// HTML, then the `quoted` history with the quoted marks only.
+pub fn message(body: &str, signature: &str, quoted: &str) -> (String, String) {
+    let signed = !signature.trim().is_empty();
+    let quoted_any = !quoted.trim().is_empty();
+    if !signed && !quoted_any {
         return (to_html(body, Marks::Own), to_plain(body));
     }
     let body = body.trim_end();
-    (
-        to_html_parts(&[(body, Marks::Own), (quoted, Marks::Quoted)]),
-        format!("{}\n\n{quoted}", to_plain(body)),
-    )
+    // Built in one pass inside the one outer `<div>`: the text, then the
+    // signature in its own block, then the quoted history. Nothing is cut
+    // back out of what was written.
+    let mut html = String::from("<div>");
+    blocks(&body.lines().collect::<Vec<_>>(), Marks::Own, &mut html);
+    let mut plain = to_plain(body);
+    if signed {
+        html.push_str("<div class=\"signature\">");
+        blocks(
+            &signature.trim_end().lines().collect::<Vec<_>>(),
+            Marks::Own,
+            &mut html,
+        );
+        html.push_str("</div>");
+        plain.push_str("\n\n-- \n");
+        plain.push_str(&to_plain(signature.trim_end()));
+    }
+    if quoted_any {
+        blocks(
+            &quoted.lines().collect::<Vec<_>>(),
+            Marks::Quoted,
+            &mut html,
+        );
+        plain.push_str("\n\n");
+        plain.push_str(quoted);
+    }
+    html.push_str("</div>");
+    (html, plain)
 }
 
 /// `text` with every `[` and `]` made plain (`\\[`, `\\]`), so that no
@@ -709,6 +737,7 @@ mod tests {
     fn a_message_renders_body_and_quote_apart() {
         let (html, text) = super::message(
             "See [the lease](https://example.com/4b).\n",
+            "",
             "On Tue, Ana wrote:\n> [your bank](https://example.net)",
         );
         assert_eq!(
@@ -720,10 +749,41 @@ mod tests {
             text,
             "See the lease <https://example.com/4b>.\n\nOn Tue, Ana wrote:\n> [your bank](https://example.net)"
         );
-        let (html, text) = super::message("2 \\* 3", "  ");
+        let (html, text) = super::message("2 \\* 3", "", "  ");
         assert_eq!(
             (html.as_str(), text.as_str()),
             ("<div><p>2 * 3</p></div>", "2 * 3")
+        );
+    }
+
+    #[test]
+    fn a_signature_follows_the_text_before_the_quote() {
+        let (html, text) = super::message(
+            "See you Thursday.\n",
+            "**Sam Rivers**\n[Rivers Lettings](https://example.com)",
+            "On Tue, Ana wrote:\n> hi",
+        );
+        assert_eq!(
+            html,
+            "<div><p>See you Thursday.</p><div class=\"signature\"><p><strong>Sam Rivers</strong><br>\
+             <a href=\"https://example.com\">Rivers Lettings</a></p></div>\
+             <p>On Tue, Ana wrote:</p><blockquote><p>hi</p></blockquote></div>"
+        );
+        assert_eq!(
+            text,
+            "See you Thursday.\n\n-- \n**Sam Rivers**\nRivers Lettings <https://example.com>\n\nOn Tue, Ana wrote:\n> hi"
+        );
+        // No quote: the signature closes the message.
+        let (html, text) = super::message("Hi", "Sam", "");
+        assert_eq!(
+            html,
+            "<div><p>Hi</p><div class=\"signature\"><p>Sam</p></div></div>"
+        );
+        assert_eq!(text, "Hi\n\n-- \nSam");
+        // A blank signature is none.
+        assert_eq!(
+            super::message("Hi", " \n", ""),
+            super::message("Hi", "", "")
         );
     }
 

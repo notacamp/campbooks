@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -51,6 +51,11 @@ export interface MailboxesPageProps {
   adding?: boolean | undefined;
   /** Follow an in-app address without a reload (the router's; absent: a normal link). */
   onNavigate?: ((href: string) => void) | undefined;
+  /**
+   * Your signature for each mailbox you can send from (the conversations
+   * module's, handed over by the app shell: connectors may not import it).
+   */
+  signatures?: ReactNode | undefined;
 }
 
 /** A provider's name, in the user's language when it has one. */
@@ -75,6 +80,7 @@ export function MailboxesPage({
   result,
   adding = false,
   onNavigate,
+  signatures,
 }: MailboxesPageProps) {
   const { t } = useTranslation("connectors");
   const connections = useConnections(workspace.id);
@@ -254,6 +260,11 @@ export function MailboxesPage({
           </List>
         )}
       </SettingsSection>
+      {signatures === undefined ? null : (
+        <SettingsSection title={t("signature.title")} description={t("signature.lead")}>
+          {signatures}
+        </SettingsSection>
+      )}
       <SettingsSection title={t("connect.title")} description={t("connect.lead")}>
         <div className="flex">
           <Button

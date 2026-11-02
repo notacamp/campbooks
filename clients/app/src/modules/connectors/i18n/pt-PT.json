@@ -452,6 +452,10 @@
       }
     }
   },
+  "signature": {
+    "title": "A sua assinatura",
+    "lead": "Junta-se ao fim de cada nova mensagem de uma caixa de correio a partir da qual pode enviar. Cada membro assina com a sua."
+  },
   "connections": {
     "title": "Ligações",
     "lead": "Aplicações que não são correio, ligadas ao seu Campbooks. Cada ligação é sua: os colegas não a veem, nem veem o que ela traz.",
