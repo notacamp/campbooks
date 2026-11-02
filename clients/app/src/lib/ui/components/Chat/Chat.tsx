@@ -26,20 +26,19 @@ import styles from "./Chat.module.css";
 const WIDE = "(width >= 64rem)";
 
 function subscribeWide(change: () => void): () => void {
-  if (typeof globalThis.matchMedia !== "function") {
+  if (typeof matchMedia !== "function") {
     return () => {
       // Nothing was listened to.
     };
   }
-  const query = globalThis.matchMedia(WIDE);
+  const query = matchMedia(WIDE);
   query.addEventListener("change", change);
   return () => {
     query.removeEventListener("change", change);
   };
 }
 
-const isWide = () =>
-  typeof globalThis.matchMedia === "function" && globalThis.matchMedia(WIDE).matches;
+const isWide = () => typeof matchMedia === "function" && matchMedia(WIDE).matches;
 
 export interface ChatPanelProps {
   /** Its title and accessible name: "Scout". */
@@ -134,11 +133,13 @@ export function ChatPanel({
       return;
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        close.current();
+      if (event.key !== "Escape") {
+        return;
       }
+
+      event.preventDefault();
+      event.stopPropagation();
+      close.current();
     };
     element.addEventListener("keydown", onKeyDown);
     return () => {
@@ -328,10 +329,12 @@ function blocksOf(text: string): Block[] {
         blocks.push({ kind: "paragraph", text: paragraph.join("\n") });
         paragraph = [];
       }
-      if (list.length > 0) {
-        blocks.push({ kind: "list", items: list });
-        list = [];
+      if (!(list.length > 0)) {
+        return;
       }
+
+      blocks.push({ kind: "list", items: list });
+      list = [];
     };
     for (const line of lines) {
       const item = /^\s*- (.*)$/u.exec(line);
@@ -572,11 +575,13 @@ export function ChatField({
             onChange(event.target.value);
           }}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              if (ready) {
-                onAsk();
-              }
+            if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+              return;
+            }
+
+            event.preventDefault();
+            if (ready) {
+              onAsk();
             }
           }}
         />

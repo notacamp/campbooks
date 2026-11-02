@@ -130,10 +130,12 @@ export function Picker({
                 onPick(item.id);
               }}
               onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onPick(item.id);
+                if (!(event.key === "Enter" || event.key === " ")) {
+                  return;
                 }
+
+                event.preventDefault();
+                onPick(item.id);
               }}
             >
               <span className={styles["check"]}>
@@ -159,10 +161,12 @@ export function Picker({
               }}
               onClick={create.onCreate}
               onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  create.onCreate();
+                if (!(event.key === "Enter" || event.key === " ")) {
+                  return;
                 }
+
+                event.preventDefault();
+                create.onCreate();
               }}
             >
               <span className={styles["check"]}>

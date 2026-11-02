@@ -43,7 +43,9 @@ export function FailedJobs({ kind, kinds, onKind, onNotice }: FailedJobsProps) {
   const retry = useRetryJob();
   const discard = useDiscardJob();
   const items = failed.data?.pages.flatMap((page) => page.items) ?? [];
-  const options = [...new Set([...(kind === undefined ? [] : [kind]), ...kinds])].toSorted();
+  const options = [...new Set([...(kind === undefined ? [] : [kind]), ...kinds])].toSorted((a, b) =>
+    a.localeCompare(b),
+  );
 
   const said = (action: JobAction, applied: string, unchanged: string): Notice => ({
     tone: "neutral",

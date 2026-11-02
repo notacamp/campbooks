@@ -114,9 +114,11 @@ function tasks(overrides: Record<string, MockRoute> = {}, start?: ReturnType<typ
       }
       // Home's batch read of the tasks its items point at.
       const ids = url.searchParams.get("ids");
-      return ids === null
-        ? { body: { tasks: open } }
-        : { body: { tasks: open.filter((task) => ids.split(",").includes(task.id)) } };
+      return {
+        body: {
+          tasks: ids === null ? open : open.filter((task) => ids.split(",").includes(task.id)),
+        },
+      };
     },
     [`POST ${W}/tasks`]: (body) => {
       const made = { ...PHOTOS, id: "0192f1a0-0000-7000-8000-0000000007ee", ...(body as object) };
@@ -564,7 +566,7 @@ export const RepliedAsksDonePhone: Story = {
     const canvas = within(canvasElement);
     await canvas.findByText("You answered Marta Ferreira’s email. Is this task done?");
     await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
-      globalThis.innerWidth,
+      innerWidth,
     );
   },
 };
@@ -649,7 +651,7 @@ export const WhyAndHistoryPhone: Story = {
     await canvas.findByRole("heading", { name: "History" });
     await canvas.findByText(`“${LEASE_QUOTE}”`);
     await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
-      globalThis.innerWidth,
+      innerWidth,
     );
   },
 };

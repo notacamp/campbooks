@@ -172,10 +172,9 @@ const MAX_RESIZES = 60;
  * 1 when it fits, never below {@link MIN_ZOOM}.
  */
 export function fitZoom(contentWidth: number, frameWidth: number): number {
-  if (frameWidth <= 0 || contentWidth <= frameWidth + 1) {
-    return 1;
-  }
-  return Math.max(MIN_ZOOM, Math.floor((frameWidth / contentWidth) * 1000) / 1000);
+  return frameWidth <= 0 || contentWidth <= frameWidth + 1
+    ? 1
+    : Math.max(MIN_ZOOM, Math.floor((frameWidth / contentWidth) * 1000) / 1000);
 }
 
 /**

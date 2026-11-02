@@ -35,9 +35,9 @@ export function fromBase64Url(text: string): Uint8Array<ArrayBuffer> {
 /** Whether this browser can use passkeys at all. */
 export function passkeysSupported(): boolean {
   return (
-    typeof globalThis.PublicKeyCredential === "function" &&
-    "credentials" in globalThis.navigator &&
-    typeof globalThis.navigator.credentials.get === "function"
+    typeof PublicKeyCredential === "function" &&
+    "credentials" in navigator &&
+    typeof navigator.credentials.get === "function"
   );
 }
 
@@ -47,11 +47,11 @@ export async function autofillSupported(): Promise<boolean> {
     return false;
   }
   const check = (
-    globalThis.PublicKeyCredential as unknown as {
+    PublicKeyCredential as unknown as {
       isConditionalMediationAvailable?: () => Promise<boolean>;
     }
   ).isConditionalMediationAvailable;
-  return typeof check === "function" ? check.call(globalThis.PublicKeyCredential) : false;
+  return typeof check === "function" ? check.call(PublicKeyCredential) : false;
 }
 
 const descriptor = (credential: { type: string; id: string; transports?: string[] }) => ({
@@ -163,7 +163,7 @@ function isPasskeyCredential(credential: Credential | null): credential is Publi
 
 /** Ask the browser for a new passkey for `options`. */
 export async function createPasskey(json: CreationOptions): Promise<RegistrationJSON> {
-  const credential = await globalThis.navigator.credentials.create({
+  const credential = await navigator.credentials.create({
     publicKey: creationOptions(json),
   });
   if (!isPasskeyCredential(credential)) {
@@ -180,7 +180,7 @@ export async function getPasskey(
   json: RequestOptions,
   { autofill = false, signal }: { autofill?: boolean; signal?: AbortSignal } = {},
 ): Promise<AuthenticationJSON> {
-  const credential = await globalThis.navigator.credentials.get({
+  const credential = await navigator.credentials.get({
     publicKey: requestOptions(json),
     ...(autofill ? { mediation: "conditional" as CredentialMediationRequirement } : {}),
     ...(signal === undefined ? {} : { signal }),
@@ -195,7 +195,7 @@ export async function getPasskey(
  * A name for a passkey made on this device ("Mac", "iPhone", …), from the
  * user agent; `undefined` when it can't tell.
  */
-export function deviceName(userAgent: string = globalThis.navigator.userAgent): string | undefined {
+export function deviceName(userAgent: string = navigator.userAgent): string | undefined {
   const known: [RegExp, string][] = [
     [/iPhone/u, "iPhone"],
     [/iPad/u, "iPad"],

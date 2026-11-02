@@ -20,7 +20,7 @@ export type MockRoute = MockAnswer | ((body: unknown, url: URL) => MockAnswer);
  * only: demo data, no server). Returns the function that restores it.
  */
 export function mockFetch(routes: Record<string, MockRoute>): () => void {
-  const original = globalThis.fetch;
+  const original = fetch;
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
     const url = new URL(request.url);

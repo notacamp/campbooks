@@ -108,7 +108,7 @@ export function NoResults({
 }) {
   return (
     <EmptyState title={t("empty.title", { query })} visor="unsure" visorSize="lg">
-      {hasFilters ? t("empty.bodyFilters") : t("empty.body")}
+      {t(hasFilters ? "empty.bodyFilters" : "empty.body")}
     </EmptyState>
   );
 }

@@ -25,8 +25,14 @@ describe("the app's shortcuts", () => {
   it("share S and P only with one-question pages, which never show an item", () => {
     // Scout's questions skip with S and sign-in offers a passkey with P: both
     // live in the `focus` scope, which is never live with `item`.
-    expect(onKey("s").toSorted()).toEqual(["item.snooze (item)", "scout.skip (focus)"]);
-    expect(onKey("p").toSorted()).toEqual(["conversations.star (item)", "sign_in.passkey (focus)"]);
+    expect(onKey("s").toSorted((a, b) => a.localeCompare(b))).toEqual([
+      "item.snooze (item)",
+      "scout.skip (focus)",
+    ]);
+    expect(onKey("p").toSorted((a, b) => a.localeCompare(b))).toEqual([
+      "conversations.star (item)",
+      "sign_in.passkey (focus)",
+    ]);
     expect(
       findConflicts([byId("item.snooze"), byId("scout.skip")].flatMap((d) => d ?? [])),
     ).toEqual([]);

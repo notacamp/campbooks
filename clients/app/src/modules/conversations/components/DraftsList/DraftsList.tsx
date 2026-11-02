@@ -208,7 +208,7 @@ export function DraftsList({
                 <ConversationRow
                   id={`draft-${draft.id}`}
                   from={toLine(t, draft)}
-                  chips={<Tag>{reason === undefined ? t("drafts.tag") : t("drafts.notSent")}</Tag>}
+                  chips={<Tag>{t(reason === undefined ? "drafts.tag" : "drafts.notSent")}</Tag>}
                   avatar={{
                     kind: "person",
                     ...(first === undefined ? {} : { initials: initialsOf(displayName(first)) }),

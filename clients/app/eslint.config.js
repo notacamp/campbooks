@@ -86,6 +86,30 @@ export default tseslint.config(
     plugins: { "@eslint-community/eslint-comments": eslintComments },
     rules: {
       "@eslint-community/eslint-comments/no-use": ["error", { allow: [] }],
+      // unicorn 79 rules switched off (the repo bans eslint-disable comments, so a
+      // config-level decision):
+      // - prefer-default-parameters also fires on `const [y, m, d] = s.split("-").map(Number)`
+      //   with `?? fallback` (noUncheckedIndexedAccess) and turns `x ?? d` into a default that
+      //   ignores null; it has no safe autofix here.
+      // - prefer-await would rewrite ~50 deliberate fire-and-forget `.catch()`/`.then()`
+      //   chains in event handlers and effects into async wrappers.
+      "unicorn/prefer-default-parameters": "off",
+      "unicorn/prefer-await": "off",
+      // prefer-number-coercion rewrites `Number.parseFloat("16px") || 16` (computed styles,
+      // CSS lengths) to `Number()`, which is NaN for any unit suffix.
+      "unicorn/prefer-number-coercion": "off",
+      // no-declarations-before-early-exit and prefer-minimal-ternary are style-only here:
+      // the first flags grouped `const`s (module constants, test fixtures, closures) that
+      // read better together; the second moves a ternary inside `t(...)`, which hides the
+      // literal i18n keys from key extraction.
+      "unicorn/no-declarations-before-early-exit": "off",
+      "unicorn/prefer-minimal-ternary": "off",
+      // prefer-math-min-max is not type-aware: it flags comparisons of `YYYY-MM-DD` strings,
+      // where `Math.max` would return NaN.
+      "unicorn/prefer-math-min-max": "off",
+      // The TS lib target has neither `Promise.withResolvers` nor Iterator helpers (ES2023).
+      "unicorn/prefer-promise-with-resolvers": "off",
+      "unicorn/prefer-iterator-helpers": "off",
       "unicorn/filename-case": [
         "error",
         // kebab-case by default; PascalCase is for component files/folders.
@@ -174,6 +198,12 @@ export default tseslint.config(
       "vitest/no-disabled-tests": "error",
       "vitest/require-top-level-describe": "error",
     },
+  },
+  {
+    // Tests, story mocks and test helpers stub `fetch`/`Date`/WebAuthn on the global object
+    // and restore it afterwards; that is what unicorn's rule forbids in product code.
+    files: ["**/*.test.{ts,tsx}", "stories/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
+    rules: { "unicorn/no-global-object-property-assignment": "off" },
   },
   {
     files: [

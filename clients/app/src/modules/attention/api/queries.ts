@@ -61,16 +61,14 @@ export function useSnooze(workspaceId: string) {
   return useMutation({
     mutationFn: async ({ item, until }: { item: string; until: Date | undefined }) => {
       const params = { path: { workspace_id: workspaceId, item_id: item } };
-      return until === undefined
-        ? unwrap(
-            await api.POST("/api/v1/w/{workspace_id}/attention/{item_id}/unsnooze", { params }),
-          )
-        : unwrap(
-            await api.POST("/api/v1/w/{workspace_id}/attention/{item_id}/snooze", {
+      return unwrap(
+        until === undefined
+          ? await api.POST("/api/v1/w/{workspace_id}/attention/{item_id}/unsnooze", { params })
+          : await api.POST("/api/v1/w/{workspace_id}/attention/{item_id}/snooze", {
               params,
               body: { until: until.toISOString() },
             }),
-          );
+      );
     },
     onSettled: refresh,
   });

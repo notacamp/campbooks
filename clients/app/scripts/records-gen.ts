@@ -43,7 +43,7 @@ for (const [path, item] of Object.entries(spec.paths)) {
   }
 }
 
-const entries = [...readers.entries()]
+const entries = [...readers]
   .toSorted(([a], [b]) => a.localeCompare(b))
   .map(([record, ids]) => {
     const list = [...ids]

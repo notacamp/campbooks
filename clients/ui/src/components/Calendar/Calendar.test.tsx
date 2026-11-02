@@ -24,7 +24,9 @@ import { CALENDAR_KINDS } from "../../tokens/tokens";
 
 describe("kinds", () => {
   it("has an icon for every kind", () => {
-    expect(Object.keys(KIND_ICONS).toSorted()).toEqual([...CALENDAR_KINDS].toSorted());
+    expect(Object.keys(KIND_ICONS).toSorted((a, b) => a.localeCompare(b))).toEqual(
+      [...CALENDAR_KINDS].toSorted((a, b) => a.localeCompare(b)),
+    );
   });
 });
 

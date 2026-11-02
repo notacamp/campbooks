@@ -119,7 +119,7 @@ export function BoardPane({
       const cards = rows.filter((row) => {
         const id = groupOf(row);
         return group.id === ""
-          ? id === undefined || !options.some((o) => o.id === id)
+          ? id === undefined || options.every((o) => o.id !== id)
           : id === group.id;
       });
       const count = sizes.get(group.id === "" ? null : group.id) ?? cards.length;

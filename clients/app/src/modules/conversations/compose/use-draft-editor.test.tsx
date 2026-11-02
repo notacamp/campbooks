@@ -163,7 +163,7 @@ describe("useDraftEditor.attach", () => {
     const gate = new Promise<string>((resolve) => {
       holder.release = resolve;
     });
-    const answering = globalThis.fetch;
+    const answering = fetch;
     globalThis.fetch = async (input, init) => {
       const request = input instanceof Request ? input.clone() : new Request(input, init);
       if (request.method === "POST") {
@@ -238,10 +238,7 @@ describe("useDraftEditor.attach", () => {
 
   it("handles a draft changed elsewhere as a save does: reads it again and says so", async () => {
     const calls = stub((seen) => {
-      if (seen.method === "POST") {
-        return problem(409, "draft_changed");
-      }
-      return { body: draftAt(5) };
+      return seen.method === "POST" ? problem(409, "draft_changed") : { body: draftAt(5) };
     });
     const editor = mount(draftAt(1));
     let refused: { code: string }[] = [];
@@ -265,7 +262,7 @@ describe("useDraftEditor.attach", () => {
 
 /** The calls of the stub installed last (a second `stub` replaces the first). */
 function stubCalls() {
-  const original = globalThis.fetch;
+  const original = fetch;
   const calls: Seen[] = [];
   globalThis.fetch = async (input, init) => {
     const request = input instanceof Request ? input : new Request(input, init);

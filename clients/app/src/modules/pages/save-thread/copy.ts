@@ -34,7 +34,7 @@ export function sanitiseText(text: string): string {
  * reorder or hide text.
  */
 function kept(character: string): boolean {
-  return character === "\n" || character === "\u200D" || character === "\u200C";
+  return character === "\n" || character === "\u{200D}" || character === "\u{200C}";
 }
 
 const textNode = (text: string): BlockJson => ({ type: "text", text });

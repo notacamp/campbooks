@@ -26,7 +26,7 @@ export const BODY_IMAGES_STALE_MS = 60_000;
 /** The body query's `staleTime`, from its data and whether changes come live. */
 export function bodyStaleTime(data: unknown, live: boolean): number {
   if (live || !holdsImageState(data)) {
-    return Number.POSITIVE_INFINITY;
+    return Infinity;
   }
   return trustsImages(data) ? 0 : BODY_IMAGES_STALE_MS;
 }

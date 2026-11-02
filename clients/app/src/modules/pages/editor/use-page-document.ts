@@ -61,10 +61,12 @@ export function usePageDocument({
 
   const seen = useRef(revision);
   useEffect(() => {
-    if (revision !== seen.current) {
-      seen.current = revision;
-      void sync.current?.pull();
+    if (revision === seen.current) {
+      return;
     }
+
+    seen.current = revision;
+    void sync.current?.pull();
   }, [revision]);
 
   return { doc: session.doc, state };

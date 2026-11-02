@@ -49,8 +49,7 @@ export function readersOf(sharing: PageSharing, members: readonly Named[]): Read
 
 /** Words for a list: the pieces and the word for "and" in the member's language. */
 export function joinNames(pieces: readonly string[], and: string): string {
-  if (pieces.length <= 1) {
-    return pieces.join("");
-  }
-  return `${pieces.slice(0, -1).join(", ")} ${and} ${pieces.at(-1) ?? ""}`;
+  return pieces.length <= 1
+    ? pieces.join("")
+    : `${pieces.slice(0, -1).join(", ")} ${and} ${pieces.at(-1) ?? ""}`;
 }

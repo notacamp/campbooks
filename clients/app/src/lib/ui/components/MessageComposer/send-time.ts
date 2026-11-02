@@ -46,10 +46,9 @@ export function sendTimeProblem(at: Date, now: Date): "past" | "tooFar" | undefi
 export function fromPicked(date: string, time: string): Date {
   const [year, month, day] = date.split("-").map(Number);
   const [hours, minutes] = time.split(":").map(Number);
-  if ([year, month, day, hours, minutes].some((n) => n === undefined || Number.isNaN(n))) {
-    return new Date(Number.NaN);
-  }
-  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1, hours ?? 0, minutes ?? 0);
+  return [year, month, day, hours, minutes].some((n) => n === undefined || Number.isNaN(n))
+    ? new Date(NaN)
+    : new Date(year ?? 0, (month ?? 1) - 1, day ?? 1, hours ?? 0, minutes ?? 0);
 }
 
 /** "Tue 29 Oct, 08:00" in `locale`. */

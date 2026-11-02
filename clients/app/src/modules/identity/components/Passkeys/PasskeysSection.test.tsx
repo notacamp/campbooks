@@ -46,7 +46,7 @@ describe("PasskeysSection", () => {
 
   it("adds a passkey made on this device, named after it", async () => {
     const browser = stubWebAuthn();
-    vi.spyOn(globalThis.navigator, "userAgent", "get").mockReturnValue(
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
     );
     const added = { ...PHONE_PASSKEY, id: "p3", name: "Passkey on Windows" };

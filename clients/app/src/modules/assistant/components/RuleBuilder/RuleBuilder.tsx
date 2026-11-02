@@ -255,13 +255,13 @@ export function RuleBuilder({
           }}
         />
       ) : null}
-      {kind !== "subject_contains" && error !== undefined ? (
+      {kind === "subject_contains" || error === undefined ? null : (
         <div role="alert">
           <Text tone="danger" size="sm">
             {error}
           </Text>
         </div>
-      ) : null}
+      )}
       <Select
         label={`${t("memory.builder.then")} · ${t("memory.builder.action")}`}
         value={action}
@@ -273,7 +273,7 @@ export function RuleBuilder({
       />
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" keys="enter">
-          {many ? t("memory.builder.showMany") : t("memory.builder.show")}
+          {t(many ? "memory.builder.showMany" : "memory.builder.show")}
         </Button>
       </div>
     </form>

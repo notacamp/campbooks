@@ -130,8 +130,7 @@ export function StreamChips({ workspaceId, current }: StreamNavProps) {
   useEffect(() => {
     // Not every environment lays out or animates (tests, old webviews).
     const reduced =
-      typeof globalThis.matchMedia === "function" &&
-      globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     const bring = () => {
       const chip: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
         active.current;

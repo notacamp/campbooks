@@ -168,7 +168,7 @@ export function useHomeDay(
         url === undefined
           ? undefined
           : () => {
-              globalThis.open(url.href, "_blank", "noopener,noreferrer");
+              open(url.href, "_blank", "noopener,noreferrer");
             },
       openInCalendar: () => {
         void navigate({

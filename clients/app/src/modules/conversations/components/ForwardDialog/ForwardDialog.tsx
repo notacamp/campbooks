@@ -227,21 +227,25 @@ export function ForwardDialog({
   // Said failed: a start still running is given up on, before its draft can
   // arrive (layout effects run with the commit that shows the failure).
   useLayoutEffect(() => {
-    if (failed) {
-      attempt.current += 1;
-      started.current = null;
+    if (!failed) {
+      return;
     }
+
+    attempt.current += 1;
+    started.current = null;
   }, [failed]);
   useEffect(() => {
     if (
-      chosen !== undefined &&
-      chosen !== started.current &&
-      message !== undefined &&
-      drafts.data !== undefined
+      chosen === undefined ||
+      chosen === started.current ||
+      message === undefined ||
+      drafts.data === undefined
     ) {
-      started.current = chosen;
-      start(chosen, message, drafts.data);
+      return;
     }
+
+    started.current = chosen;
+    start(chosen, message, drafts.data);
   }, [chosen, message, drafts.data]);
 
   const pick = (address: string) => {

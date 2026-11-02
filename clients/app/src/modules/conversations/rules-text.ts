@@ -17,10 +17,7 @@ import { streamName, type Translate } from "./model";
 function listName(listId: string): string {
   const open = listId.indexOf("<");
   const name = (open === -1 ? listId : listId.slice(0, open)).trim();
-  if (name !== "") {
-    return name;
-  }
-  return listId.replaceAll(/[<>]/gu, "").trim();
+  return name === "" ? listId.replaceAll(/[<>]/gu, "").trim() : name;
 }
 
 /** One condition, as a phrase that follows "Mail". */
@@ -138,16 +135,13 @@ function waitSentence(
   const [action, ...others] = rule.actions;
   const sender = [first, second].find((condition) => condition?.field === "sender_address");
   const copied = [first, second].some((condition) => condition?.field === "member_not_in_to");
-  if (
-    more.length > 0 ||
+  return more.length > 0 ||
     others.length > 0 ||
     action?.action !== "wait_on_addressed" ||
     !copied ||
     sender?.field !== "sender_address"
-  ) {
-    return undefined;
-  }
-  return t("rules.waitSentence", { sender: sender.value });
+    ? undefined
+    : t("rules.waitSentence", { sender: sender.value });
 }
 
 /** The whole rule as one sentence: "Mail from x about “y” → Updates". */

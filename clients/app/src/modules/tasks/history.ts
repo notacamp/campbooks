@@ -44,9 +44,11 @@ export function historyLine(entry: TaskHistoryEntry, verb: TaskView["verb"], c: 
 
   switch (entry.what) {
     case "created":
-      return entry.actor === "scout" && c.sourceName !== undefined
-        ? t("history.created.scoutFrom", { name: c.sourceName }) + due
-        : say("created") + due;
+      return (
+        (entry.actor === "scout" && c.sourceName !== undefined
+          ? t("history.created.scoutFrom", { name: c.sourceName })
+          : say("created")) + due
+      );
     case "edited": {
       const fields = (detail.fields ?? []).map((field) => t(`history.field.${field}`));
       return fields.length === 0

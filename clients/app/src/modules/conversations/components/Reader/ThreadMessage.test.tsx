@@ -56,7 +56,7 @@ function gatedBody(answer: unknown) {
     release = resolve;
   });
   mockApi({ [BODY_ROUTE]: () => ({ body: answer }) });
-  const answered = globalThis.fetch;
+  const answered = fetch;
   const asked = { count: 0 };
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     asked.count += 1;

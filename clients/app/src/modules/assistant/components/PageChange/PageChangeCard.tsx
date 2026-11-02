@@ -184,10 +184,12 @@ export function PageChangeCard(props: PageChangeCardProps) {
   };
   const openPage = () => {
     const id = addedId();
-    if (id !== undefined) {
-      onLeave?.();
-      void navigate({ to: `/w/${workspaceId}/pages/${id}` });
+    if (id === undefined) {
+      return;
     }
+
+    onLeave?.();
+    void navigate({ to: `/w/${workspaceId}/pages/${id}` });
   };
 
   const title =
@@ -210,14 +212,14 @@ export function PageChangeCard(props: PageChangeCardProps) {
   const status = {
     pending: undefined,
     working: t("chat.proposal.working"),
-    done: undoFailed ? t("chat.proposal.undoFailed") : t("chat.proposal.page.added"),
+    done: t(undoFailed ? "chat.proposal.undoFailed" : "chat.proposal.page.added"),
     undone: t("chat.proposal.undone"),
     declined: t("chat.proposal.declined"),
     failed:
       reason === undefined
         ? t("chat.proposal.failed")
         : t("chat.proposal.failedBecause", { reason }),
-    blocked: view === undefined ? t("chat.proposal.page.cannotShow") : t("chat.proposal.blocked"),
+    blocked: t(view === undefined ? "chat.proposal.page.cannotShow" : "chat.proposal.blocked"),
   }[state];
 
   const stillPending = proposal.state === "pending" && phase === undefined;
@@ -244,7 +246,7 @@ export function PageChangeCard(props: PageChangeCardProps) {
             }
           }}
         >
-          {editing ? t("chat.proposal.page.preview") : t("chat.proposal.page.edit")}
+          {t(editing ? "chat.proposal.page.preview" : "chat.proposal.page.edit")}
         </Button>
         <Button
           onClick={() => {

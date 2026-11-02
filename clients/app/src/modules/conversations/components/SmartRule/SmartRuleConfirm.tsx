@@ -323,7 +323,7 @@ function Confirm({
             disabled={create.isPending || already || !ready}
             onClick={save}
           >
-            {failed ? t("smartRule.retry") : t("smartRule.save")}
+            {t(failed ? "smartRule.retry" : "smartRule.save")}
           </Button>
           <Button variant="ghost" shortcut="overlay.close" onClick={onClose}>
             {t("smartRule.cancel")}

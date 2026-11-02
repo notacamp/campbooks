@@ -107,11 +107,13 @@ export function usePasskeySignIn(
     }
     let live = true;
     void autofillSupported().then((available) => {
-      if (live && available) {
-        autofillOn.current = true;
-        setAutofill(true);
-        void attempt(false);
+      if (!(live && available)) {
+        return;
       }
+
+      autofillOn.current = true;
+      setAutofill(true);
+      void attempt(false);
     });
     return () => {
       live = false;

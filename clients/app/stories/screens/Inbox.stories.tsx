@@ -92,7 +92,7 @@ interface ScreenArgs {
 /** `mockFetch`, with some paths left pending forever. */
 function mockWithHangs(args: ScreenArgs): () => void {
   const restore = mockFetch(args.api);
-  const mocked = globalThis.fetch;
+  const mocked = fetch;
   const hang = args.hang ?? [];
   globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input), "http://localhost");
@@ -276,7 +276,7 @@ export const ThreadReadFailed: Story = {
   ...readFailed,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByText("Scout couldn\u2019t read this one.")).toBeVisible();
+    await expect(await canvas.findByText("Scout couldn\u{2019}t read this one.")).toBeVisible();
   },
 };
 
@@ -509,13 +509,14 @@ const unbroken: Pick<Story, "args" | "play"> = {
     }
     // …so the page never scrolls sideways.
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
     // From 64rem the reader sits beside the list, never under it.
-    if (globalThis.matchMedia("(width >= 64rem)").matches) {
-      const list = canvas.getByRole("region", { name: "Conversations" });
-      await expect(reader.getBoundingClientRect().top).toBe(list.getBoundingClientRect().top);
+    if (!matchMedia("(width >= 64rem)").matches) {
+      return;
     }
+    const list = canvas.getByRole("region", { name: "Conversations" });
+    await expect(reader.getBoundingClientRect().top).toBe(list.getBoundingClientRect().top);
   },
 };
 
@@ -551,13 +552,13 @@ const many: Pick<Story, "args" | "play"> = {
     list.scrollTop = list.scrollHeight;
     await waitFor(() => expect(list.scrollTop).toBeGreaterThan(0));
     // …while the page itself stays the window's height…
-    await expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(globalThis.innerHeight);
+    await expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(innerHeight);
     // …the list's header stays at the top of its pane, and the reader stays in view.
     await expect(tabs.getBoundingClientRect().top).toBeGreaterThanOrEqual(
       list.getBoundingClientRect().top,
     );
     await expect(reader.getBoundingClientRect().top).toBe(0);
-    await expect(reader.getBoundingClientRect().bottom).toBe(globalThis.innerHeight);
+    await expect(reader.getBoundingClientRect().bottom).toBe(innerHeight);
   },
 };
 
@@ -581,7 +582,7 @@ const sent: Story = {
     await expect(canvas.getByText("Replied")).toBeVisible();
     // The views sit after the streams, behind a divider; the page never scrolls sideways.
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
   },
 };
@@ -701,7 +702,7 @@ const drafts: Story = {
       canvas.getByRole("button", { name: "Delete draft: Figures for the board" }),
     ).toBeVisible();
     await waitFor(() =>
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth),
     );
   },
 };
@@ -1027,7 +1028,7 @@ export const TrashChipPhone: Story = {
     await expect(trash).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => {
       const edge = trash.getBoundingClientRect().right;
-      return expect(edge).toBeLessThanOrEqual(globalThis.innerWidth);
+      return expect(edge).toBeLessThanOrEqual(innerWidth);
     });
   },
 };
@@ -1203,7 +1204,7 @@ const suggestPlay: Story["play"] = async ({ canvasElement }) => {
   const copies = await canvas.findByRole("listbox", { name: "Suggestions for Cc" });
   await waitFor(() => expect(within(copies).getAllByRole("option")).toHaveLength(3));
   // The list never makes the page scroll sideways.
-  await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth);
+  await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth);
 };
 
 export const SuggestPeople: Story = {

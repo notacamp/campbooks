@@ -56,7 +56,7 @@ function uiLanguage(): string {
 }
 
 function currentPage(): string {
-  const { pathname, search, hash } = globalThis.location;
+  const { pathname, search, hash } = location;
   return pathname + search + hash;
 }
 
@@ -78,10 +78,10 @@ async function isSessionRequired(response: Response): Promise<boolean> {
 }
 
 export function createWebTransport(
-  origin: string = globalThis.location.origin,
-  send: (request: Request) => Promise<Response> = (request) => globalThis.fetch(request),
+  origin: string = location.origin,
+  send: (request: Request) => Promise<Response> = (request) => fetch(request),
   signIn: (url: string) => void = (url) => {
-    globalThis.location.assign(url);
+    location.assign(url);
   },
 ): Transport {
   const baseUrl = origin + BFF_PREFIX;
@@ -167,7 +167,7 @@ export function createTauriTransport(
       const args: ApiRequestArgs = {
         method: request.method,
         path: url.pathname,
-        query: [...url.searchParams.entries()],
+        query: [...url.searchParams],
         body: await readJsonBody(request),
       };
       let result: ApiRequestResult;

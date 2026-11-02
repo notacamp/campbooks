@@ -353,7 +353,7 @@ describe("the inbox", () => {
         },
       },
     });
-    const mocked = globalThis.fetch;
+    const mocked = fetch;
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
       if (new URL(request.url).pathname.endsWith(`/messages/${first}/body`)) {

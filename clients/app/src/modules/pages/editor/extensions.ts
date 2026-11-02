@@ -27,7 +27,7 @@ import {
 export const isAllowedLink = (url: string) => /^(https?:|mailto:)/iu.test(url.trim());
 
 /** A fenced block (three backticks and a language) names only a language the server knows. */
-const FENCE = /^```([\w#+-]*)[\s\u00A0]$/u;
+const FENCE = /^```([\w#+-]*)[\s\u{A0}]$/u;
 
 const SafeCodeBlock = CodeBlock.extend({
   addAttributes() {

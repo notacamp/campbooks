@@ -93,7 +93,7 @@ describe("useTopLayer", () => {
       PROTOTYPE["hidePopover"] = hide;
       layout(box(-200, 50, 200, 32), box(0, 0, 300, 200));
 
-      globalThis.dispatchEvent(new Event("scroll"));
+      dispatchEvent(new Event("scroll"));
       expect(onAway).toHaveBeenCalledOnce();
 
       rerender(<Harness open={false} onAway={onAway} />);

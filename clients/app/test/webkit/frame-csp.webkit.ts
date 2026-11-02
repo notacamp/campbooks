@@ -298,7 +298,9 @@ describe.each(POLICIES)("the mail frame under the %s policy", (_name, csp) => {
       it("shows exactly its images once asked or trusted", async () => {
         const html = read(`fixtures/${fixture}.shown.html`);
         const { page, requested } = await open(csp, html, true);
-        expect([...new Set(requested)].toSorted()).toEqual(remoteImages(html).toSorted());
+        expect([...new Set(requested)].toSorted((a, b) => a.localeCompare(b))).toEqual(
+          remoteImages(html).toSorted((a, b) => a.localeCompare(b)),
+        );
         await page.context().close();
       });
     },

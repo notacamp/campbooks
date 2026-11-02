@@ -183,10 +183,12 @@ export function useTableActions(workspaceId: string, tableId: string) {
       const done = await attempt(label, () =>
         calls.setCells(tableId, row.id, [{ property: property.id, value: next ?? null, version }]),
       );
-      if (done !== undefined) {
-        replaceRow(client, workspaceId, tableId, done.row);
-        version = done.results[0]?.version ?? version;
+      if (done === undefined) {
+        return;
       }
+
+      replaceRow(client, workspaceId, tableId, done.row);
+      version = done.results[0]?.version ?? version;
     };
     undo.push({
       label: result.stale
@@ -224,14 +226,16 @@ export function useTableActions(workspaceId: string, tableId: string) {
     );
     const rename = async (next: string) => {
       const done = await attempt(label, () => calls.renameRow(row.id, meta, next));
-      if (done !== undefined) {
-        meta = done.meta_revision;
-        mapRows(client, workspaceId, tableId, (candidate) =>
-          candidate.id === row.id
-            ? { ...candidate, title: done.title, meta_revision: meta }
-            : candidate,
-        );
+      if (done === undefined) {
+        return;
       }
+
+      meta = done.meta_revision;
+      mapRows(client, workspaceId, tableId, (candidate) =>
+        candidate.id === row.id
+          ? { ...candidate, title: done.title, meta_revision: meta }
+          : candidate,
+      );
     };
     undo.push({
       label: t("tables.toast.title"),

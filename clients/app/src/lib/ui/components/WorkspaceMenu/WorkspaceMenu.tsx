@@ -60,10 +60,12 @@ export function WorkspaceMenu({
       const index = focused instanceof HTMLButtonElement ? buttons.indexOf(focused) : -1;
       const step = event.key === "ArrowDown" ? 1 : -1;
       const next = buttons[(index + step + buttons.length) % buttons.length];
-      if (next !== undefined) {
-        event.preventDefault();
-        next.focus();
+      if (next === undefined) {
+        return;
       }
+
+      event.preventDefault();
+      next.focus();
     };
     element.addEventListener("keydown", onKeyDown);
     return () => {

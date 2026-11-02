@@ -14,7 +14,7 @@ const TAB_PREFIX = "campbooks.tab.";
 
 function storage(): Storage | null {
   try {
-    return globalThis.sessionStorage;
+    return sessionStorage;
   } catch {
     // Blocked storage (privacy mode, sandboxed iframe) behaves as empty.
     return null;

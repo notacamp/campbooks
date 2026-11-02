@@ -68,10 +68,7 @@ export function useExplanation(
           signal,
         },
       );
-      if (result.response.status === 404) {
-        return null;
-      }
-      return unwrap(result);
+      return result.response.status === 404 ? null : unwrap(result);
     },
     refetchInterval: (query) =>
       pollDelay(query.state.data?.state, seenKey(workspaceId, conversationId), Date.now()),

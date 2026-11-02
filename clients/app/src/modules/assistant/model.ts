@@ -109,10 +109,9 @@ function who(condition: Condition, t: Translate, names: Names): string | undefin
     const name = names.get(condition.value);
     return name === undefined ? condition.value : `${name} (${condition.value})`;
   }
-  if (condition.field === "sender_domain") {
-    return t("rule.anyoneAt", { domain: condition.value });
-  }
-  return undefined;
+  return condition.field === "sender_domain"
+    ? t("rule.anyoneAt", { domain: condition.value })
+    : undefined;
 }
 
 function conditionPhrase(condition: Condition, t: Translate, labels: Names): string {

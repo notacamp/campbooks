@@ -63,7 +63,7 @@ describe("createScreenViews", () => {
     const { send, views } = setup();
     views.viewed("/w/$workspaceId/inbox/$stream/$conversationId");
     expect(send).toHaveBeenCalledExactlyOnceWith("/w/:workspaceId/inbox/:stream/:conversationId");
-    expect(JSON.stringify(send.mock.calls)).not.toContain(globalThis.location.href);
+    expect(JSON.stringify(send.mock.calls)).not.toContain(location.href);
   });
 
   it("sends nothing under Do Not Track", () => {

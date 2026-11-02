@@ -200,10 +200,12 @@ describe("the conversations in the command menu", () => {
   it("says when older mail is still being indexed, and when nothing matches", async () => {
     mockApi({
       ...SIGNED_IN,
-      [`GET ${W}/search`]: (request) =>
-        new URL(request.url).searchParams.get("q") === "zzz"
-          ? { body: results([], { indexing: true }, "zzz") }
-          : { body: results([INVOICE_HIT]) },
+      [`GET ${W}/search`]: (request) => ({
+        body:
+          new URL(request.url).searchParams.get("q") === "zzz"
+            ? results([], { indexing: true }, "zzz")
+            : results([INVOICE_HIT]),
+      }),
     });
     renderMenu();
 

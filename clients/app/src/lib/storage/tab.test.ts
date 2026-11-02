@@ -5,14 +5,14 @@ import { readTabValue, writeTabValue } from "./tab";
 describe("tab values", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    globalThis.sessionStorage.clear();
+    sessionStorage.clear();
   });
 
   it("round-trips a value in this tab's storage under a namespaced key", () => {
     writeTabValue("signIn.returnTo", "/w/1");
 
     expect(readTabValue("signIn.returnTo")).toBe("/w/1");
-    expect(globalThis.sessionStorage.getItem("campbooks.tab.signIn.returnTo")).toBe("/w/1");
+    expect(sessionStorage.getItem("campbooks.tab.signIn.returnTo")).toBe("/w/1");
   });
 
   it("returns null for a missing value", () => {

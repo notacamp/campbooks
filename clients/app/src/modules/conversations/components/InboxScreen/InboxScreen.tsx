@@ -70,7 +70,7 @@ interface Farewell extends LeavingRow {
 const NARROW = "(width < 64rem)";
 
 function isNarrow(): boolean {
-  return typeof globalThis.matchMedia === "function" && globalThis.matchMedia(NARROW).matches;
+  return typeof matchMedia === "function" && matchMedia(NARROW).matches;
 }
 
 export interface InboxScreenProps {
@@ -135,8 +135,8 @@ export function InboxScreen({
   // The rows leaving the list stay in place while they say what happened,
   // out of the keyboard's reach; one back on the list (Undo while it
   // folded) is a plain row again.
-  const folding = leaving.filter(
-    (row) => !(conversations ?? []).some((conversation) => conversation.id === row.conversation.id),
+  const folding = leaving.filter((row) =>
+    (conversations ?? []).every((conversation) => conversation.id !== row.conversation.id),
   );
   const shown = conversations === undefined ? undefined : withLeaving(conversations, folding);
 

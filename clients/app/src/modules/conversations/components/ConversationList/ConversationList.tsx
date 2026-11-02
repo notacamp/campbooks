@@ -193,7 +193,7 @@ export function ConversationList({
       {hasMore ? (
         <div className="flex justify-center p-2">
           <Button variant="ghost" onClick={onMore} disabled={loadingMore}>
-            {loadingMore ? t("list.loadingMore") : t("list.more")}
+            {t(loadingMore ? "list.loadingMore" : "list.more")}
           </Button>
         </div>
       ) : null}

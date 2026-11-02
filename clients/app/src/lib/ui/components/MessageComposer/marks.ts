@@ -86,10 +86,9 @@ function blockToMarks(block: DocNode): string {
 }
 
 function flattenText(node: DocNode): DocNode[] {
-  if (node.type === "text" || node.type === "hardBreak") {
-    return [node];
-  }
-  return (node.content ?? []).flatMap(flattenText);
+  return node.type === "text" || node.type === "hardBreak"
+    ? [node]
+    : (node.content ?? []).flatMap(flattenText);
 }
 
 /** The items of a list, one level: deeper lists are flattened into it. */

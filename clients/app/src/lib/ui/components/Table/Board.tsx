@@ -72,7 +72,7 @@ export function Board({
     const id = event.dataTransfer.getData(DRAG_TYPE);
     setDragging(undefined);
     setOver(undefined);
-    if (id !== "" && !group.cards.some((card) => card.id === id)) {
+    if (id !== "" && group.cards.every((card) => card.id !== id)) {
       onMove(id, group.id);
     }
   };
@@ -87,10 +87,12 @@ export function Board({
             className={styles["column"]}
             data-over={over === group.id || undefined}
             onDragOver={(event) => {
-              if (dragging !== undefined) {
-                event.preventDefault();
-                setOver(group.id);
+              if (dragging === undefined) {
+                return;
               }
+
+              event.preventDefault();
+              setOver(group.id);
             }}
             onDragLeave={() => {
               setOver((current) => (current === group.id ? undefined : current));

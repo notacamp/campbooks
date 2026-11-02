@@ -118,11 +118,12 @@ function TextEditor({
   const field = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const input = field.current;
-    if (input !== null) {
-      input.focus();
-      const end = input.value.length;
-      input.setSelectionRange(end, end);
+    if (input === null) {
+      return;
     }
+    input.focus();
+    const end = input.value.length;
+    input.setSelectionRange(end, end);
   }, []);
   const parsed = parseText(type, draft);
   const finish = (commit: boolean) => {

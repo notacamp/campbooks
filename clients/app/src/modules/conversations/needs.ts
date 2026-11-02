@@ -26,23 +26,19 @@ export function billKind(need: NeedView): "ask" | "toPay" | undefined {
  * need, and for a question about mail the member got alone.
  */
 export function unsureOf(need: NeedView): Unsure | undefined {
-  if (
-    need.trust !== "check" ||
+  return need.trust !== "check" ||
     (need.question !== "needs_reply" && need.question !== "asks_action")
-  ) {
-    return undefined;
-  }
-  return need.unsure ?? undefined;
+    ? undefined
+    : (need.unsure ?? undefined);
 }
 
 /** The people an unsure card names: one or two by name, then how many more. */
 function othersLabel(t: Translate, others: Unsure["others"], locale: string): string {
   const names = others.slice(0, 2).map((person) => displayName(person));
   const more = others.length - names.length;
-  if (more > 0) {
-    return t("needs.unsure.more", { names: names.join(", "), count: more });
-  }
-  return new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(names);
+  return more > 0
+    ? t("needs.unsure.more", { names: names.join(", "), count: more })
+    : new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(names);
 }
 
 /**
@@ -131,10 +127,7 @@ function needFrom(need: NeedView, conversation: ConversationSummary) {
 /** Who a need is from: the sender's name; for a warning, their address (a name is free to fake). */
 export function needSender(need: NeedView, conversation: ConversationSummary): string {
   const from = needFrom(need, conversation);
-  if (need.question === "suspicious") {
-    return from?.address ?? "";
-  }
-  return displayName(from);
+  return need.question === "suspicious" ? (from?.address ?? "") : displayName(from);
 }
 
 /** Whether Scout waits on someone to write (`waiting`), or it is time to nudge them (`nudge`). */

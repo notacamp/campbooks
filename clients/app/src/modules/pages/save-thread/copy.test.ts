@@ -65,7 +65,7 @@ describe("buildCopy", () => {
 
 describe("sanitiseText", () => {
   it("drops control characters and bidirectional overrides but keeps line breaks and emoji joiners", () => {
-    expect(sanitiseText("a\u0000b‮c​d﻿e\r\nf\tg")).toBe("abcde\nf g");
+    expect(sanitiseText("a\0b‮c\u{200B}d\u{FEFF}e\r\nf\tg")).toBe("abcde\nf g");
     expect(sanitiseText("👩‍💻")).toBe("👩‍💻");
   });
 

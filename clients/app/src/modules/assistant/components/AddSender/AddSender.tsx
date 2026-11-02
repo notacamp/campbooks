@@ -54,11 +54,13 @@ export function AddSender({ onAdd, label }: AddSenderProps) {
             setValue(event.target.value);
           }}
           onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              if (value.trim().length > 0) {
-                add();
-              }
+            if (event.key !== "Enter") {
+              return;
+            }
+
+            event.preventDefault();
+            if (value.trim().length > 0) {
+              add();
             }
           }}
         />

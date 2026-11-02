@@ -94,7 +94,7 @@ export function mockWebAuthn({ autofill = true, ceremony = "ok" }: MockWebAuthn)
     create: () => answer(ceremony, ATTESTATION),
   };
   const hadCredential = "PublicKeyCredential" in globalThis;
-  const original = hadCredential ? globalThis.PublicKeyCredential : undefined;
+  const original = hadCredential ? PublicKeyCredential : undefined;
   Object.defineProperty(globalThis, "PublicKeyCredential", {
     value: Object.assign(
       function PublicKeyCredential() {
@@ -105,12 +105,12 @@ export function mockWebAuthn({ autofill = true, ceremony = "ok" }: MockWebAuthn)
     configurable: true,
     writable: true,
   });
-  Object.defineProperty(globalThis.navigator, "credentials", {
+  Object.defineProperty(navigator, "credentials", {
     value: credentials,
     configurable: true,
   });
   return () => {
-    Reflect.deleteProperty(globalThis.navigator, "credentials");
+    Reflect.deleteProperty(navigator, "credentials");
     if (original === undefined) {
       Reflect.deleteProperty(globalThis, "PublicKeyCredential");
     } else {

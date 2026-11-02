@@ -39,10 +39,12 @@ export function AboutPerson({ workspaceId, address, name, onRewrite }: AboutPers
   const back = useRef(false);
 
   useEffect(() => {
-    if (!editing && back.current) {
-      back.current = false;
-      line.current?.focus();
+    if (editing || !back.current) {
+      return;
     }
+
+    back.current = false;
+    line.current?.focus();
   }, [editing]);
 
   if (notes.data === undefined) {

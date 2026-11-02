@@ -65,9 +65,9 @@ const instances = new Map<StoryLocale, I18n>();
 function i18nFor(locale: StoryLocale): I18n {
   let instance = instances.get(locale);
   if (instance === undefined) {
-    instance =
+    instance = createI18n(
       locale === LONGEST
-        ? createI18n({
+        ? {
             locale: "fr",
             shell: asLongest(shell),
             bundled: Object.fromEntries(
@@ -77,8 +77,9 @@ function i18nFor(locale: StoryLocale): I18n {
               ]),
             ),
             loaders: {},
-          })
-        : createI18n({ locale, shell, bundled, loaders: {} });
+          }
+        : { locale, shell, bundled, loaders: {} },
+    );
     instances.set(locale, instance);
   }
   return instance;

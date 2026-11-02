@@ -65,7 +65,7 @@ const READER_HINTS = ["list.next", "list.previous", "list.open", "item.done"] as
 const NARROW = "(width < 64rem)";
 
 function isNarrow(): boolean {
-  return typeof globalThis.matchMedia === "function" && globalThis.matchMedia(NARROW).matches;
+  return typeof matchMedia === "function" && matchMedia(NARROW).matches;
 }
 
 const rowId = (conversationId: string) => `search-hit-${conversationId}`;
@@ -123,27 +123,31 @@ export function SearchScreen({ workspaceId, query, sort, conversationId, now }: 
   // The address follows the field (once typing settles); a query put there
   // from outside (a recent search, the overlay) comes back into the field.
   useEffect(() => {
-    if (query !== pushed.current) {
-      pushed.current = query;
-      setDraft(query);
+    if (query === pushed.current) {
+      return;
     }
+
+    pushed.current = query;
+    setDraft(query);
   }, [query]);
   useEffect(() => {
-    if (debounced !== pushed.current.trim()) {
-      pushed.current = debounced;
-      void navigate({
-        to:
-          conversationId === undefined
-            ? "/w/$workspaceId/search"
-            : "/w/$workspaceId/search/$conversationId",
-        params: { workspaceId, ...(conversationId === undefined ? {} : { conversationId }) },
-        search: {
-          ...(debounced === "" ? {} : { q: debounced }),
-          ...(sort === "relevance" ? { sort } : {}),
-        },
-        replace: true,
-      });
+    if (debounced === pushed.current.trim()) {
+      return;
     }
+
+    pushed.current = debounced;
+    void navigate({
+      to:
+        conversationId === undefined
+          ? "/w/$workspaceId/search"
+          : "/w/$workspaceId/search/$conversationId",
+      params: { workspaceId, ...(conversationId === undefined ? {} : { conversationId }) },
+      search: {
+        ...(debounced === "" ? {} : { q: debounced }),
+        ...(sort === "relevance" ? { sort } : {}),
+      },
+      replace: true,
+    });
   }, [debounced, navigate, workspaceId, conversationId, sort]);
 
   const go = (id?: string, nextSort: SearchSort = sort) => {
@@ -425,7 +429,7 @@ export function SearchScreen({ workspaceId, query, sort, conversationId, now }: 
                     void results.fetchNextPage();
                   }}
                 >
-                  {results.isFetchingNextPage ? t("page.loadingMore") : t("page.more")}
+                  {t(results.isFetchingNextPage ? "page.loadingMore" : "page.more")}
                 </Button>
               </div>
             ) : null}

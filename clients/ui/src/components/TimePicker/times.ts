@@ -59,7 +59,7 @@ export function parseTime(typed: string): Time | undefined {
   const text = typed
     .trim()
     .toLowerCase()
-    .replaceAll(/[\u00A0\u202F]/gu, " ");
+    .replaceAll(/[\u{A0}\u{202F}]/gu, " ");
   const read = readClock(text);
   if (read === undefined) {
     return undefined;
@@ -95,7 +95,7 @@ export function timeSlots(step: number, min?: Time): Time[] {
 export function nearestSlot(slots: readonly Time[], time: Time): number {
   const target = toMinutes(time);
   let best = -1;
-  let distance = Number.POSITIVE_INFINITY;
+  let distance = Infinity;
   for (const [index, slot] of slots.entries()) {
     const gap = Math.abs(toMinutes(slot) - target);
     if (gap < distance) {

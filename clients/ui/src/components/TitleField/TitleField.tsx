@@ -49,10 +49,12 @@ export function TitleField({
   useLayoutEffect(() => {
     const fit = () => {
       const node = field.current;
-      if (node !== null) {
-        node.style.setProperty("--title-height", "auto");
-        node.style.setProperty("--title-height", `${String(node.scrollHeight)}px`);
+      if (node === null) {
+        return;
       }
+
+      node.style.setProperty("--title-height", "auto");
+      node.style.setProperty("--title-height", `${String(node.scrollHeight)}px`);
     };
     fit();
     window.addEventListener("resize", fit);
@@ -64,10 +66,12 @@ export function TitleField({
         ? undefined
         : new ResizeObserver(() => {
             // Only a change of width changes the wrapping (fitting changes the height).
-            if (node !== null && node.clientWidth !== width) {
-              width = node.clientWidth;
-              fit();
+            if (node === null || node.clientWidth === width) {
+              return;
             }
+
+            width = node.clientWidth;
+            fit();
           });
     if (node !== null) {
       watch?.observe(node);

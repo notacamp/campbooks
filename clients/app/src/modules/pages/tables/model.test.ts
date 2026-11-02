@@ -329,7 +329,9 @@ describe("how values are shown", () => {
       formatNumber("9600", property({ config: { format: "currency", currency: "EUR" } }), "en"),
     ).toBe("€9,600.00");
     expect(formatNumber("9600", property({ config: { format: "number" } }), "pt-PT")).toBe("9600");
-    expect(formatNumber("42", property({ config: { format: "percent" } }), "en")).toBe("42 %");
+    expect(formatNumber("42", property({ config: { format: "percent" } }), "en")).toBe(
+      "42\u{202F}%",
+    );
     expect(formatNumber(7, property({ config: {} }), "en")).toBe("7");
     expect(formatNumber("x", property({ config: {} }), "en")).toBe("");
     expect(formatNumber(null, property({ config: {} }), "en")).toBe("");
@@ -353,7 +355,7 @@ describe("how values are shown", () => {
     expect(formatSummary("sum", "28400", value, "en")).toBe("€28,400.00");
     expect(formatSummary("count", "4", value, "en")).toBe("4");
     expect(formatSummary("percent_checked", "50", property({ type: "checkbox" }), "en")).toBe(
-      "50 %",
+      "50\u{202F}%",
     );
     expect(formatSummary("max", "2026-10-30", property({ type: "date" }), "en")).toContain("30");
     expect(

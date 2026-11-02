@@ -288,7 +288,7 @@ function wordsQuery(workspaceId: string, conversationId: string, messageId: stri
   return {
     queryKey: keys.words(workspaceId, conversationId, messageId),
     // A message's words never change once stored.
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: Infinity,
     // As a message's text: its words, and whether they were cut.
     queryFn: async ({ signal }: { signal: AbortSignal }) => {
       const body = unwrap(
@@ -498,7 +498,7 @@ async function needRequest(
  * another module's references to conversations (Home).
  */
 export function useConversationsByIds(workspaceId: string, ids: readonly string[]) {
-  const sorted = [...ids].toSorted();
+  const sorted = [...ids].toSorted((a, b) => a.localeCompare(b));
   return useQuery({
     queryKey: operationKey("conversations.list", {
       workspace_id: workspaceId,
@@ -528,7 +528,7 @@ export function useConversationSummaries(
   workspaceId: string,
   ids: readonly string[],
 ): ReadonlyMap<string, ConversationSummary> {
-  const sorted = [...new Set(ids)].toSorted();
+  const sorted = [...new Set(ids)].toSorted((a, b) => a.localeCompare(b));
   const batches: string[][] = [];
   for (let start = 0; start < sorted.length; start += IDS_MAX) {
     batches.push(sorted.slice(start, start + IDS_MAX));

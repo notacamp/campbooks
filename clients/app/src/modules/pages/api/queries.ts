@@ -117,7 +117,7 @@ export function usePage(workspaceId: string, id: string | undefined) {
       ),
     retry: retryUnlessMissing,
     // The editor holds the live document; only the change feed asks again.
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
 }

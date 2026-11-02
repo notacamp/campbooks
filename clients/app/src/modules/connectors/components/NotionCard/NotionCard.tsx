@@ -24,7 +24,7 @@ import { agoLabel, healthTone, lastCheckedAt } from "../../model";
 
 /** Navigate the whole page (the consent leaves the app for Notion); tests pass a spy. */
 const leavePage = (url: string) => {
-  globalThis.location.assign(url);
+  location.assign(url);
 };
 
 export interface NotionCardProps {

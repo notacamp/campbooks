@@ -48,11 +48,13 @@ export function RowPeek({
     const element = panel.current;
     const onKeyDown = (event: KeyboardEvent) => {
       // A menu or picker inside closes itself on Escape first.
-      if (event.key === "Escape" && !event.defaultPrevented) {
-        event.stopPropagation();
-        event.preventDefault();
-        close.current();
+      if (event.key !== "Escape" || event.defaultPrevented) {
+        return;
       }
+
+      event.stopPropagation();
+      event.preventDefault();
+      close.current();
     };
     element?.addEventListener("keydown", onKeyDown);
     return () => {

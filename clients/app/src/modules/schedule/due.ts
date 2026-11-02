@@ -32,10 +32,9 @@ const behind = (day: Ymd, today: Ymd): number => Math.max(daysBetween(day, today
 
 /** The minutes after midnight a task is due at on the member's clock, when it has a time. */
 function dueMinute(task: TaskView, zone: string): number | undefined {
-  if (task.due_at === null || task.due_at === undefined) {
-    return undefined;
-  }
-  return nowIn(zone, new Date(task.due_at)).minute;
+  return task.due_at === null || task.due_at === undefined
+    ? undefined
+    : nowIn(zone, new Date(task.due_at)).minute;
 }
 
 /**

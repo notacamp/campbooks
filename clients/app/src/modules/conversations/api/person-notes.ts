@@ -84,10 +84,9 @@ export function usePersonNoteMutations(workspaceId: string) {
  */
 function plainAddress(address: string): boolean {
   const parts = address.split("@");
-  if (parts.length !== 2 || parts[0] === "" || parts[1] === "") {
-    return false;
-  }
-  return !/["\\\s\p{Cc}]/u.test(address);
+  return (
+    parts.length === 2 && parts[0] !== "" && parts[1] !== "" && !/["\\\s\p{Cc}]/u.test(address)
+  );
 }
 
 /** A party of a message: its name and address. */

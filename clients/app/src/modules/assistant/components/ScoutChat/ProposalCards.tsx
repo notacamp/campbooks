@@ -166,10 +166,9 @@ function whenOf(action: string, detail: Detail, locale: string): string {
  */
 function eventLine(t: Translate, proposal: Proposal, locale: string): string | undefined {
   const event = proposal.event;
-  if (event === undefined || event === null) {
-    return undefined;
-  }
-  return t("chat.proposal.eventLine", { title: event.title, when: whenText(event.starts, locale) });
+  return event === undefined || event === null
+    ? undefined
+    : t("chat.proposal.eventLine", { title: event.title, when: whenText(event.starts, locale) });
 }
 
 /**
@@ -323,7 +322,7 @@ function ChangeCard(props: CardProps) {
   const status = {
     pending: undefined,
     working: t("chat.proposal.working"),
-    done: undoFailed ? t("chat.proposal.undoFailed") : t("chat.proposal.done"),
+    done: t(undoFailed ? "chat.proposal.undoFailed" : "chat.proposal.done"),
     undone: t("chat.proposal.undone"),
     declined: t("chat.proposal.declined"),
     failed:
@@ -401,10 +400,12 @@ function RuleCard(props: CardProps) {
 
   const close = () => {
     setTeaching(false);
-    if (!saved.current) {
-      setPhase("declined");
-      void settle("declined");
+    if (saved.current) {
+      return;
     }
+
+    setPhase("declined");
+    void settle("declined");
   };
 
   return (

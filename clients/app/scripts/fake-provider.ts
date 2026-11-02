@@ -311,7 +311,7 @@ const server = createServer((request, response) => {
         back.searchParams.set("location", "eu");
         back.searchParams.set("accounts-server", base);
       }
-      response.writeHead(302, { location: back.toString() });
+      response.writeHead(302, { location: back.href });
       response.end();
       return;
     }

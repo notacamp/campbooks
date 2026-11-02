@@ -154,18 +154,16 @@ export function useDecideSignupRequest() {
       reason?: string | undefined;
     }) => {
       const params = { path: { user_id: userId } };
-      return decision === "approve"
-        ? unwrap(
-            await adminApi.POST("/admin/v1/workspaces/signup-requests/{user_id}/approve", {
+      return unwrap(
+        decision === "approve"
+          ? await adminApi.POST("/admin/v1/workspaces/signup-requests/{user_id}/approve", {
               params,
-            }),
-          )
-        : unwrap(
-            await adminApi.POST("/admin/v1/workspaces/signup-requests/{user_id}/reject", {
+            })
+          : await adminApi.POST("/admin/v1/workspaces/signup-requests/{user_id}/reject", {
               params,
               body: reason === undefined || reason.trim() === "" ? {} : { reason: reason.trim() },
             }),
-          );
+      );
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: REQUESTS_KEY });

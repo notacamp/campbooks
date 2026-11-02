@@ -52,7 +52,7 @@ describe("a column's menu", () => {
     const date = column({ type: "date", config: { time: false } });
     fireEvent.click(await screen.findByRole("menuitemradio", { name: "Include time" }));
     expect(date.onConfig).toHaveBeenCalledWith({ time: true });
-    document.body.innerHTML = "";
+    document.body.replaceChildren();
     const created = column({ type: "created", config: { of: "time" } });
     fireEvent.click(await screen.findByRole("menuitemradio", { name: "Show who, not when" }));
     expect(created.onConfig).toHaveBeenCalledWith({ of: "who" });

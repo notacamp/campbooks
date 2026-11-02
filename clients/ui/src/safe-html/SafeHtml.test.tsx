@@ -27,7 +27,9 @@ describe("SafeHtml", () => {
   it("sandboxes the frame: never scripts, no forms or top navigation, popups only", () => {
     const { container } = renderUi(<SafeHtml html="<p>Hi</p>" title="Message from Maya" />);
     const element = frame(container);
-    const tokens = (element.getAttribute("sandbox") ?? "").split(/\s+/u).toSorted();
+    const tokens = (element.getAttribute("sandbox") ?? "")
+      .split(/\s+/u)
+      .toSorted((a, b) => a.localeCompare(b));
 
     // Exactly these: `allow-same-origin` is safe only because scripts never
     // run in the frame, so `allow-scripts` must never join it.

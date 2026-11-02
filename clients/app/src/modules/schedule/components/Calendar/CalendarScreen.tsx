@@ -73,20 +73,19 @@ export interface CalendarScreenProps {
 const PHONE = "(width < 48rem)";
 
 function subscribePhone(change: () => void): () => void {
-  if (typeof globalThis.matchMedia !== "function") {
+  if (typeof matchMedia !== "function") {
     return () => {
       // Nothing was listened to.
     };
   }
-  const query = globalThis.matchMedia(PHONE);
+  const query = matchMedia(PHONE);
   query.addEventListener("change", change);
   return () => {
     query.removeEventListener("change", change);
   };
 }
 
-const isPhone = () =>
-  typeof globalThis.matchMedia === "function" && globalThis.matchMedia(PHONE).matches;
+const isPhone = () => typeof matchMedia === "function" && matchMedia(PHONE).matches;
 
 /**
  * The Calendar place: Agenda, Week or Month of the member's events (what

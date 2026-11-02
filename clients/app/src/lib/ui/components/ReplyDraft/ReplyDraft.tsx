@@ -52,10 +52,12 @@ export function AskLine({
   const [value, setValue] = useState("");
   const words = value.trim();
   const submit = () => {
-    if (words !== "" && !disabled) {
-      onSubmit(words);
-      setValue("");
+    if (words === "" || disabled) {
+      return;
     }
+
+    onSubmit(words);
+    setValue("");
   };
   return (
     <form
@@ -81,11 +83,13 @@ export function AskLine({
         }}
         onKeyDown={(event) => {
           // ⌘↵ here asks, as Enter does: it never reaches a page's Send.
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            event.stopPropagation();
-            submit();
+          if (!(event.key === "Enter" && (event.metaKey || event.ctrlKey))) {
+            return;
           }
+
+          event.preventDefault();
+          event.stopPropagation();
+          submit();
         }}
       />
       <Button type="submit" ai disabled={disabled || words === ""}>

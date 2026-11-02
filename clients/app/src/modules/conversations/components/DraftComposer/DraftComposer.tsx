@@ -202,7 +202,7 @@ export function DraftComposer({
   function refuse(file: File, reason: RefusalReason) {
     const said = t(`compose.attach.refused.${reason}`, {
       name: file.name,
-      max: reason === "attachments_too_large" ? megabytes(MAX_ATTACHMENT_BYTES) : megabytes(budget),
+      max: megabytes(reason === "attachments_too_large" ? MAX_ATTACHMENT_BYTES : budget),
       files: MAX_ATTACHMENTS,
     });
     setRefusals((so) => [...so, said]);

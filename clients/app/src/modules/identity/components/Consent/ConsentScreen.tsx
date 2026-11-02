@@ -369,13 +369,13 @@ function useArmed(): boolean {
     };
     arm();
     document.addEventListener("visibilitychange", arm);
-    globalThis.addEventListener("focus", arm);
-    globalThis.addEventListener("blur", disarm);
+    addEventListener("focus", arm);
+    addEventListener("blur", disarm);
     return () => {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", arm);
-      globalThis.removeEventListener("focus", arm);
-      globalThis.removeEventListener("blur", disarm);
+      removeEventListener("focus", arm);
+      removeEventListener("blur", disarm);
     };
   }, []);
   return armed;

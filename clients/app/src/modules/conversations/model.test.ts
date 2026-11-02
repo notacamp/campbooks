@@ -242,7 +242,7 @@ describe("attachments", () => {
     expect(cleanFileName("invoice‮fdp.exe")).toBe("invoicefdp.exe");
     expect(cleanFileName("../../etc/pass\r\nwd")).toBe("etcpasswd");
     expect(cleanFileName(" .hidden ")).toBe("hidden");
-    expect(cleanFileName("\u0000⁦")).toBe("attachment");
+    expect(cleanFileName("\0⁦")).toBe("attachment");
     expect(cleanFileName("orçamento 2026.pdf")).toBe("orçamento 2026.pdf");
   });
 

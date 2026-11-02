@@ -41,10 +41,10 @@ export function startTelemetry(currentView: () => string | undefined): void {
   );
   reporter = started;
 
-  globalThis.addEventListener("error", (event) => {
+  addEventListener("error", (event) => {
     started.error(event.error);
   });
-  globalThis.addEventListener("unhandledrejection", (event) => {
+  addEventListener("unhandledrejection", (event) => {
     started.error(event.reason);
   });
   const vital = (metric: Metric) => {

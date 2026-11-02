@@ -212,7 +212,7 @@ export default async function mailboxes({ page }: ScenarioContext): Promise<void
       "GET",
       "/bff/api/v1/identity/ways-in",
     );
-    return !ways.items.some((way) => way.provider === "zoho");
+    return ways.items.every((way) => way.provider !== "zoho");
   }, 60);
   await page.goto(`/w/${workspace}/settings/sign-in`);
   await page.getByRole("heading", { level: 1, name: "Ways to sign in" }).waitFor();

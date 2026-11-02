@@ -44,18 +44,16 @@ export function isLater(task: TaskView, now: Date): boolean {
 
 /** The day the member means to do it: the planned day, else the due day. */
 function doingDay(task: TaskView): string | undefined {
-  if (task.plan === "date" && task.plan_on !== null && task.plan_on !== undefined) {
-    return task.plan_on;
-  }
-  return task.due_on ?? undefined;
+  return task.plan === "date" && task.plan_on !== null && task.plan_on !== undefined
+    ? task.plan_on
+    : (task.due_on ?? undefined);
 }
 
 /** How many days past its due day it is (0 when it is not). */
 export function daysOverdue(task: TaskView, now: Date): number {
-  if (task.due_on === null || task.due_on === undefined) {
-    return 0;
-  }
-  return Math.max(0, daysBetween(task.due_on, isoDay(now)));
+  return task.due_on === null || task.due_on === undefined
+    ? 0
+    : Math.max(0, daysBetween(task.due_on, isoDay(now)));
 }
 
 /** Which group an open task is in. */

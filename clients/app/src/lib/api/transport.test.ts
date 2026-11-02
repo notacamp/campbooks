@@ -61,7 +61,7 @@ describe("createWebTransport", () => {
       ),
     );
     const signIn = vi.fn<(url: string) => void>();
-    globalThis.history.replaceState(null, "", "/people/42?thread=7#m-3");
+    history.replaceState(null, "", "/people/42?thread=7#m-3");
     const transport = createWebTransport(ORIGIN, send, signIn);
 
     const response = await transport.fetch(new Request(`${transport.baseUrl}/api/v1/things`));
@@ -157,7 +157,7 @@ describe("createWebTransport", () => {
 
     await transport.fetch(new Request(`${transport.baseUrl}/api/v1/system/health`));
 
-    expect(transport.baseUrl).toBe(`${globalThis.location.origin}/bff`);
+    expect(transport.baseUrl).toBe(`${location.origin}/bff`);
     expect(fetchSpy).toHaveBeenCalledOnce();
   });
 });

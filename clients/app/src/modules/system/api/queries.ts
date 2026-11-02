@@ -12,7 +12,7 @@ const systemQueries = {
     queryOptions({
       queryKey: operationKey("system.version"),
       queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/system/version", { signal })),
-      staleTime: Number.POSITIVE_INFINITY,
+      staleTime: Infinity,
     }),
 };
 

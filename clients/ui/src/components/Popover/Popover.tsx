@@ -92,12 +92,14 @@ export function Popover({
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        event.preventDefault();
-        change.current(false);
-        triggerRef.current?.focus();
+      if (event.key !== "Escape") {
+        return;
       }
+
+      event.stopPropagation();
+      event.preventDefault();
+      change.current(false);
+      triggerRef.current?.focus();
     };
     const anchorElement = anchor.current;
     document.addEventListener("pointerdown", onPointerDown);

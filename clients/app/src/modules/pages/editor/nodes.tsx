@@ -78,10 +78,12 @@ function chipOf(
     label: label.state === "closed" ? closedText : label.label,
     href: label.href,
     onOpen: (event) => {
-      if (label.href !== undefined && !event.metaKey && !event.ctrlKey && event.button === 0) {
-        event.preventDefault();
-        open(label.href);
+      if (!(label.href !== undefined && !event.metaKey && !event.ctrlKey && event.button === 0)) {
+        return;
       }
+
+      event.preventDefault();
+      open(label.href);
     },
   };
 }

@@ -18,13 +18,15 @@ Object.defineProperty(globalThis, "scrollTo", { value: vi.fn(), writable: true }
 // for the boxes of text ranges when it scrolls the cursor into view.
 if (typeof Range !== "undefined") {
   const none = { length: 0, item: () => null, [Symbol.iterator]: () => [][Symbol.iterator]() };
-  Object.defineProperty(Range.prototype, "getClientRects", {
-    value: () => none,
-    configurable: true,
-  });
-  Object.defineProperty(Range.prototype, "getBoundingClientRect", {
-    value: () => new DOMRect(),
-    configurable: true,
+  Object.defineProperties(Range.prototype, {
+    getClientRects: {
+      value: () => none,
+      configurable: true,
+    },
+    getBoundingClientRect: {
+      value: () => new DOMRect(),
+      configurable: true,
+    },
   });
   Object.defineProperty(document, "elementFromPoint", { value: () => null, configurable: true });
 }

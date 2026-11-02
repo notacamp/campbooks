@@ -25,7 +25,7 @@ describe("times", () => {
     expect(parseTime("12am")).toBe("00:00");
     expect(parseTime("12 pm")).toBe("12:00");
     // As English writes it, with the narrow no-break space before PM.
-    expect(parseTime("9:30\u202FPM")).toBe("21:30");
+    expect(parseTime("9:30\u{202F}PM")).toBe("21:30");
   });
 
   it("reads nothing from what is no time", () => {
