@@ -1,10 +1,19 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
-import { MessageComposer, sendTimeLabel, useUndoToast } from "~/lib/ui";
+import { problemCode } from "~/lib/api";
+import {
+  Button,
+  MessageComposer,
+  sendTimeLabel,
+  useUndoToast,
+  type ComposerMode,
+  type ScoutRewrite,
+} from "~/lib/ui";
 
 import { useSendingInboxes, type Draft } from "../../api/drafts";
+import { useRepliesUnavailable, writeNudge, streamReply } from "../../api/replies";
 import { useSignature } from "../../api/signatures";
 import type { Translate } from "../../model";
 import {
@@ -19,6 +28,18 @@ import { addressLine, displayName } from "../../compose/quote";
 import { KNOWN_ERRORS } from "../../compose/errors";
 import { useDraftEditor } from "../../compose/use-draft-editor";
 import { useRecipientSuggestions } from "../../compose/use-recipient-suggestions";
+
+/** What a switch of kind carries to the new draft. */
+export interface SwitchCarried {
+  body: string;
+  /** The subject, when the member changed it. */
+  subject: string | undefined;
+  /** From: the inbox the draft is in now. */
+  inboxId: string;
+  to: Draft["to"];
+  cc: Draft["cc"];
+  bcc: Draft["bcc"];
+}
 
 export interface DraftComposerProps {
   workspaceId: string;
@@ -37,6 +58,14 @@ export interface DraftComposerProps {
   onUndone?: (() => void) | undefined;
   /** Said beside the quoted history (that it holds only the start of a long email). */
   quotedNote?: string | undefined;
+  /**
+   * Switch this reply to Reply, Reply all or Forward, carrying what the
+   * member wrote: the conversation's composer starts a draft of the new kind
+   * and drops this one. Its files can't come along, so the composer asks
+   * first when it has any. Omit where the kind cannot change (a new message,
+   * a nudge).
+   */
+  onSwitchMode?: ((mode: ComposerMode, carried: SwitchCarried) => Promise<void>) | undefined;
 }
 
 /**
@@ -53,6 +82,7 @@ export function DraftComposer({
   onDone,
   onUndone,
   quotedNote,
+  onSwitchMode,
 }: DraftComposerProps) {
   const { t: typed, i18n } = useTranslation("conversations");
   const t = typed as unknown as Translate;
@@ -69,20 +99,104 @@ export function DraftComposer({
   // Without a router (a story, a test) the link is a plain one.
   const router = useRouter({ warn: false }) as ReturnType<typeof useRouter> | undefined;
 
+  const sendingInboxes = useSendingInboxes(workspaceId);
+  const inboxes = sendingInboxes.data ?? [];
+  const current = inboxes.find((inbox) => inbox.id === editor.shown.inboxId);
+  // What the draft's mailbox can send in one message: 25 MiB, or less for a
+  // provider that takes less (Microsoft Graph, campbooks-cloud#391). It
+  // follows the draft when From moves it to another inbox.
+  const budget = Math.min(
+    MAX_ATTACHMENT_BYTES,
+    current?.max_attachment_bytes ?? MAX_ATTACHMENT_BYTES,
+  );
+
+  // Why a switch or a rewrite did not happen, said in the composer.
+  const [notice, setNotice] = useState<string | undefined>();
+
+  // Scout in the composer: reply, reply all and nudge, while it can write replies.
+  const askable =
+    (draft.kind === "reply" || draft.kind === "reply_all" || draft.kind === "nudge") &&
+    draft.conversation_id != null &&
+    draft.message_id != null;
+  const knownUnavailable = useRepliesUnavailable(
+    workspaceId,
+    draft.conversation_id ?? undefined,
+    draft.message_id ?? undefined,
+  );
+  const [unavailable, setUnavailable] = useState(false);
+  const [thinking, setThinking] = useState("");
+  const stopScout = useRef<AbortController | undefined>(undefined);
+
+  async function rewrite(how: ScoutRewrite, plain: string): Promise<string | undefined> {
+    const { conversation_id: conversation, message_id: message } = draft;
+    if (conversation == null || message == null) {
+      return undefined;
+    }
+    stopScout.current?.abort();
+    const request = new AbortController();
+    stopScout.current = request;
+    setThinking("");
+    setNotice(undefined);
+    const change =
+      how.kind === "warmer"
+        ? t("rewrite.warmer")
+        : how.kind === "spelling"
+          ? t("rewrite.spelling")
+          : how.kind === "change"
+            ? how.change
+            : null;
+    const shorter = how.kind === "shorter";
+    try {
+      return draft.kind === "nudge"
+        ? await writeNudge(workspaceId, conversation, { draft: plain, shorter, change })
+        : await streamReply(
+            workspaceId,
+            conversation,
+            { message_id: message, intent: t("rewrite.keep"), draft: plain, shorter, change },
+            {
+              signal: request.signal,
+              onThinking: (delta) => {
+                setThinking((so) => so + delta);
+              },
+              onText: () => {
+                // The words arrive whole, when it is done.
+              },
+            },
+          );
+    } catch (thrown) {
+      if (request.signal.aborted) {
+        return undefined;
+      }
+      const code = problemCode(thrown);
+      if (code === "reply_unavailable") {
+        setUnavailable(true);
+      }
+      setNotice(
+        t(
+          `reply.errors.${
+            code === "rate_limited"
+              ? "limit"
+              : code === "ai_daily_limit_reached"
+                ? "dailyLimit"
+                : code === "reply_timed_out" || code === "request_timed_out"
+                  ? "timeout"
+                  : "write"
+          }`,
+        ),
+      );
+      return undefined;
+    }
+  }
+
   const kept = editor.shown.attachments.filter((a) => fields.attachments.includes(a.id));
+  // A switch of kind waiting for the member to agree to leave the files
+  // (attached, or still on their way).
+  const [switching, setSwitching] = useState<ComposerMode | undefined>();
+  const files = [...kept.map((a) => a.filename), ...editor.uploading.map((u) => u.name)];
 
   // Why the files last added were not attached, said in the composer beside
   // them (a toast is one line and would cut the reason at 375px).
   const [refusals, setRefusals] = useState<string[]>([]);
-
-  // What the draft's mailbox can send in one message: 25 MiB, or less for
-  // a provider that takes less (Microsoft Graph, campbooks-cloud#391).
-  const inboxes = useSendingInboxes(workspaceId);
-  const budget = Math.min(
-    MAX_ATTACHMENT_BYTES,
-    inboxes.data?.find((inbox) => inbox.id === draft.inbox_id)?.max_attachment_bytes ??
-      MAX_ATTACHMENT_BYTES,
-  );
 
   /** Say, naming the file, why it was not attached. */
   function refuse(file: File, reason: RefusalReason) {
@@ -169,12 +283,67 @@ export function DraftComposer({
     onDone();
   }
 
+  // Switch kind, carrying what was typed (saved first: the new draft starts
+  // from it).
+  function switchTo(mode: ComposerMode) {
+    if (onSwitchMode === undefined) {
+      return;
+    }
+    setSwitching(undefined);
+    setNotice(undefined);
+    void (async () => {
+      await editor.flush();
+      try {
+        await onSwitchMode(mode, {
+          body: fields.body,
+          subject: fields.subject === draft.subject ? undefined : fields.subject,
+          inboxId: editor.shown.inboxId,
+          to: fields.to,
+          cc: fields.cc,
+          bcc: fields.bcc,
+        });
+      } catch {
+        // The old draft stays open, as it was.
+        setNotice(t("compose.errors.switch_failed"));
+      }
+    })();
+  }
+
+  const said = [...refusals, ...(notice === undefined ? [] : [notice])];
   const error =
-    editor.error === undefined
-      ? refusals.length === 0
-        ? undefined
-        : refusals.join(" ")
-      : t(`compose.errors.${KNOWN_ERRORS.has(editor.error) ? editor.error : "unknown"}`);
+    switching === undefined ? (
+      editor.error === undefined ? (
+        said.length === 0 ? undefined : (
+          said.join(" ")
+        )
+      ) : (
+        t(`compose.errors.${KNOWN_ERRORS.has(editor.error) ? editor.error : "unknown"}`)
+      )
+    ) : (
+      <>
+        {t("compose.switch.dropsFiles", {
+          count: files.length,
+          names: files.join(", "),
+          kind: t(`compose.switch.kind.${switching}`),
+        })}{" "}
+        <Button
+          variant="secondary"
+          onClick={() => {
+            switchTo(switching);
+          }}
+        >
+          {t("compose.switch.dropAndSwitch")}
+        </Button>{" "}
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setSwitching(undefined);
+          }}
+        >
+          {t("compose.switch.keep")}
+        </Button>
+      </>
+    );
 
   return (
     <MessageComposer
@@ -225,6 +394,45 @@ export function DraftComposer({
           void router.navigate({ href: settingsHref });
         },
       }}
+      fromPicker={{
+        options: inboxes.map((inbox) => ({
+          id: inbox.id,
+          label: addressLine({ name: inbox.display_name ?? null, address: inbox.address }),
+        })),
+        value: editor.shown.inboxId,
+        onChange: (inbox) => {
+          setNotice(undefined);
+          void editor.moveTo(inbox);
+        },
+      }}
+      modes={
+        onSwitchMode !== undefined &&
+        (draft.kind === "reply" || draft.kind === "reply_all" || draft.kind === "forward")
+          ? {
+              value: draft.kind,
+              onChange: (mode) => {
+                // Files can't come along: say which before they are dropped.
+                if (files.length > 0) {
+                  setNotice(undefined);
+                  setSwitching(mode);
+                } else {
+                  switchTo(mode);
+                }
+              },
+            }
+          : undefined
+      }
+      scout={
+        askable && !unavailable && !knownUnavailable
+          ? {
+              thinking,
+              onRewrite: rewrite,
+              onDone: (undo) => {
+                undoToast.push({ label: t("rewrite.done"), undo });
+              },
+            }
+          : undefined
+      }
       attachments={kept}
       onAttach={attach}
       uploading={editor.uploading.map((u) => ({ key: u.key, filename: u.name, size: u.size }))}

@@ -336,6 +336,8 @@
       "content_changed": "Isto mudou desde que o abriu. Verifique-o e envie de novo.",
       "quote": "Não foi possível ler o email para o citar. Nada foi iniciado. Tente novamente.",
       "send_at_invalid": "Esta hora não pode ser usada. Escolha uma mais tarde, até um ano de antecedência.",
+      "switch_failed": "Não foi possível mudar. O rascunho ficou como o deixou.",
+      "inbox_read_only": "Pode ler esta caixa de correio, mas não enviar a partir dela.",
       "destination_changed": "Não enviado: esta caixa de correio mudou depois de agendar. Verifique e envie de novo.",
       "sender_may_not_send": "Não enviado: já não pode enviar a partir desta caixa de correio.",
       "release_lost": "Não conseguimos confirmar que foi enviado. Verifique a pasta Enviados antes de o enviar de novo.",
@@ -361,7 +363,18 @@
         "request_timed_out": "{{name}} demorou demasiado a carregar. Tente outra vez com uma ligação mais rápida, ou anexe um ficheiro mais pequeno."
       }
     },
-    "scheduled": "Agendado para {{time}}"
+    "scheduled": "Agendado para {{time}}",
+    "switch": {
+      "dropsFiles_one": "Mudar para {{kind}} cria um novo rascunho, e o seu ficheiro não pode passar para ele: {{names}}.",
+      "dropsFiles_other": "Mudar para {{kind}} cria um novo rascunho, e os seus {{count}} ficheiros não podem passar para ele: {{names}}.",
+      "dropAndSwitch": "Mudar sem eles",
+      "keep": "Manter este rascunho",
+      "kind": {
+        "reply": "Responder",
+        "reply_all": "Responder a todos",
+        "forward": "Reencaminhar"
+      }
+    }
   },
   "needs": {
     "line": {
@@ -964,6 +977,12 @@
     "chars": "{{chars}} de {{max}} caracteres",
     "tooLong": "Uma assinatura pode ter no máximo {{max}} caracteres.",
     "failed": "Não foi possível guardar a assinatura. Tente de novo."
+  },
+  "rewrite": {
+    "keep": "Manter o que o meu rascunho diz",
+    "warmer": "Torna-o mais caloroso; mantém o que diz",
+    "spelling": "Corrige apenas a ortografia e a gramática; não alteres mais nada",
+    "done": "Reescrito pelo Scout"
   },
   "explain": {
     "button": "Explicar esta conversa",

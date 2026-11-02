@@ -58,7 +58,7 @@ describe("NewMessage", () => {
     expect(screen.getByText("Sending to ana@example.com")).toBeVisible();
   });
 
-  it("chooses the inbox to send from when there are several", async () => {
+  it("starts in the first inbox and moves the draft when From is changed in the composer", async () => {
     const office = {
       ...INBOX,
       id: "0192f1a0-0000-7000-8000-0000000000b9",
@@ -72,21 +72,30 @@ describe("NewMessage", () => {
       },
       [`POST ${D}`]: { status: 201, body: NEW },
       [`GET ${D}/${NEW.id}`]: { body: NEW },
-      [`DELETE ${D}/${NEW.id}`]: { status: 204 },
+      [`PATCH ${D}/${NEW.id}`]: (_request, body) => ({
+        body: { ...NEW, ...(body as object), inbox_id: office.id, version: NEW.version + 1 },
+      }),
     });
     renderWithProviders(
       <NewMessage workspaceId={DUARTE.id} onLeave={vi.fn()} onReopen={vi.fn()} />,
     );
+    // One draft, in the first inbox; From is the composer's own picker.
     const from = await screen.findByRole("combobox", { name: "From" });
     expect(from.querySelectorAll("option")).toHaveLength(2);
+    expect(api.calls.filter((call) => call.route === `POST ${D}`)).toHaveLength(1);
+    expect(api.calls.find((call) => call.route === `POST ${D}`)?.body).toEqual({
+      kind: "new",
+      inbox_id: INBOX.id,
+    });
     fireEvent.change(from, { target: { value: office.id } });
     await waitFor(() => {
-      expect(api.calls.filter((call) => call.route === `POST ${D}`)).toHaveLength(2);
+      expect(api.calls.find((call) => call.route === `PATCH ${D}/${NEW.id}`)?.body).toMatchObject({
+        inbox_id: office.id,
+      });
     });
-    expect(api.calls.findLast((call) => call.route === `POST ${D}`)?.body).toEqual({
-      kind: "new",
-      inbox_id: office.id,
-    });
+    // No second draft, and none deleted.
+    expect(api.calls.filter((call) => call.route === `POST ${D}`)).toHaveLength(1);
+    expect(api.calls.some((call) => call.route.startsWith("DELETE"))).toBe(false);
   });
 
   it("asks for a mailbox when there is none to send from", async () => {

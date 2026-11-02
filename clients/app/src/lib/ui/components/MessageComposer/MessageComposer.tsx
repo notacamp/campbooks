@@ -20,6 +20,7 @@ import {
   Icon,
   IconButton,
   OverflowActions,
+  Select,
   type IconName,
   type OverflowAction,
 } from "@notacamp/ui";
@@ -29,8 +30,11 @@ import {
   type RecipientSuggestion,
 } from "../RecipientField/RecipientField";
 
+import { ThinkingTrace } from "../ThinkingTrace/ThinkingTrace";
 import { composerExtensions } from "./editor";
 import { LinkForm } from "./LinkForm";
+import { ComposerHeaderMenus, ScoutMenu } from "./ComposerMenus";
+import type { ComposerFrom, ComposerModes, ComposerScout } from "./composer-types";
 import { SendLater } from "./SendLater";
 import { SignatureText } from "./SignatureText";
 import { fromMarks, toMarks, type DocNode } from "./marks";
@@ -61,6 +65,14 @@ export interface ComposerSignature {
   /** Follow `settingsHref` without a reload. */
   onOpenSettings?: ((event: React.MouseEvent<HTMLElement>) => void) | undefined;
 }
+
+export type {
+  ComposerFrom,
+  ComposerMode,
+  ComposerModes,
+  ComposerScout,
+  ScoutRewrite,
+} from "./composer-types";
 
 /** A file on its way to the server. */
 export interface ComposerUpload {
@@ -121,6 +133,12 @@ export interface MessageComposerProps {
   uploading?: readonly ComposerUpload[] | undefined;
   /** Most bytes of attachments in all; with it, the total is said once something is attached. */
   attachmentBudget?: number | undefined;
+  /** From as a picker, when the member may send from more than one inbox. */
+  fromPicker?: ComposerFrom | undefined;
+  /** The title as a menu to switch between Reply, Reply all and Forward. */
+  modes?: ComposerModes | undefined;
+  /** Scout ▾ (⌘J): rewrite the text in place. */
+  scout?: ComposerScout | undefined;
   /** The signature under the text; omit for a composer that has none. */
   signature?: ComposerSignature | undefined;
   /** "Saved", "Saving…": said politely next to Send. */
@@ -229,6 +247,9 @@ export function MessageComposer({
   quotedNote,
   attachments = [],
   onRemoveAttachment,
+  fromPicker,
+  modes,
+  scout,
   signature,
   onAttach,
   uploading = [],
@@ -261,6 +282,8 @@ export function MessageComposer({
   const frameRef = useRef<HTMLDialogElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const compact = useCompact(sectionRef, open);
+  // Scout is rewriting the text: it cannot be edited meanwhile.
+  const [writing, setWriting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   // Files dragged over it: counted in and out of its children, so the drop
   // zone does not flicker as the pointer crosses them.
@@ -666,6 +689,7 @@ export function MessageComposer({
         <h2 id={`${id}-title`} className={styles["title"]}>
           {title}
         </h2>
+        {modes === undefined ? null : <ComposerHeaderMenus modes={modes} />}
         {wide ? (
           <IconButton
             label={open ? t("composer.shrink") : t("composer.expand")}
@@ -686,10 +710,20 @@ export function MessageComposer({
       </header>
 
       <div className={styles["fields"]}>
-        <p className={styles["from"]}>
-          <span className={styles["fromLabel"]}>{t("composer.from")}</span>
-          <span className={styles["fromValue"]}>{from}</span>
-        </p>
+        {fromPicker === undefined || fromPicker.options.length < 2 ? (
+          <p className={styles["from"]}>
+            <span className={styles["fromLabel"]}>{t("composer.from")}</span>
+            <span className={styles["fromValue"]}>{from}</span>
+          </p>
+        ) : (
+          <Select
+            label={t("composer.from")}
+            size="md"
+            value={fromPicker.value}
+            options={fromPicker.options.map((o) => ({ value: o.id, label: o.label }))}
+            onChange={fromPicker.onChange}
+          />
+        )}
         <RecipientField
           label={t("composer.to")}
           recipients={to}
@@ -754,7 +788,25 @@ export function MessageComposer({
           }
           more={compact ? [strike, numbers, quote] : []}
         />
+        {scout === undefined ? null : (
+          <ScoutMenu
+            scout={scout}
+            compact={compact}
+            active={active}
+            editor={editor}
+            onWriting={setWriting}
+            writing={writing}
+          />
+        )}
       </div>
+      {scout !== undefined && writing ? (
+        <ThinkingTrace
+          label={t("composer.scout.thinking")}
+          text={scout.thinking}
+          live
+          summary={t("composer.scout.thoughts")}
+        />
+      ) : null}
 
       {link === null ? null : (
         <LinkForm

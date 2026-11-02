@@ -4859,12 +4859,14 @@ export interface components {
             /**
              * @description The `content_token` that came with the draft on screen (its last
              *     save's answer, or the draft as read). Every save keeps fields it
-             *     cannot set (the inbox, the reply headers, the attachments' files),
+             *     does not name (the inbox, unless it moves the draft; the reply headers;
+             *     the attachments' files),
              *     so every save names what it was shown: missing, another member's, or
              *     not the draft as it is now answers 409 `content_changed` and nothing
              *     is saved (campbooks-cloud#242).
              */
             content_token?: string | null;
+            inbox_id?: components["schemas"]["InboxId"] | null;
             /** @description The quoted history. */
             quoted?: string | null;
             /**
@@ -14748,7 +14750,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or you only read its inbox. */
+            /** @description Missing scope, you only read its inbox or the one it would move to, or a move that is not your own request (`from_needs_you`): the assistant never changes From. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -14768,6 +14770,15 @@ export interface operations {
             };
             /** @description Changed since that version (`draft_changed`), on its way (`draft_not_editable`), or not what you were shown (`content_changed`): read it again, then save. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Moving it to an inbox whose mailbox carries less than the draft's attachments (`attachments_too_large_for_mailbox`; `conversations.list_inboxes` says it as `max_attachment_bytes`): nothing moved. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };

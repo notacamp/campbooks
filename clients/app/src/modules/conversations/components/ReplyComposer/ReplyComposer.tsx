@@ -2,14 +2,22 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Banner, Button, Text, useUndoToast } from "~/lib/ui";
+import { Banner, Button, Text, useUndoToast, type ComposerMode } from "~/lib/ui";
 
-import { createDraft, draftKeys, useConversationDrafts, type Draft } from "../../api/drafts";
+import {
+  createDraft,
+  deleteDraft as removeDraft,
+  draftKeys,
+  saveDraft,
+  useConversationDrafts,
+  type Draft,
+} from "../../api/drafts";
 import { useMessageWords, withWords } from "../../api/queries";
 import { displayName, forwardQuote, replyQuote, type QuoteWords } from "../../compose/quote";
+import { carryRecipients, filledFor } from "../../compose/switch-mode";
 import { useDeleteDraft } from "../../compose/use-delete-draft";
 import type { Translate } from "../../model";
-import { DraftComposer } from "../DraftComposer/DraftComposer";
+import { DraftComposer, type SwitchCarried } from "../DraftComposer/DraftComposer";
 import type { ReplyRequest, ReplySlotContext } from "../Reader/ReplySlot";
 
 /** A draft the member can still change. */
@@ -123,6 +131,57 @@ export function ReplyComposer({
     }
   }, [request, drafts.data]);
 
+  // Reply ▾ in the title: a draft of the new kind with what the member wrote
+  // carried over (From, their changes to the recipients, the subject and the
+  // text), then the old one deleted (best effort). If the new one cannot be
+  // made or written, it is dropped and the old one stays as it was. Files
+  // can't come along (the composer asks before it drops them).
+  const switchMode = async (old: Draft, mode: ComposerMode, carried: SwitchCarried) => {
+    const message = messages.find((m) => m.id === old.message_id);
+    if (message === undefined) {
+      throw new Error("the message answered is not here");
+    }
+    const full = await withWords(queryClient, workspaceId, conversation.id, message);
+    const quoted =
+      mode === "forward"
+        ? forwardQuote(full, i18n.language, words)
+        : replyQuote(full, i18n.language, words);
+    const made = await createDraft(workspaceId, { kind: mode, message_id: full.id, quoted });
+    // The new draft is in the message's inbox, whose address both kinds
+    // left out when they were filled in.
+    const recipients = carryRecipients(carried, filledFor(old.kind, full, made.from.address), {
+      to: made.to,
+      cc: made.cc,
+      bcc: made.bcc,
+    });
+    let ready = made;
+    try {
+      ready = await saveDraft(workspaceId, made.id, {
+        version: made.version,
+        content_token: made.content_token ?? null,
+        body: carried.body,
+        ...recipients,
+        ...(carried.subject === undefined ? {} : { subject: carried.subject }),
+        // From stays what the member chose.
+        ...(carried.inboxId === made.inbox_id ? {} : { inbox_id: carried.inboxId }),
+      });
+    } catch (error) {
+      void removeDraft(workspaceId, made.id).catch(() => null);
+      throw error;
+    }
+    queryClient.setQueryData<Draft[]>(
+      draftKeys.forConversation(workspaceId, conversation.id),
+      (list) => [ready, ...(list ?? []).filter((d) => d.id !== old.id)],
+    );
+    setDraftId(ready.id);
+    // Best effort: a failure leaves a stray draft, listed as a chip.
+    void removeDraft(workspaceId, old.id)
+      .catch(() => null)
+      .finally(() => {
+        void queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
+      });
+  };
+
   const open = drafts.data?.filter(editable) ?? [];
   const draft = open.find((d) => d.id === draftId) ?? (request === null ? open[0] : undefined);
   // The message it quotes, and whether its words were cut (a long email):
@@ -195,7 +254,10 @@ export function ReplyComposer({
       workspaceId={workspaceId}
       draft={draft}
       title={title}
-      withSubject={draft.kind === "forward"}
+      withSubject
+      onSwitchMode={
+        draft.kind === "nudge" ? undefined : (mode, carried) => switchMode(draft, mode, carried)
+      }
       focus={draft.kind === "forward" ? "to" : "body"}
       quotedNote={quoteCut ? t("compose.quoteCut") : undefined}
       onClose={() => {

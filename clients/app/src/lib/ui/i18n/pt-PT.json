@@ -78,6 +78,26 @@
       "add": "Adicionar assinatura",
       "edit": "Editar nas definições",
       "create": "Adicione uma assinatura nas definições"
+    },
+    "mode": {
+      "label": "Mudar o tipo de resposta",
+      "reply": "Responder",
+      "reply_all": "Responder a todos",
+      "forward": "Reencaminhar"
+    },
+    "scout": {
+      "label": "Scout",
+      "menu": "Pedir ao Scout que reescreva",
+      "shorter": "Mais curto",
+      "warmer": "Mais caloroso",
+      "spelling": "Corrigir a ortografia",
+      "change": {
+        "label": "Alterar…",
+        "placeholder": "ex.: mencionar os planos",
+        "action": "Alterar"
+      },
+      "thinking": "O Scout está a reescrever…",
+      "thoughts": "Como o Scout pensou"
     }
   },
   "attachments": {

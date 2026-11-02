@@ -8,6 +8,9 @@ import type { Recipient, RecipientSuggestion } from "../RecipientField/Recipient
 import {
   MessageComposer,
   type ComposerAttachment,
+  type ComposerFrom,
+  type ComposerModes,
+  type ComposerScout,
   type ComposerSignature,
   type ComposerUpload,
   type RecipientFieldName,
@@ -27,6 +30,9 @@ interface DemoProps {
   onAttach?: (files: File[]) => void;
   onSendLater?: (at: Date) => void;
   signature?: ComposerSignature;
+  fromPicker?: ComposerFrom;
+  modes?: ComposerModes;
+  scout?: ComposerScout;
   status?: string;
   error?: string;
   sending?: boolean;
@@ -373,6 +379,64 @@ export const NoSignature: Story = {
     await expect(
       within(canvasElement).getByRole("link", { name: "Add a signature in Settings" }),
     ).toBeVisible();
+  },
+};
+
+const TWO_INBOXES = [
+  { id: "i1", label: "Sam Rivera <sam@example.com>" },
+  { id: "i2", label: "Rivera Lettings <office@rivera-lettings.example>" },
+];
+
+/** From as a picker when the member may send from more than one inbox. */
+export const FromPicker: Story = {
+  args: {
+    body: "Thursday works for me.",
+    fromPicker: { options: TWO_INBOXES, value: "i1", onChange: fn() },
+  },
+  play: async ({ canvasElement, args }) => {
+    const from = within(canvasElement).getByRole("combobox", { name: "From" });
+    await userEvent.selectOptions(from, "i2");
+    await expect(args.fromPicker?.onChange).toHaveBeenCalledWith("i2");
+  },
+};
+
+/** Reply ▾ in the title: Reply, Reply all, Forward (R, ⇧R, F inside the menu). */
+export const ReplyTypeMenu: Story = {
+  args: { body: "Thursday works for me.", modes: { value: "reply", onChange: fn() } },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Change reply type" }));
+    await userEvent.click(canvas.getByRole("menuitemradio", { name: /Forward/u }));
+    await expect(args.modes?.onChange).toHaveBeenCalledWith("forward");
+  },
+};
+
+/** Scout ▾ (⌘J): Shorter, Warmer, Fix spelling and Change…. */
+export const ScoutMenu: Story = {
+  args: {
+    body: "hi maya thursday works for me ok",
+    scout: { thinking: "", onRewrite: () => Promise.resolve("Hi Maya, Thursday works for me.") },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Ask Scout to rewrite" }));
+    await expect(canvas.getByRole("button", { name: "Shorter" })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Warmer" })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Fix spelling" })).toBeVisible();
+    await expect(canvas.getByRole("textbox", { name: "Change…" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Fix spelling" }));
+    await expect(await canvas.findByText("Hi Maya, Thursday works for me.")).toBeVisible();
+  },
+};
+
+/** A play-less twin for recordings: pick Shorter and Scout keeps writing (the text read-only, its thinking showing). */
+export const ScoutWriting: Story = {
+  args: {
+    body: "hi maya thursday works for me ok",
+    scout: {
+      thinking: "Reading the email. Keeping what the draft says.",
+      onRewrite: () => new Promise<string | undefined>(() => null),
+    },
   },
 };
 

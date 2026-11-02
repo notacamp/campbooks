@@ -5,7 +5,6 @@ import { api, operationKey, problemCode, unwrap, unwrapEmpty, type Schema } from
 export type Draft = Schema<"DraftView">;
 export type NewDraft = Schema<"NewDraft">;
 export type DraftChanges = Schema<"DraftChanges">;
-export type Inbox = Schema<"InboxView">;
 
 /** Most drafts `conversations.list_drafts` returns. */
 export const DRAFTS_MAX = 50;

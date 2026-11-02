@@ -336,6 +336,8 @@
       "content_changed": "Ceci a changé depuis que vous l’avez ouvert. Vérifiez-le et renvoyez-le.",
       "quote": "Impossible de lire l’e-mail pour le citer. Rien n’a été commencé. Réessayez.",
       "send_at_invalid": "Cette heure n’est pas utilisable. Choisissez-en une plus tardive, jusqu’à un an à l’avance.",
+      "switch_failed": "Impossible de changer. Votre brouillon est resté tel quel.",
+      "inbox_read_only": "Vous pouvez lire cette boîte, mais pas envoyer depuis celle-ci.",
       "destination_changed": "Non envoyé : cette boîte a changé après la programmation. Vérifiez et envoyez à nouveau.",
       "sender_may_not_send": "Non envoyé : vous ne pouvez plus envoyer depuis cette boîte.",
       "release_lost": "Nous n’avons pas pu confirmer l’envoi. Vérifiez votre dossier Envoyés avant de renvoyer.",
@@ -361,7 +363,18 @@
         "request_timed_out": "{{name}} a mis trop de temps à se charger. Réessayez avec une connexion plus rapide, ou joignez un fichier plus petit."
       }
     },
-    "scheduled": "Programmé pour {{time}}"
+    "scheduled": "Programmé pour {{time}}",
+    "switch": {
+      "dropsFiles_one": "Passer à {{kind}} crée un nouveau brouillon, et votre fichier ne peut pas suivre : {{names}}.",
+      "dropsFiles_other": "Passer à {{kind}} crée un nouveau brouillon, et vos {{count}} fichiers ne peuvent pas suivre : {{names}}.",
+      "dropAndSwitch": "Changer sans eux",
+      "keep": "Garder ce brouillon",
+      "kind": {
+        "reply": "Répondre",
+        "reply_all": "Répondre à tous",
+        "forward": "Transférer"
+      }
+    }
   },
   "needs": {
     "line": {
@@ -964,6 +977,12 @@
     "chars": "{{chars}} sur {{max}} caractères",
     "tooLong": "Une signature peut contenir {{max}} caractères au plus.",
     "failed": "Impossible d’enregistrer la signature. Réessayez."
+  },
+  "rewrite": {
+    "keep": "Garde ce que dit mon brouillon",
+    "warmer": "Rends-le plus chaleureux ; garde ce qu’il dit",
+    "spelling": "Corrige uniquement l’orthographe et la grammaire ; ne change rien d’autre",
+    "done": "Réécrit par Scout"
   },
   "explain": {
     "button": "Expliquer la conversation",

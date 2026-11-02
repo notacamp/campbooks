@@ -280,15 +280,7 @@ async fn may_take(
     }
     let limit = max_attachment_bytes(state, conn, row).await?;
     if attachment_bytes(&attachments).saturating_add(size) > limit {
-        return Err(if limit < MAX_ATTACHMENT_BYTES {
-            Error::PayloadTooLarge(
-                crate::MESSAGES
-                    .reason("attachments_too_large_for_mailbox")
-                    .arg("max", megabytes(limit)),
-            )
-        } else {
-            too_large(limit)
-        });
+        return Err(over_limit(limit));
     }
     Ok(attachments)
 }
@@ -301,13 +293,38 @@ pub async fn max_attachment_bytes(
     conn: &mut PgConnection,
     row: &drafts::DraftRow,
 ) -> Result<u64> {
+    max_attachment_bytes_of(state, conn, row.inbox_id).await
+}
+
+/// [`max_attachment_bytes`] for sending from `inbox` (a draft moved there,
+/// campbooks-cloud#394).
+pub async fn max_attachment_bytes_of(
+    state: &AppState,
+    conn: &mut PgConnection,
+    inbox: crate::model::InboxId,
+) -> Result<u64> {
     let resolved = state
         .destinations
-        .destination(conn, *row.inbox_id.as_uuid())
+        .destination(conn, *inbox.as_uuid())
         .await?;
     Ok(resolved
         .and_then(|at| at.max_attachment_bytes)
         .map_or(MAX_ATTACHMENT_BYTES, |max| max.min(MAX_ATTACHMENT_BYTES)))
+}
+
+/// The 413 for attachments past `limit`: `attachments_too_large_for_mailbox`
+/// when the mailbox takes less than 25 MiB, else `attachments_too_large`,
+/// naming the limit in MB. For an upload, and for a move to another inbox.
+pub(crate) fn over_limit(limit: u64) -> Error {
+    if limit < MAX_ATTACHMENT_BYTES {
+        Error::PayloadTooLarge(
+            crate::MESSAGES
+                .reason("attachments_too_large_for_mailbox")
+                .arg("max", megabytes(limit)),
+        )
+    } else {
+        too_large(limit)
+    }
 }
 
 /// 413 `attachments_too_large`, naming `limit` in MB.

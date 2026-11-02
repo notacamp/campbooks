@@ -336,6 +336,8 @@
       "content_changed": "This changed since you opened it. Check it and send again.",
       "quote": "Couldn’t read the email to quote it. Nothing was started. Try again.",
       "send_at_invalid": "This time can’t be used. Pick a later one, up to a year ahead.",
+      "switch_failed": "Couldn’t switch. Your draft is as you left it.",
+      "inbox_read_only": "You can read this mailbox but not send from it.",
       "destination_changed": "Not sent: this mailbox changed after you scheduled it. Check it and send it again.",
       "sender_may_not_send": "Not sent: you can no longer send from this mailbox.",
       "release_lost": "We couldn’t confirm this was sent. Check your Sent folder before sending it again.",
@@ -361,7 +363,18 @@
         "request_timed_out": "{{name}} took too long to upload. Try again on a faster connection, or attach a smaller file."
       }
     },
-    "scheduled": "Scheduled for {{time}}"
+    "scheduled": "Scheduled for {{time}}",
+    "switch": {
+      "dropsFiles_one": "Switching to {{kind}} starts a new draft, and your file can’t come along: {{names}}.",
+      "dropsFiles_other": "Switching to {{kind}} starts a new draft, and your {{count}} files can’t come along: {{names}}.",
+      "dropAndSwitch": "Switch without them",
+      "keep": "Keep this draft",
+      "kind": {
+        "reply": "Reply",
+        "reply_all": "Reply all",
+        "forward": "Forward"
+      }
+    }
   },
   "needs": {
     "line": {
@@ -964,6 +977,12 @@
     "chars": "{{chars}} of {{max}} characters",
     "tooLong": "A signature can have {{max}} characters at most.",
     "failed": "Couldn’t save the signature. Try again."
+  },
+  "rewrite": {
+    "keep": "Keep what my draft says",
+    "warmer": "Make it warmer; keep what it says",
+    "spelling": "Fix spelling and grammar only; change nothing else",
+    "done": "Rewritten by Scout"
   },
   "explain": {
     "button": "Explain this thread",
