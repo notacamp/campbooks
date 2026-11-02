@@ -172,7 +172,7 @@ whatlang = "0.18.0"
 # TLS to the servers with the platform's verifier (rustls, tokio-rustls and
 # the verifier are already in the graph through reqwest and lettre).
 hickory-resolver = { version = "0.26.3", default-features = false, features = ["system-config", "tokio"] }
-quick-xml = "0.41.0"
+quick-xml = "0.42.0"
 rustls-platform-verifier = "0.7.1"
 tokio-rustls = "0.26.6"
 # Email: MIME building of messages to send and parsing of raw messages
@@ -210,7 +210,7 @@ ciborium = "0.2.2"
 # Pages: the block documents of the pages module (campbooks-cloud#363) are Yjs
 # documents merged on the server, so two people editing one page never
 # overwrite each other. Pinned; MIT, Rust only.
-yrs = "=0.27.4"
+yrs = "=0.28.0"
 
 # Tests
 wiremock = "0.6.5"

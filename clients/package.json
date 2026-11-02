@@ -30,8 +30,8 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "knip": "6.39.0",
-    "prettier": "3.9.9",
+    "knip": "6.43.0",
+    "prettier": "3.9.10",
     "prettier-plugin-tailwindcss": "0.8.1",
     "typescript": "6.0.3"
   }

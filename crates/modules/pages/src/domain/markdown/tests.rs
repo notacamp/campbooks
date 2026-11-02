@@ -241,7 +241,7 @@ fn mentions_and_embeds_are_references_never_resolved() {
         let file = fragment.push_back(txn, XmlElementPrelim::empty("file"));
         file.insert_attribute(txn, "blob", s(&"a".repeat(64)));
         file.insert_attribute(txn, "name", s("Offer.pdf"));
-        file.insert_attribute(txn, "size", Any::Number(12.0));
+        file.insert_attribute(txn, "size", Any::Number(yrs::Number::Int(12)));
     });
     document::apply(&doc, &update).unwrap();
     let read = render(&doc, "", MAX_TEXT_BYTES);

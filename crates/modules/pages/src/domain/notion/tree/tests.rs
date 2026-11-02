@@ -294,7 +294,7 @@ fn attribute_helpers_read_only_what_has_the_right_shape() {
     let doc = docs::client(3);
     docs::edit(&doc, |txn, fragment| {
         let node = fragment.push_back(txn, XmlElementPrelim::empty("heading"));
-        node.insert_attribute(txn, "level", Any::Number(2.0));
+        node.insert_attribute(txn, "level", Any::Number(yrs::Number::Int(2)));
         node.insert_attribute(txn, "bid", docs::s("not-a-uuid"));
         node.insert_attribute(
             txn,
