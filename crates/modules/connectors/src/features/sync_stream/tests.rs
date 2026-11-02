@@ -424,6 +424,10 @@ async fn an_idle_stream_backs_off_to_the_maximum(db: PgPool) {
         intervals.push(kit.stream().await["interval_seconds"].as_i64().unwrap());
     }
     assert_eq!(intervals, [240, 480, 600, 600, 600]);
+    // Due a tick's slack before the interval ends, so the tick that
+    // interval reaches takes it (campbooks-cloud#409).
+    let due: DateTime<Utc> = serde_json::from_value(kit.stream().await["due_at"].clone()).unwrap();
+    assert_eq!(due, kit.clock.now() + TimeDelta::seconds(600 - 15));
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

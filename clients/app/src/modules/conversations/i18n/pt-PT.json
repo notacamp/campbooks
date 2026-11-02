@@ -284,7 +284,8 @@
     "delete": "Eliminar, ou restaurar do Lixo",
     "reportSpam": "Denunciar spam, ou não é spam",
     "noticedAsk": "Perguntar ao Scout sobre a sugestão",
-    "noticedSee": "O Scout reparou: ver os emails"
+    "noticedSee": "O Scout reparou: ver os emails",
+    "explain": "Explicar a conversa"
   },
   "compose": {
     "title": {
@@ -490,6 +491,7 @@
   },
   "rules": {
     "sentence": "Mensagens {{conditions}} → {{actions}}",
+    "waitSentence": "Emails de {{sender}} para outra pessoa com o seu email em Cc: ficar à espera dela.",
     "when": {
       "from": "de {{value}}",
       "list": "da lista {{value}}",
@@ -499,7 +501,8 @@
       "label": "com uma etiqueta",
       "stream": "em {{value}}",
       "checksFail": "que falha as verificações do remetente",
-      "pretending": "que diz vir de {{value}} mas falha as verificações do remetente"
+      "pretending": "que diz vir de {{value}} mas falha as verificações do remetente",
+      "notInTo": "sem si em Para"
     },
     "do": {
       "archive": "arquivadas",
@@ -515,7 +518,8 @@
       "spam": "denunciado como spam",
       "paid": "as faturas já estão pagas",
       "images": "as imagens aparecem sempre",
-      "worthALook": "fica na Página inicial até o abrir"
+      "worthALook": "fica na Página inicial até o abrir",
+      "waitOnAddressed": "o Scout fica à espera da pessoa a quem foi escrito"
     },
     "likeness": {
       "sender": "Tudo de {{address}}",
@@ -644,7 +648,8 @@
       "spam": "O Campbooks denunciou isto como spam",
       "paid": "O Campbooks diz que isto já está pago",
       "images": "O Campbooks mostra as imagens deste remetente",
-      "worthALook": "O Campbooks mantém esta na Página inicial até a abrir"
+      "worthALook": "O Campbooks mantém esta na Página inicial até a abrir",
+      "waitOnAddressed": "O Campbooks está à espera da pessoa a quem este email foi escrito"
     },
     "reader": {
       "stop": "Deixar de fazer isto"
@@ -799,6 +804,7 @@
     "titleTeach": "Uma regra para emails como este",
     "titleReport": "Uma regra para emails como este",
     "titlePaid": "Uma regra para as faturas de {{payee}}",
+    "titleWaiting": "Uma regra para quando {{name}} escreve a outra pessoa",
     "titleNotice": "Uma regra para emails de {{sender}}",
     "whose": "Mostrar imagens de",
     "imagesTitle": "Mostrar sempre as imagens de {{sender}}",
@@ -843,6 +849,11 @@
     "paidTitle": "As faturas de {{payee}} são sempre pagas por si?",
     "paidDetail": "Se estiverem em débito direto, o Campbooks pode marcar como pagas as próximas faturas de {{payee}}, sem perguntar. A regra aparece na memória do Scout.",
     "accept": "Sim, a partir de agora",
+    "waitingTitle": "Quando {{name}} escreve a outra pessoa com o seu email em Cc, o Scout deve ficar à espera dela por si?",
+    "waitingDetail_one": "O Scout ficaria à espera dela e sugeriria um lembrete passado {{count}} dia útil. Nunca envia nada sozinho.",
+    "waitingDetail_other": "O Scout ficaria à espera dela e sugeriria um lembrete passados {{count}} dias úteis. Nunca envia nada sozinho.",
+    "waitingAccept": "Sim, sempre",
+    "waitingAsk": "Perguntar de cada vez",
     "loadFailed": "O Campbooks não conseguiu preparar essa regra. Nada mudou."
   },
   "noticed": {
@@ -961,5 +972,49 @@
     "warmer": "Torna-o mais caloroso; mantém o que diz",
     "spelling": "Corrige apenas a ortografia e a gramática; não alteres mais nada",
     "done": "Reescrito pelo Scout"
+  },
+  "explain": {
+    "button": "Explicar esta conversa",
+    "title": "Explicação do Scout",
+    "hide": "Ocultar a explicação",
+    "show": "Mostrar",
+    "again": "Explicar de novo",
+    "tryAgain": "Tentar de novo",
+    "stop": "Parar",
+    "reading_one": "O Scout está a ler a mensagem…",
+    "reading_other": "O Scout está a ler as {{count}} mensagens…",
+    "meta_one": "De {{count}} mensagem · escrita {{when}}",
+    "meta_other": "De {{count}} mensagens · escrita {{when}}",
+    "inShort": "Em resumo",
+    "wants": "Quem quer o quê",
+    "agreed": "Combinado",
+    "open": "Ainda em aberto",
+    "onYou": "Da sua parte",
+    "by": "até {{date}}",
+    "chip": "{{name}} · {{date}}",
+    "more": "Quem quer o quê, combinado, em aberto",
+    "less": "Mostrar menos",
+    "followUp": "Fazer outra pergunta",
+    "reply": "Responder",
+    "privacy": "Só você vê isto. O Scout leu as palavras de cada mensagem, não o histórico citado.",
+    "long": "De {{total}} mensagens: as {{full}} mais recentes por inteiro e as {{earlier}} anteriores a partir das notas do Scout.",
+    "newer": "{{name}} escreveu entretanto ({{when}}). Esta explicação é anterior.",
+    "otherLanguage": "Escrita em {{language}}.",
+    "limit": "Esta área de trabalho já usou a IA de hoje. O Scout pode voltar a explicar esta conversa amanhã.",
+    "failed": "O Scout não conseguiu explicar esta conversa.",
+    "slow": "O Scout está a demorar. Pode deixar isto aberto ou tentar de novo.",
+    "line": {
+      "kept_one": "A sua explicação de {{when}} · de {{count}} mensagem",
+      "kept_other": "A sua explicação de {{when}} · de {{count}} mensagens",
+      "newer": "A sua explicação de {{when}} · {{name}} escreveu entretanto ({{at}})",
+      "writing": "O Scout ainda está a ler esta conversa",
+      "none": "A sua explicação desta conversa"
+    },
+    "refused": {
+      "not_explainable": "O Scout não pode explicar esta conversa.",
+      "unavailable": "O Scout não pode ler correio neste servidor, por isso não pode explicar conversas.",
+      "limit": "Pediu muitas explicações. Tente de novo dentro de uma hora.",
+      "failed": "O Scout não conseguiu explicar esta conversa. Tente de novo."
+    }
   }
 }

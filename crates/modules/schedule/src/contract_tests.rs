@@ -619,3 +619,26 @@ fn a_change_document_follows_its_contract() {
     let value = serde_json::to_value(&update).unwrap();
     assert!(accepts("calendar-change.v1.schema.json", &value), "{value}");
 }
+
+#[test]
+fn a_calendar_list_read_again_is_ids_and_a_blob() {
+    let read = json!({
+        "workspace": UUID, "connection": UUID, "granted_by": UUID,
+        "calendars": {"hash": "2".repeat(64), "size": 300, "content_type": "application/json"}
+    });
+    assert!(accepts(
+        "connectors.calendar_list_read.v1.schema.json",
+        &read
+    ));
+    let _: crate::inbound::CalendarListRead = serde_json::from_value(read).unwrap();
+    // Nothing else travels in the event.
+    let mut named = json!({
+        "workspace": UUID, "connection": UUID, "granted_by": UUID,
+        "calendars": {"hash": "2".repeat(64), "size": 300, "content_type": "application/json"}
+    });
+    named["name"] = json!("Marta");
+    assert!(!accepts(
+        "connectors.calendar_list_read.v1.schema.json",
+        &named
+    ));
+}

@@ -21,6 +21,15 @@ export {
   type AttachmentListProps,
   type ImagePreviewProps,
 } from "./components/Attachments/Attachments";
+export {
+  ExplanationCard,
+  ExplanationLine,
+  type ExplanationCardProps,
+  type ExplanationChip,
+  type ExplanationGroup,
+  type ExplanationItem,
+  type ExplanationLineProps,
+} from "./components/Explanation/Explanation";
 // Tables (cloud#365): the grid, the board, the row peek and their small parts.
 export {
   OptionTag,

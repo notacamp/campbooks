@@ -318,7 +318,8 @@ source module's `SearchSource` port (ADR 0016); `WorkspaceDeleting`.
 
 **Publishes** `schedule.event_created`, `schedule.event_changed`,
 `schedule.event_cancelled`, `schedule.outbound_requested` (ids and times only).
-**Consumes** `connectors.calendar_changed`, `conversations.message_read` (its
+**Consumes** `connectors.calendar_changed`, `connectors.calendar_list_read`,
+`conversations.message_read` (its
 items), `TimeHeld`. **AI** none of its own: the dated things in mail are read
 once per email by `conversations` (the decide pass's `has_dated_thing` and
 `dated_kind`, then one `complete` read).

@@ -847,3 +847,118 @@ fn worth_a_look_cannot_share_a_rule_with_something_that_hides() {
         Err(Invalid::SameSlot)
     );
 }
+
+fn wait_rule(id: &str, confirmed_at: i64) -> TaughtRule {
+    rule(
+        id,
+        vec![
+            Condition::SenderAddress("ana@studio.example".into()),
+            Condition::MemberNotInTo,
+        ],
+        vec![Action::WaitOnAddressed],
+        confirmed_at,
+    )
+}
+
+#[test]
+fn waiting_on_the_addressed_needs_the_member_not_in_to() {
+    let rules = [wait_rule("w1", 1)];
+    let copied = Facts {
+        member_not_in_to: true,
+        ..facts("ana@studio.example", "Quote", None)
+    };
+    assert_eq!(evaluate(&rules, &copied).wait.as_deref(), Some("w1"));
+    assert_eq!(evaluate(&rules, &copied).rules().len(), 1);
+    // In To, or an inbox that is not known: the condition fails closed.
+    let addressed = facts("ana@studio.example", "Quote", None);
+    assert!(evaluate(&rules, &addressed).is_empty());
+    // Another sender is not this rule's.
+    let other = Facts {
+        member_not_in_to: true,
+        ..facts("bob@studio.example", "Quote", None)
+    };
+    assert!(evaluate(&rules, &other).is_empty());
+}
+
+#[test]
+fn waiting_is_never_raised_for_mail_that_looks_wrong() {
+    let rules = [wait_rule("w1", 1)];
+    for wrong in [
+        Facts {
+            suspicious: true,
+            ..facts("ana@studio.example", "Quote", None)
+        },
+        Facts {
+            auth_failed: true,
+            ..facts("ana@studio.example", "Quote", None)
+        },
+        Facts {
+            impersonated: true,
+            ..facts("ana@studio.example", "Quote", None)
+        },
+    ] {
+        let wrong = Facts {
+            member_not_in_to: true,
+            ..wrong
+        };
+        assert_eq!(evaluate(&rules, &wrong).wait, None);
+    }
+}
+
+#[test]
+fn waiting_is_its_own_slot_and_leaves_a_taught_reply_alone() {
+    let sender = Condition::SenderAddress("ana@studio.example".into());
+    let rules = [
+        wait_rule("w1", 1),
+        rule(
+            "r1",
+            vec![sender.clone()],
+            vec![Action::NeedsReply { value: true }],
+            2,
+        ),
+    ];
+    let copied = Facts {
+        member_not_in_to: true,
+        ..facts("ana@studio.example", "Quote", None)
+    };
+    let out = evaluate(&rules, &copied);
+    assert_eq!(out.wait.as_deref(), Some("w1"));
+    assert_eq!(out.needs_reply.as_ref().map(|a| a.value), Some(true));
+    assert_eq!(out.rules().len(), 2);
+    assert_eq!(
+        TaughtRule::validate(
+            &[sender.clone(), Condition::MemberNotInTo],
+            &[Action::WaitOnAddressed, Action::NeedsReply { value: true }]
+        ),
+        Ok(())
+    );
+    assert_eq!(
+        TaughtRule::validate(
+            &[sender.clone(), Condition::MemberNotInTo],
+            &[Action::WaitOnAddressed, Action::WaitOnAddressed]
+        ),
+        Err(Invalid::SameSlot)
+    );
+    // Without "not in To" it would wait on whoever the member wrote to.
+    assert_eq!(
+        TaughtRule::validate(&[sender], &[Action::WaitOnAddressed]),
+        Err(Invalid::WaitNeedsNotInTo)
+    );
+    // "Not in To" alone says nothing about which mail.
+    assert_eq!(
+        TaughtRule::validate(&[Condition::MemberNotInTo], &[Action::WaitOnAddressed]),
+        Err(Invalid::TooBroad)
+    );
+}
+
+#[test]
+fn the_new_condition_and_action_have_a_stable_json_shape() {
+    assert_eq!(
+        serde_json::to_value(Condition::MemberNotInTo).unwrap(),
+        serde_json::json!({"field": "member_not_in_to"})
+    );
+    assert_eq!(
+        serde_json::to_value(Action::WaitOnAddressed).unwrap(),
+        serde_json::json!({"action": "wait_on_addressed"})
+    );
+}

@@ -284,7 +284,8 @@
     "delete": "Delete, or restore from Trash",
     "reportSpam": "Report spam, or not spam",
     "noticedAsk": "Ask Scout about the suggestion",
-    "noticedSee": "Scout noticed: see the emails"
+    "noticedSee": "Scout noticed: see the emails",
+    "explain": "Explain this thread"
   },
   "compose": {
     "title": {
@@ -490,6 +491,7 @@
   },
   "rules": {
     "sentence": "Mail {{conditions}} → {{actions}}",
+    "waitSentence": "Mail from {{sender}} to someone else with you in Cc: wait on them.",
     "when": {
       "from": "from {{value}}",
       "list": "on the {{value}} list",
@@ -499,7 +501,8 @@
       "label": "with a label",
       "stream": "in {{value}}",
       "checksFail": "that fails its sender checks",
-      "pretending": "that says it’s from {{value}} but fails its sender checks"
+      "pretending": "that says it’s from {{value}} but fails its sender checks",
+      "notInTo": "with you not in To"
     },
     "do": {
       "archive": "archived",
@@ -515,7 +518,8 @@
       "spam": "reported as spam",
       "paid": "its bills are already paid",
       "images": "its images always show",
-      "worthALook": "kept on Home until you open it"
+      "worthALook": "kept on Home until you open it",
+      "waitOnAddressed": "Scout waits on the person it was written to"
     },
     "likeness": {
       "sender": "Everything from {{address}}",
@@ -644,7 +648,8 @@
       "spam": "Campbooks reported this as spam",
       "paid": "Campbooks says this is already paid",
       "images": "Campbooks shows this sender’s images",
-      "worthALook": "Campbooks is keeping this on Home until you open it"
+      "worthALook": "Campbooks is keeping this on Home until you open it",
+      "waitOnAddressed": "Campbooks is waiting on the person this was written to"
     },
     "reader": {
       "stop": "Stop doing this"
@@ -799,6 +804,7 @@
     "titleTeach": "A rule for mail like this",
     "titleReport": "A rule for mail like this",
     "titlePaid": "A rule for {{payee}}’s invoices",
+    "titleWaiting": "A rule for when {{name}} writes to someone else",
     "titleNotice": "A rule for mail from {{sender}}",
     "whose": "Show images from",
     "imagesTitle": "Always show images from {{sender}}",
@@ -843,6 +849,11 @@
     "paidTitle": "Are {{payee}}’s invoices always paid for you?",
     "paidDetail": "If they’re on direct debit, Campbooks can mark future invoices from {{payee}} paid, without asking. The rule shows in Scout’s memory.",
     "accept": "Yes, from now on",
+    "waitingTitle": "When {{name}} writes to someone else with you in Cc, should Scout wait on them for you?",
+    "waitingDetail_one": "Scout would wait on them and suggest a nudge after {{count}} working day. It never sends anything on its own.",
+    "waitingDetail_other": "Scout would wait on them and suggest a nudge after {{count}} working days. It never sends anything on its own.",
+    "waitingAccept": "Yes, always",
+    "waitingAsk": "Ask me each time",
     "loadFailed": "Campbooks could not prepare that rule. Nothing changed."
   },
   "noticed": {
@@ -961,5 +972,49 @@
     "warmer": "Make it warmer; keep what it says",
     "spelling": "Fix spelling and grammar only; change nothing else",
     "done": "Rewritten by Scout"
+  },
+  "explain": {
+    "button": "Explain this thread",
+    "title": "Scout’s explanation",
+    "hide": "Hide the explanation",
+    "show": "Show",
+    "again": "Explain again",
+    "tryAgain": "Try again",
+    "stop": "Stop",
+    "reading_one": "Scout is reading the message…",
+    "reading_other": "Scout is reading the {{count}} messages…",
+    "meta_one": "From {{count}} message · written {{when}}",
+    "meta_other": "From {{count}} messages · written {{when}}",
+    "inShort": "In short",
+    "wants": "Who wants what",
+    "agreed": "Agreed",
+    "open": "Still open",
+    "onYou": "On you",
+    "by": "by {{date}}",
+    "chip": "{{name}} · {{date}}",
+    "more": "Who wants what, agreed, open",
+    "less": "Show less",
+    "followUp": "Ask a follow-up",
+    "reply": "Reply",
+    "privacy": "Only you see this. Scout read the messages’ own words, not the quoted history.",
+    "long": "From {{total}} messages: the newest {{full}} in full, the {{earlier}} before them from Scout’s notes.",
+    "newer": "{{name}} wrote since, at {{when}}. This explanation is from before.",
+    "otherLanguage": "Written in {{language}}.",
+    "limit": "This workspace has used today’s AI. Scout can explain this thread again tomorrow.",
+    "failed": "Scout couldn’t explain this thread.",
+    "slow": "Scout is taking long. You can leave this open or try again.",
+    "line": {
+      "kept_one": "Your explanation from {{when}} · from {{count}} message",
+      "kept_other": "Your explanation from {{when}} · from {{count}} messages",
+      "newer": "Your explanation from {{when}} · {{name}} wrote since, at {{at}}",
+      "writing": "Scout is still reading this thread",
+      "none": "Your explanation of this thread"
+    },
+    "refused": {
+      "not_explainable": "Scout can’t explain this thread.",
+      "unavailable": "Scout can’t read mail on this server, so it can’t explain threads.",
+      "limit": "You asked for many explanations. Try again in an hour.",
+      "failed": "Scout couldn’t explain this thread. Try again."
+    }
   }
 }

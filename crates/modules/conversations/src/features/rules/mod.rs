@@ -587,7 +587,7 @@ fn sample(c: &rules::Candidate) -> PreviewSample {
 }
 
 /// The rule winning each slot of `outcome` (labels aside).
-fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 9] {
+fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 10] {
     [
         outcome.stream.as_ref().map(|a| a.rule.as_str()),
         outcome.archive.as_deref(),
@@ -598,6 +598,7 @@ fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 9]
         outcome.bin.as_ref().map(|a| a.rule.as_str()),
         outcome.paid.as_deref(),
         outcome.highlight.as_deref(),
+        outcome.wait.as_deref(),
     ]
 }
 
@@ -645,6 +646,10 @@ fn would_change(
         // The scan leaves out mail already in the trash or spam.
         || outcome.bin.as_ref().is_some_and(|a| won(&a.rule))
         || outcome.paid.as_deref().is_some_and(won)
+        // The wait is settled when the rule acts, from the headers (no single
+        // person it was written to: nothing): the preview counts the mail it
+        // would look at.
+        || outcome.wait.as_deref().is_some_and(won)
 }
 
 // --- Create ------------------------------------------------------------------

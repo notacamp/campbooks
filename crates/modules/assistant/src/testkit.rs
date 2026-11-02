@@ -88,6 +88,9 @@ pub struct Mail {
     pub conversations: HashMap<String, Value>,
     /// `conversations.get_history`'s answers, by conversation id.
     pub histories: HashMap<String, Value>,
+    /// `conversations.get_explanation`'s answers, by conversation id; any
+    /// other id is 404 (the member never asked).
+    pub explanations: HashMap<String, Value>,
     /// `conversations.get_rule`'s answers, by rule id; any other id is 404.
     pub rules: HashMap<String, Value>,
     /// `conversations.get_rule_notice`'s answers, by suggestion id; any
@@ -282,6 +285,26 @@ async fn get_history(
     Ok(Json(mail.histories.get(&path.1).cloned().unwrap_or_else(
         || json!({ "events": [], "truncated": false }),
     )))
+}
+
+#[utoipa::path(get, path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/explanation",
+    operation_id = "conversations.get_explanation",
+    params(("workspace_id" = String, Path), ("conversation_id" = String, Path)),
+    security(("bearer" = ["conversations:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"])))),
+    responses((status = OK, body = Value)))]
+async fn get_explanation(
+    _: Workspace<ConversationsRead>,
+    Extension(mail): Extension<Shared>,
+    extract::Path(path): extract::Path<(String, String)>,
+) -> Result<Json<Value>, Error> {
+    let mut mail = mail.lock().unwrap();
+    mail.called.push("conversations.get_explanation".into());
+    mail.explanations
+        .get(&path.1)
+        .cloned()
+        .map(Json)
+        .ok_or(Error::NotFound)
 }
 
 #[utoipa::path(get, path = "/api/v1/w/{workspace_id}/rules/{rule_id}",
@@ -928,6 +951,7 @@ impl Kit {
             .routes(routes!(list_senders))
             .routes(routes!(get_conversation))
             .routes(routes!(get_history))
+            .routes(routes!(get_explanation))
             .routes(routes!(get_rule))
             .routes(routes!(get_rule_notice))
             .routes(routes!(list_conversations))

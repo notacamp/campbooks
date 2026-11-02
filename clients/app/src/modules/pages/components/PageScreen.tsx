@@ -203,7 +203,7 @@ function OpenPage({
   // Ask Scout about this page (campbooks-cloud#364): in the More menu, so the
   // toolbar stays one row; only while the server offers it and Scout is there.
   const scout = useScoutChat();
-  const mailScout = useMailScoutAvailable(workspaceId, page.id) === true;
+  const mailScout = useMailScoutAvailable(workspaceId) === true;
   const canAsk = scout !== undefined && mailScout && page.kind === "page" && !trashed;
   const askScout = () => {
     const active = document.activeElement;

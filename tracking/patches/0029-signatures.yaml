@@ -5,12 +5,12 @@
 # events (their words are personal data: only a count could be, and nothing
 # acts on one).
 # Applied with
-# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0025-signatures.yaml`.
+# `cargo run -p campbooks-tracking-plan -- apply tracking/patches/0029-signatures.yaml`.
 changelog:
-  - date: "2026-10-28"
-    plan_version: 25
+  - date: "2026-10-31"
+    plan_version: 29
     change: "Signatures (campbooks-cloud#393): Coverage for conversations.get_signature and conversations.set_signature, which track nothing."
-    pr: "#393"
+    pr: "#715"
 
 coverage:
   - kind: "operation"

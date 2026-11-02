@@ -143,6 +143,7 @@ impl Deps {
         secret: Option<SecretKey>,
     ) -> Result<Self, String> {
         let settings = ConnectorsConfig::from_figment(figment)?;
+        settings.zoho.warn_unusable();
         let mut deps = Self {
             imap: Arc::new(Imap::new(settings.imap.clone())),
             config: Arc::new(settings),
@@ -716,6 +717,31 @@ mod tests {
         })));
         let err = Deps::from_figment(&broken, &kernel_config(), key()).unwrap_err();
         assert!(err.contains("SEND_PER_HOUR"), "{err}");
+    }
+
+    #[test]
+    fn the_module_starts_with_production_settings_and_a_bad_zoho_poll_maximum() {
+        // campbooks-cloud#409: the new variable is never tied to the poll
+        // bounds, and an unusable value is a warning, not a stop.
+        for value in ["abc", "0", "99999", "45"] {
+            let figment = Figment::from(Serialized::defaults(serde_json::json!({
+                "connectors": {
+                    "poll": {"min_seconds": 60, "max_seconds": 120},
+                    "zoho": {"poll_max_seconds": value}
+                },
+                "google": {"client_id": "client-1", "client_secret": "s3cret"}
+            })));
+            let deps = Deps::from_figment(
+                &figment,
+                &kernel_config(),
+                Some(SecretKey::from_bytes([1; 32])),
+            )
+            .unwrap();
+            assert_eq!(
+                deps.config.zoho.poll_max_seconds(),
+                if value == "45" { 45 } else { 60 }
+            );
+        }
     }
 
     #[test]

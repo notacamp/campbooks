@@ -222,3 +222,46 @@ unavailable, and the page toolbar SHALL stay one row.
 #### Scenario: Scout not configured
 - **WHEN** the `complete` role is not configured
 - **THEN** the page's More menu has no "Ask Scout"
+
+### Requirement: Table cells that do not fit end in an ellipsis
+A table's cells SHALL show their content on one
+line, ending in an ellipsis when the column is too narrow, and SHALL carry the
+whole value in their title (a footer summary wraps instead, with the whole value in its title). The add-column control SHALL sit in the header row,
+and the footer's "New row" SHALL show a single "+" at any width.
+
+#### Scenario: A narrow number column
+- **WHEN** the Value column is as narrow as it can be and a cell holds €9,600.00
+- **THEN** the cell ends in an ellipsis and its title is "€9,600.00"
+
+#### Scenario: New row on a phone
+- **WHEN** Ana opens a table at 375 px
+- **THEN** "New row" shows one "+", and "Add a column" is in the header and can be clicked
+
+### Requirement: Callout tones are told apart
+A callout SHALL show its tone by colour: neutral in grey, info in blue,
+warning in red, each with a soft fill and a bar on its leading edge, in light
+and dark themes. The info colour SHALL be its own design token, not the
+workspace accent, so it reads the same whatever accent the workspace uses.
+
+#### Scenario: Info and neutral callouts side by side
+- **WHEN** a page has an info callout and a neutral callout
+- **THEN** the info callout is blue and the neutral one grey, in light and in dark
+
+#### Scenario: A workspace with a coloured accent
+- **WHEN** the workspace accent is forest
+- **THEN** the info callout is still blue
+
+### Requirement: Mail and Scout follow the pages list
+The client SHALL take whether mail and Scout in pages is on from `pages.list`
+(the list the page tree already holds), with no request of its own. While the
+list is loading, "Save to page" and "Ask Scout" are hidden. A workspace with
+no pages yet SHALL be offered "Save to page" when it is on, whose "New page"
+choice makes the first page.
+
+#### Scenario: No pages yet
+- **WHEN** Ana has no pages, mail and Scout are on, and she opens a thread
+- **THEN** the reader offers "Save to page", and its dialog offers "New page"
+
+#### Scenario: Off
+- **WHEN** the list says `mail_scout` is false
+- **THEN** the reader has no "Save to page" and a page's menu has no "Ask Scout"

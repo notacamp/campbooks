@@ -620,3 +620,126 @@ describe("the offer after Report and delete", () => {
     );
   });
 });
+
+/** Ana Costa's mail to someone else, with the member in Cc. */
+const FROM_ANA: typeof LEDGER = {
+  ...LEDGER,
+  latest_from: { name: "Ana Costa", address: "ana@studio.example" },
+};
+
+const WAIT_OFFER: Schema<"RuleSuggestions"> = {
+  shared: false,
+  default: 0,
+  none: null,
+  wait_days: 3,
+  suggestions: [
+    {
+      likeness: "sender",
+      key: "sender|ana|wait",
+      conditions: [
+        { field: "sender_address", value: "ana@studio.example" },
+        { field: "member_not_in_to" },
+      ],
+      actions: [{ action: "wait_on_addressed" }],
+      preview: {
+        matching: 0,
+        would_change: 0,
+        skipped_suspicious: 0,
+        skipped_member: 0,
+        overrides: [],
+        complete: true,
+        samples: [],
+      },
+    },
+  ],
+};
+
+/** A screen that offers after Nudge, the second time. */
+function Nudged() {
+  const ahead = useAheadOffer(DUARTE.id);
+  const [asked, setAsked] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setAsked(true);
+          ahead.offer(FROM_ANA, { kind: "waiting" });
+        }}
+      >
+        nudge
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          ahead.cancel(FROM_ANA.id);
+        }}
+      >
+        undo
+      </button>
+      {asked ? ahead.element : null}
+    </>
+  );
+}
+
+const WAIT_TITLE =
+  "When Ana writes to someone else with you in Cc, should Scout wait on them for you?";
+
+describe("the offer after the second Nudge", () => {
+  it("asks once, and Yes always opens the confirmation that alone saves", async () => {
+    const api = mockApi({
+      [`GET ${W}/conversations/${FROM_ANA.id}/rule-suggestions`]: { body: WAIT_OFFER },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`POST ${W}/inboxes/${INBOX.id}/rules/preview`]: {
+        body: WAIT_OFFER.suggestions[0]?.preview,
+      },
+    });
+    renderWithProviders(<Nudged />);
+    fireEvent.click(screen.getByRole("button", { name: "nudge" }));
+    const offer = await screen.findByRole("dialog", { name: WAIT_TITLE });
+    expect(
+      within(offer).getByText(
+        "Scout would wait on them and suggest a nudge after 3 working days. It never sends anything on its own.",
+      ),
+    ).toBeVisible();
+    expect(api.calls.some((call) => call.route.endsWith("/rule-suggestions"))).toBe(true);
+    fireEvent.click(within(offer).getByRole("button", { name: /Yes, always/u }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "A rule for when Ana writes to someone else",
+    });
+    expect(
+      within(dialog).getByText(
+        "Mail from ana@studio.example to someone else with you in Cc: wait on them.",
+      ),
+    ).toBeVisible();
+    // The offer saves nothing: only the confirmation does.
+    expect(api.calls.some((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`)).toBe(
+      false,
+    );
+  });
+
+  it("Ask me each time turns it down, and Undo of the answer cancels it", async () => {
+    const api = mockApi({
+      [`GET ${W}/conversations/${FROM_ANA.id}/rule-suggestions`]: { body: WAIT_OFFER },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+      [`POST ${W}/conversations/${FROM_ANA.id}/rule-suggestions/dismiss`]: { status: 204 },
+    });
+    renderWithProviders(<Nudged />);
+    fireEvent.click(screen.getByRole("button", { name: "nudge" }));
+    const offer = await screen.findByRole("dialog", { name: WAIT_TITLE });
+    fireEvent.click(within(offer).getByRole("button", { name: /Ask me each time/u }));
+    await waitFor(() => {
+      expect(
+        api.calls.find((call) => call.route.endsWith("/rule-suggestions/dismiss"))?.body,
+      ).toEqual({ key: "sender|ana|wait" });
+    });
+    expect(screen.queryByRole("dialog", { name: WAIT_TITLE })).toBeNull();
+
+    // Undone before it came back: nothing is offered.
+    fireEvent.click(screen.getByRole("button", { name: "nudge" }));
+    fireEvent.click(screen.getByRole("button", { name: "undo" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: WAIT_TITLE })).toBeNull();
+    });
+  });
+});

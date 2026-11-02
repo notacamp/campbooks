@@ -1135,8 +1135,14 @@ impl SyncStream {
             batches.push((blob, document.changes.len()));
         }
         let cursor_json = page.cursor;
-        let interval =
+        let mut interval =
             schedule::next_interval(target.interval_seconds, changed, &self.deps.config.poll);
+        if target.provider == Provider::Zoho {
+            // Zoho has no push: its mail is read at least this often,
+            // whatever the global maximum (or minimum) says.
+            interval = interval
+                .min(i32::try_from(self.deps.config.zoho.poll_max_seconds()).unwrap_or(i32::MAX));
+        }
         let retention = TimeDelta::days(i64::from(self.deps.config.batch_retention_days));
 
         let tx = ctx.tx().await?;
@@ -1246,7 +1252,7 @@ impl SyncStream {
             )
             .await?;
         } else {
-            let mut next = now + TimeDelta::seconds(i64::from(interval.max(least_wait)));
+            let mut next = schedule::next_poll(now, interval, least_wait);
             if page.checking {
                 // An address check waits for its message: look again soon.
                 let soon = i64::from(self.deps.config.poll.min_seconds);

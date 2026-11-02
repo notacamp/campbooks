@@ -28,7 +28,7 @@ export const SEMANTIC_TOKENS = {
     "highlight",
     "focus-ring",
   ],
-  status: ["danger", "danger-soft", "success", "success-soft"],
+  status: ["danger", "danger-soft", "success", "success-soft", "info", "info-soft"],
   signal: [
     "signal-reply",
     "signal-decide",

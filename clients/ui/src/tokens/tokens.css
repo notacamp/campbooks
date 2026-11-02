@@ -249,6 +249,9 @@
   --danger-soft: light-dark(oklch(0.52 0.19 25 / 0.09), oklch(0.72 0.16 25 / 0.14));
   --success: light-dark(oklch(0.5 0.13 155), oklch(0.76 0.14 155));
   --success-soft: light-dark(oklch(0.5 0.13 155 / 0.12), oklch(0.76 0.14 155 / 0.16));
+  /* info: a note to read, not a warning; blue, apart from every accent preset */
+  --info: light-dark(oklch(0.5 0.12 245), oklch(0.76 0.11 245));
+  --info-soft: light-dark(oklch(0.5 0.12 245 / 0.1), oklch(0.76 0.11 245 / 0.14));
 
   /* signals: dot colour; soft fills mix it at --signal-soft-mix */
   --signal-soft-mix: 15%;

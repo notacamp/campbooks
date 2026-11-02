@@ -203,8 +203,8 @@
 }
 
 .document :where([data-type="callout"][data-tone="info"]) {
-  background: var(--accent-soft);
-  box-shadow: inset var(--space-1) 0 0 var(--accent);
+  background: var(--info-soft);
+  box-shadow: inset var(--space-1) 0 0 var(--info);
 }
 
 .document :where([data-type="callout"][data-tone="warning"]) {

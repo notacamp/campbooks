@@ -84,7 +84,9 @@
 }
 
 .line[data-end] {
+  max-width: 100%;
   margin-inline-start: auto;
+  text-align: end;
   font-variant-numeric: tabular-nums;
 }
 
@@ -123,6 +125,7 @@
   color: var(--text-primary);
   font-size: var(--text-sm);
   outline: none;
+  text-overflow: ellipsis;
 }
 
 .input[aria-invalid="true"] {
@@ -199,6 +202,7 @@
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   text-align: start;
+  /* It wraps where it can (a long summary in a small column), so it never needs cutting. */
   overflow-wrap: anywhere;
   cursor: pointer;
 }

@@ -611,3 +611,191 @@ async fn turning_a_calendar_on_reads_it_again_from_the_start(db: PgPool) {
             .unwrap();
     assert_eq!(after, (true, Some("t9".to_owned())));
 }
+
+const LIST_PATH: &str = "/calendar/v3/users/me/calendarList";
+
+/// How many times the calendar list was asked for.
+async fn list_calls(kit: &Kit) -> usize {
+    kit.google
+        .received()
+        .await
+        .iter()
+        .filter(|call| call.as_str() == format!("GET {LIST_PATH}"))
+        .count()
+}
+
+/// The `calendar-list` blobs of the `calendar_list_read` events of `ws`.
+async fn lists_read(kit: &Kit, ws: WorkspaceId) -> Vec<Value> {
+    let mut lists = Vec::new();
+    for payload in kit.payloads(ws, "connectors.calendar_list_read").await {
+        assert_contract("connectors.calendar_list_read.v1.schema.json", &payload);
+        // Ids and a blob reference only: the provider's ids are in the blob.
+        assert!(!payload.to_string().contains("example.com"), "{payload}");
+        let blob: BlobRef = serde_json::from_value(payload["calendars"].clone()).unwrap();
+        let list: Value = serde_json::from_slice(&kit.blob(ws, &blob).await).unwrap();
+        assert_contract("calendar-list.v1.schema.json", &list);
+        lists.push(list);
+    }
+    lists
+}
+
+/// The account's calendar list, answering `times` times (or always).
+async fn listing(kit: &Kit, ids: &[(&str, &str, bool)], times: Option<u64>) {
+    let items: Vec<Value> = ids
+        .iter()
+        .map(|(id, name, owner)| {
+            json!({"id": id, "summary": name, "primary": *id == CALENDAR,
+                   "accessRole": if *owner { "owner" } else { "reader" }})
+        })
+        .collect();
+    let mock = Mock::given(method("GET"))
+        .and(path(LIST_PATH))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "items": items })));
+    let mock = match times {
+        Some(n) => mock.up_to_n_times(n),
+        None => mock,
+    };
+    kit.google.mount_first(mock).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_calendar_list_is_read_again_about_once_a_day_and_published(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (sam, ws) = member(&kit);
+    listing(&kit, &[(CALENDAR, "Sam", true)], Some(1)).await;
+    // A week later Marta has shared hers.
+    listing(
+        &kit,
+        &[
+            (CALENDAR, "Sam", true),
+            ("marta@example.com", "Marta", false),
+        ],
+        None,
+    )
+    .await;
+    first_read(&kit, &[timed("e1", "\"1\"", "Dentist")], "t1", None).await;
+    changes_since(&kit, "t1", &[], "t1").await;
+    kit.adopt_calendar(&sam, ws, ACCOUNT_SUB).await.unwrap();
+    kit.run_jobs().await;
+    assert_eq!(list_calls(&kit).await, 1);
+    assert!(lists_read(&kit, ws).await.is_empty());
+
+    // Within the day it is not asked for again, however often the stream runs.
+    for _ in 0..3 {
+        kit.tick(TimeDelta::minutes(30)).await;
+    }
+    assert_eq!(list_calls(&kit).await, 1);
+    assert!(lists_read(&kit, ws).await.is_empty());
+
+    // After a day and the jitter (under three hours): read, and published.
+    kit.tick(TimeDelta::hours(27)).await;
+    assert_eq!(list_calls(&kit).await, 2);
+    let lists = lists_read(&kit, ws).await;
+    assert_eq!(lists.len(), 1, "{lists:?}");
+    assert_eq!(lists[0]["provider"], "google");
+    let ids: Vec<&str> = lists[0]["calendars"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["provider_id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, [CALENDAR, "marta@example.com"]);
+    assert_eq!(lists[0]["calendars"][1]["owned"], false);
+
+    // It is not a grant.
+    let grants = kit.payloads(ws, "connectors.capability_granted").await;
+    assert_eq!(
+        grants
+            .iter()
+            .filter(|event| event["capability"] == "calendar")
+            .count(),
+        1
+    );
+    // The stream knows the new calendar, not syncing; the primary still is.
+    let known: Vec<(String, bool)> = sqlx::query_as(
+        "SELECT provider_calendar_id, syncing FROM connectors.calendars
+          ORDER BY provider_calendar_id",
+    )
+    .fetch_all(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(
+        known,
+        [
+            ("marta@example.com".to_owned(), false),
+            (CALENDAR.to_owned(), true),
+        ]
+    );
+    // And not again the next hour.
+    kit.tick(TimeDelta::hours(1)).await;
+    assert_eq!(list_calls(&kit).await, 2);
+    assert_eq!(lists_read(&kit, ws).await.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn no_calendar_list_is_read_without_the_calendar_capability(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (sam, ws) = member(&kit);
+    listing(&kit, &[(CALENDAR, "Sam", true)], None).await;
+    kit.adopt(&sam, ws, ACCOUNT_SUB, None).await.unwrap();
+    kit.run_jobs().await;
+    kit.tick(TimeDelta::hours(30)).await;
+    kit.tick(TimeDelta::hours(30)).await;
+    assert_eq!(list_calls(&kit).await, 0);
+    assert!(
+        kit.payloads(ws, "connectors.calendar_list_read")
+            .await
+            .is_empty()
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_calendar_list_the_provider_refuses_keeps_event_sync_healthy(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (sam, ws) = member(&kit);
+    listing(&kit, &[(CALENDAR, "Sam", true)], Some(1)).await;
+    // From then on the list fails.
+    kit.google
+        .mount_first(
+            Mock::given(method("GET"))
+                .and(path(LIST_PATH))
+                .respond_with(ResponseTemplate::new(500)),
+        )
+        .await;
+    first_read(&kit, &[timed("e1", "\"1\"", "Dentist")], "t1", None).await;
+    changes_since(&kit, "t1", &[timed("e2", "\"1\"", "Lunch")], "t2").await;
+    kit.adopt_calendar(&sam, ws, ACCOUNT_SUB).await.unwrap();
+    kit.run_jobs().await;
+    assert_eq!(batches(&kit, ws).await.len(), 1);
+
+    kit.tick(TimeDelta::hours(27)).await;
+    assert_eq!(list_calls(&kit).await, 2);
+    assert!(lists_read(&kit, ws).await.is_empty());
+    // The events were still read in the same run.
+    assert_eq!(batches(&kit, ws).await.len(), 2);
+    assert_eq!(sync_token(&kit).await.as_deref(), Some("t2"));
+    // Neither the stream nor the connection is marked.
+    let stream = stream(&kit).await;
+    assert!(stream["health_reason"].is_null(), "{stream}");
+    assert_eq!(stream["consecutive_failures"], 0);
+    let connections = kit
+        .get(&sam, &format!("/api/v1/w/{ws}/connections"))
+        .await
+        .json;
+    assert_eq!(
+        connections["connections"][0]["health"], "ok",
+        "{connections}"
+    );
+    // It is asked for again within the hour, not the day.
+    let due: chrono::DateTime<chrono::Utc> = sqlx::query_scalar(
+        "SELECT calendar_list_due_at FROM connectors.streams WHERE capability = 'calendar'",
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    let wait = due - campbooks_kernel::clock::Clock::now(&*kit.clock);
+    assert!(
+        wait > TimeDelta::zero() && wait <= TimeDelta::hours(1),
+        "{wait}"
+    );
+}

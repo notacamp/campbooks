@@ -17,15 +17,17 @@
 }
 
 .grid {
-  width: var(--grid-width);
+  width: calc(var(--grid-width) + var(--grid-end));
   min-width: 100%;
   outline: none;
 }
 
 .row {
   display: grid;
-  grid-template-columns: var(--grid-columns);
-  width: var(--grid-width);
+  /* The columns, then (when there is a "+" to add one) a track of its own: without it the
+     "+" falls to a second grid row under the first column. */
+  grid-template-columns: var(--grid-columns) var(--grid-end);
+  width: calc(var(--grid-width) + var(--grid-end));
   min-width: 100%;
 }
 
@@ -58,6 +60,7 @@
   z-index: var(--z-sticky);
   display: flex;
   align-items: center;
+  justify-content: center;
   min-width: var(--size-hit);
   background: var(--surface-sunken);
   border-bottom: var(--border-width) solid var(--border-subtle);
@@ -92,6 +95,8 @@
 .footCell[data-first] {
   position: sticky;
   left: 0;
+  /* Above what scrolls under it: a later cell's own button (its summary "+") never shows through. */
+  z-index: var(--z-sticky);
 }
 
 /* The corner stays above the rest of the header, which stays above the cells. */

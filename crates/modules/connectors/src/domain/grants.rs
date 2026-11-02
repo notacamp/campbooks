@@ -564,6 +564,14 @@ async fn start_streams(
             let calendars = match (&g.calendars, capability) {
                 (Some(grant), Capability::Calendar) => {
                     calendar::remember(tx, g.grant.workspace, created, &grant.listed).await?;
+                    // Read again in about a day.
+                    sqlx::query(
+                        "UPDATE connectors.streams SET calendar_list_due_at = $2 WHERE id = $1",
+                    )
+                    .bind(created)
+                    .bind(calendar::next_list_read(created, g.now))
+                    .execute(&mut **tx)
+                    .await?;
                     if let Some(reason) = grant.reason {
                         sqlx::query(
                             "UPDATE connectors.streams SET health_reason = $2 WHERE id = $1",

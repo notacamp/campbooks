@@ -10,4 +10,7 @@
 # Renewed 2026-10-31: Debian ships the fix in bookworm-security, but
 # distroless's current cc-debian12:nonroot still carries 3.0.20-1~deb12u2.
 # Remove this entry as soon as it ships 3.0.22.
+# This file applies to every image, so the entry also hides the finding in the
+# Laya image, which does load OpenSSL (Python's ssl). Laya is covered instead by
+# ci.yml's "Debian packages are current" check and its daily APT_REFRESH rebuild.
 CVE-2026-84782 exp:2026-11-24
