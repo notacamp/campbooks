@@ -51,6 +51,9 @@ function conditionPhrase(t: Translate, condition: RuleCondition): string {
     case "sender_checks_fail": {
       return t("rules.when.checksFail");
     }
+    case "member_not_in_to": {
+      return t("rules.when.notInTo");
+    }
   }
 }
 
@@ -111,6 +114,9 @@ function actionPhrase(t: Translate, action: RuleAction): string {
     case "worth_a_look": {
       return t("rules.do.worthALook");
     }
+    case "wait_on_addressed": {
+      return t("rules.do.waitOnAddressed");
+    }
   }
 }
 
@@ -119,12 +125,41 @@ function joined(items: readonly string[], locale: string): string {
   return new Intl.ListFormat(locale, { type: "conjunction" }).format(items);
 }
 
+/**
+ * "Wait on them" (campbooks-cloud#378) in its own words, when a rule is
+ * exactly that: one sender, the member not in To, waiting on the person it
+ * was written to.
+ */
+function waitSentence(
+  t: Translate,
+  rule: { conditions: readonly RuleCondition[]; actions: readonly RuleAction[] },
+): string | undefined {
+  const [first, second, ...more] = rule.conditions;
+  const [action, ...others] = rule.actions;
+  const sender = [first, second].find((condition) => condition?.field === "sender_address");
+  const copied = [first, second].some((condition) => condition?.field === "member_not_in_to");
+  if (
+    more.length > 0 ||
+    others.length > 0 ||
+    action?.action !== "wait_on_addressed" ||
+    !copied ||
+    sender?.field !== "sender_address"
+  ) {
+    return undefined;
+  }
+  return t("rules.waitSentence", { sender: sender.value });
+}
+
 /** The whole rule as one sentence: "Mail from x about “y” → Updates". */
 export function ruleSentence(
   t: Translate,
   locale: string,
   rule: { conditions: readonly RuleCondition[]; actions: readonly RuleAction[] },
 ): string {
+  const waiting = waitSentence(t, rule);
+  if (waiting !== undefined) {
+    return waiting;
+  }
   return t("rules.sentence", {
     conditions: joined(conditionPhrases(t, rule.conditions), locale),
     actions: joined(
@@ -244,6 +279,9 @@ function markKey(actions: readonly RuleAction[]): string {
     }
     case "worth_a_look": {
       return "worthALook";
+    }
+    case "wait_on_addressed": {
+      return "waitOnAddressed";
     }
   }
 }

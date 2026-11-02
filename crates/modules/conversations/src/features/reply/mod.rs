@@ -1146,7 +1146,11 @@ async fn known_person(
 
 /// A message's own words: its text part, else its HTML part reduced to
 /// text, without quoted history. Text hygiene, not a decision.
-async fn own_words(state: &AppState, workspace: &str, bodies: &Bodies) -> Result<String> {
+pub(crate) async fn own_words(
+    state: &AppState,
+    workspace: &str,
+    bodies: &Bodies,
+) -> Result<String> {
     // Its text part, else its HTML read as text (campbooks-cloud#218).
     let (raw, _) = words(
         &state.blobs,
@@ -1163,7 +1167,7 @@ async fn own_words(state: &AppState, workspace: &str, bodies: &Bodies) -> Result
 }
 
 /// A sender as the model reads them: their name, else their address, capped.
-fn shown_name(sender: Address) -> String {
+pub(crate) fn shown_name(sender: Address) -> String {
     let name = sender
         .name
         .filter(|name| !name.trim().is_empty())
@@ -1172,7 +1176,7 @@ fn shown_name(sender: Address) -> String {
 }
 
 /// `text` cut to at most `max` bytes, at a character boundary.
-fn cut_bytes(text: &str, max: usize) -> String {
+pub(crate) fn cut_bytes(text: &str, max: usize) -> String {
     if text.len() <= max {
         return text.to_owned();
     }

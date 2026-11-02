@@ -564,7 +564,11 @@ async fn a_tool_that_does_not_exist_is_never_run(db: PgPool) {
     // Only what the chat is about was read.
     assert_eq!(
         kit.mail.lock().unwrap().called,
-        ["conversations.get", "conversations.get_history"]
+        [
+            "conversations.get",
+            "conversations.get_history",
+            "conversations.get_explanation"
+        ]
     );
     let requests = sent(&server).await;
     let result = requests[1]["messages"].as_array().unwrap().last().unwrap();
@@ -644,6 +648,126 @@ async fn access_lost_sends_nothing_of_it(db: PgPool) {
     ] {
         assert!(!whole.contains(never), "{never}");
     }
+}
+
+/// Sam's explanation of Marta's thread, as `conversations.get_explanation`
+/// answers it.
+fn explained() -> Value {
+    json!({
+        "state": "ready",
+        "body": {
+            "in_short": "Marta asks for November's rent, due on the 1st.",
+            "wants": [{"who": "Marta Silva", "what": "The rent for November", "refs": ["m-1"]}],
+            "agreed": [],
+            "open": [{"text": "Which account to pay into.", "refs": ["m-1"]}],
+            "on_you": [{"text": "Pay the rent.", "due_on": "2026-11-01", "refs": ["m-1"]}]
+        },
+        "locale": "en",
+        "written_at": "2026-10-20T10:00:00Z",
+        "messages": 1, "in_full": 1,
+        "stale": true,
+        "newer": {"from": "Marta Silva", "sent_at": "2026-10-21T08:00:00Z"},
+        "refs": [{"id": "m-1", "from": "Marta Silva", "sent_at": "2026-10-20T09:00:00Z"}]
+    })
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_chat_about_a_thread_starts_from_the_members_explanation_when_they_have_one(db: PgPool) {
+    let server = MockServer::start().await;
+    once(&server, text(ANSWER)).await;
+    let kit = kit_with(db, Some(gateway(&server.uri()))).await;
+    kit.mail
+        .lock()
+        .unwrap()
+        .explanations
+        .insert(CONVERSATION.into(), explained());
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let asked = kit
+        .post(
+            &sam,
+            &format!("{}/{id}/questions", chats(workspace)),
+            json!({ "text": "What price did we give?" }),
+        )
+        .await;
+    assert_eq!(asked.status, StatusCode::OK, "{}", asked.json);
+    let about = context(&sent(&server).await[0])["about"].clone();
+    // The explanation is there, as Scout's own earlier reading: its texts,
+    // when it was written, that it is out of date, and what is newer; no
+    // message id.
+    let scout = &about["scout_explanation"];
+    assert_eq!(
+        scout["in_short"],
+        "Marta asks for November's rent, due on the 1st."
+    );
+    assert_eq!(scout["out_of_date"], true);
+    assert_eq!(scout["written_at"], "2026-10-20T10:00:00Z");
+    assert_eq!(scout["on_the_member"][0]["due_on"], "2026-11-01");
+    assert_eq!(scout["newer_message"]["from"], "Marta Silva");
+    assert!(!scout.to_string().contains("m-1"));
+    assert!(scout.to_string().len() <= 3 * 1024);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_thread_the_member_never_explained_is_still_theirs_to_ask_about(db: PgPool) {
+    let server = MockServer::start().await;
+    once(&server, text(ANSWER)).await;
+    let kit = kit_with(db, Some(gateway(&server.uri()))).await;
+    let workspace = WorkspaceId::new();
+    let (sam, _) = kit.member("sam", workspace);
+    let id = started(&kit, &sam, workspace).await;
+    let asked = kit
+        .post(
+            &sam,
+            &format!("{}/{id}/questions", chats(workspace)),
+            json!({ "text": "And now?" }),
+        )
+        .await;
+    assert_eq!(asked.status, StatusCode::OK, "{}", asked.json);
+    let about = context(&sent(&server).await[0])["about"].clone();
+    // No explanation (404) is no error and no mention of one.
+    assert_eq!(about["subject"], "Rent for November");
+    assert!(about.get("scout_explanation").is_none());
+    assert!(
+        kit.mail
+            .lock()
+            .unwrap()
+            .called
+            .contains(&"conversations.get_explanation".to_owned())
+    );
+}
+
+#[test]
+fn a_long_explanation_is_cut_to_three_kib() {
+    let long = "word ".repeat(200);
+    let mut view = explained();
+    view["body"]["agreed"] = json!(
+        (0..6)
+            .map(|_| json!({"text": long, "refs": []}))
+            .collect::<Vec<_>>()
+    );
+    view["body"]["open"] = json!(
+        (0..6)
+            .map(|_| json!({"text": long, "refs": []}))
+            .collect::<Vec<_>>()
+    );
+    let scout = super::project::explanation(&view).unwrap();
+    assert!(
+        scout.to_string().len() <= 3 * 1024,
+        "{}",
+        scout.to_string().len()
+    );
+    // The summary survives the cut.
+    assert_eq!(
+        scout["in_short"],
+        "Marta asks for November's rent, due on the 1st."
+    );
+    // A failed first request holds no explanation to show.
+    assert_eq!(
+        super::project::explanation(&json!({"state": "failed", "failure": "limit"})),
+        None
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -1363,6 +1487,7 @@ fn only_reads(kit: &Kit) {
             [
                 "conversations.get",
                 "conversations.get_history",
+                "conversations.get_explanation",
                 "conversations.list",
                 "conversations.list_streams",
                 "search.query",

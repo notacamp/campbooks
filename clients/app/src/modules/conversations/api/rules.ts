@@ -29,10 +29,12 @@ export type TaughtAction =
 
 /**
  * What a member did that offers a rule for mail still to come: reported a
- * conversation as spam ("Never see emails like this again?"), or said a bill
- * is already paid ("Mark their invoices paid from now on").
+ * conversation as spam ("Never see emails like this again?"), said a bill
+ * is already paid ("Mark their invoices paid from now on"), or chose to wait
+ * on the person a sender wrote to ("Nudge them": from the second time for the
+ * same sender, "Wait on them for you?", campbooks-cloud#378).
  */
-export type AheadAction = { kind: "report" } | { kind: "paid" };
+export type AheadAction = { kind: "report" } | { kind: "paid" } | { kind: "waiting" };
 
 // Keyed by operationId, so the change feed refetches them when a rule (its
 // run's progress) changes.

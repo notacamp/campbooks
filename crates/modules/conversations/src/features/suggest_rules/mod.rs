@@ -15,6 +15,8 @@
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod waiting_tests;
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_ai::decide::{
@@ -35,6 +37,7 @@ use utoipa::{IntoParams, ToSchema};
 use crate::{
     config::NoticeSettings,
     domain::{
+        needs::NeedSettings,
         paths::ConversationPath,
         resources,
         rules::{self, Candidate, RuleAction, RuleCondition, SurfaceWhen},
@@ -75,6 +78,11 @@ pub enum TaughtAction {
     /// Said its bill is already paid: offers to mark that sender's bills
     /// paid from now on.
     Paid,
+    /// Chose to wait on the person the sender wrote to ("Nudge them", the
+    /// answer to Scout's "whose move is it?"): offers, from the second time
+    /// for the same sender, to wait on them whenever that sender writes to
+    /// someone else with the member in Cc (campbooks-cloud#378).
+    Waiting,
 }
 
 /// The action to suggest a rule for.
@@ -154,6 +162,10 @@ pub struct RuleSuggestions {
     pub shared: bool,
     /// Why there is nothing to offer, when there is not.
     pub none: Option<NoSuggestion>,
+    /// For the offer to wait on someone: the working days Scout waits before
+    /// it suggests a nudge. Absent for every other offer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wait_days: Option<u32>,
 }
 
 impl RuleSuggestions {
@@ -163,6 +175,7 @@ impl RuleSuggestions {
             default: None,
             shared,
             none: Some(why),
+            wait_days: None,
         }
     }
 }
@@ -193,6 +206,7 @@ impl RuleSuggestions {
 pub async fn suggest(
     State(state): State<AppState>,
     Extension(settings): Extension<NoticeSettings>,
+    Extension(needs): Extension<NeedSettings>,
     workspace: Workspace<ConversationsRead>,
     extract::Path(path): extract::Path<ConversationPath>,
     extract::Query(query): extract::Query<SuggestQuery>,
@@ -204,6 +218,7 @@ pub async fn suggest(
         inbox,
         id: path.conversation_id,
         query,
+        wait_days: needs.wait_days,
     };
     let out = suggestions(&mut tx, access, asked, &settings).await?;
     tx.commit().await?;
@@ -244,15 +259,23 @@ struct Asked {
     inbox: InboxId,
     id: ConversationId,
     query: SuggestQuery,
+    /// The working days a wait lasts before a nudge is suggested.
+    wait_days: u32,
 }
 
+#[allow(clippy::too_many_lines)]
 async fn suggestions(
     conn: &mut PgConnection,
     access: &Access,
     asked: Asked,
     settings: &NoticeSettings,
 ) -> Result<RuleSuggestions> {
-    let Asked { inbox, id, query } = asked;
+    let Asked {
+        inbox,
+        id,
+        query,
+        wait_days,
+    } = asked;
     // One deadline for every likeness's preview together.
     let deadline = std::time::Instant::now() + PREVIEW_DEADLINE;
     let shared = rules::is_shared(conn, inbox).await?;
@@ -273,6 +296,18 @@ async fn suggestions(
             NoSuggestion::Correspondent,
             shared,
         ));
+    }
+    // The same answer for the same sender, a second time.
+    if query.action == TaughtAction::Waiting {
+        return waiting_suggestions(
+            conn,
+            access,
+            (inbox, id),
+            &candidate,
+            (shared, wait_days),
+            deadline,
+        )
+        .await;
     }
     // About mail still to come: offered even with no lookalike yet.
     let ahead = matches!(query.action, TaughtAction::Report | TaughtAction::Paid);
@@ -347,6 +382,7 @@ async fn suggestions(
         default: default.and_then(|i| u32::try_from(i).ok()),
         shared,
         none: None,
+        wait_days: None,
     })
 }
 
@@ -390,6 +426,94 @@ async fn ahead_suggestions(
         default: Some(0),
         shared,
         none: None,
+        wait_days: None,
+    })
+}
+
+/// How many times the same answer must have been given for the same sender
+/// before the rule is offered, this one counted.
+pub const MIN_WAITS: i64 = 2;
+
+/// The offer after "Nudge {person}" (campbooks-cloud#378): "when {sender}
+/// writes to someone else with you in Cc, wait on them for you". Offered
+/// only when the member's active, not-withdrawn answers "someone else has
+/// the move" on mail from this sender number [`MIN_WAITS`] or more, this one
+/// included; the message is one the member was only copied on; and the
+/// person the member chose is the one person the rule would name (so it does
+/// exactly what they did). Counted from the corrections the answer files,
+/// within the member's workspace. The conditions read addresses alone.
+async fn waiting_suggestions(
+    conn: &mut PgConnection,
+    access: &Access,
+    (inbox, id): (InboxId, ConversationId),
+    candidate: &Candidate,
+    (shared, wait_days): (bool, u32),
+    deadline: std::time::Instant,
+) -> Result<RuleSuggestions> {
+    let not_teachable = || Ok(RuleSuggestions::nothing(NoSuggestion::NotTeachable, shared));
+    let Some(user) = access.user else {
+        return not_teachable();
+    };
+    if !candidate.member_not_in_to {
+        return not_teachable();
+    }
+    // What the member chose on this mail, and what the rule would choose.
+    let chosen = sqlx::query_scalar::<_, String>(
+        "SELECT lower(verdict_awaited_address) FROM conversations.needs
+          WHERE conversation_id = $1 AND verdict_message_id = $2
+            AND verdict = 'not_needed' AND verdict_awaited_address IS NOT NULL",
+    )
+    .bind(id)
+    .bind(candidate.message)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let people = crate::domain::needs::people(conn, candidate.message).await?;
+    let would = people.as_ref().and_then(rules::single_addressed);
+    if chosen.is_none() || chosen != would {
+        return not_teachable();
+    }
+    // A runtime query, so it needs no entry in the `.sqlx` offline cache.
+    let answered: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.corrections c
+           JOIN conversations.messages m ON m.id = c.message_id
+          WHERE c.question = 'next_move' AND c.to_value = 'someone_else'
+            AND c.withdrawn_at IS NULL AND c.corrected_by = $1
+            AND m.inbox_id = $2 AND m.sender_address = $3",
+    )
+    .bind(user.as_uuid())
+    .bind(inbox)
+    .bind(&candidate.sender_address)
+    .fetch_one(&mut *conn)
+    .await?;
+    if answered < MIN_WAITS {
+        return Ok(RuleSuggestions::nothing(NoSuggestion::TooFew, shared));
+    }
+    let conditions = vec![
+        RuleCondition::SenderAddress(candidate.sender_address.clone()),
+        RuleCondition::MemberNotInTo,
+    ];
+    let actions = vec![RuleAction::WaitOnAddressed];
+    if rules::validate(&conditions, &actions).is_err() {
+        return not_teachable();
+    }
+    let preview = compute_preview(conn, inbox, (&conditions, &actions), deadline).await?;
+    let key = suggestion_key(Likeness::Sender, &conditions, &actions);
+    let out = vec![RuleSuggestion {
+        likeness: Likeness::Sender,
+        conditions,
+        actions,
+        preview,
+        key,
+    }];
+    if dismissed(conn, access, inbox, &out, Some(0)).await? {
+        return Ok(RuleSuggestions::nothing(NoSuggestion::Dismissed, shared));
+    }
+    Ok(RuleSuggestions {
+        suggestions: out,
+        default: Some(0),
+        shared,
+        none: None,
+        wait_days: Some(wait_days),
     })
 }
 
@@ -515,6 +639,7 @@ async fn actions_for(
             .await?;
             paid.then(|| vec![RuleAction::MarkPaid])
         }
+        TaughtAction::Waiting => Some(vec![RuleAction::WaitOnAddressed]),
     })
 }
 

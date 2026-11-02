@@ -332,6 +332,7 @@ export function DataGrid({
   const style = {
     "--grid-columns": columns.map((column) => `${String(widthOf(column))}px`).join(" "),
     "--grid-width": `${String(total)}px`,
+    "--grid-end": headerEnd === undefined ? "0px" : "var(--size-hit)",
   } as CSSProperties;
 
   const visible = rows.slice(first, last);

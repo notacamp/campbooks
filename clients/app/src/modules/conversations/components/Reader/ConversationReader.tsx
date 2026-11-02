@@ -69,6 +69,7 @@ import {
 import { saveThreadOf } from "../../save-thread";
 import { ExpiredChip, NeedChips } from "../Needs/NeedChips";
 import { ruleLine } from "../../rules-text";
+import { useThreadExplanation } from "../Explanation/ThreadExplanation";
 import { useNeedActions } from "../Needs/use-need-actions";
 import { useTeachOnce } from "../TeachOnce/TeachOnce";
 import { useRuleActions } from "../TeachOnce/use-rule-actions";
@@ -77,6 +78,7 @@ import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 import { firstName } from "../../compose/dialog";
 import { NudgeDialog } from "../NudgeDialog/NudgeDialog";
 import { ReplyDialog } from "../ReplyDialog/ReplyDialog";
+import { useAheadOffer } from "../SmartRule/AheadOffer";
 import { SmartRuleConfirm, type SmartRuleDraft } from "../SmartRule/SmartRuleConfirm";
 
 import { MovePicker } from "./MovePicker";
@@ -156,11 +158,18 @@ export function ConversationReader({
   // The wait the member just asked for (campbooks-cloud#372): the nudge to that person is a
   // dialog away, and optional.
   const [nudging, setNudging] = useState<{ need: NeedView; opened: number } | undefined>();
+  // The same answer for the same sender a second time offers the rule that
+  // waits on them for the member (campbooks-cloud#378).
+  const ahead = useAheadOffer(workspaceId);
   const needActions = useNeedActions(workspaceId, {
+    onUndo: (summary) => {
+      ahead.cancel(summary.id);
+    },
     onWaiting: (summary) => {
       const waiting = summary.need;
       if (waiting?.reason === "waiting" && (waiting.waiting_on ?? null) !== null) {
         setNudging((current) => ({ need: waiting, opened: (current?.opened ?? 0) + 1 }));
+        ahead.offer(summary, { kind: "waiting" });
       }
     },
   });
@@ -182,7 +191,7 @@ export function ConversationReader({
   const ruleActions = useRuleActions(workspaceId);
   // While a teach-once offer or question is up, it holds the choice keys:
   // the reader's own choices stay clickable but unbound and unhinted.
-  const offering = useTeachOnce()?.offering ?? false;
+  const offering = (useTeachOnce()?.offering ?? false) || ahead.offering;
   const ruleMark = conversation?.rule ?? undefined;
   // Only whoever may change the rule (its author, a manager) may stop it.
   const stoppable = ruleMark?.may_change === true;
@@ -436,6 +445,40 @@ export function ConversationReader({
     // Asking changes nothing: a reader of the inbox asks too.
     { enabled: scout !== undefined && conversation !== undefined },
   );
+  // Scout's explanation of the thread, only when the member asks
+  // (campbooks-cloud#407): the one thing the reader asks the server for
+  // beyond the thread is whether they asked before.
+  const explanation = useThreadExplanation({
+    workspaceId,
+    conversationId,
+    offered: detail?.explain === true && !binned,
+    messageCount: conversation?.message_count ?? messages.length,
+    onOpenMessage: (messageId) => {
+      setOpened((current) => new Set([...current, messageId]));
+      // After the message has opened in its place.
+      globalThis.setTimeout(() => {
+        document.getElementById(`message-${messageId}`)?.scrollIntoView({ block: "center" });
+      }, 50);
+    },
+    onFollowUp: askScout,
+    onReply: renderReplySlot === undefined ? undefined : openReply,
+    now,
+  });
+  useShortcut("conversations.explain", explanation.ask, {
+    enabled: explanation.offered && !explanation.busy && !offering,
+  });
+  const explainButton =
+    explanation.offered && !explanation.asked ? (
+      <Button
+        variant="ghost"
+        icon="preview"
+        shortcut="conversations.explain"
+        disabled={explanation.busy}
+        onClick={explanation.ask}
+      >
+        {t("explain.button")}
+      </Button>
+    ) : null;
   /** Save to page: the messages' words first (some come later), then the dialog. */
   const saveToPage = () => {
     if (conversation === undefined || !mailScout || savingThread !== undefined) {
@@ -716,6 +759,16 @@ export function ConversationReader({
       onSelect: saveToPage,
     });
   }
+  // Asking for an explanation changes no mail: offered to a reader too.
+  if (explanation.offered) {
+    moreActions.push({
+      id: "explain",
+      label: t("explain.button"),
+      icon: "preview",
+      shortcut: "conversations.explain",
+      onSelect: explanation.ask,
+    });
+  }
   // Asking changes nothing: offered to a reader of the inbox too.
   if (scout !== undefined) {
     moreActions.push({
@@ -853,12 +906,13 @@ export function ConversationReader({
               ? {}
               : { chips: <ExpiredChip /> })}
             footer={footerLine(conversation)}
-            {...(suggestedReply === null && stopButton === null
+            {...(suggestedReply === null && stopButton === null && explainButton === null
               ? {}
               : {
                   actions: (
                     <>
                       {suggestedReply}
+                      {explainButton}
                       {stopButton}
                     </>
                   ),
@@ -992,13 +1046,21 @@ export function ConversationReader({
                             >
                               {t("needs.actions.notNeeded")}
                             </Button>
+                            {explainButton}
                             {stopButton}
                           </>
                         ),
                       }
-                    : stopButton === null
+                    : stopButton === null && explainButton === null
                       ? {}
-                      : { actions: stopButton }),
+                      : {
+                          actions: (
+                            <>
+                              {explainButton}
+                              {stopButton}
+                            </>
+                          ),
+                        }),
                 }
               : {
                   actions: (
@@ -1029,6 +1091,7 @@ export function ConversationReader({
                             : "needs.actions.notNeeded",
                         )}
                       </Button>
+                      {explainButton}
                       {stopButton}
                     </>
                   ),
@@ -1052,6 +1115,7 @@ export function ConversationReader({
             })}
           </Note>
         )}
+        {explanation.element}
         {thread.map((entry) =>
           entry.kind === "more" ? (
             <MoreMessages
@@ -1172,6 +1236,8 @@ export function ConversationReader({
           }}
         />
       )}
+      {/* Not under the nudge dialog: its keys (1, Esc) are the dialog's while it is open. */}
+      {nudging === undefined ? ahead.element : null}
       <SmartRuleConfirm
         workspaceId={workspaceId}
         draft={trusting}

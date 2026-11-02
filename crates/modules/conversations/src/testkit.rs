@@ -337,7 +337,15 @@ impl Kit {
     /// Run every pending job until none is left.
     pub async fn run_jobs(&self) -> WorkerStats {
         let stats = Worker::new(self.state.clone()).run_until_idle().await;
-        assert_eq!(stats.failed, 0, "{stats:?}");
+        if stats.failed > 0 {
+            let errors: Vec<(String, Option<String>)> = sqlx::query_as(
+                "SELECT kind, last_error FROM kernel.jobs WHERE last_error IS NOT NULL",
+            )
+            .fetch_all(&self.db)
+            .await
+            .unwrap_or_default();
+            assert_eq!(stats.failed, 0, "{stats:?} {errors:?}");
+        }
         stats
     }
 
@@ -357,6 +365,17 @@ impl Kit {
     /// `GET uri` with `token`, asking for `language` (`Accept-Language`).
     pub async fn get_in(&self, token: &str, uri: &str, language: &str) -> TestResponse {
         let request = Request::get(uri)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(header::ACCEPT_LANGUAGE, language)
+            .body(Body::empty())
+            .unwrap();
+        testing::send(&self.app, request).await
+    }
+
+    /// `POST uri` with `token`, no body, asking for `language`
+    /// (`Accept-Language`).
+    pub async fn post_in(&self, token: &str, uri: &str, language: &str) -> TestResponse {
+        let request = Request::post(uri)
             .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .header(header::ACCEPT_LANGUAGE, language)
             .body(Body::empty())

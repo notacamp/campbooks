@@ -7,6 +7,7 @@ The Calendar is where the member's days are. Each member has their own calendars
 - Every member has one Campbooks calendar. It exists only in Campbooks. No Google or other provider ever sees it. It holds what Scout found in the member's email.
 - A member who gives calendar access to a connected account also gets that account's calendars, such as their main calendar, a family calendar, or holidays. They are read from the provider and changes are written back to it.
 - Only the main calendar of an account is shown at first. The member turns the others on in Settings, under Calendar. A calendar that is off shows nothing.
+- Calendars shared with the member later, or made later at the provider, show up in Settings, under Calendar, off, within a day. The member turns them on.
 - Some provider calendars cannot be written, such as a holidays calendar. Events cannot be added to them.
 - Each provider calendar is Mine, Following or Off. Mine is the member's own: its events make them busy, time can be held on it, and invitations on it wait for their answer. Following is shown only: its events do not make the member busy, no time is held on it, and its invitations are not theirs to answer. Off shows nothing. A calendar shared by someone else starts as Following, and the member can change it in Settings, under Calendar. The Campbooks calendar is always Mine.
 - A shared inbox has no calendar. Nothing is added from a shared inbox.

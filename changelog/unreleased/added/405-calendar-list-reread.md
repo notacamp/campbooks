@@ -1,0 +1,1 @@
+- **Calendars shared with you later show up.** Campbooks now checks your Google or Zoho calendar list about once a day, so a calendar someone shares with you, or one you create, appears in Settings → Calendar, off until you turn it on.

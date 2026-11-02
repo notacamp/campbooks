@@ -43,7 +43,7 @@ use crate::{
     },
     events::{
         ACCOUNT_CONTENT_TYPE, AccountDocument, CalendarChangeCompleted, CalendarChanged,
-        CalendarOutcome, CalendarReason, CapabilityGranted,
+        CalendarListRead, CalendarOutcome, CalendarReason, CapabilityGranted,
     },
     google::CalendarError,
     metrics::{self, SyncOutcome},
@@ -196,6 +196,10 @@ impl SyncStream {
             self.list_calendars(ctx, workspace, target, &source, now)
                 .await
         } else {
+            // The list is read again when it is due; its trouble never
+            // stops the events from being synced.
+            self.reread_calendar_list(ctx, workspace, target, &source, now)
+                .await?;
             self.sync_calendars(ctx, workspace, target, &source, &known, &backlog, now)
                 .await
         };
@@ -247,24 +251,7 @@ impl SyncStream {
         }
         let state = ctx.state().clone();
         let key = workspace.to_string();
-        let document = ListDocument {
-            version: 1,
-            provider: match target.provider {
-                Provider::Google => Some("google"),
-                Provider::Zoho => Some("zoho"),
-                Provider::Imap | Provider::Microsoft | Provider::Notion => None,
-            },
-            calendars: listed.clone(),
-        };
-        let list = state
-            .blobs
-            .put(
-                &key,
-                serde_json::to_vec(&document)
-                    .map_err(|_| JobError::fatal("a calendar list did not encode"))?,
-                LIST_CONTENT_TYPE,
-            )
-            .await?;
+        let list = put_list(&state, &key, target.provider, &listed).await?;
         let account = account_blob(&state, workspace, target.connection, target.provider).await?;
         let tx = ctx.tx().await?;
         health::lock(tx, target.connection).await?;
@@ -295,16 +282,108 @@ impl SyncStream {
             .await?;
         sqlx::query(
             "UPDATE connectors.streams
-                SET health_reason = NULL, consecutive_failures = 0, throttled_until = NULL
+                SET health_reason = NULL, consecutive_failures = 0, throttled_until = NULL,
+                    calendar_list_due_at = $2
               WHERE id = $1",
         )
         .bind(target.stream)
+        .bind(calendar::next_list_read(target.stream, now))
         .execute(&mut **tx)
         .await?;
         // The calendars are known now: read the one that syncs.
         schedule::set_due(tx, workspace, target.stream, now).await?;
         metrics::sync_finished(target.provider, SyncOutcome::Ok);
         tracing::info!(%workspace, stream = %target.stream, calendars = listed.len(), "calendars listed");
+        Ok(())
+    }
+
+    /// Read the account's calendar list again when it is due (about once a
+    /// day), and announce it for the schedule module, which adds the
+    /// calendars it does not have, off. A calendar found now is remembered
+    /// here as not syncing. A provider error only moves the next read up to
+    /// an hour away: it marks neither the stream nor the connection, because
+    /// the events read that follows meets and reports the same trouble.
+    async fn reread_calendar_list(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        source: &Source<'_>,
+        now: DateTime<Utc>,
+    ) -> Result<(), JobError> {
+        let due: Option<DateTime<Utc>> = {
+            let mut tx = ctx.pool().begin_for(workspace).await?;
+            let due = sqlx::query_scalar(
+                "SELECT calendar_list_due_at FROM connectors.streams WHERE id = $1",
+            )
+            .bind(target.stream)
+            .fetch_one(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            due
+        };
+        if due.is_some_and(|due| due > now) {
+            return Ok(());
+        }
+        let rate = Rate::per_minute(self.deps.config.calendar.requests_per_minute);
+        let key = schedule::calendar_budget(target.connection);
+        if schedule::take(ctx.pool(), &key, 1, rate).await?.is_err() {
+            // No room now: asked again by the next run.
+            return Ok(());
+        }
+        let listed = match source.list().await {
+            Ok(listed) if !listed.is_empty() => listed,
+            Ok(_) => {
+                let tx = ctx.tx().await?;
+                set_list_due(
+                    tx,
+                    target.stream,
+                    calendar::next_list_read(target.stream, now),
+                )
+                .await?;
+                return Ok(());
+            }
+            Err(_) => {
+                let tx = ctx.tx().await?;
+                set_list_due(tx, target.stream, now + calendar::LIST_RETRY).await?;
+                tracing::warn!(%workspace, stream = %target.stream, "the calendar list could not be read again");
+                return Ok(());
+            }
+        };
+        let state = ctx.state().clone();
+        let key = workspace.to_string();
+        let list = put_list(&state, &key, target.provider, &listed).await?;
+        let tx = ctx.tx().await?;
+        health::lock(tx, target.connection).await?;
+        let added = calendar::remember_as(tx, workspace, target.stream, &listed, false).await?;
+        state
+            .blobs
+            .attach(
+                tx,
+                &key,
+                &list,
+                &BlobOwner::new(CONNECTION_OWNER, uuid::Uuid::from(target.connection)),
+            )
+            .await?;
+        state
+            .events
+            .publish(
+                tx,
+                &CalendarListRead {
+                    workspace: key,
+                    connection: target.connection,
+                    granted_by: target.granted_by,
+                    calendars: list,
+                },
+            )
+            .await?;
+        set_list_due(
+            tx,
+            target.stream,
+            calendar::next_list_read(target.stream, now),
+        )
+        .await?;
+        tracing::info!(%workspace, stream = %target.stream, calendars = listed.len(), added, "calendar list read again");
         Ok(())
     }
 
@@ -489,7 +568,7 @@ impl SyncStream {
             )
             .await?;
         } else {
-            let next = now + TimeDelta::seconds(i64::from(interval));
+            let next = schedule::next_poll(now, interval, 0);
             schedule::set_due(tx, workspace, target.stream, next).await?;
         }
         metrics::sync_finished(target.provider, SyncOutcome::Ok);
@@ -747,6 +826,47 @@ impl SyncStream {
             }
         }
     }
+}
+
+/// Record when the list of `stream` is next read.
+async fn set_list_due(
+    tx: &mut Transaction<'static, Postgres>,
+    stream: StreamId,
+    due: DateTime<Utc>,
+) -> Result<(), JobError> {
+    sqlx::query("UPDATE connectors.streams SET calendar_list_due_at = $2 WHERE id = $1")
+        .bind(stream)
+        .bind(due)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+/// Store `listed` as a `calendar-list` v1 blob of the workspace.
+async fn put_list(
+    state: &AppState,
+    workspace: &str,
+    provider: Provider,
+    listed: &[calendar::ListedCalendar],
+) -> Result<BlobRef, JobError> {
+    let document = ListDocument {
+        version: 1,
+        provider: match provider {
+            Provider::Google => Some("google"),
+            Provider::Zoho => Some("zoho"),
+            Provider::Imap | Provider::Microsoft | Provider::Notion => None,
+        },
+        calendars: listed.to_vec(),
+    };
+    Ok(state
+        .blobs
+        .put(
+            workspace,
+            serde_json::to_vec(&document)
+                .map_err(|_| JobError::fatal("a calendar list did not encode"))?,
+            LIST_CONTENT_TYPE,
+        )
+        .await?)
 }
 
 /// The account document of `connection`, as a blob (the same bytes as the

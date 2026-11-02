@@ -256,6 +256,7 @@ export function everyBlockDoc(threadId: string, taskId: string): Y.Doc {
         para("Never send the contract before the rate card is signed off."),
         para("Legal reads it first."),
       ),
+      wrap("callout", { tone: "neutral" }, para("Rates are reviewed every January.")),
       wrap("blockquote", {}, para("Keep it short, and send it the same day.")),
       block("horizontalRule", {}),
       block("heading", { level: 2 }, "Linked from here"),

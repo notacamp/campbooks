@@ -50,7 +50,7 @@ function renderOpen(scout?: OpenScoutChat) {
 function api(extra: Record<string, MockHandler> = {}) {
   return mockApi({
     [`GET ${W}/members`]: { body: { members: TEAM } },
-    [`GET ${P}`]: { body: { pages: PAGES, tables: false } },
+    [`GET ${P}`]: { body: { pages: PAGES, tables: false, mail_scout: true } },
     [`GET ${P}/backlinks`]: { body: { pages: [] } },
     [`GET ${P}/${HANDBOOK.id}`]: {
       body: viewOfDoc({ ...HANDBOOK, created_by: ANA.user_id }, plainDoc("Welcome")),
@@ -93,7 +93,7 @@ describe("Ask Scout on a page", () => {
   });
 
   it("is not in the menu while the server does not offer mail and Scout in pages", async () => {
-    api({ [`GET ${P}/${HANDBOOK.id}/sharing`]: { status: 404, body: { code: "not_found" } } });
+    api({ [`GET ${P}`]: { body: { pages: PAGES, tables: false, mail_scout: false } } });
     renderOpen(vi.fn());
     await more();
     await waitFor(() => {

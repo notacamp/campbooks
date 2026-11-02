@@ -7,6 +7,7 @@ pub mod blobs;
 pub mod free;
 pub mod invitations;
 pub mod listing;
+pub mod locks;
 pub mod moment;
 pub mod ops;
 pub mod outbound;

@@ -20,7 +20,12 @@ export interface OptionTagProps {
 export function OptionTag({ color, children, onRemove, removeLabel }: OptionTagProps) {
   return (
     <span className={styles["option"]} data-color={color}>
-      <span className={styles["optionText"]}>{children}</span>
+      <span
+        className={styles["optionText"]}
+        title={typeof children === "string" ? children : undefined}
+      >
+        {children}
+      </span>
       {onRemove === undefined ? null : (
         <IconButton icon="close" label={removeLabel ?? ""} size="md" onClick={onRemove} />
       )}
@@ -46,12 +51,15 @@ export interface CellLineProps {
   children: ReactNode;
   /** Right-aligned (numbers). */
   end?: boolean | undefined;
+  /** The whole value, for when the cell cuts it short (defaults to the content when it is text). */
+  title?: string | undefined;
 }
 
-/** What a cell shows: its content on one line, cut short at the cell's edge. */
-export function CellLine({ children, end = false }: CellLineProps) {
+/** What a cell shows: its content on one line, ending in an ellipsis at the cell's edge, the whole value in its title. */
+export function CellLine({ children, end = false, title }: CellLineProps) {
+  const whole = title ?? (typeof children === "string" ? children : undefined);
   return (
-    <span className={styles["line"]} data-end={end || undefined}>
+    <span className={styles["line"]} data-end={end || undefined} title={whole}>
       {children}
     </span>
   );
@@ -70,7 +78,13 @@ export interface CellLinkProps {
 /** A web or mail address in a cell. Only the caller's safe addresses reach it. */
 export function CellLink({ href, children }: CellLinkProps) {
   return (
-    <a className={styles["link"]} href={href} target="_blank" rel="noopener noreferrer">
+    <a
+      className={styles["link"]}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={typeof children === "string" ? children : undefined}
+    >
       {children}
       <Icon name="arrow-right" />
     </a>
@@ -151,7 +165,7 @@ export function SummaryButton({ label, text, type = "button", ...rest }: Summary
       type={type}
       className={styles["summary"]}
       aria-label={text === undefined ? label : `${label}: ${text}`}
-      title={label}
+      title={text === undefined ? label : `${label}: ${text}`}
     >
       {text ?? <Icon name="plus" />}
     </button>

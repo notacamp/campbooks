@@ -28,7 +28,10 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     Question, QuestionKind,
-    signals::email::{Envelope, is_public_suffix, registrable_domain, subject_words, triage},
+    signals::{
+        email::{Envelope, is_public_suffix, registrable_domain, subject_words, triage},
+        facts::addressed_to_inbox,
+    },
     strategy::{BoxFuture, Decided, Decisions, Reason, Strategy, local_answer, peaked},
 };
 use crate::Error;
@@ -86,17 +89,25 @@ pub enum Condition {
     /// The receiving provider's authentication results say the sender's
     /// domain failed its checks (a structured fact, never the content).
     SenderChecksFail,
+    /// None of the inbox's addresses is in the message's `To`: it was only
+    /// copied (Cc, Bcc or an undisclosed list). A fact of the headers'
+    /// addresses, never of the content (ADR 0018); unknown inboxes fail it.
+    MemberNotInTo,
 }
 
 impl Condition {
     /// How narrowly it picks mail: a template, list or header 3; subject
-    /// words or an address 2; a domain, label, stream or failed sender
-    /// checks 1.
+    /// words or an address 2; a domain, label, stream, failed sender checks
+    /// or "not in To" 1.
     pub fn weight(&self) -> u32 {
         match self {
             Self::SubjectTemplate(_) | Self::ListId(_) | Self::Header(_) => 3,
             Self::SubjectContains(_) | Self::SenderAddress(_) => 2,
-            Self::SenderDomain(_) | Self::Label(_) | Self::Stream(_) | Self::SenderChecksFail => 1,
+            Self::SenderDomain(_)
+            | Self::Label(_)
+            | Self::Stream(_)
+            | Self::SenderChecksFail
+            | Self::MemberNotInTo => 1,
         }
     }
 
@@ -138,6 +149,7 @@ impl Condition {
             Self::Label(label) => facts.labels.iter().any(|l| l == label),
             Self::Stream(stream) => facts.stream == stream,
             Self::SenderChecksFail => facts.impersonated && !facts.correspondent,
+            Self::MemberNotInTo => facts.member_not_in_to,
         }
     }
 }
@@ -200,6 +212,12 @@ pub enum Action {
     /// "Worth a look" until it has been opened once. Not pinned: it hides
     /// nothing, and the mail can still be archived like any other.
     WorthALook,
+    /// Wait on the one person the message was written to (campbooks-cloud#378):
+    /// answers `next_move` "someone else" and `awaited` that person, as a
+    /// rule the member taught. It answers nothing when the headers name no
+    /// single obvious person in `To`, so Scout asks as before. Never sends
+    /// anything.
+    WaitOnAddressed,
 }
 
 /// Where a rule puts mail it takes out of the way for good.
@@ -237,6 +255,8 @@ pub enum Slot {
     Images,
     /// Whether each new message is "Worth a look" on Home.
     Highlight,
+    /// Whether Scout waits on the person the message was written to.
+    Wait,
 }
 
 impl Action {
@@ -248,7 +268,9 @@ impl Action {
             Self::MoveToStream { stream } => stream != "primary",
             Self::NeedsReply { value } | Self::AsksAction { value } => !value,
             Self::Surface { value } => *value == Surface::Never,
-            Self::AddLabel { .. } | Self::ShowImages | Self::WorthALook => false,
+            Self::AddLabel { .. } | Self::ShowImages | Self::WorthALook | Self::WaitOnAddressed => {
+                false
+            }
         }
     }
 
@@ -266,6 +288,7 @@ impl Action {
             Self::MarkPaid => Slot::Money,
             Self::ShowImages => Slot::Images,
             Self::WorthALook => Slot::Highlight,
+            Self::WaitOnAddressed => Slot::Wait,
         }
     }
 }
@@ -306,6 +329,10 @@ pub enum Invalid {
     /// Highlighting mail and hiding it in the same rule.
     #[error("a rule cannot both highlight mail and hide it")]
     HighlightHides,
+    /// Waiting on the person a message was written to, for mail that may
+    /// have been written to the member: it needs "I am not in To".
+    #[error("waiting on the person it was written to needs the member not in To")]
+    WaitNeedsNotInTo,
 }
 
 /// Free mail providers, and the mail of internet providers, by registrable
@@ -805,7 +832,7 @@ impl TaughtRule {
                 Condition::SubjectContains(v) => !subject_words(v).is_empty(),
                 Condition::Header(test) => test.value.as_ref().is_none_or(|v| !v.trim().is_empty()),
                 Condition::Stream(v) => triage::STREAMS.contains(&v.as_str()),
-                Condition::SenderChecksFail => true,
+                Condition::SenderChecksFail | Condition::MemberNotInTo => true,
             };
             if !ok {
                 return Err(Invalid::Value);
@@ -851,6 +878,13 @@ impl TaughtRule {
         // Highlighting mail and hiding it contradict each other.
         if actions.contains(&Action::WorthALook) && actions.iter().any(Action::hides) {
             return Err(Invalid::HighlightHides);
+        }
+        // Waiting on whoever the mail was written to only makes sense for
+        // mail the member was only copied on.
+        if actions.contains(&Action::WaitOnAddressed)
+            && !conditions.contains(&Condition::MemberNotInTo)
+        {
+            return Err(Invalid::WaitNeedsNotInTo);
         }
         // Trusting a sender's images: one sender (an address, or a domain
         // the checks above allow), as the rule's only condition and action.
@@ -943,6 +977,10 @@ pub struct Facts<'a> {
     /// aligned DKIM pass; no results at all is not a pass). "Worth a look"
     /// is raised only for such mail (campbooks-cloud#282).
     pub authenticated: bool,
+    /// None of the inbox's addresses is in the message's `To`
+    /// (`signals::facts::addressed_to_inbox` says `Some(false)`); `false`
+    /// when the inbox is unknown. Read by "the member is not in To".
+    pub member_not_in_to: bool,
 }
 
 /// One slot's answer and the rule that gave it.
@@ -977,6 +1015,8 @@ pub struct Outcome {
     pub paid: Option<String>,
     /// Each new message is "Worth a look" on Home.
     pub highlight: Option<String>,
+    /// Wait on the person the message was written to.
+    pub wait: Option<String>,
 }
 
 impl Outcome {
@@ -998,6 +1038,7 @@ impl Outcome {
         out.extend(self.bin.as_ref().map(|a| a.rule.as_str()));
         out.extend(self.paid.as_deref());
         out.extend(self.highlight.as_deref());
+        out.extend(self.wait.as_deref());
         out
     }
 }
@@ -1054,6 +1095,7 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
                 }
                 Action::MarkPaid if out.paid.is_none() => out.paid = Some(id()),
                 Action::WorthALook if out.highlight.is_none() => out.highlight = Some(id()),
+                Action::WaitOnAddressed if out.wait.is_none() => out.wait = Some(id()),
                 _ => {}
             }
         }
@@ -1102,6 +1144,11 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
     // holds too; campbooks-cloud#282).
     if !facts.authenticated || facts.suspicious || facts.auth_failed || facts.impersonated {
         out.highlight = None;
+    }
+    // A wait puts a nudge to a third party in front of the member: never for
+    // mail that looks suspicious or pretends to be its sender.
+    if facts.suspicious || facts.auth_failed || facts.impersonated {
+        out.wait = None;
     }
     out
 }
@@ -1201,6 +1248,7 @@ impl Strategy for TaughtRules {
                 impersonated: false,
                 correspondent: false,
                 authenticated: false,
+                member_not_in_to: addressed_to_inbox(envelope) == Some(false),
             };
             let outcome = evaluate(&self.rules, &facts);
             let answers = questions

@@ -84,6 +84,7 @@ pub fn module() -> Module {
             .publishes::<events::CalendarSyncChanged>()
             .publishes::<events::InvitationChanged>()
             .on_event::<features::grant_calendars::GrantCalendars>()
+            .on_event::<features::grant_calendars::ApplyCalendarList>()
             .on_event::<features::apply_calendar_changes::ApplyCalendarChanges>()
             .on_event::<features::apply_outcome::ApplyOutcome>()
             .on_event::<features::add_read_items::AddReadItems>()

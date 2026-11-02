@@ -186,6 +186,12 @@
       "date": "2026-10-31",
       "plan_version": 28,
       "pr": "#711"
+    },
+    {
+      "change": "Signatures (campbooks-cloud#393): Coverage for conversations.get_signature and conversations.set_signature, which track nothing.",
+      "date": "2026-10-31",
+      "plan_version": 29,
+      "pr": "#715"
     }
   ],
   "coverage": [
@@ -1282,6 +1288,12 @@
       "name": "conversations.get_explanation"
     },
     {
+      "events": [],
+      "exemption": "reads a member's own signature for an inbox; it changes nothing",
+      "kind": "operation",
+      "name": "conversations.get_signature"
+    },
+    {
       "events": [
         "conversations.conversation_read"
       ],
@@ -1391,6 +1403,12 @@
       "exemption": "",
       "kind": "operation",
       "name": "conversations.set_person_note"
+    },
+    {
+      "events": [],
+      "exemption": "keeps a member's own text for their mail, private to them; their words are personal data and no tracked event holds them",
+      "kind": "operation",
+      "name": "conversations.set_signature"
     },
     {
       "events": [
@@ -25575,7 +25593,7 @@
   ],
   "generated_by": "campbooks-tracking-plan",
   "plan_date": "2026-10-31",
-  "plan_version": 28,
+  "plan_version": 29,
   "properties": [
     {
       "classification": "operational",

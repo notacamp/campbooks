@@ -10,6 +10,7 @@ pub mod dated;
 pub mod decide;
 pub mod decisions;
 pub mod drafts;
+pub mod explanation;
 pub mod flags;
 pub mod format;
 pub mod needs;
