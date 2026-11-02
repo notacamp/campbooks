@@ -10,10 +10,10 @@
 -- catalog-only on Postgres 11+. The member's departure (`forget_member`)
 -- and the workspace's purge delete the rows. Only a new table and a column
 -- are added; the timeout keeps an unexpected lock wait from holding up a
--- deploy.
+-- deploy. Every statement can be run again (self-hosters re-run migrations).
 SET LOCAL lock_timeout = '5s';
 
-CREATE TABLE conversations.signatures (
+CREATE TABLE IF NOT EXISTS conversations.signatures (
     workspace_id uuid NOT NULL,
     inbox_id uuid NOT NULL REFERENCES conversations.inboxes (id) ON DELETE CASCADE,
     user_id uuid NOT NULL,
@@ -23,13 +23,15 @@ CREATE TABLE conversations.signatures (
 );
 
 -- A member's departure and the workspace's purge delete by these.
-CREATE INDEX signatures_member_idx ON conversations.signatures (workspace_id, user_id);
+CREATE INDEX IF NOT EXISTS signatures_member_idx ON conversations.signatures (workspace_id, user_id);
 
 ALTER TABLE conversations.signatures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversations.signatures FORCE ROW LEVEL SECURITY;
+-- Re-runnable: the policy is made again, never twice.
+DROP POLICY IF EXISTS workspace_isolation ON conversations.signatures;
 CREATE POLICY workspace_isolation ON conversations.signatures USING
     (workspace_id = nullif(current_setting('campbooks.workspace_id', true), '')::uuid);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON conversations.signatures TO campbooks_app;
 
-ALTER TABLE conversations.drafts ADD COLUMN signature text NOT NULL DEFAULT '';
+ALTER TABLE conversations.drafts ADD COLUMN IF NOT EXISTS signature text NOT NULL DEFAULT '';
