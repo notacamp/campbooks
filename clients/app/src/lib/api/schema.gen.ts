@@ -12642,7 +12642,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope. */
+            /** @description Missing scope, or not your own request (`members_only`): an app and the assistant never ask, it spends the workspace's AI. */
             403: {
                 headers: {
                     [name: string]: unknown;
