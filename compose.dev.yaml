@@ -14,7 +14,9 @@ services:
       POSTGRES_PASSWORD: postgres # local dev only
       POSTGRES_DB: campbooks
     ports:
-      - "55432:5432"
+      # Loopback only: the dev password is "postgres", so publishing on every
+      # interface would let anyone on the same Wi-Fi into the database.
+      - "127.0.0.1:55432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
