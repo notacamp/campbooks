@@ -246,10 +246,7 @@ async fn upload(
         if total > MAX_MESSAGE_BYTES {
             return Ok(Err(Upload::TooLarge));
         }
-        match mail
-            .upload(&attachment.filename, &attachment.content_type, bytes)
-            .await
-        {
+        match mail.upload(&attachment.filename, bytes).await {
             Ok(reference) => uploaded.push(reference),
             Err(err @ ProviderError::Unavailable(_)) => {
                 return Err(JobError::retry(format!("uploading an attachment: {err}")));

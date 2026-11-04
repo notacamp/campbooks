@@ -427,18 +427,19 @@ impl<'a> ZohoMail<'a> {
     }
 
     /// Upload one attachment for a message to send: what the send names it
-    /// by (`storeName`, `attachmentPath`, `attachmentName`).
+    /// by (`storeName`, `attachmentPath`, `attachmentName`). Zoho takes the
+    /// file only as a stream of octets (any other type answers 415) and
+    /// names it by `fileName`.
     pub async fn upload(
         &self,
         file_name: &str,
-        content_type: &str,
         bytes: Vec<u8>,
     ) -> Result<serde_json::Value, ProviderError> {
         let mut url = self.url("messages/attachments")?;
         url.query_pairs_mut().append_pair("fileName", file_name);
         let request = self
             .request(reqwest::Method::POST, url)
-            .header(reqwest::header::CONTENT_TYPE, content_type)
+            .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
             .body(bytes);
         let uploaded: serde_json::Value = self.call(request).await?;
         // One file answers an object; some answers wrap it in a list.
