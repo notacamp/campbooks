@@ -490,6 +490,21 @@ impl SendMessage {
         target: &Target,
         err: &ProviderError,
     ) -> Result<(), JobError> {
+        self.refused_as(ctx, workspace, send, target, err, "rejected")
+            .await
+    }
+
+    /// [`Self::refused`], failing a refusal for good with `reason` (what
+    /// was refused: the message, or one of its attachments).
+    async fn refused_as(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        send: SendId,
+        target: &Target,
+        err: &ProviderError,
+        reason: &'static str,
+    ) -> Result<(), JobError> {
         match err {
             ProviderError::RateLimited { retry_after } => Err(JobError::retry_after(
                 "rate limited by the provider",
@@ -509,8 +524,8 @@ impl SendMessage {
             ProviderError::Unavailable(_)
             | ProviderError::NotFound
             | ProviderError::Unexpected(_) => {
-                tracing::warn!(%workspace, %send, error = %err, "the provider refused the message");
-                finish_failed(ctx, workspace, send, target, "rejected").await
+                tracing::warn!(%workspace, %send, %reason, error = %err, "the provider refused the message");
+                finish_failed(ctx, workspace, send, target, reason).await
             }
         }
     }

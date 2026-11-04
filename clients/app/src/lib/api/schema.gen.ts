@@ -4929,7 +4929,7 @@ export interface components {
             created_at: string;
             /**
              * @description Why the last send failed (`not_connected`, `needs_reauth`,
-             *     `rejected`, `too_large`, `unknown_outcome`).
+             *     `rejected`, `attachment_refused`, `too_large`, `unknown_outcome`).
              */
             failure_reason?: string | null;
             /** @description The inbox's address and name. */

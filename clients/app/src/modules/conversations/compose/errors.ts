@@ -17,6 +17,7 @@ export const KNOWN_ERRORS: ReadonlySet<string> = new Set([
   "not_connected",
   "needs_reauth",
   "rejected",
+  "attachment_refused",
   "too_large",
   "unavailable",
   "unknown_outcome",

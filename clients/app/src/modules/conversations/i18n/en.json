@@ -328,6 +328,7 @@
       "not_connected": "This mailbox is no longer connected. Reconnect it, then send again.",
       "needs_reauth": "Campbooks needs your permission again to send from this mailbox. Reconnect it, then send again.",
       "rejected": "Your mail provider refused this message. Check the addresses and try again.",
+      "attachment_refused": "Your mail provider wouldn’t accept one of the attachments, so nothing was sent. Try again, or try without the attachments.",
       "too_large": "This message is too large for your mail provider to send.",
       "unavailable": "Your mail provider could not be reached, so nothing was sent. Try again.",
       "unknown_outcome": "Campbooks could not confirm that this message was sent. Check your Sent folder before sending it again.",

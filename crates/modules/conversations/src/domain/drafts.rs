@@ -122,7 +122,7 @@ pub struct DraftView {
     /// When a scheduled send leaves (until then it can be cancelled).
     pub send_at: Option<DateTime<Utc>>,
     /// Why the last send failed (`not_connected`, `needs_reauth`,
-    /// `rejected`, `too_large`, `unknown_outcome`).
+    /// `rejected`, `attachment_refused`, `too_large`, `unknown_outcome`).
     pub failure_reason: Option<String>,
     /// When it was started.
     pub created_at: DateTime<Utc>,

@@ -119,6 +119,21 @@ describe("ReplyComposer", () => {
     expect(await screen.findByRole("textbox", { name: "Message" })).toBeVisible();
   });
 
+  it("says an attachment was refused, not the addresses", async () => {
+    mockApi({
+      [`GET ${D}`]: {
+        body: { drafts: [{ ...REPLY, state: "failed", failure_reason: "attachment_refused" }] },
+      },
+    });
+    renderWithProviders(slot(null));
+    expect(
+      await screen.findByText(
+        "Your mail provider wouldn’t accept one of the attachments, so nothing was sent. Try again, or try without the attachments.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/Check the addresses/)).toBeNull();
+  });
+
   it("says in words why a scheduled send stopped, when its draft is opened", async () => {
     mockApi({
       [`GET ${D}`]: {

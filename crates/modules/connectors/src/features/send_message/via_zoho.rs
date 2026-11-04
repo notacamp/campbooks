@@ -43,6 +43,20 @@ const TEXT_PREFIX: usize = 40;
 const LOOKUP_PAGE: u32 = 50;
 
 impl SendMessage {
+    /// Zoho refused one of `send`'s attachments: wait (a rate limit, a
+    /// refused token) or fail it `attachment_refused`, never `rejected`.
+    async fn refused_file(
+        &self,
+        ctx: &mut JobContext,
+        workspace: campbooks_kernel::tenancy::WorkspaceId,
+        send: SendId,
+        target: &Target,
+        err: &ProviderError,
+    ) -> Result<(), JobError> {
+        self.refused_as(ctx, workspace, send, target, err, "attachment_refused")
+            .await
+    }
+
     /// An attempt through Zoho.
     pub(super) async fn attempt_zoho(
         &self,
@@ -111,7 +125,7 @@ impl SendMessage {
                 return finish_failed(ctx, workspace, send, &target, "too_large").await;
             }
             Err(Upload::Refused(err)) => {
-                return self.refused(ctx, workspace, send, &target, &err).await;
+                return self.refused_file(ctx, workspace, send, &target, &err).await;
             }
         };
         let body = message_json(document, uploaded);

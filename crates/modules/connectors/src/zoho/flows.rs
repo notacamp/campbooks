@@ -812,16 +812,8 @@ async fn a_reply_goes_out_as_a_zoho_reply_and_comes_back_once(db: PgPool) {
     assert!(upsert_of(&changes(&kit, mailbox.ws).await[mark..], &sent_id).is_empty());
 }
 
-#[sqlx::test(migrations = "../../../migrations")]
-async fn a_reply_with_attachments_uploads_them_as_octets_then_sends(db: PgPool) {
-    let kit = Kit::new(db).await;
-    kit.zoho.deliver(
-        &synthetic(1),
-        INBOX,
-        false,
-        kit.clock.now() - TimeDelta::hours(1),
-    );
-    let mailbox = connected(&kit).await;
+/// A PDF and a JPEG, stored as the workspace's blobs.
+async fn plan_and_photo(kit: &Kit, mailbox: &Connected) -> Vec<OutgoingAttachment> {
     let mut attachments = Vec::new();
     for (filename, content_type, bytes) in [
         ("plan.pdf", "application/pdf", b"%PDF-1.7 plan".as_slice()),
@@ -839,6 +831,45 @@ async fn a_reply_with_attachments_uploads_them_as_octets_then_sends(db: PgPool) 
             blob,
         });
     }
+    attachments
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_refused_attachment_fails_the_send_as_attachment_refused(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        false,
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    let mailbox = connected(&kit).await;
+    kit.zoho.refuse_uploads();
+    let attachments = plan_and_photo(&kit, &mailbox).await;
+    let send = reply_with(&kit, &mailbox, "m1@example.com", attachments).await;
+    settle_sends(&kit).await;
+
+    // Nothing is sent, and the reason names the attachment, not the message.
+    assert!(kit.zoho.sends().is_empty(), "no send");
+    let completed = kit.payloads(mailbox.ws, "connectors.send_completed").await;
+    assert_eq!(completed.len(), 1);
+    assert_contract("connectors.send_completed.v1.schema.json", &completed[0]);
+    assert_eq!(completed[0]["send_id"], send.to_string());
+    assert_eq!(completed[0]["outcome"], "failed");
+    assert_eq!(completed[0]["reason"], "attachment_refused");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reply_with_attachments_uploads_them_as_octets_then_sends(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        false,
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    let mailbox = connected(&kit).await;
+    let attachments = plan_and_photo(&kit, &mailbox).await;
     let send = reply_with(&kit, &mailbox, "m1@example.com", attachments).await;
     settle_sends(&kit).await;
 

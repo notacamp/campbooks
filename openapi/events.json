@@ -655,7 +655,7 @@
               "string",
               "null"
             ],
-            "description": "Why it failed (failed only): `not_connected`, `needs_reauth`,\n`rejected`, `too_large`, `unavailable` (nothing was sent) or\n`unknown_outcome` (it may have been)."
+            "description": "Why it failed (failed only): `not_connected`, `needs_reauth`,\n`rejected`, `attachment_refused` (the provider would not take one of\nits attachments), `too_large`, `unavailable` (nothing was sent) or\n`unknown_outcome` (it may have been)."
           },
           "send_id": {
             "$ref": "#/components/schemas/SendId",
@@ -1232,7 +1232,7 @@
           },
           "reason": {
             "type": "string",
-            "description": "Why (`not_connected`, `needs_reauth`, `rejected`, `too_large`,\n`unavailable`, `unknown_outcome`)."
+            "description": "Why (`not_connected`, `needs_reauth`, `rejected`,\n`attachment_refused`, `too_large`, `unavailable`, `unknown_outcome`)."
           },
           "workspace": {
             "type": "string",

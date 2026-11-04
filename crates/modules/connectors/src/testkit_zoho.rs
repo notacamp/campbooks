@@ -84,6 +84,8 @@ struct State {
     sends: Vec<(Option<String>, serde_json::Value)>,
     /// Attachments uploaded for sends: file name and bytes, in order.
     uploads: Vec<(String, Vec<u8>)>,
+    /// Attachment uploads answer 400.
+    uploads_refused: bool,
     refusing: Vec<String>,
     /// The folder list leaves the Sent folder out.
     sent_hidden: bool,
@@ -141,6 +143,7 @@ impl FakeZoho {
             send_fault: None,
             sends: Vec::new(),
             uploads: Vec::new(),
+            uploads_refused: false,
             refusing: Vec::new(),
             sent_hidden: false,
             trash_hidden: false,
@@ -297,6 +300,11 @@ impl FakeZoho {
     /// The attachments uploaded for sends: file name and bytes, in order.
     pub fn uploads(&self) -> Vec<(String, Vec<u8>)> {
         self.lock().uploads.clone()
+    }
+
+    /// Every attachment upload from now on answers 400.
+    pub fn refuse_uploads(&self) {
+        self.lock().uploads_refused = true;
     }
 
     /// The next Mail API call answers 429 with `Retry-After: seconds`.
@@ -757,6 +765,9 @@ fn mail(
             }
         }
         ("PUT", ["updatemessage"]) => update(state, index, body),
+        ("POST", ["messages", "attachments"]) if state.uploads_refused => {
+            error(400, "INVALID_ATTACHMENT")
+        }
         ("POST", ["messages", "attachments"]) => {
             let name = query.get("fileName").cloned().unwrap_or_default();
             state.uploads.push((name.clone(), raw_body.to_vec()));
