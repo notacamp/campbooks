@@ -133,26 +133,32 @@ export function ExplanationCard({
             >
               <span className={styles["label"]}>{group.label}</span>
               {group.items.map((item) => (
-                <p key={item.id} className={styles["item"]}>
-                  <span className={styles["text"]}>
+                <div key={item.id} className={styles["item"]}>
+                  <p className={styles["text"]}>
                     {item.lead === undefined ? null : (
                       <strong className={styles["lead"]}>{item.lead}</strong>
                     )}
                     {item.lead === undefined ? null : ": "}
                     {item.text}
                     {item.due === undefined ? null : ` ${item.due}`}
-                  </span>
-                  {item.chips.map((chip) => (
-                    <button
-                      key={chip.id}
-                      type="button"
-                      className={styles["chip"]}
-                      onClick={chip.onSelect}
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </p>
+                  </p>
+                  {/* Under the text, wrapping: beside it, two chips squeezed the text to a letter a line. */}
+                  {item.chips.length === 0 ? null : (
+                    <span className={styles["chips"]}>
+                      {item.chips.map((chip) => (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          className={styles["chip"]}
+                          title={chip.label}
+                          onClick={chip.onSelect}
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
           ))}

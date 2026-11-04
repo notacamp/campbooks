@@ -457,6 +457,9 @@ export function ConversationReader({
     conversationId,
     offered: detail?.explain === true && !binned,
     messageCount: conversation?.message_count ?? messages.length,
+    yours: new Set(
+      messages.filter((message) => message.direction === "outbound").map((message) => message.id),
+    ),
     onOpenMessage: (messageId) => {
       setOpened((current) => new Set([...current, messageId]));
       // After the message has opened in its place.
