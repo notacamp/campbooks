@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::{
-    contract::{Address, OUTGOING_CONTENT_TYPE, OutgoingMessage},
+    contract::{Address, OUTGOING_CONTENT_TYPE, OutgoingAttachment, OutgoingMessage},
     domain::model::{InboxId, SendId, StreamId},
     events::{ChangesRequested, SendRequested},
     testkit::{FIXTURES, Kit, assert_contract, synthetic},
@@ -682,6 +682,16 @@ async fn a_change_zoho_refuses_fails_and_the_others_are_made(db: PgPool) {
 
 /// A reply to `parent`'s Message-ID from Sam's Zoho inbox: the send id.
 async fn reply(kit: &Kit, mailbox: &Connected, parent: &str) -> SendId {
+    reply_with(kit, mailbox, parent, Vec::new()).await
+}
+
+/// That reply carrying `attachments`.
+async fn reply_with(
+    kit: &Kit,
+    mailbox: &Connected,
+    parent: &str,
+    attachments: Vec<OutgoingAttachment>,
+) -> SendId {
     let send_id = SendId::new();
     let document = OutgoingMessage {
         version: 1,
@@ -704,7 +714,7 @@ async fn reply(kit: &Kit, mailbox: &Connected, parent: &str) -> SendId {
         thread_key: None,
         text: "Thanks, see you Thursday.".into(),
         html: Some("<p>Thanks, see you Thursday.</p>".into()),
-        attachments: Vec::new(),
+        attachments,
     };
     let mut value = serde_json::to_value(&document).unwrap();
     value["send_id"] = send_id.to_string().into();
@@ -800,6 +810,61 @@ async fn a_reply_goes_out_as_a_zoho_reply_and_comes_back_once(db: PgPool) {
     let mark = changes(&kit, mailbox.ws).await.len();
     mailbox.run(&kit).await;
     assert!(upsert_of(&changes(&kit, mailbox.ws).await[mark..], &sent_id).is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reply_with_attachments_uploads_them_as_octets_then_sends(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        false,
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    let mailbox = connected(&kit).await;
+    let mut attachments = Vec::new();
+    for (filename, content_type, bytes) in [
+        ("plan.pdf", "application/pdf", b"%PDF-1.7 plan".as_slice()),
+        ("site.jpg", "image/jpeg", b"\xff\xd8\xff site".as_slice()),
+    ] {
+        let blob = kit
+            .state
+            .blobs
+            .put(&mailbox.ws.to_string(), bytes.to_vec(), content_type)
+            .await
+            .unwrap();
+        attachments.push(OutgoingAttachment {
+            filename: filename.into(),
+            content_type: content_type.into(),
+            blob,
+        });
+    }
+    let send = reply_with(&kit, &mailbox, "m1@example.com", attachments).await;
+    settle_sends(&kit).await;
+
+    // Each file goes up as it is, whatever its own media type …
+    let uploads = kit.zoho.uploads();
+    assert_eq!(
+        uploads,
+        vec![
+            ("plan.pdf".to_owned(), b"%PDF-1.7 plan".to_vec()),
+            ("site.jpg".to_owned(), b"\xff\xd8\xff site".to_vec()),
+        ]
+    );
+    // … and the one send names both.
+    let sends = kit.zoho.sends();
+    assert_eq!(sends.len(), 1, "one send");
+    let named: Vec<_> = sends[0].1["attachments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["attachmentName"].clone())
+        .collect();
+    assert_eq!(named, ["plan.pdf", "site.jpg"]);
+    let completed = kit.payloads(mailbox.ws, "connectors.send_completed").await;
+    assert_eq!(completed.len(), 1);
+    assert_eq!(completed[0]["send_id"], send.to_string());
+    assert_eq!(completed[0]["outcome"], "sent");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

@@ -82,6 +82,8 @@ struct State {
     send_fault: Option<SendFault>,
     /// Bodies of the sends Zoho received (JSON), in order.
     sends: Vec<(Option<String>, serde_json::Value)>,
+    /// Attachments uploaded for sends: file name and bytes, in order.
+    uploads: Vec<(String, Vec<u8>)>,
     refusing: Vec<String>,
     /// The folder list leaves the Sent folder out.
     sent_hidden: bool,
@@ -138,6 +140,7 @@ impl FakeZoho {
             rate_limit_next: None,
             send_fault: None,
             sends: Vec::new(),
+            uploads: Vec::new(),
             refusing: Vec::new(),
             sent_hidden: false,
             trash_hidden: false,
@@ -289,6 +292,11 @@ impl FakeZoho {
     /// Each send Zoho received: the message replied to, and the JSON.
     pub fn sends(&self) -> Vec<(Option<String>, serde_json::Value)> {
         self.lock().sends.clone()
+    }
+
+    /// The attachments uploaded for sends: file name and bytes, in order.
+    pub fn uploads(&self) -> Vec<(String, Vec<u8>)> {
+        self.lock().uploads.clone()
     }
 
     /// The next Mail API call answers 429 with `Retry-After: seconds`.
@@ -580,6 +588,15 @@ impl Respond for Responder {
         let Some(index) = state.accounts.iter().position(|a| a.id == account_id) else {
             return error(404, "ACCOUNT_NOT_FOUND");
         };
+        // Like Zoho, an upload is a stream of octets, whatever the file is.
+        let octets = request
+            .headers
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            == Some("application/octet-stream");
+        if request.method.as_str() == "POST" && rest == "messages/attachments" && !octets {
+            return error(415, "UNSUPPORTED_MEDIA_TYPE");
+        }
         mail(
             &mut state,
             index,
@@ -742,6 +759,7 @@ fn mail(
         ("PUT", ["updatemessage"]) => update(state, index, body),
         ("POST", ["messages", "attachments"]) => {
             let name = query.get("fileName").cloned().unwrap_or_default();
+            state.uploads.push((name.clone(), raw_body.to_vec()));
             ok(&serde_json::json!({"storeName": "52882865",
                                   "attachmentPath": format!("/compose/{}", raw_body.len()),
                                   "attachmentName": name}))
