@@ -579,7 +579,9 @@ A send from an inbox fed by a Zoho stream SHALL go through Zoho's send API
 from the stream's mailbox, with To, Cc, Bcc, subject, the HTML alternative
 (or the text) and the attachments, uploaded first. Each attachment SHALL be
 uploaded as a raw stream (`application/octet-stream`) named by its file name,
-whatever its own media type. A reply whose
+whatever its own media type. An attachment Zoho refuses with a definite
+answer (not a rate limit or a refused token) SHALL fail the send
+`attachment_refused`, and nothing SHALL be sent. A reply whose
 `In-Reply-To` names a message of the stream SHALL be sent as Zoho's reply to
 that message. The idempotency rules of Gmail sending SHALL hold, with one
 difference: while a send is unclear, the next attempt SHALL look in the
@@ -613,6 +615,10 @@ the send SHALL still be `sent` and the stream due at once.
 #### Scenario: A reply with attachments
 - **WHEN** a member replies from a Zoho inbox with a PDF and a JPEG attached
 - **THEN** Zoho receives both files as octet streams under their file names, then one send naming both, and the send is `sent`
+
+#### Scenario: Zoho refuses an attachment
+- **WHEN** Zoho answers 400 to an attachment upload of a reply
+- **THEN** Zoho receives no send, and the send fails `attachment_refused`, not `rejected`
 
 ### Requirement: Zoho request budget
 Requests to Zoho SHALL draw from a budget per Zoho login,

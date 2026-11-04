@@ -26826,7 +26826,7 @@
               "string",
               "null"
             ],
-            "description": "Why the last send failed (`not_connected`, `needs_reauth`,\n`rejected`, `too_large`, `unknown_outcome`)."
+            "description": "Why the last send failed (`not_connected`, `needs_reauth`,\n`rejected`, `attachment_refused`, `too_large`, `unknown_outcome`)."
           },
           "from": {
             "$ref": "#/components/schemas/Address",

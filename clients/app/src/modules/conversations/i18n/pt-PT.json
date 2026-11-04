@@ -328,6 +328,7 @@
       "not_connected": "Esta caixa de correio já não está ligada. Volte a ligá-la e envie de novo.",
       "needs_reauth": "O Campbooks precisa de nova autorização para enviar a partir desta caixa de correio. Volte a ligá-la e envie de novo.",
       "rejected": "O seu fornecedor de correio recusou esta mensagem. Verifique os endereços e tente de novo.",
+      "attachment_refused": "O seu fornecedor de correio não aceitou um dos anexos, por isso nada foi enviado. Tente de novo ou tente sem os anexos.",
       "too_large": "Esta mensagem é demasiado grande para o seu fornecedor de correio a enviar.",
       "unavailable": "Não foi possível contactar o seu fornecedor de correio, por isso nada foi enviado. Tente de novo.",
       "unknown_outcome": "O Campbooks não conseguiu confirmar que esta mensagem foi enviada. Verifique a pasta Enviados antes de a enviar de novo.",

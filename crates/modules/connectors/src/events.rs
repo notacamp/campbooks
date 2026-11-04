@@ -792,7 +792,8 @@ pub struct SendCompleted {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_message_id: Option<String>,
     /// Why it failed (failed only): `not_connected`, `needs_reauth`,
-    /// `rejected`, `too_large`, `unavailable` (nothing was sent) or
+    /// `rejected`, `attachment_refused` (the provider would not take one of
+    /// its attachments), `too_large`, `unavailable` (nothing was sent) or
     /// `unknown_outcome` (it may have been).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,

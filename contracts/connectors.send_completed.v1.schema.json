@@ -37,11 +37,12 @@
         "not_connected",
         "needs_reauth",
         "rejected",
+        "attachment_refused",
         "too_large",
         "unavailable",
         "unknown_outcome"
       ],
-      "description": "Why it failed (failed only). `unavailable`: the provider could not be reached and nothing was sent; `unknown_outcome`: the provider may have sent it."
+      "description": "Why it failed (failed only). `attachment_refused`: the provider would not take one of its attachments and nothing was sent; `unavailable`: the provider could not be reached and nothing was sent; `unknown_outcome`: the provider may have sent it."
     }
   },
   "allOf": [

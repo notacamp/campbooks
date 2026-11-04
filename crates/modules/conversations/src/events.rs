@@ -674,8 +674,8 @@ pub struct SendFailed {
     pub inbox: InboxId,
     /// The draft.
     pub draft: DraftId,
-    /// Why (`not_connected`, `needs_reauth`, `rejected`, `too_large`,
-    /// `unavailable`, `unknown_outcome`).
+    /// Why (`not_connected`, `needs_reauth`, `rejected`,
+    /// `attachment_refused`, `too_large`, `unavailable`, `unknown_outcome`).
     pub reason: String,
     /// The draft's author; `None` for a client token's draft.
     #[serde(default, skip_serializing_if = "Option::is_none")]

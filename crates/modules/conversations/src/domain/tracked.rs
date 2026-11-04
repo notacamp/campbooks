@@ -258,7 +258,8 @@ pub fn send_error(reason: &str) -> tracking::SendError {
     match reason {
         "not_connected" => tracking::SendError::NotConnected,
         "needs_reauth" => tracking::SendError::NeedsReauth,
-        "rejected" => tracking::SendError::Rejected,
+        // A refused attachment is the provider refusing the message.
+        "rejected" | "attachment_refused" => tracking::SendError::Rejected,
         "too_large" => tracking::SendError::TooLarge,
         "unavailable" => tracking::SendError::Unavailable,
         "unknown_outcome" => tracking::SendError::UnknownOutcome,

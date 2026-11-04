@@ -328,6 +328,7 @@
       "not_connected": "Cette boîte mail n’est plus connectée. Reconnectez-la, puis renvoyez le message.",
       "needs_reauth": "Campbooks a de nouveau besoin de votre autorisation pour envoyer depuis cette boîte mail. Reconnectez-la, puis renvoyez le message.",
       "rejected": "Votre fournisseur de messagerie a refusé ce message. Vérifiez les adresses et réessayez.",
+      "attachment_refused": "Votre fournisseur de messagerie n’a pas accepté l’une des pièces jointes, donc rien n’a été envoyé. Réessayez, ou essayez sans les pièces jointes.",
       "too_large": "Ce message est trop lourd pour que votre fournisseur de messagerie l’envoie.",
       "unavailable": "Votre fournisseur de messagerie était injoignable, rien n’a été envoyé. Réessayez.",
       "unknown_outcome": "Campbooks n’a pas pu confirmer l’envoi de ce message. Vérifiez votre dossier Envoyés avant de le renvoyer.",

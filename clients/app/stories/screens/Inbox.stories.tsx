@@ -995,6 +995,35 @@ export const DraftsStoppedPhone: Story = {
   ...at("phone", 375, 812),
 };
 
+/**
+ * A send whose attachment the provider would not take (campbooks-cloud#424):
+ * the draft says so, not to check the addresses.
+ */
+function refusedAttachmentDrafts(): Record<string, MockRoute> {
+  const list: Draft[] = [
+    { ...REPLY_WRITTEN, state: "failed", failure_reason: "attachment_refused" },
+  ];
+  return inbox({ [`GET ${W}/drafts`]: { body: { drafts: list } } });
+}
+export const DraftsAttachmentRefused: Story = {
+  args: { path: `${PATH}/drafts`, api: refusedAttachmentDrafts() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Not sent")).toBeVisible();
+    await expect(
+      canvas.getByText(/wouldn’t accept one of the attachments, so nothing was sent/u),
+    ).toBeVisible();
+    await expect(canvas.queryByText(/Check the addresses/u)).toBeNull();
+  },
+};
+
+/** The same on a phone. */
+export const DraftsAttachmentRefusedPhone: Story = {
+  ...DraftsAttachmentRefused,
+  args: { path: `${PATH}/drafts`, api: refusedAttachmentDrafts() },
+  ...at("phone", 375, 812),
+};
+
 /** Scheduled sends on a phone. */
 export const DraftsScheduledPhone: Story = {
   ...DraftsScheduled,
