@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+  container-type: inline-size;
   padding: var(--space-4);
   border-radius: var(--panel-radius);
   background: var(--surface-raised);
@@ -67,6 +68,14 @@
   gap: var(--space-4) var(--space-6);
 }
 
+/* Two columns only when each still holds a line of words: the reader beside
+   the list leaves the card about 35rem, where two columns were 15rem each. */
+@container (width < 40rem) {
+  .groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .group {
   display: flex;
   flex-direction: column;
@@ -86,18 +95,26 @@
 
 .item {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  margin: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
 }
 
 .text {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: break-word;
   unicode-bidi: plaintext;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+  max-width: 100%;
 }
 
 .lead {
@@ -107,6 +124,7 @@
 .chip {
   flex: none;
   max-width: 100%;
+  min-width: 0;
   height: var(--pill-height);
   padding: 0 var(--space-2);
   border: 0;
@@ -117,6 +135,8 @@
   font: inherit;
   font-size: var(--text-xs);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 
@@ -196,10 +216,6 @@
   .more {
     display: inline-flex;
     align-items: center;
-  }
-
-  .item {
-    flex-wrap: wrap;
   }
 
   .chip {

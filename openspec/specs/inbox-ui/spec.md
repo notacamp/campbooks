@@ -1268,7 +1268,13 @@ arrived if it did) with Show and, when stale, "Explain again".
 - while writing: "Scout is reading the N messages…" with a skeleton;
 - then In short, Who wants what, Agreed, Still open and On you (emphasised),
   each point with chips naming the sender and date of the messages it comes
-  from, which open them;
+  from, which open them. The chips SHALL sit in a row under the point's text
+  and wrap there, so the text keeps the column's width however many messages
+  it cites; a chip too long for the column SHALL shorten with "…". A message
+  the inbox sent SHALL be named "You", as the reader names it, and a sender
+  known only by their address by the part before the @. The groups SHALL sit
+  in two columns only when the card is wide enough for both to hold a line of
+  words, and in one column otherwise;
 - "From N messages · written <time>", saying when the older messages came
   from Scout's notes;
 - "Ask a follow-up", which opens the Scout chat about the thread;
@@ -1302,3 +1308,7 @@ tap away. Every string SHALL be in en, pt-PT, es-ES and fr.
 #### Scenario: Coming back
 - **WHEN** Ana opens "Kickoff agenda" the next day, after Rui wrote again
 - **THEN** one line says her explanation predates Rui's message, with Show and "Explain again", and nothing is written until she chooses
+
+#### Scenario: A point from several messages
+- **WHEN** a point in Still open comes from Rui's message and one Ana sent, on a desktop screen
+- **THEN** its text reads across the column on whole words, and below it the chips "You · 23 Oct" and "Rui · 29 Oct" sit side by side, wrapping to a second row if they need it

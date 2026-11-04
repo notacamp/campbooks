@@ -35,6 +35,7 @@ function Reader() {
 }
 
 const FIRST = Q4_DETAIL.messages[0]?.id ?? "";
+const SENT = Q4_DETAIL.messages[1]?.id ?? "";
 const NEWEST = Q4_DETAIL.messages[2]?.id ?? "";
 const PATH = `${W}/conversations/${Q4.id}/explanation`;
 
@@ -160,6 +161,33 @@ describe("Explaining a thread in the reader", () => {
       expect(scroll).toHaveBeenCalled();
     });
     expect(document.getElementById(`message-${FIRST}`)).not.toBeNull();
+  });
+
+  it("names your own messages You and a bare address by its name part, on chips under the point", async () => {
+    setup({
+      stored: explained({
+        body: {
+          in_short: "Maya sent the Q4 plan; you answered.",
+          wants: [],
+          agreed: [],
+          open: [{ text: "Whether the timeline can move.", refs: [SENT, NEWEST] }],
+          on_you: [],
+        },
+        refs: [
+          { id: SENT, from: "sam@duarte.example", sent_at: "2026-10-11T15:00:00Z" },
+          { id: NEWEST, from: "maya.okafor@acme.example", sent_at: "2026-10-12T09:00:00Z" },
+        ],
+      }),
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Show" }));
+    const card = await screen.findByRole("region", { name: "Scout’s explanation" });
+    const you = within(card).getByRole("button", { name: /^You · / });
+    const maya = within(card).getByRole("button", { name: /^maya\.okafor · / });
+    // Both chips sit together below the point's text, never beside it.
+    const text = within(card).getByText("Whether the timeline can move.");
+    expect(you.parentElement).toBe(maya.parentElement);
+    expect(you.parentElement?.contains(text)).toBe(false);
+    expect(within(card).queryByText(/@/u)).not.toBeInTheDocument();
   });
 
   it("asks on W and from the More menu", async () => {

@@ -22,6 +22,8 @@ export interface ThreadExplanationOptions {
   offered: boolean;
   /** How many messages the thread has now (what Scout is reading while it writes). */
   messageCount: number;
+  /** The messages the inbox sent: their chips say "You", as the reader does. */
+  yours?: ReadonlySet<string> | undefined;
   /** A chip was chosen: scroll to that message and open it. */
   onOpenMessage: (messageId: string) => void;
   /** Ask a follow-up: Scout's chat about this thread. */
@@ -135,6 +137,7 @@ export function useThreadExplanation({
   conversationId,
   offered,
   messageCount,
+  yours,
   onOpenMessage,
   onFollowUp,
   onReply,
@@ -348,7 +351,7 @@ export function useThreadExplanation({
     return ref === undefined
       ? undefined
       : t("explain.chip", {
-          name: firstNameOf(ref.from),
+          name: yours?.has(id) === true ? t("reader.you") : firstNameOf(ref.from),
           date: new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(
             new Date(ref.sent_at),
           ),
@@ -406,8 +409,16 @@ export function useThreadExplanation({
   };
 }
 
-/** The first name of whoever wrote, for a chip or a line: "Jonas". */
+/**
+ * The first name of whoever wrote, for a chip or a line: "Jonas". A sender
+ * known only by their address is named by the part before the @, so a chip
+ * stays short.
+ */
 function firstNameOf(from: string): string {
   const first = firstName(from);
-  return first === "" ? from : first;
+  if (first === "") {
+    return from;
+  }
+  const at = first.indexOf("@");
+  return at > 0 ? first.slice(0, at) : first;
 }

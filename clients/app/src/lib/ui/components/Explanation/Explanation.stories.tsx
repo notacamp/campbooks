@@ -127,6 +127,73 @@ export const Stale: Story = {
   },
 };
 
+/**
+ * Points that come from several messages, one of them from a sender known
+ * only by a long address: the chips wrap under the text, which keeps its width.
+ */
+export const ManySources: Story = {
+  // As wide as the card is in the reader beside the inbox list.
+  decorators: [
+    (Story) => (
+      <div style={{ maxWidth: "35rem" }}>
+        <Story />
+      </div>
+    ),
+  ],
+  args: {
+    ...ready,
+    inShort: {
+      label: "In short",
+      text: "Hugo outlined the closing steps and costs, and Léa has taken over the file and asked for documents and invoices.",
+    },
+    groups: [
+      {
+        id: "wants",
+        label: "Who wants what",
+        folded: true,
+        items: [
+          {
+            id: "w1",
+            lead: "Léa Martin",
+            text: "Wants the sale invoice for the company's investments",
+            chips: [chip("a", "Léa · 29 Oct")],
+          },
+          {
+            id: "w2",
+            lead: "Hugo Lambert",
+            text: "Wants confirmation of the closing steps and the notary's fee before filing",
+            chips: [
+              chip("b", "Hugo · 23 Sep"),
+              chip("c", "You · 23 Oct"),
+              chip("d", "accounting-department-closures@ledger-partners.example · 30 Oct"),
+            ],
+          },
+        ],
+      },
+      {
+        id: "open",
+        label: "Still open",
+        folded: true,
+        items: [
+          {
+            id: "o1",
+            text: "Payment details for the 2025 corporate tax await the tax notice",
+            chips: [chip("e", "Léa · 29 Oct")],
+          },
+          {
+            id: "o2",
+            text: "Whether to involve the parent company’s accountant in the closing",
+            chips: [chip("f", "You · 21 Sep"), chip("g", "Hugo · 23 Sep")],
+          },
+        ],
+      },
+    ],
+  },
+};
+
+/** The same points on a wide card: two columns, the chips still under each point. */
+export const ManySourcesWide: Story = { args: { ...ManySources.args } };
+
 /** A long thread says what it rests on. */
 export const LongThread: Story = {
   args: {
